@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>🚀 フェーズ2: モダン構成・拡張編（セキュリティ＆マルチベンダー）</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>ロードマップ</span></nav>
+      <h1 class="doc-title">🚀 フェーズ2: モダン構成・拡張編（セキュリティ＆マルチベンダー）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>このドキュメントは、フェーズ1（基礎編・テーマ27まで）の<strong>ネットワーク関連テーマを全て完了後</strong>に取り組む**「シーズン2」のマスタードキュメント**です。
+これまで「将来の目標（FUTURE_GOALS）」「拡張ロードマップ」「実務案件再現ロードマップ」に分かれていた内容を一つに統合したものです。</p>
+</blockquote>
+<p>最終更新: 2026-07-02</p>
+<hr>
+<blockquote>
+<p>[!IMPORTANT]
+<strong>サーバー系技術の学習はまだタイミングではありません。</strong> まずフェーズ1のネットワーク関連テーマ（テーマ27まで）を全て完了し、ネットワーク層の基礎を盤石にしてからフェーズ2に進みます。フェーズ2で必要となるサーバー（DNS/RADIUS等）は「ネットワーク連携のための最小限のダミーサーバ」として構築し、サーバー構築スキルの習得が目的ではありません。</p>
+</blockquote>
+<hr>
+<h2 id="-フェーズ2のゴール" tabindex="-1">🎯 フェーズ2のゴール <a class="header-anchor" href="#-フェーズ2のゴール" aria-hidden="true">#</a></h2>
+<p><strong>Cisco IOSによる伝統的な構成から一歩進み、実際の現場で使われる「マルチベンダー製品」「ゼロトラストセキュリティ」「クラウド管理」をラボ環境に導入・検証する。</strong></p>
+<h3 id="主なテーマ" tabindex="-1">主なテーマ <a class="header-anchor" href="#主なテーマ" aria-hidden="true">#</a></h3>
+<ol>
+<li><strong>境界防御のモダナイズ</strong>: FortiGate / Cisco ASAv を用いた次世代ファイアウォール（NGFW）の構築。</li>
+<li><strong>ゼロトラストとリモートアクセス</strong>: SSL-VPN、デバイスポスチャーチェック（802.1X/NAC）、SSE（Secure Access）。</li>
+<li><strong>実務要件の統合</strong>: ロードバランサ（LB）、NDR（フロー可視化・分析）、認証統合（RADIUS/AD）。</li>
+<li><strong>クラウド・SDN管理</strong>: Meraki, Aruba, Faucet SDNによるモダンな集中管理。</li>
+</ol>
+<hr>
+<h2 id="-前提事項仮想基盤とホストアーキテクチャ" tabindex="-1">⚠️ 前提事項：仮想基盤とホストアーキテクチャ <a class="header-anchor" href="#-前提事項仮想基盤とホストアーキテクチャ" aria-hidden="true">#</a></h2>
+<p>このMacは <strong>Apple Silicon（arm64）</strong> のため、仮想化する製品のアプローチを分ける必要があります。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>方針</th>
+<th>内容</th>
+<th>主な対象製品</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>✅ <strong>Mac上のコンテナ/OSS</strong></td>
+<td>arm64でそのまま無料で動くもの</td>
+<td>DNS/RADIUS(FreeRADIUS)/踏み台/Faucet SDN/HAProxy(LB)</td>
+</tr>
+<tr>
+<td>⚠️ <strong>x86専用アプライアンス</strong></td>
+<td>別途 x86ホスト（VMware/Proxmox）が必要</td>
+<td>FortiGate VM / Cisco ISE / Aruba ClearPass / ASAv / F5 BIG-IP</td>
+</tr>
+<tr>
+<td>☁️ <strong>クラウド/サンドボックス</strong></td>
+<td>DevNetやベンダーの無料トライアルを活用</td>
+<td>Cisco Secure Access / Meraki / ACI / Zscaler</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="-フェーズ2-拡張ロードマップ着手順" tabindex="-1">🗺️ フェーズ2 拡張ロードマップ（着手順） <a class="header-anchor" href="#-フェーズ2-拡張ロードマップ着手順" aria-hidden="true">#</a></h2>
+<p>実務案件由来のテーマ（LB, NDR等）を含め、実装しやすい順にフェーズ分けしています。</p>
+<h3 id="2026-07-02-テーマ番号移行" tabindex="-1">2026-07-02 テーマ番号移行 <a class="header-anchor" href="#2026-07-02-テーマ番号移行" aria-hidden="true">#</a></h3>
+<p>フェーズ1にテーマ26（動的ルーティング深堀り）・テーマ27（QoS/ACL/route-map応用）を追加し、旧テーマ26（Spine-Leaf）を削除したため、フェーズ2の番号を一律<code>+1</code>しました。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:right">旧番号</th>
+<th style="text-align:right">新番号</th>
+<th>テーマ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right">27〜30</td>
+<td style="text-align:right">28〜31</td>
+<td>DNS、RADIUS、踏み台、NAC</td>
+</tr>
+<tr>
+<td style="text-align:right">31〜35</td>
+<td style="text-align:right">32〜36</td>
+<td>FortiGate、SSL-VPN、SD-WAN、Faucet、Secure Access</td>
+</tr>
+<tr>
+<td style="text-align:right">36〜40</td>
+<td style="text-align:right">37〜41</td>
+<td>Meraki、Aruba、UniFi/Omada、ACI、ESET</td>
+</tr>
+<tr>
+<td style="text-align:right">41〜43</td>
+<td style="text-align:right">42〜44</td>
+<td>NDR、ロードバランサ、MQ</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>過去に完了記録がある旧<code>23_internal_dns</code>と準備記録がある旧<code>24_radius_auth</code>は、現在のディスク上で成果物を確認できません。現物を復元するまで、テーマ28/29を完了扱いには戻しません。</p>
+</blockquote>
+<h3 id="フェーズa--コアサービス--認証基盤ネットワーク連携のための箱作り" tabindex="-1">フェーズA — コアサービス &amp; 認証基盤（ネットワーク連携のための「箱」作り） <a class="header-anchor" href="#フェーズa--コアサービス--認証基盤ネットワーク連携のための箱作り" aria-hidden="true">#</a></h3>
+<blockquote>
+<p><strong>💡 ネットワークエンジニアとしての立ち位置</strong>
+実務において、DNSやAD/RADIUS、踏み台サーバの「構築」はサーバーチームやセキュリティチームが担うことが多く、NWエンジニアがゼロから構築する可能性は低いです。
+したがって、ここでの主眼は「サーバーの構築スキルを極めること」<strong>ではなく</strong>、「ネットワーク機器（スイッチやFW）から認証サーバ等へ連携する際の設定（例：802.1Xの設定やRADIUS連携）を検証するために、<strong>必要最小限のダミーサーバを立てること</strong>」に置きます。</p>
+</blockquote>
+<ul>
+<li><strong>テーマ28</strong>: 業務用DNS連携（NW機器からの名前解決やFWのFQDN制御の動作確認用）</li>
+<li><strong>テーマ29</strong>: RADIUS / 認証サーバ連携（NW機器からのRADIUS問い合わせ先の用意）</li>
+<li><strong>テーマ30</strong>: 踏み台サーバ（NW機器への管理アクセス経路のテスト用）</li>
+<li><strong>テーマ31</strong>: NAC / 802.1X 認証（スイッチ側の認証設定を検証するための対向サーバとして）</li>
+</ul>
+<h3 id="フェーズbc--境界リモートアクセスwan次世代fw" tabindex="-1">フェーズB/C — 境界・リモートアクセス・WAN（次世代FW） <a class="header-anchor" href="#フェーズbc--境界リモートアクセスwan次世代fw" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>テーマ32</strong>: Fortinet / FortiGate VM 導入（1台で複数機能をハブ化）※x86基盤要</li>
+<li><strong>テーマ33</strong>: SSL-VPN ＋ 端末ポスチャ / アクセスチェック（FortiGate等を利用）</li>
+<li><strong>テーマ34</strong>: SD-WAN コントローラ導入検証</li>
+<li><strong>テーマ36</strong>: Cisco Secure Access / SSE・ZTNA トライアル（クラウド側ポリシー管理）</li>
+</ul>
+<h3 id="フェーズd--sdn--ロードバランサ--可視化実務特化" tabindex="-1">フェーズD — SDN / ロードバランサ / 可視化（実務特化） <a class="header-anchor" href="#フェーズd--sdn--ロードバランサ--可視化実務特化" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>テーマ35</strong>: Faucet SDN（Open vSwitch + Faucetで宣言的ネットワーク制御）</li>
+<li><strong>テーマ42</strong>: フロー可視化＆NDR入門（NetFlow + ntopng/ElastiFlow等）✅実務案件由来</li>
+<li><strong>テーマ43</strong>: ロードバランサ（L4/L7分散、VIP、HAProxy等）✅実務案件由来</li>
+<li><strong>テーマ44</strong>: アプリ連携（MQ / メッセージキューの送受信概念）※任意</li>
+</ul>
+<h3 id="フェーズef--クラウド管理型--エンドポイント" tabindex="-1">フェーズE/F — クラウド管理型 &amp; エンドポイント <a class="header-anchor" href="#フェーズef--クラウド管理型--エンドポイント" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>テーマ37</strong>: Cisco Meraki（DevNetでDashboard / API体験）</li>
+<li><strong>テーマ38</strong>: HPE Aruba（Aruba Central + ClearPass）</li>
+<li><strong>テーマ39</strong>: Ubiquiti UniFi / TP-Link Omada（自宅ラボ向け・コントローラ仮想化）</li>
+<li><strong>テーマ40</strong>: Cisco ACI / Nexus 9000v（DCファブリック・DevNet予約）</li>
+<li><strong>テーマ41</strong>: ESET PROTECT（エンドポイントの一元管理とポスチャ連動）</li>
+</ul>
+<hr>
+<h2 id="-関連リソース" tabindex="-1">🗂️ 関連リソース <a class="header-anchor" href="#-関連リソース" aria-hidden="true">#</a></h2>
+<ul>
+<li>過去の実務案件の分析ログ原本（構成図や生メモ）は <code>実務案件ログ/</code> フォルダに残しています。構築時の参考にしてください。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-フェーズ2のゴール">🎯 フェーズ2のゴール</a></li>
+<li class="lvl-3"><a href="#主なテーマ">主なテーマ</a></li>
+<li class="lvl-2"><a href="#-前提事項仮想基盤とホストアーキテクチャ">⚠️ 前提事項：仮想基盤とホストアーキテクチャ</a></li>
+<li class="lvl-2"><a href="#-フェーズ2-拡張ロードマップ着手順">🗺️ フェーズ2 拡張ロードマップ（着手順）</a></li>
+<li class="lvl-3"><a href="#2026-07-02-テーマ番号移行">2026-07-02 テーマ番号移行</a></li>
+<li class="lvl-3"><a href="#フェーズa--コアサービス--認証基盤ネットワーク連携のための箱作り">フェーズA — コアサービス &amp; 認証基盤（ネットワーク連携のための「箱」作り）</a></li>
+<li class="lvl-3"><a href="#フェーズbc--境界リモートアクセスwan次世代fw">フェーズB/C — 境界・リモートアクセス・WAN（次世代FW）</a></li>
+<li class="lvl-3"><a href="#フェーズd--sdn--ロードバランサ--可視化実務特化">フェーズD — SDN / ロードバランサ / 可視化（実務特化）</a></li>
+<li class="lvl-3"><a href="#フェーズef--クラウド管理型--エンドポイント">フェーズE/F — クラウド管理型 &amp; エンドポイント</a></li>
+<li class="lvl-2"><a href="#-関連リソース">🗂️ 関連リソース</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

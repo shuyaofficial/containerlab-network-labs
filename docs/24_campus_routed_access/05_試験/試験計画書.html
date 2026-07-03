@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>試験計画書 — Theme 24 Routed Access</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>24_campus_routed_access</span>
+<span class="sep">/</span>
+<span>05_試験</span></nav>
+      <h1 class="doc-title">試験計画書 — Theme 24 Routed Access</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>コマンドはすべてOrbStack Linux VMへ<code>ssh clab@orb</code>で接続後に実行します。IOSの<code>show</code>コマンドは<a href="../00_%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3/%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89.html">機器別ログインコマンド</a>に従い、対象IOLへ<code>docker attach</code>して実行します。</p>
+</blockquote>
+<blockquote>
+<p><strong>完了（2026-07-01）</strong>: 学習者がT-101〜T-304の完了を確認しました。完了時の端末経路、双方向ping、気づきは<a href="./%E8%A9%A6%E9%A8%93%E5%AE%8C%E4%BA%86%E8%A8%98%E9%8C%B2_2026-07-01.html">試験完了記録</a>に保存しています。</p>
+</blockquote>
+<h2 id="判定" tabindex="-1">判定 <a class="header-anchor" href="#判定" aria-hidden="true">#</a></h2>
+<ul>
+<li>✅ 合格</li>
+<li>❌ 不合格</li>
+<li>— 未実施</li>
+</ul>
+<h2 id="t-1xx-起動配線" tabindex="-1">T-1xx 起動・配線 <a class="header-anchor" href="#t-1xx-起動配線" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>試験</th>
+<th>期待結果</th>
+<th>証跡</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-101</td>
+<td>containerlab起動</td>
+<td>6ノードがrunning</td>
+<td><code>containerlab inspect -t 04_構築/campus.clab.yml</code></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>T-102</td>
+<td>インターフェース状態</td>
+<td>使用する全リンクがup/up</td>
+<td><code>show ip interface brief</code></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>T-103</td>
+<td>Routed Port確認</td>
+<td>インフラIFが<code>/30</code>かつup/upで、L2 Trunk/STPを使用しない</td>
+<td><code>show ip interface brief</code>、<code>show running-config interface ...</code></td>
+<td>✅</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="t-2xx-ospfecmp" tabindex="-1">T-2xx OSPF・ECMP <a class="header-anchor" href="#t-2xx-ospfecmp" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>試験</th>
+<th>期待結果</th>
+<th>証跡</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-201</td>
+<td>OSPF隣接</td>
+<td>設計した全隣接がFULL</td>
+<td><code>show ip ospf neighbor</code></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>T-202</td>
+<td>Loopback学習</td>
+<td>4台すべてのLoopbackへ到達可能</td>
+<td><code>show ip route ospf</code>、<code>ping</code></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>T-203</td>
+<td>access1のECMP</td>
+<td>10.24.20.0/24に2ネクストホップ</td>
+<td><code>show ip route 10.24.20.0</code>、<code>show ip cef 10.24.20.10</code></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>T-204</td>
+<td>access2のECMP</td>
+<td>10.24.10.0/24に2ネクストホップ</td>
+<td><code>show ip route 10.24.10.0</code>、<code>show ip cef 10.24.10.10</code></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>T-205</td>
+<td>E2E疎通</td>
+<td>pc-aとpc-bが相互疎通</td>
+<td><code>docker exec clab-campus-routed-access-pc-a ping -c 5 10.24.20.10</code></td>
+<td>✅</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="t-3xx-障害復旧" tabindex="-1">T-3xx 障害・復旧 <a class="header-anchor" href="#t-3xx-障害復旧" aria-hidden="true">#</a></h2>
+<blockquote>
+<p><a href="./%E9%9A%9C%E5%AE%B3%E8%A9%A6%E9%A8%93_%E6%83%B3%E5%AE%9A%E7%B5%8C%E8%B7%AF%E5%9B%B3.html">障害経路シミュレーターを開く</a> — T-301〜T-304の通信経路、OSPF収束、復旧過程を動的に確認できます。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>試験</th>
+<th>期待結果</th>
+<th>証跡</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-301</td>
+<td>access1—core1断</td>
+<td>core2経由に収束し疎通復旧</td>
+<td>連続ping、OSPF neighbor、route</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>T-302</td>
+<td>core1停止</td>
+<td>core2経由で両Access間が疎通</td>
+<td>連続pingと経路表</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>T-303</td>
+<td>core1復旧</td>
+<td>OSPF隣接とECMPが復元</td>
+<td><code>show ip ospf neighbor</code>、<code>show ip route</code></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>T-304</td>
+<td>STP非依存</td>
+<td>障害復旧がOSPF経路変更として観測される</td>
+<td>OSPFログ・経路表</td>
+<td>✅</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="実測記録" tabindex="-1">実測記録 <a class="header-anchor" href="#実測記録" aria-hidden="true">#</a></h2>
+<ul>
+<li>障害中の時刻、ping欠落数、通信断時間の数値は生ログ未転記。</li>
+<li>完了時の双方向pingは各5回成功、packet loss 0%。</li>
+<li>詳細は<a href="./%E8%A9%A6%E9%A8%93%E5%AE%8C%E4%BA%86%E8%A8%98%E9%8C%B2_2026-07-01.html">試験完了記録</a>を参照。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#判定">判定</a></li>
+<li class="lvl-2"><a href="#t-1xx-起動配線">T-1xx 起動・配線</a></li>
+<li class="lvl-2"><a href="#t-2xx-ospfecmp">T-2xx OSPF・ECMP</a></li>
+<li class="lvl-2"><a href="#t-3xx-障害復旧">T-3xx 障害・復旧</a></li>
+<li class="lvl-2"><a href="#実測記録">実測記録</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

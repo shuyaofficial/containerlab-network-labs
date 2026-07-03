@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Theme 24: Campus Pattern B — Routed Access</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>24_campus_routed_access</span></nav>
+      <h1 class="doc-title">Theme 24: Campus Pattern B — Routed Access</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="1-このラボで学ぶこと" tabindex="-1">1. このラボで学ぶこと <a class="header-anchor" href="#1-このラボで学ぶこと" aria-hidden="true">#</a></h2>
+<p>Routed Accessは、アクセス層までルーティングを伸ばし、上位接続をL2トランクではなくL3リンクにする設計です。ループ回避をSTPに任せず、OSPFとECMPで複数経路を同時利用し、障害時の収束を観察します。</p>
+<p>このローカル環境では、実機Catalystの「L3スイッチ」をCisco IOLのL3ルーターモードで模擬します。したがって、Catalyst固有のスイッチポート機能ではなく、Routed Port、OSPF、ECMPという設計の中心を学習対象にします。</p>
+<blockquote>
+<p><strong>初期状態</strong>: containerlabは機器、配線、attach可能な起動方式だけを用意します。インフラリンク、Loopback、OSPF、端末のデータプレーンIP・経路は一切自動設定しません。設定はすべて自分で考えて投入してください。</p>
+</blockquote>
+<blockquote>
+<p><strong>完了状態（2026-07-01）</strong>: Routed Port、OSPF、ECMP、双方向疎通、リンク/Core障害、復旧試験まで完了しました。結果と気づきは<a href="05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E5%AE%8C%E4%BA%86%E8%A8%98%E9%8C%B2_2026-07-01.html">試験完了記録</a>を参照してください。</p>
+</blockquote>
+<h2 id="2-トポロジ" tabindex="-1">2. トポロジ <a class="header-anchor" href="#2-トポロジ" aria-hidden="true">#</a></h2>
+<pre class="mermaid">flowchart TB
+    C1[&quot;core1\nCore/Distribution&quot;]
+    C2[&quot;core2\nCore/Distribution&quot;]
+    A1[&quot;access1\nL3 Access&quot;]
+    A2[&quot;access2\nL3 Access&quot;]
+    P1[&quot;pc-a\n10.24.10.10/24&quot;]
+    P2[&quot;pc-b\n10.24.20.10/24&quot;]
+
+    C1 ---|&quot;Routed /30&quot;| C2
+    C1 ---|&quot;Routed /30&quot;| A1
+    C2 ---|&quot;Routed /30&quot;| A1
+    C1 ---|&quot;Routed /30&quot;| A2
+    C2 ---|&quot;Routed /30&quot;| A2
+    A1 ---|&quot;User subnet&quot;| P1
+    A2 ---|&quot;User subnet&quot;| P2
+</pre>
+<blockquote>
+<p>「全リンクをRouted Portにする」の対象は、Core/DistributionとAccess間のインフラリンクです。端末収容リンクは通常のユーザーサブネットとして扱います。</p>
+</blockquote>
+<h2 id="3-ノードとアドレス設計" tabindex="-1">3. ノードとアドレス設計 <a class="header-anchor" href="#3-ノードとアドレス設計" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>役割</th>
+<th style="text-align:right">Loopback0</th>
+<th style="text-align:right">管理IP</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>core1</td>
+<td>Core/Distribution</td>
+<td style="text-align:right">10.24.255.1/32</td>
+<td style="text-align:right">172.24.24.11</td>
+</tr>
+<tr>
+<td>core2</td>
+<td>Core/Distribution</td>
+<td style="text-align:right">10.24.255.2/32</td>
+<td style="text-align:right">172.24.24.12</td>
+</tr>
+<tr>
+<td>access1</td>
+<td>L3 Access</td>
+<td style="text-align:right">10.24.255.11/32</td>
+<td style="text-align:right">172.24.24.21</td>
+</tr>
+<tr>
+<td>access2</td>
+<td>L3 Access</td>
+<td style="text-align:right">10.24.255.12/32</td>
+<td style="text-align:right">172.24.24.22</td>
+</tr>
+<tr>
+<td>pc-a</td>
+<td>Access1配下端末</td>
+<td style="text-align:right">—</td>
+<td style="text-align:right">172.24.24.101</td>
+</tr>
+<tr>
+<td>pc-b</td>
+<td>Access2配下端末</td>
+<td style="text-align:right">—</td>
+<td style="text-align:right">172.24.24.102</td>
+</tr>
+</tbody>
+</table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>接続</th>
+<th>サブネット</th>
+<th style="text-align:right">左側</th>
+<th style="text-align:right">右側</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>core1—access1</td>
+<td>10.24.0.0/30</td>
+<td style="text-align:right">.1</td>
+<td style="text-align:right">.2</td>
+</tr>
+<tr>
+<td>core2—access1</td>
+<td>10.24.0.4/30</td>
+<td style="text-align:right">.5</td>
+<td style="text-align:right">.6</td>
+</tr>
+<tr>
+<td>core1—access2</td>
+<td>10.24.0.8/30</td>
+<td style="text-align:right">.9</td>
+<td style="text-align:right">.10</td>
+</tr>
+<tr>
+<td>core2—access2</td>
+<td>10.24.0.12/30</td>
+<td style="text-align:right">.13</td>
+<td style="text-align:right">.14</td>
+</tr>
+<tr>
+<td>core1—core2</td>
+<td>10.24.0.16/30</td>
+<td style="text-align:right">.17</td>
+<td style="text-align:right">.18</td>
+</tr>
+<tr>
+<td>access1—pc-a</td>
+<td>10.24.10.0/24</td>
+<td style="text-align:right">.1</td>
+<td style="text-align:right">.10</td>
+</tr>
+<tr>
+<td>access2—pc-b</td>
+<td>10.24.20.0/24</td>
+<td style="text-align:right">.1</td>
+<td style="text-align:right">.10</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="4-mission" tabindex="-1">4. Mission <a class="header-anchor" href="#4-mission" aria-hidden="true">#</a></h2>
+<h3 id="mission-1-routed-portを構築する" tabindex="-1">Mission 1: Routed Portを構築する <a class="header-anchor" href="#mission-1-routed-portを構築する" aria-hidden="true">#</a></h3>
+<ul>
+<li>5本のインフラリンクへ表どおりの<code>/30</code>を設定する。</li>
+<li>すべてのインフラ用インターフェースをL3として使用する。</li>
+<li>各ノードへLoopback0を設定する。</li>
+</ul>
+<h3 id="mission-2-ospfとecmpを成立させる" tabindex="-1">Mission 2: OSPFとECMPを成立させる <a class="header-anchor" href="#mission-2-ospfとecmpを成立させる" aria-hidden="true">#</a></h3>
+<ul>
+<li>全インフラリンクとLoopback0をOSPF area 0へ参加させる。</li>
+<li>Router IDはLoopback0のIPに固定する。</li>
+<li>access1から<code>10.24.20.0/24</code>への経路に、core1/core2の2ネクストホップが載るようコストを揃える。</li>
+</ul>
+<h3 id="mission-3-stp非依存を証明する" tabindex="-1">Mission 3: STP非依存を証明する <a class="header-anchor" href="#mission-3-stp非依存を証明する" aria-hidden="true">#</a></h3>
+<ul>
+<li>インフラリンクでVLAN、Trunk、STPを設定しない。</li>
+<li>OSPF経路表とCEFのネクストホップで転送経路を確認する。</li>
+<li>pc-aからpc-bへ連続pingを行う。</li>
+</ul>
+<h3 id="mission-4-障害試験を行う" tabindex="-1">Mission 4: 障害試験を行う <a class="header-anchor" href="#mission-4-障害試験を行う" aria-hidden="true">#</a></h3>
+<ul>
+<li>access1—core1リンクをshutdownし、通信断時間を記録する。</li>
+<li>core1全体を停止し、残ったcore2経路で通信が復旧することを確認する。</li>
+<li>復旧後にOSPF隣接とECMPが元へ戻ることを確認する。</li>
+</ul>
+<h2 id="5-起動方法" tabindex="-1">5. 起動方法 <a class="header-anchor" href="#5-起動方法" aria-hidden="true">#</a></h2>
+<h3 id="実行場所-orbstack-linux-vmssh-claborb" tabindex="-1">実行場所: OrbStack Linux VM（<code>ssh clab@orb</code>） <a class="header-anchor" href="#実行場所-orbstack-linux-vmssh-claborb" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">cd</span> /Users/shuya/Documents/claude/Mac仮想環境構築/24_campus_routed_access/04_構築
+./deploy.sh deploy
+</code></pre>
+<p>Cisco IOLへのログイン例:</p>
+<pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker attach --sig-proxy=<span class="hljs-literal">false</span> clab-campus-routed-access-core1
+</code></pre>
+<p>画面が表示されない場合はEnterを1〜2回押します。機器ごとのコマンド、離脱方法、切り分けは<a href="00_%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3/%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89.html">00_ログイン/ログインコマンド.md</a>を参照してください。</p>
+<p>停止・削除:</p>
+<pre><code class="language-bash">./deploy.sh destroy
+</code></pre>
+<h2 id="6-達成条件" tabindex="-1">6. 達成条件 <a class="header-anchor" href="#6-達成条件" aria-hidden="true">#</a></h2>
+<ul>
+<li>すべてのOSPF隣接が<code>FULL</code>。</li>
+<li>access1/access2が相互のユーザーサブネットをOSPFで学習。</li>
+<li>対向ユーザーサブネットに等コストの2経路が存在。</li>
+<li>pc-aとpc-bが相互疎通。</li>
+<li>単一アップリンク障害後、残存経路で通信が復旧。</li>
+<li>復旧過程を<a href="05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a>へ記録。</li>
+</ul>
+<h2 id="7-ローカル環境上の注意" tabindex="-1">7. ローカル環境上の注意 <a class="header-anchor" href="#7-ローカル環境上の注意" aria-hidden="true">#</a></h2>
+<ul>
+<li>使用イメージは<code>vrnetlab/cisco_iol:15.7.3M2</code>。<code>type: l2</code>は指定しません。</li>
+<li>containerlabのリンク名は<code>eth1</code>形式で記述し、IOS内では<code>Ethernet0/1</code>等に対応します。</li>
+<li>Linux端末とのリンクでエミュレータ固有のduplex問題が出た場合、まずAccessのLoopback間pingでL3ファブリックを切り分け、その後端末リンクを確認します。</li>
+<li>既存テーマとは異なるラボ名と管理ネットワーク<code>172.24.24.0/24</code>を使用します。</li>
+</ul>
+<h2 id="8-設計文書の読み順" tabindex="-1">8. 設計文書の読み順 <a class="header-anchor" href="#8-設計文書の読み順" aria-hidden="true">#</a></h2>
+<ol>
+<li><a href="00_%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3/%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89.html">機器別ログインコマンド</a></li>
+<li><a href="01_%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9/%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9%E6%9B%B8.html">要件定義書</a></li>
+<li><a href="02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88%E6%9B%B8.html">基本設計書</a></li>
+<li><a href="02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/IP%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9%E7%AE%A1%E7%90%86%E8%A1%A8.html">IPアドレス管理表</a></li>
+<li><a href="02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E3%83%8D%E3%83%83%E3%83%88%E3%83%AF%E3%83%BC%E3%82%AF%E7%89%A9%E7%90%86%E6%A7%8B%E6%88%90%E5%9B%B3.mermaid">ネットワーク物理構成図</a></li>
+<li><a href="03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E3%83%91%E3%83%A9%E3%83%A1%E3%83%BC%E3%82%BF%E3%82%B7%E3%83%BC%E3%83%88.html">パラメータシート</a></li>
+<li><a href="04_%E6%A7%8B%E7%AF%89/%E6%A7%8B%E7%AF%89%E3%83%AD%E3%82%B0_2026-06-30.html">環境起動ログ（2026-06-30）</a></li>
+<li><a href="04_%E6%A7%8B%E7%AF%89/%E6%A7%8B%E7%AF%89%E3%83%AD%E3%82%B0_%E3%83%86%E3%83%B3%E3%83%97%E3%83%AC%E3%83%BC%E3%83%88.html">構築ログテンプレート</a></li>
+<li><a href="05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a></li>
+<li><a href="05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E5%AE%8C%E4%BA%86%E8%A8%98%E9%8C%B2_2026-07-01.html">試験完了記録（2026-07-01）</a></li>
+<li><a href="05_%E8%A9%A6%E9%A8%93/%E9%9A%9C%E5%AE%B3%E8%A9%A6%E9%A8%93_%E6%83%B3%E5%AE%9A%E7%B5%8C%E8%B7%AF%E5%9B%B3.html">障害経路シミュレーター</a></li>
+</ol>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-このラボで学ぶこと">1. このラボで学ぶこと</a></li>
+<li class="lvl-2"><a href="#2-トポロジ">2. トポロジ</a></li>
+<li class="lvl-2"><a href="#3-ノードとアドレス設計">3. ノードとアドレス設計</a></li>
+<li class="lvl-2"><a href="#4-mission">4. Mission</a></li>
+<li class="lvl-3"><a href="#mission-1-routed-portを構築する">Mission 1: Routed Portを構築する</a></li>
+<li class="lvl-3"><a href="#mission-2-ospfとecmpを成立させる">Mission 2: OSPFとECMPを成立させる</a></li>
+<li class="lvl-3"><a href="#mission-3-stp非依存を証明する">Mission 3: STP非依存を証明する</a></li>
+<li class="lvl-3"><a href="#mission-4-障害試験を行う">Mission 4: 障害試験を行う</a></li>
+<li class="lvl-2"><a href="#5-起動方法">5. 起動方法</a></li>
+<li class="lvl-3"><a href="#実行場所-orbstack-linux-vmssh-claborb">実行場所: OrbStack Linux VM（ssh clab@orb）</a></li>
+<li class="lvl-2"><a href="#6-達成条件">6. 達成条件</a></li>
+<li class="lvl-2"><a href="#7-ローカル環境上の注意">7. ローカル環境上の注意</a></li>
+<li class="lvl-2"><a href="#8-設計文書の読み順">8. 設計文書の読み順</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

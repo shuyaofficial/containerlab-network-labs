@@ -1,0 +1,35 @@
+#!/usr/bin/expect -f
+# Run a command on IOL console and capture output
+# Usage: expect console_show.exp <pts_device> <command>
+
+set pts [lindex $argv 0]
+set cmd [lindex $argv 1]
+set timeout 10
+
+# Open the pts device
+set fd [open $pts RDWR]
+spawn -open $fd
+
+# Send a return to get a prompt
+send "\r"
+expect {
+    -re {[A-Za-z0-9_-]+[>#]} { }
+    timeout { puts "TIMEOUT waiting for prompt"; exit 1 }
+}
+
+# Set terminal length 0
+send "terminal length 0\r"
+expect {
+    -re {[A-Za-z0-9_-]+[>#]} { }
+    timeout { }
+}
+
+# Send the actual command
+send "$cmd\r"
+expect {
+    -re {[A-Za-z0-9_-]+[>#]} { }
+    timeout { puts "TIMEOUT waiting for command output"; exit 1 }
+}
+
+# Print captured output
+puts $expect_out(buffer)

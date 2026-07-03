@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>QoS / DiffServ チャレンジ：パラメータシート形式</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>15_cisco_qos</span></nav>
+      <h1 class="doc-title">QoS / DiffServ チャレンジ：パラメータシート形式</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>このドキュメントは、実務の「要件定義（パラメータシート）」のみを記載したチャレンジ用資料です。
+今回はルーター（R1）に「Telnet通信（遠隔操作）を最優先で処理せよ！」というVIP設定を施します。</p>
+<hr>
+<h2 id="-トポロジとipアドレス設計" tabindex="-1">🎯 トポロジとIPアドレス設計 <a class="header-anchor" href="#-トポロジとipアドレス設計" aria-hidden="true">#</a></h2>
+<h3 id="ログイン情報" tabindex="-1">ログイン情報 <a class="header-anchor" href="#ログイン情報" aria-hidden="true">#</a></h3>
+<p>ユーザー/パス: <code>admin</code> / <code>admin</code></p>
+<ul>
+<li><strong>PC1</strong>: <code>telnet 172.20.20.2</code></li>
+<li><strong>R1</strong>: <code>telnet 172.20.20.4</code></li>
+<li><strong>R2</strong>: <code>telnet 172.20.20.3</code></li>
+<li><strong>PC2</strong>: <code>telnet 172.20.20.5</code></li>
+</ul>
+<h3 id="インターフェース設計" tabindex="-1">インターフェース設計 <a class="header-anchor" href="#インターフェース設計" aria-hidden="true">#</a></h3>
+<p><strong>【送信元拠点】</strong></p>
+<ul>
+<li>PC1 (e0/1): <code>192.168.10.10 /24</code> （GW: <code>192.168.10.254</code>）</li>
+<li>R1 (e0/2): <code>192.168.10.254 /24</code> （PC1側）</li>
+<li>R1 (e0/1): <code>10.1.1.1 /24</code> （R2側）</li>
+</ul>
+<p><strong>【宛先拠点】</strong></p>
+<ul>
+<li>R2 (e0/1): <code>10.1.1.2 /24</code> （R1側）</li>
+<li>R2 (e0/2): <code>192.168.20.254 /24</code> （PC2側）</li>
+<li>PC2 (e0/1): <code>192.168.20.10 /24</code> （GW: <code>192.168.20.254</code>）</li>
+</ul>
+<hr>
+<h2 id="-設定パラメータ要件" tabindex="-1">🏗️ 設定パラメータ要件 <a class="header-anchor" href="#-設定パラメータ要件" aria-hidden="true">#</a></h2>
+<h3 id="要件1ipアドレスとルーティングの基礎" tabindex="-1">要件1：IPアドレスとルーティングの基礎 <a class="header-anchor" href="#要件1ipアドレスとルーティングの基礎" aria-hidden="true">#</a></h3>
+<p>各機器に上記のIPを設定し、R1とR2で互いのLAN（192.168.10.0 と 192.168.20.0）へ到達できるようにスタティックルート（<code>ip route</code>）を設定してください。（※PC1とPC2の <code>no ip routing</code> も忘れずに！）</p>
+<blockquote>
+<p>✅ <strong>【検証1】</strong>
+PC1 から PC2（<code>ping 192.168.20.10</code>）へPingが通ることを確認。</p>
+</blockquote>
+<hr>
+<h3 id="要件2qosの分類class-mapルールの作成r1にて" tabindex="-1">要件2：QoSの「分類（Class-Map）」ルールの作成（R1にて） <a class="header-anchor" href="#要件2qosの分類class-mapルールの作成r1にて" aria-hidden="true">#</a></h3>
+<p>QoSの第一歩は「誰を特別扱いするか」を決めることです。
+まず、Telnet通信を識別するためのアクセスリスト（番号 100）を作成し、それを<strong>クラスマップ</strong>に紐づけます。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>指定パラメータ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ACL番号</td>
+<td><strong>100</strong></td>
+</tr>
+<tr>
+<td>ACL条件</td>
+<td>送信元 <code>any</code> から 宛先 <code>any</code> への <strong>tcp 23番（telnet）</strong></td>
+</tr>
+<tr>
+<td>クラスマップ名</td>
+<td><strong>CLASS-TELNET</strong></td>
+</tr>
+<tr>
+<td>マッチ条件</td>
+<td>作成したアクセスリスト <strong>100</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>💡 <strong>【構造のヒント】</strong></p>
+<pre><code class="language-bash">! ① ACLで荷物を特定する
+R1(config)# access-list 100 permit tcp any any eq 23
+
+! ② クラスマップ（特定の荷物のグループ）を作る
+R1(config)# class-map CLASS-TELNET
+R1(config-cmap)# match access-group 100
+</code></pre>
+<hr>
+<h3 id="要件3qosのアクションpolicy-mapの定義r1にて" tabindex="-1">要件3：QoSの「アクション（Policy-Map）」の定義（R1にて） <a class="header-anchor" href="#要件3qosのアクションpolicy-mapの定義r1にて" aria-hidden="true">#</a></h3>
+<p>次に、「先ほど分類した荷物に対して、どういう優先処理を行うか」を<strong>ポリシーマップ</strong>で定義します。
+今回はTelnetパケットに「これは最優先（EF）だ！」というVIPシール（DSCP）を貼り付け、優先レーン（Priority）を通すように指示します。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>指定パラメータ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ポリシーマップ名</td>
+<td><strong>POLICY-QOS</strong></td>
+</tr>
+<tr>
+<td>適用するクラス</td>
+<td><strong>CLASS-TELNET</strong> (要件2で作ったもの)</td>
+</tr>
+<tr>
+<td>シール貼り (Marking)</td>
+<td>DSCP値を <strong>ef</strong> (Expedited Forwarding) に設定</td>
+</tr>
+<tr>
+<td>優先レーン (Queuing)</td>
+<td><strong>priority</strong> コマンドで優先帯域を <strong>512</strong> kbps割り当て</td>
+</tr>
+</tbody>
+</table></div>
+<p>💡 <strong>【構造のヒント】</strong></p>
+<pre><code class="language-bash">R1(config)# policy-map POLICY-QOS
+R1(config-pmap)# class CLASS-TELNET
+R1(config-pmap-c)# <span class="hljs-built_in">set</span> dscp ef
+R1(config-pmap-c)# priority 512
+</code></pre>
+<hr>
+<h3 id="要件4インターフェースへの適用service-policyr1にて" tabindex="-1">要件4：インターフェースへの適用（Service-Policy）（R1にて） <a class="header-anchor" href="#要件4インターフェースへの適用service-policyr1にて" aria-hidden="true">#</a></h3>
+<p>最後に、このポリシー（警備員マニュアル）をR1がパケットを「送り出す」ドアに適用します。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>指定パラメータ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>適用先インターフェース</td>
+<td><strong>Ethernet 0/1</strong> (R2へ出ていく側)</td>
+</tr>
+<tr>
+<td>適用方向</td>
+<td><strong>out</strong> (出ていくパケットに対して適用)</td>
+</tr>
+</tbody>
+</table></div>
+<p>💡 <strong>【構造のヒント】</strong></p>
+<pre><code class="language-bash">R1(config)# interface e0/1
+R1(config-if)# service-policy out POLICY-QOS
+</code></pre>
+<hr>
+<h3 id="-最終検証優先制御の確認" tabindex="-1">🏁 最終検証（優先制御の確認） <a class="header-anchor" href="#-最終検証優先制御の確認" aria-hidden="true">#</a></h3>
+<p>すべて設定できたら、実際にパケットを流してQoSが効いているか確認します。</p>
+<blockquote>
+<p>✅ <strong>【検証2】</strong></p>
+<ol>
+<li>まず <strong>PC1</strong> からただのPingを打ちます（<code>ping 192.168.20.10</code>）。</li>
+<li>次に <strong>PC1</strong> からTelnetを打ちます（<code>telnet 192.168.20.10</code>）。※パスワードが無いので弾かれますが、パケットはR1を通過します。</li>
+<li><strong>R1</strong> で <code>show policy-map interface e0/1</code> を実行してください。
+<ul>
+<li><code>Class CLASS-TELNET</code> の欄に <code>pkts matched</code> というカウンターが増えていれば、**「TelnetパケットがVIPレーンを通って優先処理された」**という大成功の証拠です！！</li>
+</ul>
+</li>
+</ol>
+</blockquote>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-トポロジとipアドレス設計">🎯 トポロジとIPアドレス設計</a></li>
+<li class="lvl-3"><a href="#ログイン情報">ログイン情報</a></li>
+<li class="lvl-3"><a href="#インターフェース設計">インターフェース設計</a></li>
+<li class="lvl-2"><a href="#-設定パラメータ要件">🏗️ 設定パラメータ要件</a></li>
+<li class="lvl-3"><a href="#要件1ipアドレスとルーティングの基礎">要件1：IPアドレスとルーティングの基礎</a></li>
+<li class="lvl-3"><a href="#要件2qosの分類class-mapルールの作成r1にて">要件2：QoSの「分類（Class-Map）」ルールの作成（R1にて）</a></li>
+<li class="lvl-3"><a href="#要件3qosのアクションpolicy-mapの定義r1にて">要件3：QoSの「アクション（Policy-Map）」の定義（R1にて）</a></li>
+<li class="lvl-3"><a href="#要件4インターフェースへの適用service-policyr1にて">要件4：インターフェースへの適用（Service-Policy）（R1にて）</a></li>
+<li class="lvl-3"><a href="#-最終検証優先制御の確認">🏁 最終検証（優先制御の確認）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

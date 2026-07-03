@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>サイト間VPN（IPsec）チャレンジ：パラメータシート形式</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>14_cisco_ipsec_vpn</span></nav>
+      <h1 class="doc-title">サイト間VPN（IPsec）チャレンジ：パラメータシート形式</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>このドキュメントは、より実務に近い「要件定義（パラメータシート）」のみを記載したチャレンジ用資料です。
+コマンドの丸写しではなく、「どの設定項目に何を入れるか」を考えてルーターに設定を投入してください！</p>
+<hr>
+<h2 id="-トポロジとipアドレス設計" tabindex="-1">🎯 トポロジとIPアドレス設計 <a class="header-anchor" href="#-トポロジとipアドレス設計" aria-hidden="true">#</a></h2>
+<h3 id="ログイン情報" tabindex="-1">ログイン情報 <a class="header-anchor" href="#ログイン情報" aria-hidden="true">#</a></h3>
+<p>ユーザー/パス: <code>admin</code> / <code>admin</code></p>
+<ul>
+<li><strong>Tokyo-PC</strong>: <code>telnet 172.20.20.6</code></li>
+<li><strong>Tokyo-R1</strong>: <code>telnet 172.20.20.3</code></li>
+<li><strong>ISP</strong>: <code>telnet 172.20.20.4</code></li>
+<li><strong>Osaka-R1</strong>: <code>telnet 172.20.20.5</code></li>
+<li><strong>Osaka-PC</strong>: <code>telnet 172.20.20.2</code></li>
+</ul>
+<h3 id="インターフェース設計" tabindex="-1">インターフェース設計 <a class="header-anchor" href="#インターフェース設計" aria-hidden="true">#</a></h3>
+<p><strong>【東京本社 (Tokyo)】</strong></p>
+<ul>
+<li>内部LAN: <code>192.168.10.0 /24</code></li>
+<li>Tokyo-PC (e0/1): <code>192.168.10.10</code> （GW: <code>192.168.10.254</code>）</li>
+<li>Tokyo-R1 (e0/2): <code>192.168.10.254</code> （LAN側）</li>
+<li>Tokyo-R1 (e0/1): <code>200.1.1.1 /24</code> （インターネット側）</li>
+</ul>
+<p><strong>【ISP (インターネット)】</strong></p>
+<ul>
+<li>ISP (e0/1): <code>200.1.1.254 /24</code> （東京向け）</li>
+<li>ISP (e0/2): <code>200.2.2.254 /24</code> （大阪向け）</li>
+</ul>
+<p><strong>【大阪支社 (Osaka)】</strong></p>
+<ul>
+<li>内部LAN: <code>192.168.20.0 /24</code></li>
+<li>Osaka-PC (e0/1): <code>192.168.20.10</code> （GW: <code>192.168.20.254</code>）</li>
+<li>Osaka-R1 (e0/2): <code>192.168.20.254</code> （LAN側）</li>
+<li>Osaka-R1 (e0/1): <code>200.2.2.1 /24</code> （インターネット側）</li>
+</ul>
+<hr>
+<h2 id="-設定パラメータ要件" tabindex="-1">🏗️ 設定パラメータ要件 <a class="header-anchor" href="#-設定パラメータ要件" aria-hidden="true">#</a></h2>
+<h3 id="要件1ipアドレスとルーティングの基礎" tabindex="-1">要件1：IPアドレスとルーティングの基礎 <a class="header-anchor" href="#要件1ipアドレスとルーティングの基礎" aria-hidden="true">#</a></h3>
+<p>各機器に上記のIPアドレスを設定し、以下のルーティング要件を満たしてください。</p>
+<ul>
+<li><strong>PC類</strong>: L2ホストとして動作させ（<code>no ip routing</code>）、適切なデフォルトゲートウェイを設定すること。</li>
+<li><strong>ルーター類 (Tokyo-R1 / Osaka-R1)</strong>: 外部（ISP: <code>200.x.x.254</code>）へ向かうデフォルトルート（<code>ip route</code>）を設定すること。</li>
+</ul>
+<blockquote>
+<p>✅ <strong>【検証1】</strong>
+Tokyo-R1 から Osaka-R1（<code>ping 200.2.2.1</code>）へPingが飛ぶこと。</p>
+</blockquote>
+<hr>
+<h3 id="要件2ikeフェーズ1isakmp-ポリシーパラメータ" tabindex="-1">要件2：IKEフェーズ1（ISAKMP ポリシー）パラメータ <a class="header-anchor" href="#要件2ikeフェーズ1isakmp-ポリシーパラメータ" aria-hidden="true">#</a></h3>
+<p>東京と大阪で、全く同じ以下の鍵交換ポリシー（ルール番号 10）を作成してください。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>指定パラメータ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>暗号化アルゴリズム (Encryption)</td>
+<td><strong>AES</strong></td>
+</tr>
+<tr>
+<td>ハッシュ関数 (Hash)</td>
+<td><strong>SHA</strong></td>
+</tr>
+<tr>
+<td>認証方式 (Authentication)</td>
+<td><strong>Pre-Share</strong> (事前共有キー)</td>
+</tr>
+<tr>
+<td>DHグループ (Group)</td>
+<td><strong>14</strong></td>
+</tr>
+<tr>
+<td>事前共有キー (Key)</td>
+<td><strong>cisco123</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p><em>※注意：事前共有キーのピアアドレス（対向先IP）は、お互いのルーターのインターネット側IPを指定すること。</em></p>
+<hr>
+<h3 id="要件3ikeフェーズ2ipsec-トランスフォームセットパラメータ" tabindex="-1">要件3：IKEフェーズ2（IPsec トランスフォームセット）パラメータ <a class="header-anchor" href="#要件3ikeフェーズ2ipsec-トランスフォームセットパラメータ" aria-hidden="true">#</a></h3>
+<p>実際にデータをカプセル化する際の「変換ルール」を作成してください。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>指定パラメータ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>セット名</td>
+<td><strong>MYSET</strong> (任意だが両端で合わせるのが推奨)</td>
+</tr>
+<tr>
+<td>カプセル化と暗号化</td>
+<td><strong>esp-aes</strong></td>
+</tr>
+<tr>
+<td>認証・改ざん防止</td>
+<td><strong>esp-sha-hmac</strong></td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h3 id="要件4暗号化対象トラフィックの定義acl" tabindex="-1">要件4：暗号化対象トラフィックの定義（ACL） <a class="header-anchor" href="#要件4暗号化対象トラフィックの定義acl" aria-hidden="true">#</a></h3>
+<p>「どの通信をVPNトンネルに通すか」を定義するアクセスリスト（番号 100）を作成してください。</p>
+<ul>
+<li><strong>Tokyo-R1側</strong>: <code>192.168.10.0/24</code> から <code>192.168.20.0/24</code> へ向かうIP通信を許可</li>
+<li><strong>Osaka-R1側</strong>: <code>192.168.20.0/24</code> から <code>192.168.10.0/24</code> へ向かうIP通信を許可（※東京の鏡合わせになります）</li>
+</ul>
+<hr>
+<h3 id="要件5crypto-mapクリプトマップの作成と適用" tabindex="-1">要件5：Crypto Map（クリプトマップ）の作成と適用 <a class="header-anchor" href="#要件5crypto-mapクリプトマップの作成と適用" aria-hidden="true">#</a></h3>
+<p>上記のフェーズ1、フェーズ2、ACLをすべて束ねる指示書を作成し、外側のインターフェースに適用してください。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>指定パラメータ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>マップ名 / 番号</td>
+<td><strong>MYMAP / 10</strong></td>
+</tr>
+<tr>
+<td>プロトコル</td>
+<td><strong>ipsec-isakmp</strong></td>
+</tr>
+<tr>
+<td>対象トラフィック (Match)</td>
+<td>作成したアクセスリスト <strong>100</strong></td>
+</tr>
+<tr>
+<td>変換ルール (Transform-set)</td>
+<td>作成した <strong>MYSET</strong></td>
+</tr>
+<tr>
+<td>対向先IP (Peer)</td>
+<td>相手拠点のインターネット側IP</td>
+</tr>
+<tr>
+<td>適用先インターフェース</td>
+<td><strong>Ethernet 0/1</strong> (インターネット側)</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h3 id="-最終検証トンネルの開通" tabindex="-1">🏁 最終検証（トンネルの開通） <a class="header-anchor" href="#-最終検証トンネルの開通" aria-hidden="true">#</a></h3>
+<p>すべて設定できたら、ついにトンネルに通信を通します！</p>
+<blockquote>
+<p>✅ <strong>【検証2】</strong></p>
+<ol>
+<li><strong>Tokyo-PC</strong> から <strong>Osaka-PC</strong>（<code>ping 192.168.20.10</code>）へPingを打つ。（最初はトンネル生成のため1〜2回タイムアウトしますが、通るはずです）</li>
+<li><code>show crypto isakmp sa</code> で状態が <code>ACTIVE</code>（または <code>QM_IDLE</code>）になっていることを確認。</li>
+<li><code>show crypto ipsec sa</code> で <code>#pkts encaps</code> と <code>#pkts encrypt</code> のカウンターが増加し、パケットが暗号化されていることを確認。</li>
+</ol>
+</blockquote>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-トポロジとipアドレス設計">🎯 トポロジとIPアドレス設計</a></li>
+<li class="lvl-3"><a href="#ログイン情報">ログイン情報</a></li>
+<li class="lvl-3"><a href="#インターフェース設計">インターフェース設計</a></li>
+<li class="lvl-2"><a href="#-設定パラメータ要件">🏗️ 設定パラメータ要件</a></li>
+<li class="lvl-3"><a href="#要件1ipアドレスとルーティングの基礎">要件1：IPアドレスとルーティングの基礎</a></li>
+<li class="lvl-3"><a href="#要件2ikeフェーズ1isakmp-ポリシーパラメータ">要件2：IKEフェーズ1（ISAKMP ポリシー）パラメータ</a></li>
+<li class="lvl-3"><a href="#要件3ikeフェーズ2ipsec-トランスフォームセットパラメータ">要件3：IKEフェーズ2（IPsec トランスフォームセット）パラメータ</a></li>
+<li class="lvl-3"><a href="#要件4暗号化対象トラフィックの定義acl">要件4：暗号化対象トラフィックの定義（ACL）</a></li>
+<li class="lvl-3"><a href="#要件5crypto-mapクリプトマップの作成と適用">要件5：Crypto Map（クリプトマップ）の作成と適用</a></li>
+<li class="lvl-3"><a href="#-最終検証トンネルの開通">🏁 最終検証（トンネルの開通）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

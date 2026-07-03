@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜ゼロトラスト6観点 実装可能性マトリクス</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>02_基本設計</span></nav>
+      <h1 class="doc-title">テーマZERO｜ゼロトラスト6観点 実装可能性マトリクス</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">feasibility</span><span class="tag">arm64</span><span class="tag">oss</span><span class="tag">matrix</span></span>
+      </div>
+      
+      <div class="content">
+<p>6観点それぞれについて、商用製品を OSS で代替した場合の実装可能性を整理する。
+<strong>arm64 可用性列は 2026-07-04 に clab VM 上で実測確定済み</strong>（<a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果</a>、<a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB.html">軽量検証計画</a> 参照）。17イメージ中15がarm64ネイティブ対応を確認、osquery と clamav の2つが amd64 のみで代替が必要と判明した。</p>
+<h2 id="確度の凡例" tabindex="-1">確度の凡例 <a class="header-anchor" href="#確度の凡例" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>確度</th>
+<th>意味</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>High</td>
+<td>arm64 実績が広く、実装手順が確立。ブロッカーの見込み低い</td>
+</tr>
+<tr>
+<td>Med</td>
+<td>arm64 可用性または実装難度に不確実性あり。検証で確認が必要</td>
+</tr>
+<tr>
+<td>Low</td>
+<td>arm64 非対応の懸念大 or 重量級。代替差し替えを想定</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="マトリクス6観点" tabindex="-1">マトリクス（6観点） <a class="header-anchor" href="#マトリクス6観点" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>観点</th>
+<th>商用製品例</th>
+<th>OSS 確定案</th>
+<th>arm64 可用性※</th>
+<th>リソース見積</th>
+<th>確度</th>
+<th>検証要否</th>
+<th>代替案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>ID統制</td>
+<td>Okta / Entra ID</td>
+<td>Keycloak</td>
+<td>○ 確定（keycloak/openldap ともarm64）</td>
+<td>~512MB-1GB</td>
+<td><strong>High（確定）</strong></td>
+<td>済（manifest確認）</td>
+<td>発展で OpenLDAP 連携</td>
+</tr>
+<tr>
+<td>2</td>
+<td>デバイス統制</td>
+<td>Intune / CrowdStrike</td>
+<td>step-ca + posture claimモック</td>
+<td>step-ca ○ / <strong>osquery ✕（amd64のみ）</strong></td>
+<td>~128-256MB</td>
+<td><strong>Med</strong></td>
+<td>要（mTLS/posture 確認）</td>
+<td>osquery非対応→posture claimモック主軸、実測はamd64エミュ or Wazuhエージェント（発展）</td>
+</tr>
+<tr>
+<td>3</td>
+<td>NWセキュリティ</td>
+<td>Zscaler ZPA / Prisma</td>
+<td>oauth2-proxy → Pomerium</td>
+<td>○ 確定（oauth2-proxy/pomerium/openzitiともarm64）</td>
+<td>~128-256MB</td>
+<td><strong>High（確定）</strong></td>
+<td>要（起動＋拒否確認）</td>
+<td>発展で OpenZiti</td>
+</tr>
+<tr>
+<td>4</td>
+<td>WEBセキュリティ</td>
+<td>Zscaler ZIA / Netskope</td>
+<td>mitmproxy / Squid+Suricata</td>
+<td>○ 確定（mitmproxy/squid/suricata すべてarm64）</td>
+<td>mitmproxy ~256MB / Suricata ~512MB+</td>
+<td><strong>High（確定・Medから上方修正）</strong></td>
+<td>要（SSL bump / IDS）</td>
+<td>3者ともarm64対応のため選択自由。軽量ならmitmproxy一本化</td>
+</tr>
+<tr>
+<td>5</td>
+<td>DLP / IRM</td>
+<td>各種 DLP</td>
+<td>mitmproxy Python アドオン</td>
+<td>mitmproxy ○ / <strong>clamav ✕（amd64のみ）</strong></td>
+<td>SWG と兼務</td>
+<td><strong>High</strong></td>
+<td>要（アドオン動作）</td>
+<td>ClamAV非対応が確定→c-icap+ClamAV路線は破棄、mitmproxyキーワード検査アドオンに一本化</td>
+</tr>
+<tr>
+<td>6</td>
+<td>SIEM</td>
+<td>Splunk / Sentinel</td>
+<td>Grafana+Loki+Promtail</td>
+<td>○ 確定（grafana/loki/promtail arm64、wazuhはタグ明示で可）</td>
+<td>Loki+Grafana ~512MB / Wazuh ~2-4GB</td>
+<td><strong>High（Loki）/ Med（Wazuh）</strong></td>
+<td>要（Loki=軽・Wazuh=重）</td>
+<td>Wazuhは<code>latest</code>不在→バージョンタグ必須。重すぎればLoki一本</td>
+</tr>
+</tbody>
+</table></div>
+<p>※ arm64 可用性は 2026-07-04 実測確定。詳細は <a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果_2026-07-04.md</a>。<strong>要対応2件</strong>: osquery（観点②）・clamav（観点⑤）が amd64 のみ。いずれも代替で観点自体は成立する。</p>
+<h2 id="共通基盤による集約" tabindex="-1">共通基盤による集約 <a class="header-anchor" href="#共通基盤による集約" aria-hidden="true">#</a></h2>
+<p>リソース圧縮のため、複数観点を1コンポーネントに集約する。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>集約先</th>
+<th>兼務する観点</th>
+<th>効果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>mitmproxy</td>
+<td>WEBセキュリティ(4) + DLP(5)</td>
+<td>同一プロキシ経路で検査と持ち出し制御を両立。Suricata/c-icap の追加を回避</td>
+</tr>
+<tr>
+<td>Pomerium</td>
+<td>NWセキュリティ(3) + 認可ポリシー</td>
+<td>IAP と認可判断を1点に集約。step-ca の posture を入力にできる</td>
+</tr>
+<tr>
+<td>Keycloak</td>
+<td>ID統制(1) + ユーザー DB</td>
+<td>内蔵 DB で IdP を完結。OpenLDAP は発展時のみ</td>
+</tr>
+<tr>
+<td>Loki+Grafana</td>
+<td>SIEM(6) 先行</td>
+<td>Wazuh（重量）を後回しにし、早期に可視化基盤を確保</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="リソース総量の見立て" tabindex="-1">リソース総量の見立て <a class="header-anchor" href="#リソース総量の見立て" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>Loki 先行構成</strong>（Phase 3 まで）: おおよそ 1.5-2GB 級を見込む（Keycloak + Pomerium + Loki/Grafana + multitool 3台）。</li>
+<li><strong>フル構成</strong>（Phase 6 まで、Wazuh 導入時）: Wazuh 2-4GB を上乗せするため要検証。VM のメモリ次第で Loki 一本に留める判断がありうる（D-4）。</li>
+<li>数値は目安。確定は軽量検証（起動時 RSS の実測）で更新する。</li>
+</ul>
+<h2 id="検証で確定した論点2026-07-04" tabindex="-1">検証で確定した論点（2026-07-04） <a class="header-anchor" href="#検証で確定した論点2026-07-04" aria-hidden="true">#</a></h2>
+<ol>
+<li><s>Keycloak / Pomerium / Loki / Grafana / Promtail の arm64 マニフェスト有無</s> → <strong>全て arm64 対応を確認（確定）</strong>。</li>
+<li>mitmproxy の SSL bump がラボ内で成立するか → イメージは arm64 確認済み。<strong>アドオンでの DLP 動作は Phase 4-5 デプロイ時に実機確認</strong>（今回スコープ外）。</li>
+<li><s>Squid・Suricata の arm64 可用性</s> → <strong>両者とも arm64 対応を確認</strong>。mitmproxy 一本化は不要になったが、軽量化のため任意で選べる。</li>
+<li>Wazuh の arm64 可用性 → <strong>バージョンタグ（例 <code>4.14.6</code>）で arm64 対応を確認</strong>。<code>latest</code> タグは存在しないため明示指定が必須。メモリ実測は Phase 6 デプロイ時。</li>
+<li>step-ca の mTLS 発行フロー → イメージは arm64 確認済み。<strong>posture claim モックの実装は Phase 6 で実機検証</strong>。</li>
+</ol>
+<h2 id="残る要対応今回の実測で判明" tabindex="-1">残る要対応（今回の実測で判明） <a class="header-anchor" href="#残る要対応今回の実測で判明" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>内容</th>
+<th>対応方針</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>osquery（観点②）</td>
+<td>公式イメージが amd64 のみ</td>
+<td>posture claim モックを主軸にし、実デバイス情報が要る場合のみ amd64 エミュ or Wazuh エージェント（発展）</td>
+</tr>
+<tr>
+<td>clamav（観点⑤）</td>
+<td>公式イメージが amd64 のみ</td>
+<td>c-icap+ClamAV 路線を破棄し、mitmproxy のキーワード検査アドオンに一本化</td>
+</tr>
+<tr>
+<td>wazuh（観点⑥）</td>
+<td><code>latest</code> タグ不在</td>
+<td>バージョンタグ明示。重量級のため Phase 6 まで導入は保留（Loki 先行）</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>判定基準・代替差し替えルールは <a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB.html">軽量検証計画</a> に定義。<strong>結論: 6観点すべて arm64 × OSS で実装の見込みが立った</strong>（②のデバイス実測のみモック運用が前提）。</p>
+</blockquote>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#確度の凡例">確度の凡例</a></li>
+<li class="lvl-2"><a href="#マトリクス6観点">マトリクス（6観点）</a></li>
+<li class="lvl-2"><a href="#共通基盤による集約">共通基盤による集約</a></li>
+<li class="lvl-2"><a href="#リソース総量の見立て">リソース総量の見立て</a></li>
+<li class="lvl-2"><a href="#検証で確定した論点2026-07-04">検証で確定した論点（2026-07-04）</a></li>
+<li class="lvl-2"><a href="#残る要対応今回の実測で判明">残る要対応（今回の実測で判明）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

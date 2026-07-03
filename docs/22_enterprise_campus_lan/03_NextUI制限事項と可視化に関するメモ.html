@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Containerlab NextUIの制限事項と可視化に関するメモ</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>22_enterprise_campus_lan</span></nav>
+      <h1 class="doc-title">Containerlab NextUIの制限事項と可視化に関するメモ</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="事象の概要" tabindex="-1">事象の概要 <a class="header-anchor" href="#事象の概要" aria-hidden="true">#</a></h2>
+<p>大規模キャンパスネットワーク（Core/Distribution/Accessの3階層モデル）において、Containerlab標準の可視化機能（NextUIベースの <code>containerlab graph</code> や VS CodeのContainerlab拡張機能）を用いたトポロジ図のレイアウト調整を試みたが、直感的で美しい階層構造（トップダウン）を実現できなかった。</p>
+<h2 id="試行錯誤の履歴とうまくいかなかったこと" tabindex="-1">試行錯誤の履歴とうまくいかなかったこと <a class="header-anchor" href="#試行錯誤の履歴とうまくいかなかったこと" aria-hidden="true">#</a></h2>
+<h3 id="1-group-パラメータの使用" tabindex="-1">1. <code>group</code> パラメータの使用 <a class="header-anchor" href="#1-group-パラメータの使用" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>試したこと</strong>: <code>campus.clab.yml</code> の各ノードに <code>group</code> 属性（例: &quot;Area 0&quot;, &quot;Area 1&quot;）を設定した。</li>
+<li><strong>結果</strong>: 物理エンジンベースの配置においてノードの色分けや緩いクラスタリングには寄与したが、Mermaidのような明確な論理ボックス（枠線）が描画されるわけではなく、線が絡まり合うカオスな状態の根本的な解決にはならなかった。</li>
+</ul>
+<h3 id="2-graph-level-ラベルとauto階層レイアウトの使用" tabindex="-1">2. <code>graph-level</code> ラベルとAuto（階層）レイアウトの使用 <a class="header-anchor" href="#2-graph-level-ラベルとauto階層レイアウトの使用" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>試したこと</strong>: 各ノードの <code>labels</code> に <code>graph-level</code> を指定（Internetを1、エンドポイントを6など）し、さらに <code>graph-icon</code> でアイコンを指定。その後、VS CodeのNextUIツールバーからレイアウトアルゴリズムを「Auto（ツリー型の階層レイアウト）」に変更した。</li>
+<li><strong>結果</strong>:
+<ul>
+<li>線の絡まりは解消され、ツリー状に整列することには成功した。</li>
+<li>しかし、<strong>「ディストリビューション層が最上部に配置され、インターネットやISPが最下部に配置される」という完全に上下逆さまのトポロジ</strong>としてレンダリングされてしまった。</li>
+<li><code>graph-level</code> の数値を逆に設定（Internetを6にするなど）しても、NextUI内部のDAG（有向非巡回グラフ）計算アルゴリズムの仕様により、直感的な起点のコントロールができなかった。</li>
+</ul>
+</li>
+</ul>
+<h2 id="結論と今後の可視化方針" tabindex="-1">結論と今後の可視化方針 <a class="header-anchor" href="#結論と今後の可視化方針" aria-hidden="true">#</a></h2>
+<p>Containerlab標準のNextUIでは、複雑な階層型キャンパスネットワークを「意図した通りのトップダウン配置」で厳密に固定・描画するのは限界がある（機能不足・仕様のブラックボックス化）。</p>
+<p><strong>対策・代替案の検討:</strong></p>
+<ol>
+<li><strong>外部ツールの活用</strong>: NextUIに固執せず、Pythonの <code>diagrams</code> ライブラリや、Vis.js（HTML/JS）によるカスタム可視化を利用する。</li>
+<li><strong>AI(Claude)への相談</strong>: Containerlab環境において、YAMLからDraw.io形式を自動出力させるツールや、より高機能な <code>Netreplica Graphite</code> などを導入するベストプラクティスを検討・模索する。</li>
+</ol>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#事象の概要">事象の概要</a></li>
+<li class="lvl-2"><a href="#試行錯誤の履歴とうまくいかなかったこと">試行錯誤の履歴とうまくいかなかったこと</a></li>
+<li class="lvl-3"><a href="#1-group-パラメータの使用">1. group パラメータの使用</a></li>
+<li class="lvl-3"><a href="#2-graph-level-ラベルとauto階層レイアウトの使用">2. graph-level ラベルとAuto（階層）レイアウトの使用</a></li>
+<li class="lvl-2"><a href="#結論と今後の可視化方針">結論と今後の可視化方針</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

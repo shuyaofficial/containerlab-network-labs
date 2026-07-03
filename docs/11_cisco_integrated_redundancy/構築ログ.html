@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマ11: 統合冗長（Track × HSRP × OSPF）構築ログ</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>11_cisco_integrated_redundancy</span></nav>
+      <h1 class="doc-title">テーマ11: 統合冗長（Track × HSRP × OSPF）構築ログ</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="構築で発生した問題" tabindex="-1">構築で発生した問題 <a class="header-anchor" href="#構築で発生した問題" aria-hidden="true">#</a></h2>
+<h3 id="問題1-r1ルーターにl2スイッチ用のイメージ設定を使用してしまった" tabindex="-1">問題1: R1（ルーター）にL2スイッチ用のイメージ・設定を使用してしまった <a class="header-anchor" href="#問題1-r1ルーターにl2スイッチ用のイメージ設定を使用してしまった" aria-hidden="true">#</a></h3>
+<h4>発生日時</h4>
+<p>2026-06-03 14:37 頃</p>
+<h4>事象</h4>
+<ul>
+<li>初回のトポロジファイル作成時、<code>type: l2</code> を <code>kinds</code> 配下にグローバル設定してしまった。</li>
+<li>さらに、R1（純粋なルーターとして使用する機器）にも L2スイッチ用のイメージ <code>L2-advipservices-2017</code> を割り当ててしまった。</li>
+<li>R1はインターネット側のコアルーターであり、OSPF + Loopback0 (8.8.8.8) のみを動かす純粋なルーターのため、L2スイッチモードで起動させるのは明確に間違い。</li>
+</ul>
+<h4>誤っていたトポロジファイル（修正前）</h4>
+<pre><code class="language-yaml"><span class="hljs-attr">topology:</span>
+  <span class="hljs-attr">kinds:</span>
+    <span class="hljs-attr">cisco_iol:</span>
+      <span class="hljs-attr">type:</span> <span class="hljs-string">l2</span>     <span class="hljs-comment"># ← 全ノードにL2を適用してしまっている（NG）</span>
+
+  <span class="hljs-attr">nodes:</span>
+    <span class="hljs-attr">r1:</span>
+      <span class="hljs-attr">kind:</span> <span class="hljs-string">cisco_iol</span>
+      <span class="hljs-attr">image:</span> <span class="hljs-string">vrnetlab/cisco_iol:L2-advipservices-2017</span>  <span class="hljs-comment"># ← ルーターにL2イメージ（NG）</span>
+</code></pre>
+<h4>修正後のトポロジファイル</h4>
+<pre><code class="language-yaml"><span class="hljs-attr">topology:</span>
+  <span class="hljs-attr">nodes:</span>
+    <span class="hljs-attr">r1:</span>
+      <span class="hljs-attr">kind:</span> <span class="hljs-string">cisco_iol</span>
+      <span class="hljs-attr">image:</span> <span class="hljs-string">vrnetlab/cisco_iol:15.7.3M2</span>  <span class="hljs-comment"># ルーター用イメージ（L2-なし）</span>
+      <span class="hljs-comment"># type 指定なし = ルーターモードで起動（正しい）</span>
+    <span class="hljs-attr">sw1:</span>
+      <span class="hljs-attr">kind:</span> <span class="hljs-string">cisco_iol</span>
+      <span class="hljs-attr">image:</span> <span class="hljs-string">vrnetlab/cisco_iol:L2-advipservices-2017</span>
+      <span class="hljs-attr">type:</span> <span class="hljs-string">l2</span>     <span class="hljs-comment"># L3スイッチとしてL2モードで起動（正しい）</span>
+    <span class="hljs-attr">sw2:</span>
+      <span class="hljs-attr">kind:</span> <span class="hljs-string">cisco_iol</span>
+      <span class="hljs-attr">image:</span> <span class="hljs-string">vrnetlab/cisco_iol:L2-advipservices-2017</span>
+      <span class="hljs-attr">type:</span> <span class="hljs-string">l2</span>
+</code></pre>
+<h4>教訓</h4>
+<ul>
+<li><strong>機器の「役割」を先に明確にしてからイメージを選定する</strong>こと。
+<ul>
+<li>ルーター → <code>L2-</code> プレフィックスなしのイメージ、<code>type</code> 指定なし</li>
+<li>L3スイッチ → <code>L2-advipservices-2017</code>、<code>type: l2</code></li>
+<li>L2スイッチ → <code>L2-15.2</code>、<code>type: l2</code></li>
+</ul>
+</li>
+<li><strong><code>type: l2</code> をグローバル設定にしない</strong>こと。ルーターとスイッチが混在する場合、各ノードに個別に設定する。</li>
+<li>詳細なルールは <a href="../%E5%88%87%E3%82%8A%E5%88%86%E3%81%91/containerlab_iol_quirks.html">containerlab_iol_quirks.md</a> の「§6」に記載済み。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#構築で発生した問題">構築で発生した問題</a></li>
+<li class="lvl-3"><a href="#問題1-r1ルーターにl2スイッチ用のイメージ設定を使用してしまった">問題1: R1（ルーター）にL2スイッチ用のイメージ・設定を使用してしまった</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

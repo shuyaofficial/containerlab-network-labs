@@ -1,0 +1,31 @@
+enable
+configure terminal
+hostname core1
+ip routing
+no ip domain-lookup
+interface Loopback0
+ip address 10.255.0.1 255.255.255.255
+interface Ethernet0/1
+no switchport
+ip address 10.0.0.1 255.255.255.252
+no shutdown
+interface Ethernet0/2
+no switchport
+ip address 10.0.0.5 255.255.255.252
+no shutdown
+interface Ethernet0/3
+no switchport
+ip address 10.0.0.9 255.255.255.252
+no shutdown
+interface Ethernet1/0
+no switchport
+ip address 10.0.0.21 255.255.255.252
+no shutdown
+interface Ethernet1/1
+no switchport
+ip address 10.0.1.29 255.255.255.252
+no shutdown
+interface range Ethernet1/2-3
+shutdown
+end
+write memory

@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜要件定義書</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>01_要件定義</span></nav>
+      <h1 class="doc-title">テーマZERO｜要件定義書</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-03</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">requirements</span><span class="tag">arm64</span><span class="tag">oss</span><span class="tag">feasibility</span></span>
+      </div>
+      
+      <div class="content">
+<h2 id="背景目的" tabindex="-1">背景・目的 <a class="header-anchor" href="#背景目的" aria-hidden="true">#</a></h2>
+<p>商用ゼロトラスト（ZT）製品は個人検証が難しい。代表例と制約は次のとおり。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>商用製品カテゴリ</th>
+<th>代表製品</th>
+<th>個人検証の制約</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SSE / IAP</td>
+<td>Cisco Secure Access, Zscaler ZPA</td>
+<td>ライセンス契約前提。無償評価も法人審査あり</td>
+</tr>
+<tr>
+<td>SWG / CASB</td>
+<td>Zscaler ZIA, Netskope</td>
+<td>クラウド配信型で個人テナント不可</td>
+</tr>
+<tr>
+<td>NGFW / IAP</td>
+<td>Palo Alto Prisma Access</td>
+<td>サブスクリプション必須。x86 前提</td>
+</tr>
+<tr>
+<td>EDR / MDM</td>
+<td>CrowdStrike, Intune</td>
+<td>法人契約・実端末管理が前提</td>
+</tr>
+</tbody>
+</table></div>
+<p>そこで本ラボは <strong>OSS × arm64 だけでゼロトラストの6観点が成立するか</strong>を先行検証する。
+狙いは「完成した ZT 環境の構築」ではなく、<strong>各観点が OSS で代替可能かの実装可能性を確かめること</strong>（PoC の前段）。</p>
+<ul>
+<li>位置づけ: ロードマップ PHASE2（テーマ28-44）の前哨。ここで見込みが立った観点を、後続テーマで本格実装する。</li>
+<li>ユーザー決定: 見込みが立てば実デプロイは不要。今回スコープは設計書一式 ＋ Phase 0 土台 ＋ arm64 軽量検証まで。</li>
+</ul>
+<h2 id="対象範囲" tabindex="-1">対象範囲 <a class="header-anchor" href="#対象範囲" aria-hidden="true">#</a></h2>
+<h3 id="ゼロトラスト6観点の定義と商用製品対応" tabindex="-1">ゼロトラスト6観点の定義と商用製品対応 <a class="header-anchor" href="#ゼロトラスト6観点の定義と商用製品対応" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>観点</th>
+<th>定義（本ラボでの意味）</th>
+<th>代替する商用カテゴリ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>ID統制</td>
+<td>誰であるかを IdP で一元検証（SSO / OIDC）</td>
+<td>IDaaS（Okta, Entra ID）</td>
+</tr>
+<tr>
+<td>2</td>
+<td>デバイス統制</td>
+<td>端末の正当性・状態（posture）を検証</td>
+<td>MDM / EPP / EDR</td>
+</tr>
+<tr>
+<td>3</td>
+<td>NWセキュリティ</td>
+<td>アプリ手前で認証・認可を強制（IAP）</td>
+<td>ZTNA / IAP（ZPA 等）</td>
+</tr>
+<tr>
+<td>4</td>
+<td>WEBセキュリティ</td>
+<td>外向き Web 通信を検査・制御</td>
+<td>SWG / CASB</td>
+</tr>
+<tr>
+<td>5</td>
+<td>DLP / IRM</td>
+<td>機密データの持ち出しを検知・ブロック</td>
+<td>DLP</td>
+</tr>
+<tr>
+<td>6</td>
+<td>SIEM</td>
+<td>全観点のログを集約・可視化・相関</td>
+<td>SIEM / SOAR</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="スコープ内" tabindex="-1">スコープ内 <a class="header-anchor" href="#スコープ内" aria-hidden="true">#</a></h3>
+<ul>
+<li>上記6観点の要件定義・基本設計・論理設計・IP 設計。</li>
+<li>各観点を代替する OSS の実装可能性マトリクスと段階ロードマップ。</li>
+<li>Phase 0 土台（docker network + multitool <code>client</code> / <code>app</code> / <code>external</code>）の設計。</li>
+<li>arm64 可用性の軽量検証計画（実施と結果は別タスク）。</li>
+<li>各 Phase の試験計画・切り分け手順・構築ログ雛形・Phase 実装スタブ。</li>
+</ul>
+<h3 id="スコープ外" tabindex="-1">スコープ外 <a class="header-anchor" href="#スコープ外" aria-hidden="true">#</a></h3>
+<ul>
+<li>Phase 1-6 の実デプロイ（見込み確認で十分というユーザー決定）。</li>
+<li>IOL（IOS-XE エミュレータ）との連携（発展課題として明記）。</li>
+<li>商用製品そのものの検証（ライセンス制約により不可）。</li>
+<li>解説ドキュメント（別タスクが担当）。</li>
+</ul>
+<h2 id="機能要件" tabindex="-1">機能要件 <a class="header-anchor" href="#機能要件" aria-hidden="true">#</a></h2>
+<p>観点ごとに、代替 OSS が満たすべき機能を定義する。詳細な OSS 選定根拠は <a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E5%AE%9F%E8%A3%85%E5%8F%AF%E8%83%BD%E6%80%A7%E3%83%9E%E3%83%88%E3%83%AA%E3%82%AF%E3%82%B9.html">実装可能性マトリクス</a>。</p>
+<h3 id="fr-1-id統制idp--sso-代替" tabindex="-1">FR-1 ID統制（IdP / SSO 代替） <a class="header-anchor" href="#fr-1-id統制idp--sso-代替" aria-hidden="true">#</a></h3>
+<ul>
+<li>OIDC の認可コードフローで ID トークン・アクセストークンを発行できること。</li>
+<li>内蔵ユーザー DB でユーザー・ロールを管理できること（発展: OpenLDAP 連携）。</li>
+<li>採用 OSS: <strong>Keycloak</strong>。</li>
+</ul>
+<h3 id="fr-2-デバイス統制mdm--epp--edr-代替" tabindex="-1">FR-2 デバイス統制（MDM / EPP / EDR 代替） <a class="header-anchor" href="#fr-2-デバイス統制mdm--epp--edr-代替" aria-hidden="true">#</a></h3>
+<ul>
+<li>端末証明書（mTLS）で「管理された端末か」を検証できること。</li>
+<li>posture claim（端末状態を表す属性）をモックし、認可判断の入力にできること。</li>
+<li>採用 OSS: <strong>step-ca</strong>（mTLS + posture claim モック）＋ osquery 補助。発展: Wazuh エージェント。</li>
+</ul>
+<h3 id="fr-3-nwセキュリティiap--ztna-代替" tabindex="-1">FR-3 NWセキュリティ（IAP / ZTNA 代替） <a class="header-anchor" href="#fr-3-nwセキュリティiap--ztna-代替" aria-hidden="true">#</a></h3>
+<ul>
+<li>保護対象アプリの手前で未認証アクセスを拒否できること。</li>
+<li>IdP へ認証を委譲し、認可済みリクエストのみ転送できること。</li>
+<li>採用 OSS: <strong>oauth2-proxy → Pomerium</strong>（発展: OpenZiti）。</li>
+</ul>
+<h3 id="fr-4-webセキュリティswg--casb-代替" tabindex="-1">FR-4 WEBセキュリティ（SWG / CASB 代替） <a class="header-anchor" href="#fr-4-webセキュリティswg--casb-代替" aria-hidden="true">#</a></h3>
+<ul>
+<li>外向き Web 通信を proxy 経由に強制できること。</li>
+<li>SSL bump（TLS 復号）で通信内容を可視化できること。</li>
+<li>IDS で不審通信を検知し、SIEM に発報できること。</li>
+<li>採用 OSS: <strong>mitmproxy</strong> または <strong>Squid（SSL bump）＋ Suricata（IDS）</strong>。</li>
+</ul>
+<h3 id="fr-5-dlp--irm-代替" tabindex="-1">FR-5 DLP / IRM 代替 <a class="header-anchor" href="#fr-5-dlp--irm-代替" aria-hidden="true">#</a></h3>
+<ul>
+<li>アップロード内容を検査し、機密キーワードを含むデータの持ち出しを検知・ブロックできること。</li>
+<li>検知イベントを SIEM に記録できること。</li>
+<li>採用 OSS: <strong>mitmproxy Python アドオン</strong>（SWG と兼務）。</li>
+</ul>
+<h3 id="fr-6-siem-代替" tabindex="-1">FR-6 SIEM 代替 <a class="header-anchor" href="#fr-6-siem-代替" aria-hidden="true">#</a></h3>
+<ul>
+<li>各観点のログを集約・保存・検索できること。</li>
+<li>ダッシュボードで「セキュリティ機構が効いている証拠」を可視化できること。</li>
+<li>採用 OSS: <strong>Grafana + Loki + Promtail</strong>（軽量先行）。発展: <strong>Wazuh</strong>（統合・4GB 級、要検証）。</li>
+</ul>
+<h2 id="非機能要件" tabindex="-1">非機能要件 <a class="header-anchor" href="#非機能要件" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>分類</th>
+<th>要件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NFR-1</td>
+<td>アーキ制約</td>
+<td>全コンポーネントが <strong>arm64 マニフェスト</strong>を持つこと。x86 専用は不可</td>
+</tr>
+<tr>
+<td>NFR-2</td>
+<td>リソース</td>
+<td>VM 全体のメモリ上限を意識し、共通基盤（mitmproxy/Keycloak/Pomerium）に集約すること。目安は <a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E5%AE%9F%E8%A3%85%E5%8F%AF%E8%83%BD%E6%80%A7%E3%83%9E%E3%83%88%E3%83%AA%E3%82%AF%E3%82%B9.html">実装可能性マトリクス</a> のリソース見積を参照</td>
+</tr>
+<tr>
+<td>NFR-3</td>
+<td>再構築性</td>
+<td><code>deploy.sh</code> と設定ファイルから冪等に再構築できること。手作業の秘伝は残さない</td>
+</tr>
+<tr>
+<td>NFR-4</td>
+<td>移植性</td>
+<td>絶対パス埋め込み禁止・NFC ファイル名・相対リンクで GitHub 移植可能なこと</td>
+</tr>
+<tr>
+<td>NFR-5</td>
+<td>可観測性</td>
+<td>各 Phase の効果がログで観測できること（Phase 3 SIEM を早期投入）</td>
+</tr>
+<tr>
+<td>NFR-6</td>
+<td>分離</td>
+<td>docker bridge でゾーンを分離し、ゾーン間通信は設計した経路のみとすること</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="ゾーン設計方針" tabindex="-1">ゾーン設計方針 <a class="header-anchor" href="#ゾーン設計方針" aria-hidden="true">#</a></h2>
+<p>4ゾーンに分割し、docker bridge で分離する。詳細は <a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88%E6%9B%B8.html">基本設計書</a>・<a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/IP%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9%E7%AE%A1%E7%90%86%E8%A1%A8.html">IPアドレス管理表</a>。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ゾーン</th>
+<th>役割</th>
+<th>サブネット（予定）</th>
+<th>主なコンポーネント</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Untrust</td>
+<td>信頼しない端末側</td>
+<td>172.30.0.0/24</td>
+<td>client, external</td>
+</tr>
+<tr>
+<td>DMZ（認可層）</td>
+<td>認証・認可・検査の関所</td>
+<td>172.30.10.0/24</td>
+<td>Keycloak, Pomerium, mitmproxy, step-ca</td>
+</tr>
+<tr>
+<td>Trust（業務）</td>
+<td>保護対象サービス</td>
+<td>172.30.20.0/24</td>
+<td>app</td>
+</tr>
+<tr>
+<td>可観測</td>
+<td>ログ集約・可視化</td>
+<td>172.30.30.0/24</td>
+<td>Loki, Promtail, Grafana</td>
+</tr>
+</tbody>
+</table></div>
+<p>方針:</p>
+<ul>
+<li>Untrust から Trust への <strong>直接通信は禁止</strong>。必ず DMZ（認可層）を経由する。</li>
+<li>外向き Web 通信は DMZ の SWG を強制経由する。</li>
+<li>全ゾーンのログは可観測ゾーンへ集約する。</li>
+</ul>
+<h2 id="制約" tabindex="-1">制約 <a class="header-anchor" href="#制約" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>arm64 必須</strong>（NFR-1）。arm64 マニフェスト非対応の OSS は代替差し替えルール（<a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB.html">軽量検証計画</a>）に従う。</li>
+<li><strong>IOL 非連携</strong>。x86 エミュで重く（1ノード起動 約2分）、ZT の主眼（L7 認可）と噛み合わないため docker network で閉じる。</li>
+<li><strong>docker network のみ</strong>で完結。L2/L3 の作り込みは行わない。</li>
+<li>Phase 1-6 は今回デプロイしない。</li>
+</ul>
+<h2 id="受け入れ基準" tabindex="-1">受け入れ基準 <a class="header-anchor" href="#受け入れ基準" aria-hidden="true">#</a></h2>
+<p>各 Phase のゲート条件をそのまま受け入れ基準とする。今回スコープは AC-0 と AC-検証の達成。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>対応 Phase</th>
+<th>受け入れ基準</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AC-0</td>
+<td>Phase 0</td>
+<td><code>client</code> → <code>app</code> 疎通。規約（frontmatter / HTML ビルド / git）が回る</td>
+</tr>
+<tr>
+<td>AC-検証</td>
+<td>軽量検証</td>
+<td>主要 OSS の arm64 可用性が判定され、代替差し替えが必要な観点が特定される</td>
+</tr>
+<tr>
+<td>AC-1</td>
+<td>Phase 1</td>
+<td>OIDC トークンを <code>curl</code> / ブラウザで取得できる</td>
+</tr>
+<tr>
+<td>AC-2</td>
+<td>Phase 2</td>
+<td>未認証拒否・Keycloak ログイン後のみ <code>app</code> 到達</td>
+</tr>
+<tr>
+<td>AC-3</td>
+<td>Phase 3</td>
+<td>Phase 1/2 ログが Grafana 表示</td>
+</tr>
+<tr>
+<td>AC-4</td>
+<td>Phase 4</td>
+<td>proxy 経由強制・SSL bump 可視化・IDS 発報→Loki</td>
+</tr>
+<tr>
+<td>AC-5</td>
+<td>Phase 5</td>
+<td>キーワード含むアップロード検知・ブロック・SIEM 記録</td>
+</tr>
+<tr>
+<td>AC-6</td>
+<td>Phase 6</td>
+<td>証明書なし端末拒否・posture claim で条件分岐</td>
+</tr>
+</tbody>
+</table></div>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#背景目的">背景・目的</a></li>
+<li class="lvl-2"><a href="#対象範囲">対象範囲</a></li>
+<li class="lvl-3"><a href="#ゼロトラスト6観点の定義と商用製品対応">ゼロトラスト6観点の定義と商用製品対応</a></li>
+<li class="lvl-3"><a href="#スコープ内">スコープ内</a></li>
+<li class="lvl-3"><a href="#スコープ外">スコープ外</a></li>
+<li class="lvl-2"><a href="#機能要件">機能要件</a></li>
+<li class="lvl-3"><a href="#fr-1-id統制idp--sso-代替">FR-1 ID統制（IdP / SSO 代替）</a></li>
+<li class="lvl-3"><a href="#fr-2-デバイス統制mdm--epp--edr-代替">FR-2 デバイス統制（MDM / EPP / EDR 代替）</a></li>
+<li class="lvl-3"><a href="#fr-3-nwセキュリティiap--ztna-代替">FR-3 NWセキュリティ（IAP / ZTNA 代替）</a></li>
+<li class="lvl-3"><a href="#fr-4-webセキュリティswg--casb-代替">FR-4 WEBセキュリティ（SWG / CASB 代替）</a></li>
+<li class="lvl-3"><a href="#fr-5-dlp--irm-代替">FR-5 DLP / IRM 代替</a></li>
+<li class="lvl-3"><a href="#fr-6-siem-代替">FR-6 SIEM 代替</a></li>
+<li class="lvl-2"><a href="#非機能要件">非機能要件</a></li>
+<li class="lvl-2"><a href="#ゾーン設計方針">ゾーン設計方針</a></li>
+<li class="lvl-2"><a href="#制約">制約</a></li>
+<li class="lvl-2"><a href="#受け入れ基準">受け入れ基準</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

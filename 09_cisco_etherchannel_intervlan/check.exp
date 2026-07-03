@@ -1,0 +1,21 @@
+#!/usr/bin/expect -f
+set timeout 10
+spawn ssh clab@orb "sudo docker exec -i clab-cisco-etherchannel-sw1 telnet localhost 23"
+expect "sw1#"
+send "show etherchannel detail\r"
+expect "sw1#"
+send "show run interface port-channel 1\r"
+expect "sw1#"
+send "show run interface e0/1\r"
+expect "sw1#"
+send "exit\r"
+
+spawn ssh clab@orb "sudo docker exec -i clab-cisco-etherchannel-sw2 telnet localhost 23"
+expect "sw2#"
+send "show etherchannel detail\r"
+expect "sw2#"
+send "show run interface port-channel 1\r"
+expect "sw2#"
+send "show run interface e0/1\r"
+expect "sw2#"
+send "exit\r"

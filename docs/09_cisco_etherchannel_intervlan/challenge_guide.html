@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>🚀 Challenge 09: EtherChannel (LACP) &amp; Inter-VLAN Routing (SVI)</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>09_cisco_etherchannel_intervlan</span></nav>
+      <h1 class="doc-title">🚀 Challenge 09: EtherChannel (LACP) &amp; Inter-VLAN Routing (SVI)</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>メンター対応: <strong>Theme G / Theme F発展</strong>　｜　難易度: 中級</p>
+<hr>
+<h2 id="-トポロジーと設計要件" tabindex="-1">🗺️ トポロジーと設計要件 <a class="header-anchor" href="#-トポロジーと設計要件" aria-hidden="true">#</a></h2>
+<p>SW1（コア・L3）と SW2（アクセス・L2）の間を <strong>2本のケーブル</strong> で繋ぎます。
+STPのままだとループを防ぐために1本が「通行止め（Blocking）」になりますが、今回は <strong>EtherChannel（LACP）</strong> を使って2本を「極太の1本」に論理的に束ね、両方とも通信に使えるようにします。
+さらに、SW1 で <strong>SVI（Switch Virtual Interface）</strong> を作成し、異なるVLAN間（営業部と開発部）でルーティング（通信）できるようにします。</p>
+<pre><code class="language-text">        [ SW1 (Core/L3) ]
+          │          │ 
+     e0/1 │          │ e0/2
+   (LACP EtherChannel: Po1)
+          │          │
+     e0/1 │          │ e0/2
+        [ SW2 (Access/L2) ]
+          │          │
+     e0/3 │          │ e1/0
+       VLAN10      VLAN20
+        [PC1]      [PC2]
+    10.10.10.11  10.10.20.12
+</code></pre>
+<h3 id="1-vlan--ip-設計" tabindex="-1">1. VLAN / IP 設計 <a class="header-anchor" href="#1-vlan--ip-設計" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>デバイス</th>
+<th>役割</th>
+<th>インターフェース</th>
+<th>設定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>SW1</strong></td>
+<td>コア/L3SW</td>
+<td>e0/1, e0/2</td>
+<td>LACP トランク (Port-channel 1)</td>
+</tr>
+<tr>
+<td><strong>SW1</strong></td>
+<td>〃</td>
+<td>SVI (VLAN 10)</td>
+<td><code>10.10.10.254/24</code> (VLAN10のゲートウェイ)</td>
+</tr>
+<tr>
+<td><strong>SW1</strong></td>
+<td>〃</td>
+<td>SVI (VLAN 20)</td>
+<td><code>10.10.20.254/24</code> (VLAN20のゲートウェイ)</td>
+</tr>
+<tr>
+<td><strong>SW2</strong></td>
+<td>アクセスSW</td>
+<td>e0/1, e0/2</td>
+<td>LACP トランク (Port-channel 1)</td>
+</tr>
+<tr>
+<td><strong>SW2</strong></td>
+<td>〃</td>
+<td>e0/3</td>
+<td>アクセス VLAN 10</td>
+</tr>
+<tr>
+<td><strong>SW2</strong></td>
+<td>〃</td>
+<td>e1/0</td>
+<td>アクセス VLAN 20</td>
+</tr>
+<tr>
+<td><strong>PC1</strong></td>
+<td>linux</td>
+<td>eth1</td>
+<td><code>10.10.10.11/24</code>, GW: <code>10.10.10.254</code></td>
+</tr>
+<tr>
+<td><strong>PC2</strong></td>
+<td>linux</td>
+<td>eth1</td>
+<td><code>10.10.20.12/24</code>, GW: <code>10.10.20.254</code></td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="-3つのミッション要件" tabindex="-1">🎯 3つのミッション（要件） <a class="header-anchor" href="#-3つのミッション要件" aria-hidden="true">#</a></h2>
+<p>※ <code>mentor_guidelines.md</code> に則り、コマンドは記載していません！設定の目的を読み解いてチャレンジしてください。</p>
+<h3 id="mission-1-etherchannel-lacp-の構築" tabindex="-1">Mission 1: EtherChannel (LACP) の構築 <a class="header-anchor" href="#mission-1-etherchannel-lacp-の構築" aria-hidden="true">#</a></h3>
+<ol>
+<li><strong>SW1</strong> と <strong>SW2</strong> の <code>e0/1</code> と <code>e0/2</code> を束ねて、<strong>Port-channel 1</strong> を作成してください。プロトコルは標準規格の <strong>LACP (active)</strong> を使用します。</li>
+<li>作成した論理インターフェース（<code>Port-channel 1</code>）を <strong>802.1Q トランク</strong> に設定し、VLAN 10 と 20 の通信を許可してください。
+<ul>
+<li><em>確認ポイント:</em> <code>show etherchannel summary</code> で <code>Po1(SU)</code> になっているか？ <code>show spanning-tree</code> で e0/1 や e0/2 が個別にブロックされず、<code>Po1</code> としてFWDになっているか？</li>
+</ul>
+</li>
+</ol>
+<h3 id="mission-2-アクセスvlanの割り当て" tabindex="-1">Mission 2: アクセスVLANの割り当て <a class="header-anchor" href="#mission-2-アクセスvlanの割り当て" aria-hidden="true">#</a></h3>
+<ol>
+<li><strong>SW2</strong> に VLAN 10 と 20 を作成してください。</li>
+<li><code>e0/3</code> を VLAN 10 のアクセスポート、<code>e1/0</code> を VLAN 20 のアクセスポートに設定してください。</li>
+</ol>
+<h3 id="mission-3-svi-による-vlan間ルーティング" tabindex="-1">Mission 3: SVI による VLAN間ルーティング <a class="header-anchor" href="#mission-3-svi-による-vlan間ルーティング" aria-hidden="true">#</a></h3>
+<p>現状では、PC1(VLAN10)とPC2(VLAN20)は別の部屋にいるため通信できません。ルーターの代わりに、コアスイッチ（SW1）にルーティングをさせます。</p>
+<ol>
+<li><strong>SW1</strong> に VLAN 10 と 20 を作成してください。</li>
+<li><strong>SW1</strong> に <strong>SVI（interface vlan 10, interface vlan 20）</strong> を作成し、それぞれのゲートウェイIPアドレス（<code>10.10.10.254</code> と <code>10.10.20.254</code>）を設定してください。</li>
+<li><strong>SW1</strong> でIPルーティング機能を有効化（<code>ip routing</code>）してください。
+<ul>
+<li><em>確認ポイント:</em> PC1 から PC2（<code>10.10.20.12</code>）へのPingが通るか？</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h3 id="-起動メモ" tabindex="-1">🛠 起動メモ <a class="header-anchor" href="#-起動メモ" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">ssh clab@orb
+<span class="hljs-built_in">cd</span> &lt;このフォルダのパス&gt;
+<span class="hljs-built_in">sudo</span> containerlab deploy -t cisco_etherchannel.clab.yml
+</code></pre>
+<h3 id="-wireshark-パケットキャプチャmacのターミナルで実行" tabindex="-1">🦈 Wireshark パケットキャプチャ（Macのターミナルで実行） <a class="header-anchor" href="#-wireshark-パケットキャプチャmacのターミナルで実行" aria-hidden="true">#</a></h3>
+<p>SW1 と SW2 を繋ぐケーブル（<code>Ethernet0/1</code> に相当する <code>eth1</code>）に流れるLACPやVLANのパケットを観察するためのコマンドです。</p>
+<pre><code class="language-bash">ssh clab@orb <span class="hljs-string">&quot;sudo nsenter -t \$(docker inspect -f &#x27;{{.State.Pid}}&#x27; clab-cisco-etherchannel-sw1) -n tcpdump -U -nni eth1 -w -&quot;</span> | /Applications/Wireshark.app/Contents/MacOS/Wireshark -k -i -
+</code></pre>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-トポロジーと設計要件">🗺️ トポロジーと設計要件</a></li>
+<li class="lvl-3"><a href="#1-vlan--ip-設計">1. VLAN / IP 設計</a></li>
+<li class="lvl-2"><a href="#-3つのミッション要件">🎯 3つのミッション（要件）</a></li>
+<li class="lvl-3"><a href="#mission-1-etherchannel-lacp-の構築">Mission 1: EtherChannel (LACP) の構築</a></li>
+<li class="lvl-3"><a href="#mission-2-アクセスvlanの割り当て">Mission 2: アクセスVLANの割り当て</a></li>
+<li class="lvl-3"><a href="#mission-3-svi-による-vlan間ルーティング">Mission 3: SVI による VLAN間ルーティング</a></li>
+<li class="lvl-3"><a href="#-起動メモ">🛠 起動メモ</a></li>
+<li class="lvl-3"><a href="#-wireshark-パケットキャプチャmacのターミナルで実行">🦈 Wireshark パケットキャプチャ（Macのターミナルで実行）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

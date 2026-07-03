@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>パラメータシート（詳細設計）— Theme 25: Multi-Campus</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>25_campus_multi_site</span>
+<span class="sep">/</span>
+<span>03_詳細設計</span></nav>
+      <h1 class="doc-title">パラメータシート（詳細設計）— Theme 25: Multi-Campus</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>設計値をIOS/Linuxの設定へ変換する作業は学習者が行います。本書にコンフィグコマンドやstartup-configは記載しません。</p>
+</blockquote>
+<h2 id="1-共通設計" tabindex="-1">1. 共通設計 <a class="header-anchor" href="#1-共通設計" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>Main Campus</th>
+<th>Branch Campus</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IGP</td>
+<td>OSPFv2</td>
+<td>OSPFv2</td>
+</tr>
+<tr>
+<td>OSPF Process ID</td>
+<td>10</td>
+<td>20</td>
+</tr>
+<tr>
+<td>OSPF Area</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Router ID</td>
+<td>Loopback0</td>
+<td>Loopback0</td>
+</tr>
+<tr>
+<td>EGP</td>
+<td>BGP</td>
+<td>BGP</td>
+</tr>
+<tr>
+<td>AS番号</td>
+<td>65050</td>
+<td>65060</td>
+</tr>
+<tr>
+<td>集約広告</td>
+<td>10.50.0.0/16</td>
+<td>10.60.0.0/16</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="2-main-core" tabindex="-1">2. main-core <a class="header-anchor" href="#2-main-core" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF</th>
+<th>接続先</th>
+<th>種別</th>
+<th style="text-align:right">IP設計値</th>
+<th>OSPF</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E0/1 (<code>eth1</code>)</td>
+<td>main-edge E0/1</td>
+<td>P2P</td>
+<td style="text-align:right">10.255.50.1/30</td>
+<td>process 10, area 0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>E0/2 (<code>eth2</code>)</td>
+<td>main-pc eth1</td>
+<td>利用者GW</td>
+<td style="text-align:right">10.50.10.1/24</td>
+<td>process 10, area 0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>—</td>
+<td>Loopback</td>
+<td style="text-align:right">10.50.255.1/32</td>
+<td>process 10, area 0</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="3-main-edge" tabindex="-1">3. main-edge <a class="header-anchor" href="#3-main-edge" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF</th>
+<th>接続先</th>
+<th>種別</th>
+<th style="text-align:right">IP設計値</th>
+<th>プロトコル</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E0/1 (<code>eth1</code>)</td>
+<td>main-core E0/1</td>
+<td>P2P</td>
+<td style="text-align:right">10.255.50.2/30</td>
+<td>OSPF 10, area 0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>E0/2 (<code>eth2</code>)</td>
+<td>branch-edge E0/2</td>
+<td>WAN</td>
+<td style="text-align:right">198.51.100.1/30</td>
+<td>BGPのみ（OSPF不参加）</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>—</td>
+<td>Loopback</td>
+<td style="text-align:right">10.50.255.254/32</td>
+<td>OSPF 10, area 0</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="main-edge-bgp設計" tabindex="-1">main-edge BGP設計 <a class="header-anchor" href="#main-edge-bgp設計" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>設計値</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AS番号</td>
+<td>65050</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>BGP Router ID</td>
+<td>10.50.255.254</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>eBGPネイバー</td>
+<td>198.51.100.2（AS 65060）</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>redistribute ospf 10</td>
+<td>route-map付き</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>aggregate-address</td>
+<td>10.50.0.0/16 summary-only</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="main-edge-再配信設計bgp--ospf方向" tabindex="-1">main-edge 再配信設計（BGP → OSPF方向） <a class="header-anchor" href="#main-edge-再配信設計bgp--ospf方向" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>設計値</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>redistribute bgp 65050 into ospf 10</td>
+<td>route-map付き</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>prefix-list</td>
+<td>10.60.0.0/16のみ許可</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>route-map tag</td>
+<td>tag 65060（Branch由来を識別）</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="main-edge-再配信設計ospf--bgp方向" tabindex="-1">main-edge 再配信設計（OSPF → BGP方向） <a class="header-anchor" href="#main-edge-再配信設計ospf--bgp方向" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>設計値</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>redistribute ospf 10 into bgp 65050</td>
+<td>route-map付き</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>prefix-list</td>
+<td>10.50.0.0/16 le 32で許可</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>tag deny</td>
+<td>tag 65060の経路はBGPへ再注入しない</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="4-branch-edge" tabindex="-1">4. branch-edge <a class="header-anchor" href="#4-branch-edge" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF</th>
+<th>接続先</th>
+<th>種別</th>
+<th style="text-align:right">IP設計値</th>
+<th>プロトコル</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E0/1 (<code>eth1</code>)</td>
+<td>branch-core E0/1</td>
+<td>P2P</td>
+<td style="text-align:right">10.255.60.1/30</td>
+<td>OSPF 20, area 0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>E0/2 (<code>eth2</code>)</td>
+<td>main-edge E0/2</td>
+<td>WAN</td>
+<td style="text-align:right">198.51.100.2/30</td>
+<td>BGPのみ（OSPF不参加）</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>—</td>
+<td>Loopback</td>
+<td style="text-align:right">10.60.255.254/32</td>
+<td>OSPF 20, area 0</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="branch-edge-bgp設計" tabindex="-1">branch-edge BGP設計 <a class="header-anchor" href="#branch-edge-bgp設計" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>設計値</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AS番号</td>
+<td>65060</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>BGP Router ID</td>
+<td>10.60.255.254</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>eBGPネイバー</td>
+<td>198.51.100.1（AS 65050）</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>redistribute ospf 20</td>
+<td>route-map付き</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>aggregate-address</td>
+<td>10.60.0.0/16 summary-only</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="branch-edge-再配信設計bgp--ospf方向" tabindex="-1">branch-edge 再配信設計（BGP → OSPF方向） <a class="header-anchor" href="#branch-edge-再配信設計bgp--ospf方向" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>設計値</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>redistribute bgp 65060 into ospf 20</td>
+<td>route-map付き</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>prefix-list</td>
+<td>10.50.0.0/16のみ許可</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>route-map tag</td>
+<td>tag 65050（Main由来を識別）</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="branch-edge-再配信設計ospf--bgp方向" tabindex="-1">branch-edge 再配信設計（OSPF → BGP方向） <a class="header-anchor" href="#branch-edge-再配信設計ospf--bgp方向" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>設計値</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>redistribute ospf 20 into bgp 65060</td>
+<td>route-map付き</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>prefix-list</td>
+<td>10.60.0.0/16 le 32で許可</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>tag deny</td>
+<td>tag 65050の経路はBGPへ再注入しない</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="5-branch-core" tabindex="-1">5. branch-core <a class="header-anchor" href="#5-branch-core" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF</th>
+<th>接続先</th>
+<th>種別</th>
+<th style="text-align:right">IP設計値</th>
+<th>OSPF</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E0/1 (<code>eth1</code>)</td>
+<td>branch-edge E0/1</td>
+<td>P2P</td>
+<td style="text-align:right">10.255.60.2/30</td>
+<td>process 20, area 0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>E0/2 (<code>eth2</code>)</td>
+<td>branch-pc eth1</td>
+<td>利用者GW</td>
+<td style="text-align:right">10.60.10.1/24</td>
+<td>process 20, area 0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>—</td>
+<td>Loopback</td>
+<td style="text-align:right">10.60.255.1/32</td>
+<td>process 20, area 0</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="6-endpoint環境側で自動設定済み" tabindex="-1">6. Endpoint（環境側で自動設定済み） <a class="header-anchor" href="#6-endpoint環境側で自動設定済み" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>IF</th>
+<th style="text-align:right">IP設計値</th>
+<th>GW / 対向経路</th>
+<th>自動設定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>main-pc</td>
+<td>eth1</td>
+<td style="text-align:right">10.50.10.10/24</td>
+<td><code>10.60.0.0/16 via 10.50.10.1</code></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>branch-pc</td>
+<td>eth1</td>
+<td style="text-align:right">10.60.10.10/24</td>
+<td><code>10.50.0.0/16 via 10.60.10.1</code></td>
+<td>✅</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="7-経路確認値" tabindex="-1">7. 経路確認値 <a class="header-anchor" href="#7-経路確認値" aria-hidden="true">#</a></h2>
+<h3 id="71-main側で期待する経路" tabindex="-1">7.1 Main側で期待する経路 <a class="header-anchor" href="#71-main側で期待する経路" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>確認ノード</th>
+<th>宛先</th>
+<th>経路種別</th>
+<th>ネクストホップ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>main-core</td>
+<td>10.60.0.0/16</td>
+<td>O E2</td>
+<td>main-edge</td>
+</tr>
+<tr>
+<td>main-edge</td>
+<td>10.60.0.0/16</td>
+<td>BGP</td>
+<td>198.51.100.2</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="72-branch側で期待する経路" tabindex="-1">7.2 Branch側で期待する経路 <a class="header-anchor" href="#72-branch側で期待する経路" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>確認ノード</th>
+<th>宛先</th>
+<th>経路種別</th>
+<th>ネクストホップ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>branch-core</td>
+<td>10.50.0.0/16</td>
+<td>O E2</td>
+<td>branch-edge</td>
+</tr>
+<tr>
+<td>branch-edge</td>
+<td>10.50.0.0/16</td>
+<td>BGP</td>
+<td>198.51.100.1</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="73-漏洩していないことの確認" tabindex="-1">7.3 漏洩していないことの確認 <a class="header-anchor" href="#73-漏洩していないことの確認" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>確認箇所</th>
+<th>確認対象</th>
+<th>期待結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>branch-edge <code>show ip bgp</code></td>
+<td>10.50.10.0/24</td>
+<td>存在しない（/16集約のみ）</td>
+</tr>
+<tr>
+<td>main-edge <code>show ip bgp</code></td>
+<td>10.60.10.0/24</td>
+<td>存在しない（/16集約のみ）</td>
+</tr>
+<tr>
+<td>main-core <code>show ip route</code></td>
+<td>10.60.10.0/24</td>
+<td>存在しない（/16集約のみ）</td>
+</tr>
+<tr>
+<td>branch-core <code>show ip route</code></td>
+<td>10.50.10.0/24</td>
+<td>存在しない（/16集約のみ）</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="8-構築チェック" tabindex="-1">8. 構築チェック <a class="header-anchor" href="#8-構築チェック" aria-hidden="true">#</a></h2>
+<ul>
+<li>[ ] IPアドレス管理表との照合</li>
+<li>[ ] 各Cisco IOLのインフラIP設定</li>
+<li>[ ] 4台のLoopback0作成</li>
+<li>[ ] Main OSPF 10の隣接確認</li>
+<li>[ ] Branch OSPF 20の隣接確認</li>
+<li>[ ] WANリンクIPとeBGP確立</li>
+<li>[ ] prefix-list作成</li>
+<li>[ ] route-map作成</li>
+<li>[ ] OSPF→BGP再配信</li>
+<li>[ ] aggregate-address集約</li>
+<li>[ ] BGP→OSPF再配信</li>
+<li>[ ] 経路漏洩なし確認</li>
+<li>[ ] E2E疎通（main-pc ↔ branch-pc）</li>
+<li>[ ] BGP停止・復旧試験</li>
+<li>[ ] 設定保存</li>
+<li>[ ] 試験結果とAAR記録</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-共通設計">1. 共通設計</a></li>
+<li class="lvl-2"><a href="#2-main-core">2. main-core</a></li>
+<li class="lvl-2"><a href="#3-main-edge">3. main-edge</a></li>
+<li class="lvl-3"><a href="#main-edge-bgp設計">main-edge BGP設計</a></li>
+<li class="lvl-3"><a href="#main-edge-再配信設計bgp--ospf方向">main-edge 再配信設計（BGP → OSPF方向）</a></li>
+<li class="lvl-3"><a href="#main-edge-再配信設計ospf--bgp方向">main-edge 再配信設計（OSPF → BGP方向）</a></li>
+<li class="lvl-2"><a href="#4-branch-edge">4. branch-edge</a></li>
+<li class="lvl-3"><a href="#branch-edge-bgp設計">branch-edge BGP設計</a></li>
+<li class="lvl-3"><a href="#branch-edge-再配信設計bgp--ospf方向">branch-edge 再配信設計（BGP → OSPF方向）</a></li>
+<li class="lvl-3"><a href="#branch-edge-再配信設計ospf--bgp方向">branch-edge 再配信設計（OSPF → BGP方向）</a></li>
+<li class="lvl-2"><a href="#5-branch-core">5. branch-core</a></li>
+<li class="lvl-2"><a href="#6-endpoint環境側で自動設定済み">6. Endpoint（環境側で自動設定済み）</a></li>
+<li class="lvl-2"><a href="#7-経路確認値">7. 経路確認値</a></li>
+<li class="lvl-3"><a href="#71-main側で期待する経路">7.1 Main側で期待する経路</a></li>
+<li class="lvl-3"><a href="#72-branch側で期待する経路">7.2 Branch側で期待する経路</a></li>
+<li class="lvl-3"><a href="#73-漏洩していないことの確認">7.3 漏洩していないことの確認</a></li>
+<li class="lvl-2"><a href="#8-構築チェック">8. 構築チェック</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

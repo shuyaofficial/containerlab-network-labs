@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>第6章: 発展 — 仮想化と IPv6（⬜ 任意）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ロードマップ</span>
+<span class="sep">/</span>
+<span>章別アウトライン</span></nav>
+      <h1 class="doc-title">第6章: 発展 — 仮想化と IPv6（⬜ 任意）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>キャプストン（本社+支社2拠点）には<strong>必須ではない発展枠</strong>。
+ただしカタログ「データプレーン・仮想化」「上級ルーティング」「IPv6」を押さえると、
+キャリア/データセンター/クラウド接続まで視野が一気に広がる。時間に応じて取り組む。</p>
+</blockquote>
+<hr>
+<h2 id="-章の狙い" tabindex="-1">🎯 章の狙い <a class="header-anchor" href="#-章の狙い" aria-hidden="true">#</a></h2>
+<ul>
+<li>IPv6 とデュアルスタック、OSPFv3 を扱える（現代の必須教養）</li>
+<li>（任意）MPLS / L3VPN でキャリア型VPNの仕組みを理解する</li>
+<li>（任意）VXLAN / EVPN でデータセンターファブリックを理解する</li>
+</ul>
+<h2 id="前提" tabindex="-1">前提 <a class="header-anchor" href="#前提" aria-hidden="true">#</a></h2>
+<ul>
+<li>第1章（OSPF/BGP/MP-BGP）、第4章（VPNの概念）</li>
+</ul>
+<hr>
+<h2 id="-テーマ一覧" tabindex="-1">📋 テーマ一覧 <a class="header-anchor" href="#-テーマ一覧" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>タイトル</th>
+<th>狙い</th>
+<th>対応RFC</th>
+<th>難易度</th>
+<th>位置づけ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>18</td>
+<td>IPv6 / OSPFv3 / デュアルスタック</td>
+<td>128bitアドレス設計、SLAAC、OSPFv3、v4/v6併存</td>
+<td><code>rfc8200</code> <code>rfc4291</code> <code>rfc5340</code></td>
+<td>中〜上級</td>
+<td>現代の必須・推奨</td>
+</tr>
+<tr>
+<td>19</td>
+<td>MPLS / L3VPN（任意）</td>
+<td>ラベルSW、VRF、MP-BGPでVPN経路</td>
+<td><code>rfc3031</code> <code>rfc3032</code> <code>rfc3209</code> <code>rfc4364</code> <code>rfc4762</code> <code>rfc4760</code></td>
+<td>上級</td>
+<td>キャリア志向の発展</td>
+</tr>
+<tr>
+<td>20</td>
+<td>VXLAN / EVPN（任意・DC）</td>
+<td>VTEP、24bit VNI、BGP EVPNコントロールプレーン</td>
+<td><code>rfc7348</code> <code>rfc7432</code> <code>rfc8365</code> <code>rfc4760</code></td>
+<td>上級</td>
+<td>DC/クラウド志向の発展</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="-学ぶ順のおすすめ" tabindex="-1">💡 学ぶ順のおすすめ <a class="header-anchor" href="#-学ぶ順のおすすめ" aria-hidden="true">#</a></h2>
+<ol>
+<li><strong>18（IPv6）は早めに</strong>。キャプストンでデュアルスタックにすると一気に「今どき」になる。</li>
+<li>19/20 は興味と時間次第。**MP-BGP（<code>rfc4760</code>）**が L3VPN/EVPN 双方の土台なので、
+どちらに進むにせよ MP-BGP の「アドレスファミリ」を先に押さえると効率的。</li>
+<li>arm64環境では大規模ファブリックは重い → ノード数を絞り「仕組みの体感」を優先。</li>
+</ol>
+<h2 id="-章末チェック取り組んだ分だけ" tabindex="-1">✅ 章末チェック（取り組んだ分だけ） <a class="header-anchor" href="#-章末チェック取り組んだ分だけ" aria-hidden="true">#</a></h2>
+<ul>
+<li>[ ] IPv6アドレスを <code>::</code> 圧縮込みで読み書きでき、デュアルスタックを設計できる</li>
+<li>[ ] OSPFv3 と OSPFv2 の差（リンク単位・IPv6マルチキャスト）を説明できる</li>
+<li>[ ] （任意）VRF と RD/RT の役割を説明できる</li>
+<li>[ ] （任意）VXLAN の VTEP/VNI と EVPN の学習方式を説明できる</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-章の狙い">🎯 章の狙い</a></li>
+<li class="lvl-2"><a href="#前提">前提</a></li>
+<li class="lvl-2"><a href="#-テーマ一覧">📋 テーマ一覧</a></li>
+<li class="lvl-2"><a href="#-学ぶ順のおすすめ">💡 学ぶ順のおすすめ</a></li>
+<li class="lvl-2"><a href="#-章末チェック取り組んだ分だけ">✅ 章末チェック（取り組んだ分だけ）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

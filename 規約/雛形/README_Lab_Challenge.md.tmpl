@@ -1,0 +1,80 @@
+---
+type: readme
+theme: "{{THEME_DIR}}"
+status: draft
+date: {{DATE}}
+tags: [containerlab, lab-challenge]
+title: "{{THEME_TITLE}}"
+---
+
+# {{THEME_TITLE}}
+
+## 概要
+<!-- このテーマで何を学ぶか、想定シナリオ（企業ネットワークの一部を模す等）を2〜4文で書く。
+     『ネットワーク・デザインパターン』のどのゾーン設計コンセプトに基づくかも触れる。 -->
+
+## トポロジ
+
+```mermaid
+flowchart TB
+    subgraph Untrust["Untrust（外部/ISP）"]
+        direction TB
+        ISP["isp"]
+    end
+
+    subgraph DMZ["DMZ"]
+        direction TB
+        DMZSW["{{TOPO_NAME}}-dmz"]
+    end
+
+    subgraph Trust["Trust（社内LAN）"]
+        direction TB
+        CORE["{{TOPO_NAME}}-core"]
+        PC["{{TOPO_NAME}}-pc"]
+    end
+
+    ISP --- CORE
+    CORE --- DMZSW
+    CORE --- PC
+```
+
+<!-- 上のsubgraph・ノード名はプレースホルダ。実機器構成に合わせて書き換える。
+     ノード名の命名は clab.yml のノード名と一致させる。 -->
+
+## 前提環境
+<!-- OrbStack Linux VM (clab@orb) / containerlab / 使用イメージ（IOL・Linuxコンテナ等）
+     arm64固有の制約があれば明記する。 -->
+
+## 開始手順
+
+1. **環境構築**
+   ```bash
+   cd 04_構築
+   ./deploy.sh deploy
+   ```
+2. **ログイン**
+   機器へのログインコマンドは [00_ログイン/ログインコマンド.md](00_ログイン/ログインコマンド.md) を参照してください。
+
+## Mission
+
+<!-- 段階課題を順に並べる。各MissionをH3にし、末尾に「ゲート条件」（次のMissionに進む条件）を明記する。
+     設定コマンドの答えは書かない。考えどころ・ヒントの提示に留める（学習テーマのため）。 -->
+
+### Mission 1: {{ミッション名を書く}}
+<!-- 何を達成するか／考えどころ -->
+
+**ゲート条件**: <!-- 次のMissionに進める条件（例: show ip route で経路が見えること） -->
+
+### Mission 2: {{ミッション名を書く}}
+<!-- 何を達成するか／考えどころ -->
+
+**ゲート条件**: <!-- 次のMissionに進める条件 -->
+
+## 禁止事項
+<!-- 例: clab.yml へのルーティング設定記述禁止（Linux PCのbootstrap以外は手動CLI投入で学ぶ）等、
+     このテーマ固有の制約を列挙する。 -->
+
+## 参照
+<!-- 関連するテーマ内文書・外部資料へのリンク（相対パス）。 -->
+- [01_要件定義/要件定義書.md](01_要件定義/要件定義書.md)
+- [02_基本設計/基本設計書.md](02_基本設計/基本設計書.md)

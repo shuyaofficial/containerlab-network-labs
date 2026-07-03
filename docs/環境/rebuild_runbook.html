@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>VM再構築runbook — OrbStack clab環境</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>環境</span></nav>
+      <h1 class="doc-title">VM再構築runbook — OrbStack clab環境</h1>
+      <div class="meta">
+        <span class="badge badge--review">レビュー中</span>
+        <span class="dot"></span><span class="date">2026-07-03</span>
+        <span class="tags"><span class="tag">runbook</span><span class="tag">orbstack</span><span class="tag">containerlab</span><span class="tag">vrnetlab</span><span class="tag">rebuild</span></span>
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>OrbStack VM「clab」が消失・破損した場合に、土台（VM・containerlab・vrnetlab・イメージビルド環境）をゼロから再構築するための実行手順。
+出典: 2026-06-15の実際の復旧記録（<a href="../22_enterprise_campus_lan/%E7%92%B0%E5%A2%83_%E5%9C%9F%E5%8F%B0%E5%86%8D%E6%A7%8B%E7%AF%89_2026-06-15.html">../22_enterprise_campus_lan/環境_土台再構築_2026-06-15.md</a>）を再実行可能な形に再構成したもの。
+現状の環境全体像・アクセス方法は <a href="%E7%92%B0%E5%A2%83%E8%AA%AC%E6%98%8E.html">環境説明.md</a> を参照。稼働中イメージの一覧は <code>イメージマニフェスト.md</code>（別途生成）を参照。</p>
+</blockquote>
+<hr>
+<h2 id="前提" tabindex="-1">前提 <a class="header-anchor" href="#前提" aria-hidden="true">#</a></h2>
+<ul>
+<li>Mac: Apple Silicon (arm64)、OrbStack導入済み</li>
+<li>本runbookはインフラ手順書であり、学習テーマ（ラボ機器のCLI設定）とは異なる。コマンドをそのまま実行してよい。</li>
+<li>各手順の所要時間目安は2026-06-15〜17の実測ベース。</li>
+</ul>
+<hr>
+<h2 id="手順1-orbstack-vm作成" tabindex="-1">手順1: OrbStack VM作成 <a class="header-anchor" href="#手順1-orbstack-vm作成" aria-hidden="true">#</a></h2>
+<p><strong>目安時間: 5〜10分</strong></p>
+<pre><code class="language-bash"><span class="hljs-comment"># Mac側で実行</span>
+orb create ubuntu:24.04 clab
+</code></pre>
+<ul>
+<li>ディストリビューション: Ubuntu 24.04 (noble) / arm64</li>
+<li>VM名: <code>clab</code>（既存手順・環境説明.mdの全記述がこの名前を前提にしているため変更しない）</li>
+</ul>
+<h3 id="検証コマンド" tabindex="-1">検証コマンド <a class="header-anchor" href="#検証コマンド" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">ssh clab@orb <span class="hljs-string">&quot;cat /etc/os-release | grep VERSION_ID&quot;</span>
+<span class="hljs-comment"># 期待値: VERSION_ID=&quot;24.04&quot;</span>
+ssh clab@orb <span class="hljs-string">&quot;uname -m&quot;</span>
+<span class="hljs-comment"># 期待値: aarch64</span>
+</code></pre>
+<hr>
+<h2 id="手順2-containerlabdocker関連パッケージ導入" tabindex="-1">手順2: containerlab・docker・関連パッケージ導入 <a class="header-anchor" href="#手順2-containerlabdocker関連パッケージ導入" aria-hidden="true">#</a></h2>
+<p><strong>目安時間: 10〜15分</strong></p>
+<pre><code class="language-bash">ssh clab@orb
+
+<span class="hljs-comment"># containerlab公式インストーラ</span>
+<span class="hljs-built_in">sudo</span> bash -c <span class="hljs-string">&quot;<span class="hljs-subst">$(curl -sL https://get.containerlab.dev)</span>&quot;</span>
+
+<span class="hljs-comment"># Docker（OrbStackのUbuntuイメージには同梱されていない場合あり）</span>
+curl -fsSL https://get.docker.com | <span class="hljs-built_in">sudo</span> sh
+<span class="hljs-built_in">sudo</span> usermod -aG docker <span class="hljs-variable">$USER</span>
+
+<span class="hljs-comment"># ビルド・エミュレーションに必要なパッケージ一式</span>
+<span class="hljs-built_in">sudo</span> apt-get update
+<span class="hljs-built_in">sudo</span> apt-get install -y make qemu-system-x86 expect git qemu-utils unzip gdown sshpass python3 python3-pip
+</code></pre>
+<h3 id="x86エミュレーションrosetta--qemu-binfmtの確認" tabindex="-1">x86エミュレーション（Rosetta + qemu binfmt）の確認 <a class="header-anchor" href="#x86エミュレーションrosetta--qemu-binfmtの確認" aria-hidden="true">#</a></h3>
+<p>OrbStackはRosetta経由のx86エミュレーションをVM作成時に自動登録する。手動設定は基本的に不要だが、登録有無は以下で確認する。</p>
+<pre><code class="language-bash"><span class="hljs-comment"># binfmt_misc にx86_64ハンドラが登録されているか確認</span>
+<span class="hljs-built_in">cat</span> /proc/sys/fs/binfmt_misc/qemu-x86_64 2&gt;/dev/null | <span class="hljs-built_in">head</span> -3
+<span class="hljs-comment"># もしくは</span>
+update-binfmts --display | grep qemu-x86_64
+</code></pre>
+<h3 id="検証コマンド-1" tabindex="-1">検証コマンド <a class="header-anchor" href="#検証コマンド-1" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">containerlab version
+<span class="hljs-comment"># 期待値: 0.76.1 以上</span>
+docker --version
+<span class="hljs-comment"># 期待値: 29.x系</span>
+docker run --<span class="hljs-built_in">rm</span> --platform linux/amd64 hello-world
+<span class="hljs-comment"># x86イメージが起動できればエミュレーション経路OK</span>
+</code></pre>
+<hr>
+<h2 id="手順3-vrnetlab取得arm64パッチ適用" tabindex="-1">手順3: vrnetlab取得＋ARM64パッチ適用 <a class="header-anchor" href="#手順3-vrnetlab取得arm64パッチ適用" aria-hidden="true">#</a></h2>
+<p><strong>目安時間: 15〜20分（パッチ内容の突合含む）</strong></p>
+<pre><code class="language-bash">ssh clab@orb
+<span class="hljs-built_in">cd</span> ~
+git <span class="hljs-built_in">clone</span> https://github.com/hellt/vrnetlab.git
+<span class="hljs-built_in">cd</span> vrnetlab
+git checkout v0.21.0
+</code></pre>
+<h3 id="適用するarm64パッチ4箇所" tabindex="-1">適用するARM64パッチ（4箇所） <a class="header-anchor" href="#適用するarm64パッチ4箇所" aria-hidden="true">#</a></h3>
+<p>必ず元ファイルを <code>.bak</code> として退避してから編集する（差分の切り戻しを可能にするため）。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>対象ファイル</th>
+<th>変更内容</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>common/vrnetlab.py</code></td>
+<td><code>-cpu host</code> 起動オプションを、失敗時に <code>-cpu qemu64</code> へ自動フォールバックするよう修正</td>
+<td>arm64には <code>/dev/kvm</code> が無く、<code>-cpu host</code> はホストCPUパススルー前提のため失敗する</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>cisco/iol/docker/Dockerfile</code></td>
+<td><code>dpkg --add-architecture i386</code> を追加し、<code>libc6:i386 libgcc-s1:i386</code> をインストール対象に追加</td>
+<td>旧世代IOLバイナリ(i386)の実行に必要</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>cisco/iol/docker/Dockerfile</code></td>
+<td><code>iouyap</code> を直接 <code>.deb</code> からインストールする形に変更</td>
+<td>標準ビルド手順ではiouyapの依存解決に失敗するケースがあったための回避</td>
+</tr>
+<tr>
+<td>4</td>
+<td>各種Dockerfile</td>
+<td><code>python3</code> パッケージの追加、<code>--platform=linux/amd64</code> の明示</td>
+<td>arm64ホスト上でx86ベースイメージを確実にビルドするため</td>
+</tr>
+</tbody>
+</table></div>
+<pre><code class="language-bash"><span class="hljs-comment"># バックアップ退避の例（編集前に必ず実施）</span>
+<span class="hljs-built_in">cp</span> common/vrnetlab.py common/vrnetlab.py.bak
+<span class="hljs-built_in">cp</span> cisco/iol/docker/Dockerfile cisco/iol/docker/Dockerfile.bak
+<span class="hljs-built_in">cp</span> fortigate/docker/Dockerfile fortigate/docker/Dockerfile.bak
+</code></pre>
+<p>FortiGateをビルドする場合は追加で以下を実施する。</p>
+<pre><code class="language-bash"><span class="hljs-comment"># fortigate/docker/Dockerfile の apt パッケージ一覧に qemu-system-x86 を追加</span>
+<span class="hljs-comment"># （arm64ホストでx86 QEMUを動かすために必須。1回のみ）</span>
+</code></pre>
+<h3 id="検証コマンド-2" tabindex="-1">検証コマンド <a class="header-anchor" href="#検証コマンド-2" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">diff ~/vrnetlab/common/vrnetlab.py ~/vrnetlab/common/vrnetlab.py.bak
+<span class="hljs-comment"># 差分が出ていればパッチ適用済み（.bakは無編集の原本）</span>
+grep -n <span class="hljs-string">&quot;qemu64&quot;</span> ~/vrnetlab/common/vrnetlab.py
+<span class="hljs-comment"># フォールバック処理が入っているか確認</span>
+</code></pre>
+<hr>
+<h2 id="手順4-google-driveからのプリビルトイメージロード" tabindex="-1">手順4: Google Driveからのプリビルトイメージロード <a class="header-anchor" href="#手順4-google-driveからのプリビルトイメージロード" aria-hidden="true">#</a></h2>
+<p><strong>目安時間: イメージ数・回線速度に依存（実績: 13イメージで1〜2時間）</strong></p>
+<p>OrbStack VM内はFUSEマウント（Google Drive for desktop等）が使えないため、<strong>Mac側でマウントしたGoogle DriveのファイルをSSHパイプで直接VM内のdockerへ流し込む</strong>方式を取る。</p>
+<pre><code class="language-bash"><span class="hljs-comment"># Mac側で実行（Google Driveがマウント済みである前提）</span>
+<span class="hljs-comment"># 例: マイドライブ/Images/Dockerimege/ 配下の各tarファイルを転送</span>
+<span class="hljs-keyword">for</span> f <span class="hljs-keyword">in</span> <span class="hljs-string">&quot;/path/to/GoogleDrive/マイドライブ/Images/Dockerimege/&quot;</span>*.tar; <span class="hljs-keyword">do</span>
+  <span class="hljs-built_in">echo</span> <span class="hljs-string">&quot;loading: <span class="hljs-variable">$f</span>&quot;</span>
+  ssh clab@orb <span class="hljs-string">&quot;docker load&quot;</span> &lt; <span class="hljs-string">&quot;<span class="hljs-variable">$f</span>&quot;</span>
+<span class="hljs-keyword">done</span>
+</code></pre>
+<ul>
+<li>1ファイルずつ <code>docker load</code> の完了を待つ（並列実行すると帯域を食い合い失敗しやすい）。</li>
+<li>大容量イメージ（C9800-CL 3.5GB、C8000v 2.2GB等）は特に時間がかかるため、<code>docker images</code> で個別に完了確認する。</li>
+</ul>
+<h3 id="検証コマンド-3" tabindex="-1">検証コマンド <a class="header-anchor" href="#検証コマンド-3" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">ssh clab@orb <span class="hljs-string">&quot;docker images | grep vrnetlab | wc -l&quot;</span>
+<span class="hljs-comment"># 期待値: ロードしたイメージ数と一致（2026-06-16実績: 13個ロード後、追加ビルドで合計24個）</span>
+</code></pre>
+<hr>
+<h2 id="手順5-iolライセンスiourcの適用" tabindex="-1">手順5: IOLライセンス（IOURC）の適用 <a class="header-anchor" href="#手順5-iolライセンスiourcの適用" aria-hidden="true">#</a></h2>
+<p><strong>目安時間: 30分〜1時間（entrypoint調整含む）</strong></p>
+<p>旧世代Cisco IOLバイナリ（<code>i86bi_*</code>系）は modern vrnetlab(v0.21.0) のIOLビルダーが持たない <strong>iourcライセンス生成機構</strong>を必要とする。ライセンスファイルをentrypointに埋め込む方式で対応する。</p>
+<pre><code class="language-bash"><span class="hljs-comment"># 1) Google Drive「マイドライブ/Images/IOURC.zip」を取得しVM内に展開</span>
+ssh clab@orb
+<span class="hljs-built_in">mkdir</span> -p ~/iourc_src &amp;&amp; <span class="hljs-built_in">cd</span> ~/iourc_src
+unzip /path/to/IOURC.zip
+
+<span class="hljs-comment"># 2) entrypoint.sh にライセンスを埋め込み、hostnameを固定</span>
+<span class="hljs-comment">#    対象: ~/vrnetlab/cisco/iol/docker/entrypoint.sh</span>
+<span class="hljs-comment">#    - IOURCファイルの内容を埋め込む</span>
+<span class="hljs-comment">#    - hostname を `gns3-iouvm` に固定（ライセンスがこのhostname前提で発行されているため）</span>
+<span class="hljs-comment">#    - 起動順序を IOL → iouyap の順に変更（逆順だとsock lockエラーが発生する）</span>
+</code></pre>
+<p>entrypoint.shの要点（実装済みの構成、再実装時の参考）:</p>
+<ul>
+<li><code>hostname gns3-iouvm</code> を明示的に設定してからIOLを起動する。</li>
+<li>IOLプロセスは <code>exec</code> で直接起動する（<code>&amp;</code> によるバックグラウンド起動だと、<code>docker attach</code> 時にfd 0が <code>/dev/null</code> に落ちてコンソール接続できない）。</li>
+<li>iouyapはIOL起動後に起動する。</li>
+</ul>
+<h3 id="検証コマンド-4" tabindex="-1">検証コマンド <a class="header-anchor" href="#検証コマンド-4" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-comment"># entrypoint内にライセンス埋め込みとhostname固定が反映されているか</span>
+ssh clab@orb <span class="hljs-string">&quot;grep -n &#x27;gns3-iouvm&#x27; ~/vrnetlab/cisco/iol/docker/entrypoint.sh&quot;</span>
+</code></pre>
+<hr>
+<h2 id="手順6-イメージビルド" tabindex="-1">手順6: イメージビルド <a class="header-anchor" href="#手順6-イメージビルド" aria-hidden="true">#</a></h2>
+<p><strong>目安時間: 1ノードあたり数分〜（初回ビルドはDockerレイヤ生成込みでやや長い）</strong></p>
+<pre><code class="language-bash">ssh clab@orb
+<span class="hljs-built_in">cd</span> ~/vrnetlab/cisco/iol
+<span class="hljs-built_in">rm</span> -f cisco_iol*.bin                                       <span class="hljs-comment"># 前回分の掃除</span>
+<span class="hljs-built_in">cp</span> /path/to/iol_l3sw.bin ./cisco_iol-L2-advipservices-2017.bin
+<span class="hljs-built_in">cp</span> /path/to/iol_l2sw.bin ./cisco_iol-L2-15.2.bin
+<span class="hljs-built_in">cp</span> /path/to/iol_router.bin ./cisco_iol-15.7.3M2.bin
+DOCKER_BUILDKIT=1 make docker-image
+docker images | grep cisco_iol
+</code></pre>
+<p>FortiGateの場合はビルドコマンドが異なる点に注意。</p>
+<pre><code class="language-bash"><span class="hljs-built_in">cd</span> ~/vrnetlab/fortinet/fortigate
+<span class="hljs-built_in">cp</span> /path/to/virtioa.qcow2 ./fortios-v7.4.2.qcow2   <span class="hljs-comment"># 命名規則厳守（fortios-v...）</span>
+make                                                <span class="hljs-comment"># &quot;make docker-image&quot; ではなく &quot;make&quot;</span>
+</code></pre>
+<p>他ベンダーの追加手順は <a href="%E4%BB%96%E3%83%99%E3%83%B3%E3%83%80%E3%83%BC%E8%BF%BD%E5%8A%A0%E6%89%8B%E9%A0%86.html">他ベンダー追加手順.md</a> を参照。</p>
+<hr>
+<h2 id="手順7-動作確認" tabindex="-1">手順7: 動作確認 <a class="header-anchor" href="#手順7-動作確認" aria-hidden="true">#</a></h2>
+<p><strong>目安時間: 10〜15分（IOLは1ノード約2分の起動待ちを含む）</strong></p>
+<pre><code class="language-bash">ssh clab@orb
+<span class="hljs-built_in">cd</span> ~/network-lab/ospf3   <span class="hljs-comment"># または対象テーマのclab.yml配置先</span>
+<span class="hljs-built_in">sudo</span> containerlab deploy -t &lt;対象&gt;.clab.yml
+
+<span class="hljs-comment"># 起動状態の確認</span>
+<span class="hljs-built_in">sudo</span> containerlab inspect -t &lt;対象&gt;.clab.yml
+
+<span class="hljs-comment"># IOS CLIへのコンソール接続確認</span>
+<span class="hljs-built_in">sudo</span> docker attach --sig-proxy=<span class="hljs-literal">false</span> clab-&lt;lab名&gt;-&lt;node名&gt;
+<span class="hljs-comment"># Enterキーでプロンプト表示 → r1# などが出れば起動確認OK</span>
+<span class="hljs-comment"># 切断: Ctrl-P → Ctrl-Q（Ctrl-Cで切ると強制終了扱いになるため使わない）</span>
+</code></pre>
+<h3 id="fortigateの場合" tabindex="-1">FortiGateの場合 <a class="header-anchor" href="#fortigateの場合" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">ssh admin@&lt;mgmt-ip&gt;
+<span class="hljs-comment"># 初回パスワード未設定（そのままEnter）</span>
+</code></pre>
+<h3 id="既知の詰まりどころ実績ベース" tabindex="-1">既知の詰まりどころ（実績ベース） <a class="header-anchor" href="#既知の詰まりどころ実績ベース" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>症状</th>
+<th>原因</th>
+<th>対処</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IOLルータ(15.7.3M2)がConfig Dialogでハング（CPU 96%で無限ループ）</td>
+<td>ARM64 QEMU上でダイアログ表示処理が固まる</td>
+<td><code>L2-advipservices-2017</code> イメージに切り替える（L3ルーティング機能を持ち、ダイアログを出さない）</td>
+</tr>
+<tr>
+<td><code>docker attach</code> してもコンソールに何も出ない</td>
+<td>entrypoint.shが <code>&amp;</code> でIOLをバックグラウンド起動しておりfd 0が <code>/dev/null</code></td>
+<td>entrypoint.shを <code>exec</code> でのIOL直接起動に修正（手順5参照）</td>
+</tr>
+<tr>
+<td>FortiGateがQEMUクラッシュで起動しない</td>
+<td>arm64で <code>-cpu host</code> 指定不可</td>
+<td>clab.ymlの環境変数に <code>QEMU_CPU: qemu64</code> を設定</td>
+</tr>
+<tr>
+<td><code>ssh admin@clab-&lt;node&gt;</code> が <code>No route to host</code></td>
+<td>旧IOLイメージは管理インターフェース/SSHが未設定</td>
+<td>SSHではなく <code>docker attach</code> でコンソール接続する</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="撤去作り直し" tabindex="-1">撤去・作り直し <a class="header-anchor" href="#撤去作り直し" aria-hidden="true">#</a></h2>
+<pre><code class="language-bash"><span class="hljs-comment"># VM自体を削除して手順1からやり直す場合</span>
+orb delete clab
+</code></pre>
+<p>個別ラボのみ止める場合はVMは残したまま <code>sudo containerlab destroy -t &lt;対象&gt;.clab.yml</code> で十分。VM自体の作り直しが必要になるのは、OrbStack VMそのものが破損・消失した場合のみ。</p>
+<hr>
+<h2 id="関連ファイル" tabindex="-1">関連ファイル <a class="header-anchor" href="#関連ファイル" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="%E7%92%B0%E5%A2%83%E8%AA%AC%E6%98%8E.html">環境説明.md</a> — 現在の環境の全体像・アクセス方法・使用可能イメージ一覧</li>
+<li><a href="%E4%BB%96%E3%83%99%E3%83%B3%E3%83%80%E3%83%BC%E8%BF%BD%E5%8A%A0%E6%89%8B%E9%A0%86.html">他ベンダー追加手順.md</a> — IOL以外のベンダー機器の追加手順</li>
+<li><code>イメージマニフェスト.md</code>（別途生成中） — 稼働イメージの棚卸し一覧</li>
+<li><a href="../%E8%A6%8F%E7%B4%84/%E6%8F%90%E6%A1%88_%E9%81%8B%E7%94%A8%E6%94%B9%E5%96%84.html">../規約/提案_運用改善.md</a> — 本runbookの維持運用・四半期棚卸しの提案</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#前提">前提</a></li>
+<li class="lvl-2"><a href="#手順1-orbstack-vm作成">手順1: OrbStack VM作成</a></li>
+<li class="lvl-3"><a href="#検証コマンド">検証コマンド</a></li>
+<li class="lvl-2"><a href="#手順2-containerlabdocker関連パッケージ導入">手順2: containerlab・docker・関連パッケージ導入</a></li>
+<li class="lvl-3"><a href="#x86エミュレーションrosetta--qemu-binfmtの確認">x86エミュレーション（Rosetta + qemu binfmt）の確認</a></li>
+<li class="lvl-3"><a href="#検証コマンド-1">検証コマンド</a></li>
+<li class="lvl-2"><a href="#手順3-vrnetlab取得arm64パッチ適用">手順3: vrnetlab取得＋ARM64パッチ適用</a></li>
+<li class="lvl-3"><a href="#適用するarm64パッチ4箇所">適用するARM64パッチ（4箇所）</a></li>
+<li class="lvl-3"><a href="#検証コマンド-2">検証コマンド</a></li>
+<li class="lvl-2"><a href="#手順4-google-driveからのプリビルトイメージロード">手順4: Google Driveからのプリビルトイメージロード</a></li>
+<li class="lvl-3"><a href="#検証コマンド-3">検証コマンド</a></li>
+<li class="lvl-2"><a href="#手順5-iolライセンスiourcの適用">手順5: IOLライセンス（IOURC）の適用</a></li>
+<li class="lvl-3"><a href="#検証コマンド-4">検証コマンド</a></li>
+<li class="lvl-2"><a href="#手順6-イメージビルド">手順6: イメージビルド</a></li>
+<li class="lvl-2"><a href="#手順7-動作確認">手順7: 動作確認</a></li>
+<li class="lvl-3"><a href="#fortigateの場合">FortiGateの場合</a></li>
+<li class="lvl-3"><a href="#既知の詰まりどころ実績ベース">既知の詰まりどころ（実績ベース）</a></li>
+<li class="lvl-2"><a href="#撤去作り直し">撤去・作り直し</a></li>
+<li class="lvl-2"><a href="#関連ファイル">関連ファイル</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

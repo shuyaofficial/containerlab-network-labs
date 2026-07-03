@@ -1,0 +1,35 @@
+%% {{THEME_TITLE}} — ネットワーク物理構成図
+%% 生成日: {{DATE}}
+%% このファイルは README_Lab_Challenge.md 内のトポロジ図と同一内容を保つ（単独参照・印刷用）。
+%% ノード名は clab.yml のノード名と一致させること。
+
+flowchart TB
+    subgraph Untrust["Untrust（外部/ISP）"]
+        direction TB
+        ISP["isp\nAS 65100"]
+    end
+
+    subgraph DMZ["DMZ（公開サーバ収容）"]
+        direction TB
+        DMZSW["{{TOPO_NAME}}-dmz"]
+        SRV["{{TOPO_NAME}}-dmz-srv"]
+        SRV --- DMZSW
+    end
+
+    subgraph Trust["Trust（社内LAN）"]
+        direction TB
+        CORE["{{TOPO_NAME}}-core"]
+        PC["{{TOPO_NAME}}-pc"]
+        PC --- CORE
+    end
+
+    EDGE["{{TOPO_NAME}}-edge\nNAT境界"]
+
+    %% 結線: ゾーン境界をまたぐ接続にはプロトコル・役割をラベルで明記する
+    CORE ---|"内部ルーティング"| DMZSW
+    CORE --- EDGE
+    EDGE ---|"eBGP"| ISP
+
+    %% 拡張時のヒント:
+    %% - 支社（Branch）や追加WANを足す場合は subgraph を1つ追加し、EDGE経由でISPに接続する
+    %% - ゾーンをまたぐ結線には必ずプロトコル名（OSPF/EIGRP/eBGP等）か用途をラベルで書く

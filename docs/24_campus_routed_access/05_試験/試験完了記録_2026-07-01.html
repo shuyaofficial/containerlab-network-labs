@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>試験完了記録 — Theme 24: Routed Access</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>24_campus_routed_access</span>
+<span class="sep">/</span>
+<span>05_試験</span></nav>
+      <h1 class="doc-title">試験完了記録 — Theme 24: Routed Access</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="1-完了判定" tabindex="-1">1. 完了判定 <a class="header-anchor" href="#1-完了判定" aria-hidden="true">#</a></h2>
+<ul>
+<li>完了日: 2026-07-01</li>
+<li>対象: Theme 24 Pattern B — Routed Access</li>
+<li>判定: <strong>完了</strong></li>
+<li>完了根拠: 学習者がT-101〜T-304の構築・正常系・障害・復旧試験完了を確認</li>
+<li>再確認範囲: Codexが6コンテナの稼働、端末経路、PC-A—PC-B双方向疎通を読み取りで再確認</li>
+<li>証跡上の注意: IOSの<code>show ip ospf neighbor</code>、<code>show ip route</code>、障害中の連続pingは学習者が画面で確認したものとし、生のCLI出力は本ファイルへ転記していない</li>
+</ul>
+<h2 id="2-実施の流れ" tabindex="-1">2. 実施の流れ <a class="header-anchor" href="#2-実施の流れ" aria-hidden="true">#</a></h2>
+<ol>
+<li>6ノード・7リンクのcontainerlab環境をデータプレーン未設定で起動した。</li>
+<li>Cisco IOLへ<code>docker attach</code>しても入力できない事象を切り分けた。</li>
+<li>IOLをPID 1で起動する<code>entrypoint_attach.sh</code>へ揃え、4台すべてでコンソール入力を確認した。</li>
+<li>Core—Access間の<code>/30</code>、Loopback、OSPF area 0、利用者LANを学習者が手動設定した。</li>
+<li>PC-A/PC-Bは管理用デフォルトルートを維持し、相手LANへの個別静的経路を<code>eth1</code>へ追加した。</li>
+<li>OSPF隣接、Loopback学習、ECMP、PC間疎通を確認した。</li>
+<li>access1—core1断、core1停止、core1復旧、STP非依存の障害・復旧試験を完了した。</li>
+<li>T-301〜T-304の状態遷移を説明する<a href="./%E9%9A%9C%E5%AE%B3%E8%A9%A6%E9%A8%93_%E6%83%B3%E5%AE%9A%E7%B5%8C%E8%B7%AF%E5%9B%B3.html">障害経路シミュレーター</a>を保存した。</li>
+</ol>
+<h2 id="3-試験結果サマリー" tabindex="-1">3. 試験結果サマリー <a class="header-anchor" href="#3-試験結果サマリー" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>試験群</th>
+<th>内容</th>
+<th>結果</th>
+<th>主な確認方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-1xx</td>
+<td>起動・配線・Routed Port</td>
+<td>✅</td>
+<td>container状態、interface、running-config</td>
+</tr>
+<tr>
+<td>T-2xx</td>
+<td>OSPF・Loopback・ECMP・E2E</td>
+<td>✅</td>
+<td>OSPF neighbor、route/CEF、ping</td>
+</tr>
+<tr>
+<td>T-301</td>
+<td>access1—core1断</td>
+<td>✅</td>
+<td>連続ping、Neighbor Down、core2経路</td>
+</tr>
+<tr>
+<td>T-302</td>
+<td>core1停止</td>
+<td>✅</td>
+<td>core2経由の両Access間疎通</td>
+</tr>
+<tr>
+<td>T-303</td>
+<td>core1復旧</td>
+<td>✅</td>
+<td>OSPF FULL、2 next-hop復元</td>
+</tr>
+<tr>
+<td>T-304</td>
+<td>STP非依存</td>
+<td>✅</td>
+<td>OSPF/RIB/FIBの変化として観測</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="4-完了時の実測証跡" tabindex="-1">4. 完了時の実測証跡 <a class="header-anchor" href="#4-完了時の実測証跡" aria-hidden="true">#</a></h2>
+<h3 id="41-コンテナ状態" tabindex="-1">4.1 コンテナ状態 <a class="header-anchor" href="#41-コンテナ状態" aria-hidden="true">#</a></h3>
+<p>2026-07-01にOrbStack Linux VM <code>clab</code>で再確認した。</p>
+<pre><code class="language-text">clab-campus-routed-access-pc-a    Up 20 hours
+clab-campus-routed-access-pc-b    Up 20 hours
+clab-campus-routed-access-access1 Up 20 hours
+clab-campus-routed-access-core2   Up 20 hours
+clab-campus-routed-access-access2 Up 20 hours
+clab-campus-routed-access-core1   Up 20 hours
+</code></pre>
+<h3 id="42-pc-aの経路" tabindex="-1">4.2 PC-Aの経路 <a class="header-anchor" href="#42-pc-aの経路" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">default via 172.24.24.1 dev eth0
+10.24.10.0/24 dev eth1 proto kernel scope link src 10.24.10.10
+10.24.20.0/24 via 10.24.10.1 dev eth1
+172.24.24.0/24 dev eth0 proto kernel scope link src 172.24.24.101
+</code></pre>
+<h3 id="43-pc-bの経路" tabindex="-1">4.3 PC-Bの経路 <a class="header-anchor" href="#43-pc-bの経路" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">default via 172.24.24.1 dev eth0
+10.24.10.0/24 via 10.24.20.1 dev eth1
+10.24.20.0/24 dev eth1 proto kernel scope link src 10.24.20.10
+172.24.24.0/24 dev eth0 proto kernel scope link src 172.24.24.102
+</code></pre>
+<h3 id="44-双方向疎通" tabindex="-1">4.4 双方向疎通 <a class="header-anchor" href="#44-双方向疎通" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">PC-A → PC-B (10.24.20.10)
+5 packets transmitted, 5 received, 0% packet loss
+rtt min/avg/max/mdev = 1.371/1.683/1.980/0.257 ms
+
+PC-B → PC-A (10.24.10.10)
+5 packets transmitted, 5 received, 0% packet loss
+rtt min/avg/max/mdev = 1.205/2.502/5.364/1.498 ms
+</code></pre>
+<h2 id="5-気になった点と判断" tabindex="-1">5. 気になった点と判断 <a class="header-anchor" href="#5-気になった点と判断" aria-hidden="true">#</a></h2>
+<h3 id="51-docker-attachでiosへ入力できなかった" tabindex="-1">5.1 <code>docker attach</code>でIOSへ入力できなかった <a class="header-anchor" href="#51-docker-attachでiosへ入力できなかった" aria-hidden="true">#</a></h3>
+<ul>
+<li>原因: IOLをバックグラウンド起動し、PID 1のbashが<code>wait</code>していたため、attachした入力がIOLへ届かなかった。</li>
+<li>判断: Theme 23方式の<code>exec /iol/iol.bin</code>を採用し、IOL自身をPID 1にした。</li>
+<li>教訓: containerが<code>running</code>でもログイン可能とは限らない。新規ラボではEnterがIOSへ届くところまで確認する。</li>
+<li>詳細: <a href="../00_%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3/%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3%E5%88%87%E3%82%8A%E5%88%86%E3%81%91_2026-06-30.html">ログイン切り分け記録</a></li>
+</ul>
+<h3 id="52-pcのデフォルトルートが既に存在した" tabindex="-1">5.2 PCのデフォルトルートが既に存在した <a class="header-anchor" href="#52-pcのデフォルトルートが既に存在した" aria-hidden="true">#</a></h3>
+<ul>
+<li><code>eth0</code>の<code>default via 172.24.24.1</code>はcontainerlab管理ネットワーク用であり、削除すると管理通信へ影響する。</li>
+<li><code>ip route add default via 10.24.x.1</code>は既存デフォルトルートと競合して<code>RTNETLINK answers: File exists</code>になった。</li>
+<li>判断: デフォルトルートは維持し、相手LANだけをデータプレーン側へ向けた。</li>
+</ul>
+<pre><code class="language-bash"><span class="hljs-comment"># pc-a</span>
+ip route add 10.24.20.0/24 via 10.24.10.1 dev eth1
+
+<span class="hljs-comment"># pc-b</span>
+ip route add 10.24.10.0/24 via 10.24.20.1 dev eth1
+</code></pre>
+<h3 id="53-linux端末ではiosのshowコマンドを使えない" tabindex="-1">5.3 Linux端末ではIOSの<code>show</code>コマンドを使えない <a class="header-anchor" href="#53-linux端末ではiosのshowコマンドを使えない" aria-hidden="true">#</a></h3>
+<ul>
+<li>PC-A/PC-BはLinuxコンテナなので、経路確認は<code>show ip route</code>ではなく<code>ip route</code>を使用する。</li>
+<li><code>show ip route</code>、<code>show ip ospf neighbor</code>、<code>show ip cef</code>はCisco IOL側で実行する。</li>
+</ul>
+<h3 id="54-routed-port試験の表現" tabindex="-1">5.4 Routed Port試験の表現 <a class="header-anchor" href="#54-routed-port試験の表現" aria-hidden="true">#</a></h3>
+<ul>
+<li>access1/access2はCatalyst L3スイッチではなく、Cisco IOLのルーターモードによる模擬である。</li>
+<li>そのため<code>no switchport</code>の投入可否を試験するのではなく、インフラIFの<code>/30</code>、<code>up/up</code>、OSPF P2P隣接、L2 Trunk/STP非使用を確認する。</li>
+</ul>
+<h3 id="55-ecmpはpingやtracerouteだけでは証明できない" tabindex="-1">5.5 ECMPはpingやtracerouteだけでは証明できない <a class="header-anchor" href="#55-ecmpはpingやtracerouteだけでは証明できない" aria-hidden="true">#</a></h3>
+<ul>
+<li>同一送信元・宛先の通信はハッシュ結果により、通常どちらか1経路へ固定される。</li>
+<li>ECMPの存在は<code>show ip route &lt;prefix&gt;</code>で2 next-hop、転送表は<code>show ip cef &lt;destination&gt;</code>で確認する。</li>
+<li>pingは疎通確認、片系断試験は各next-hopが実際に転送可能であることの確認として使う。</li>
+<li>tracerouteで片方しか表示されなくても、それだけでECMP失敗とは判定しない。</li>
+</ul>
+<h2 id="6-再開再確認時の順序" tabindex="-1">6. 再開・再確認時の順序 <a class="header-anchor" href="#6-再開再確認時の順序" aria-hidden="true">#</a></h2>
+<ol>
+<li><a href="../00_%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3/%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89.html">機器別ログインコマンド</a>で4台へ入れることを確認する。</li>
+<li><code>show ip interface brief</code>で使用IFが<code>up/up</code>か確認する。</li>
+<li><code>show ip ospf neighbor</code>で必要な隣接が<code>FULL</code>か確認する。</li>
+<li>access1/access2で対向LANに2 next-hopがあるか確認する。</li>
+<li>PC-A/PC-Bで<code>ip route</code>を確認し、双方向pingを行う。</li>
+<li>コンテナを再作成した場合、Linux端末のIPと個別静的経路が消えていないか確認する。</li>
+<li>IOS設定を再起動後も残す必要がある場合は、学習者が保存済みか確認する。</li>
+</ol>
+<h2 id="7-aar" tabindex="-1">7. AAR <a class="header-anchor" href="#7-aar" aria-hidden="true">#</a></h2>
+<ul>
+<li>予想: L3 AccessまでOSPFを延伸すれば、STPに依存せずECMPと高速な片系収束を観測できる。</li>
+<li>実際: 正常時ECMP、単一リンク障害、core1全停止、復旧後のOSPF/ECMP復元まで完走した。構築以前にIOLのPID 1と端末管理ルートが重要な切り分け点になった。</li>
+<li>次回: Theme 25では、最初に管理経路とデータプレーン経路を分け、BGP/OSPF境界の経路表を正常時・障害時の両方で保存する。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-完了判定">1. 完了判定</a></li>
+<li class="lvl-2"><a href="#2-実施の流れ">2. 実施の流れ</a></li>
+<li class="lvl-2"><a href="#3-試験結果サマリー">3. 試験結果サマリー</a></li>
+<li class="lvl-2"><a href="#4-完了時の実測証跡">4. 完了時の実測証跡</a></li>
+<li class="lvl-3"><a href="#41-コンテナ状態">4.1 コンテナ状態</a></li>
+<li class="lvl-3"><a href="#42-pc-aの経路">4.2 PC-Aの経路</a></li>
+<li class="lvl-3"><a href="#43-pc-bの経路">4.3 PC-Bの経路</a></li>
+<li class="lvl-3"><a href="#44-双方向疎通">4.4 双方向疎通</a></li>
+<li class="lvl-2"><a href="#5-気になった点と判断">5. 気になった点と判断</a></li>
+<li class="lvl-3"><a href="#51-docker-attachでiosへ入力できなかった">5.1 docker attachでIOSへ入力できなかった</a></li>
+<li class="lvl-3"><a href="#52-pcのデフォルトルートが既に存在した">5.2 PCのデフォルトルートが既に存在した</a></li>
+<li class="lvl-3"><a href="#53-linux端末ではiosのshowコマンドを使えない">5.3 Linux端末ではIOSのshowコマンドを使えない</a></li>
+<li class="lvl-3"><a href="#54-routed-port試験の表現">5.4 Routed Port試験の表現</a></li>
+<li class="lvl-3"><a href="#55-ecmpはpingやtracerouteだけでは証明できない">5.5 ECMPはpingやtracerouteだけでは証明できない</a></li>
+<li class="lvl-2"><a href="#6-再開再確認時の順序">6. 再開・再確認時の順序</a></li>
+<li class="lvl-2"><a href="#7-aar">7. AAR</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

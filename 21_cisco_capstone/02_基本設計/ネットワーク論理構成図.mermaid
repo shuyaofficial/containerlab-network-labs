@@ -1,0 +1,52 @@
+graph TD
+  subgraph BGP_AS_65000_ISP
+    ISP_L3((ISP))
+  end
+
+  subgraph BGP_AS_65001_HQ
+    subgraph OSPF_Area_0
+      HQE1_L3((HQ-Edge1\n200.0.1.1))
+      HQE2_L3((HQ-Edge2\n200.0.2.1))
+      HQC1_L3((HQ-Core1\nActive))
+      HQC2_L3((HQ-Core2\nStandby))
+      
+      HQE1_L3 <--> HQC1_L3
+      HQE1_L3 <--> HQC2_L3
+      HQE2_L3 <--> HQC1_L3
+      HQE2_L3 <--> HQC2_L3
+      HQC1_L3 <--> HQC2_L3
+    end
+    
+    subgraph VLAN10_Sales
+      VIP((HSRP 仮想IP\n10.1.10.254))
+      HQ_Sales[Sales PC\n10.1.10.100]
+      HQC1_L3 -.-> VIP
+      HQC2_L3 -.-> VIP
+      VIP --- HQ_Sales
+    end
+  end
+
+  subgraph Branch
+    BRE_L3((BR-Edge\n200.0.3.1))
+    
+    subgraph VLAN40_BranchLAN
+      BR_LAN[Branch PC\n10.2.40.100]
+    end
+    BRE_L3 --- BR_LAN
+  end
+
+  %% BGP Connections
+  ISP_L3 == eBGP ==> HQE1_L3
+  ISP_L3 == eBGP ==> HQE2_L3
+  ISP_L3 --- BRE_L3
+  
+  %% IPsec VPN Tunnel
+  HQE1_L3 -. IPsec VPN Tunnel .- BRE_L3
+
+  classDef ospf fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,stroke-dasharray: 5 5,color:#000;
+  classDef bgp fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000;
+  classDef vlan fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#000;
+  
+  class HQE1_L3,HQE2_L3,HQC1_L3,HQC2_L3 ospf;
+  class ISP_L3 bgp;
+  class HQ_Sales,BR_LAN,VIP vlan;

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>今後の環境構築に向けた教訓：VPN構築のオペレーション順序</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ロードマップ</span>
+<span class="sep">/</span>
+<span>tech_notes</span></nav>
+      <h1 class="doc-title">今後の環境構築に向けた教訓：VPN構築のオペレーション順序</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="1-事象の振り返り" tabindex="-1">1. 事象の振り返り <a class="header-anchor" href="#1-事象の振り返り" aria-hidden="true">#</a></h2>
+<p>FortiGateとCisco間のVPN構築において、以下の順序で作業を行ったところ、思わぬ罠に引っかかり長時間のトラブルシューティングが発生した。</p>
+<ol>
+<li>VPNインターフェース（Phase 1 / Phase 2）の作成</li>
+<li>スタティックルートの作成</li>
+<li>下回りのPingテスト（開通確認）</li>
+<li>（VPNがIN-NEGでスタックして進まない問題が発生）</li>
+<li>ファイアウォールポリシーの投入（予定だったがエラーのため保留していた）</li>
+</ol>
+<h2 id="2-教訓と次回以降のアクションfortios環境" tabindex="-1">2. 教訓と次回以降のアクション（FortiOS環境） <a class="header-anchor" href="#2-教訓と次回以降のアクションfortios環境" aria-hidden="true">#</a></h2>
+<p>FortiOSでは「使用されないVPNトンネル（＝ポリシーがないトンネル）」はネゴシエーション自体が意図的に破棄される仕様がある。
+そのため、ネットワークエンジニアの基本である「レイヤーの低いところから順番に設定して疎通確認していく」というセオリー通りに進めると、<strong>設定が正しいのにVPNが上がらない</strong>というドツボにハマってしまう。</p>
+<p><strong>【次回のアクション】</strong>
+FortiGateが関わるVPN環境を構築する際は、以下の順番を必ず守る（設計書通りに一気に流し込む）。</p>
+<ol>
+<li>VPNインターフェース（Phase 1 / Phase 2）の作成</li>
+<li>スタティックルートの作成</li>
+<li><strong>ファイアウォールポリシー（VPNトンネルの入出力許可）の作成</strong> ← 重要（テスト用でも良いので <code>all</code> to <code>all</code> を入れる）</li>
+<li>最後にVPNのステータス確認およびPingテストを実施する</li>
+</ol>
+<p>「VPNが上がってからポリシーを入れる」のではなく、「ポリシーを入れないとVPNが上がらない」という依存関係を意識した構成管理を行うこと。</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-事象の振り返り">1. 事象の振り返り</a></li>
+<li class="lvl-2"><a href="#2-教訓と次回以降のアクションfortios環境">2. 教訓と次回以降のアクション（FortiOS環境）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

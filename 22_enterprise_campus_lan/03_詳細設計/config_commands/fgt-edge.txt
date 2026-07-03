@@ -1,0 +1,76 @@
+enable
+configure terminal
+hostname fgt-edge
+ip routing
+no ip cef
+no ip domain-lookup
+!
+interface Ethernet0/1
+ description WAN_to_ISP
+ no switchport
+ ip address 200.0.1.1 255.255.255.0
+ no shutdown
+!
+interface Ethernet0/2
+ description P2P_to_core1
+ no switchport
+ ip address 10.0.1.30 255.255.255.252
+ ip ospf network point-to-point
+ no shutdown
+!
+interface Ethernet0/3
+ description P2P_to_core2
+ no switchport
+ ip address 10.0.1.34 255.255.255.252
+ ip ospf network point-to-point
+ no shutdown
+!
+crypto ikev2 proposal IKEV2_PROP
+ encryption des
+ integrity sha256
+ group 14
+!
+crypto ikev2 policy IKEV2_POL
+ proposal IKEV2_PROP
+!
+crypto ikev2 keyring IKEV2_KEY
+ peer BR_BRANCH
+  address 200.0.3.1
+  pre-shared-key cisco123
+ !
+!
+crypto ikev2 profile IKEV2_PROF
+ match identity remote address 200.0.3.1 255.255.255.255
+ identity local address 200.0.1.1
+ authentication remote pre-share
+ authentication local pre-share
+ keyring local IKEV2_KEY
+!
+crypto ipsec transform-set IPSEC_TSET esp-des esp-sha256-hmac
+ mode tunnel
+!
+crypto ipsec profile IPSEC_PROF
+ set transform-set IPSEC_TSET
+ set pfs group14
+ set ikev2-profile IKEV2_PROF
+!
+interface Tunnel1
+ description IPsec_VTI_to_br-edge
+ ip address 172.16.40.1 255.255.255.252
+ tunnel source Ethernet0/1
+ tunnel mode ipsec ipv4
+ tunnel destination 200.0.3.1
+ tunnel protection ipsec profile IPSEC_PROF
+ no shutdown
+!
+ip route 0.0.0.0 0.0.0.0 200.0.1.254
+ip route 10.2.40.0 255.255.255.0 Tunnel1
+!
+router ospf 1
+ router-id 10.255.0.254
+ redistribute static subnets
+ network 10.0.1.28 0.0.0.3 area 0
+ network 10.0.1.32 0.0.0.3 area 0
+!
+end
+write memory

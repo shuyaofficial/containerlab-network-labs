@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマ13: ACL / NAT / Port Security 構築ログと教訓</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>13_cisco_acl_nat</span></nav>
+      <h1 class="doc-title">テーマ13: ACL / NAT / Port Security 構築ログと教訓</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>本ドキュメントは、セキュリティおよびアドレス変換機能（ACL / NAT / Port Security）構築時のトラブルシューティングノウハウ、および実務上の教訓を記録する。</p>
+<h2 id="1-nat-pat-における-inside--outside-の重要性" tabindex="-1">1. NAT (PAT) における Inside / Outside の重要性 <a class="header-anchor" href="#1-nat-pat-における-inside--outside-の重要性" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>概念</strong>: ルーターが「どのパケットを変換対象とするか」を認識するためには、インターフェースに対する <code>ip nat inside</code>（社内側）と <code>ip nat outside</code>（インターネット側）の明示的な宣言が必須である。</li>
+<li><strong>動作</strong>: 内部（inside）からやってきたパケットの送信元IPが、定義したACL（許可リスト）に合致する場合のみ、外部（outside）のインターフェースが持つグローバルIPに書き換えられ（Overloadでポート変換も実施）、インターネット上のサーバーとの通信が可能となる。</li>
+</ul>
+<h2 id="2-拡張aclにおける暗黙のdenyとログlogオプションの役割" tabindex="-1">2. 拡張ACLにおける「暗黙のdeny」と「ログ(log)オプション」の役割 <a class="header-anchor" href="#2-拡張aclにおける暗黙のdenyとログlogオプションの役割" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>事象</strong>: 外部（SRV1）から内部のエッジルーター（R1）に対するTelnet（ポート23）アクセスを禁止する際、単に防ぐだけであれば <code>permit icmp any any echo-reply</code> だけを書き、残りは「暗黙のdeny」に任せればパケットは破棄される。</li>
+<li><strong>実務上のテクニック</strong>: あえて <code>deny tcp any any eq 23 log</code> を明記することで、パケットを破棄すると同時に <code>%SEC-6-IPACCESSLOGP</code> というセキュリティログを出力させることができる。これにより「いつ、どこから、何を狙った攻撃が来ているか」を検知できる。</li>
+<li><strong>カウンターの可視化</strong>: さらに最後に <code>deny ip any any</code> を明記することで、暗黙のdenyで静かに捨てられる通信の数をヒットカウンター（<code>show access-lists</code>）として可視化し、想定外の通信ボリュームを把握できる。</li>
+</ul>
+<h2 id="3-l2l3スイッチとしての端末の振る舞いip-routingの影響" tabindex="-1">3. L2/L3スイッチとしての端末の振る舞い（ip routingの影響） <a class="header-anchor" href="#3-l2l3スイッチとしての端末の振る舞いip-routingの影響" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>教訓</strong>: PCの代わりにルーターイメージ（IOL）を使用する場合、<code>no ip routing</code> を設定することで完全に「L2ホスト（PC）」として振る舞わせることができる。この際、外の世界へのルートを示す設定は <code>ip route 0.0.0.0 0.0.0.0</code>（ルーティングテーブル用）ではなく、<code>ip default-gateway</code>（ホスト用）を使用しなければならない。これを混同するとパケットが中継されず通信不可となる。</li>
+</ul>
+<h2 id="4-port-security-による未許可macアドレスの物理遮断" tabindex="-1">4. Port Security による未許可MACアドレスの物理遮断 <a class="header-anchor" href="#4-port-security-による未許可macアドレスの物理遮断" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>動作</strong>: スイッチのアクセスポートに対して <code>switchport port-security mac-address sticky</code> を設定することで、最初に通信したPCのMACアドレスを自動学習・記憶させることができる。</li>
+<li><strong>防御機能</strong>: 登録されていない別のPC（偽装されたMACアドレス等）が接続された瞬間、スイッチはそれを不正アクセスと見なし、<code>psecure-violation</code> エラーによってポートを強制的に <code>err-disable</code>（物理的シャットダウン）状態にする。</li>
+<li><strong>復旧の儀式</strong>: <code>err-disable</code> 状態のポートは、不正PCを取り外しただけでは復旧しない。管理者が明示的に <code>shutdown</code> コマンドを実行して反省（確認）を示したのち、再度 <code>no shutdown</code> を実行しなければ再利用できない仕様となっている。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-nat-pat-における-inside--outside-の重要性">1. NAT (PAT) における Inside / Outside の重要性</a></li>
+<li class="lvl-2"><a href="#2-拡張aclにおける暗黙のdenyとログlogオプションの役割">2. 拡張ACLにおける「暗黙のdeny」と「ログ(log)オプション」の役割</a></li>
+<li class="lvl-2"><a href="#3-l2l3スイッチとしての端末の振る舞いip-routingの影響">3. L2/L3スイッチとしての端末の振る舞い（ip routingの影響）</a></li>
+<li class="lvl-2"><a href="#4-port-security-による未許可macアドレスの物理遮断">4. Port Security による未許可MACアドレスの物理遮断</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

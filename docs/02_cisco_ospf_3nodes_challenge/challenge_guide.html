@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>📖 Cisco IOL OSPF 3台三角形構成 手動構築ガイド</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>02_cisco_ospf_3nodes_challenge</span></nav>
+      <h1 class="doc-title">📖 Cisco IOL OSPF 3台三角形構成 手動構築ガイド</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>本ファイルは、Cisco IOLルータ3台を三角形（冗長構成）に結び、OSPF動的ルーティングを完全に手動で構築・検証していく進行記録ガイドです。</p>
+<hr>
+<h2 id="-トポロジーとip設計要件" tabindex="-1">🗺️ トポロジーとIP設計要件 <a class="header-anchor" href="#-トポロジーとip設計要件" aria-hidden="true">#</a></h2>
+<p>R1, R2, R3 が三角形に結ばれた冗長構成を設計します。</p>
+<pre class="mermaid">graph TD
+    R1[R1 / Cisco IOL] &lt;--&gt; |192.168.12.0/24&lt;br&gt;Eth0/1 - Eth0/1| R2[R2 / Cisco IOL]
+    R2 &lt;--&gt; |192.168.23.0/24&lt;br&gt;Eth0/2 - Eth0/1| R3[R3 / Cisco IOL]
+    R3 &lt;--&gt; |192.168.31.0/24&lt;br&gt;Eth0/2 - Eth0/2| R1
+    
+    R1 --- LO1[&quot;lo0: 1.1.1.1/32&quot;]
+    R2 --- LO2[&quot;lo0: 2.2.2.2/32&quot;]
+    R3 --- LO3[&quot;lo0: 3.3.3.3/32&quot;]
+</pre>
+<h3 id="1-インターフェースip設計" tabindex="-1">1. インターフェースIP設計 <a class="header-anchor" href="#1-インターフェースip設計" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>デバイス</th>
+<th>インターフェース</th>
+<th>IPアドレス / サブネット</th>
+<th>接続相手</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.12.1/24</code></td>
+<td>R2 (<code>Ethernet0/1</code>)</td>
+</tr>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Ethernet0/2</code></td>
+<td><code>192.168.31.1/24</code></td>
+<td>R3 (<code>Ethernet0/2</code>)</td>
+</tr>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>1.1.1.1/32</code></td>
+<td>自身の識別用 (Router ID)</td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.12.2/24</code></td>
+<td>R1 (<code>Ethernet0/1</code>)</td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Ethernet0/2</code></td>
+<td><code>192.168.23.2/24</code></td>
+<td>R3 (<code>Ethernet0/1</code>)</td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>2.2.2.2/32</code></td>
+<td>自身の識別用 (Router ID)</td>
+</tr>
+<tr>
+<td><strong>R3</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.23.3/24</code></td>
+<td>R2 (<code>Ethernet0/2</code>)</td>
+</tr>
+<tr>
+<td><strong>R3</strong></td>
+<td><code>Ethernet0/2</code></td>
+<td><code>192.168.31.3/24</code></td>
+<td>R1 (<code>Ethernet0/2</code>)</td>
+</tr>
+<tr>
+<td><strong>R3</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>3.3.3.3/32</code></td>
+<td>自身の識別用 (Router ID)</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="-step-1-物理トポロジーの起動と生存確認" tabindex="-1">🏁 STEP 1: 物理トポロジーの起動と生存確認 <a class="header-anchor" href="#-step-1-物理トポロジーの起動と生存確認" aria-hidden="true">#</a></h2>
+<h3 id="1-ラボのデプロイ" tabindex="-1">1. ラボのデプロイ <a class="header-anchor" href="#1-ラボのデプロイ" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">cd</span> /Users/shuya/Documents/claude/Mac仮想環境構築/02_cisco_ospf_3nodes_challenge
+<span class="hljs-built_in">sudo</span> containerlab deploy -t cisco_ospf_3nodes.clab.yml
+</code></pre>
+<blockquote>
+<p>[!WARNING]
+今回はルータが3台に増えたため、すべてのノードが起動して完全にプロンプトを受け付けるようになるまで <strong>約3分〜4分</strong> かかります。
+<code>sudo docker ps</code> を実行し、R1, R2, R3 すべてが <code>Up</code> 状態かつ <code>healthy</code> になるのをのんびりとお待ちください。</p>
+</blockquote>
+<h3 id="2-機器の-cli-へのログイン方法" tabindex="-1">2. 機器の CLI へのログイン方法 <a class="header-anchor" href="#2-機器の-cli-へのログイン方法" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>R1 に接続:</strong><pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker attach clab-cisco-ospf-3nodes-r1
+</code></pre>
+</li>
+<li><strong>R2 に接続:</strong><pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker attach clab-cisco-ospf-3nodes-r2
+</code></pre>
+</li>
+<li><strong>R3 に接続:</strong><pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker attach clab-cisco-ospf-3nodes-r3
+</code></pre>
+</li>
+</ul>
+<blockquote>
+<p>[!CAUTION]
+<strong>デタッチ（ホストに戻る）コマンド</strong>
+コンソールから安全に抜ける際は、必ず <strong><code>Ctrl + P</code> ➔ <code>Ctrl + Q</code></strong> の順に入力してください。</p>
+</blockquote>
+<h3 id="3-生存確認コマンド" tabindex="-1">3. 生存確認コマンド <a class="header-anchor" href="#3-生存確認コマンド" aria-hidden="true">#</a></h3>
+<p>ログイン後、特権モード（<code>enable</code>）に入り、直結インターフェースが正しく存在しているかを確認します。</p>
+<pre><code class="language-ios">Router&gt; enable
+Router# show ip interface brief
+</code></pre>
+<ul>
+<li><code>Ethernet0/1</code> および <code>Ethernet0/2</code> が <code>administratively down</code> の状態で存在していることを確認してください。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-トポロジーとip設計要件">🗺️ トポロジーとIP設計要件</a></li>
+<li class="lvl-3"><a href="#1-インターフェースip設計">1. インターフェースIP設計</a></li>
+<li class="lvl-2"><a href="#-step-1-物理トポロジーの起動と生存確認">🏁 STEP 1: 物理トポロジーの起動と生存確認</a></li>
+<li class="lvl-3"><a href="#1-ラボのデプロイ">1. ラボのデプロイ</a></li>
+<li class="lvl-3"><a href="#2-機器の-cli-へのログイン方法">2. 機器の CLI へのログイン方法</a></li>
+<li class="lvl-3"><a href="#3-生存確認コマンド">3. 生存確認コマンド</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+%% テーマZERO ゼロトラストラボ 論理ネットワーク構成図（Phase 6 目標像）
+%% 今回デプロイは Phase 0（client / app / external）のみ。他は設計値。
+%% アドレスの正: 02_基本設計/IPアドレス管理表.md
+graph TB
+    subgraph UNTRUST["Untrust ゾーン｜zt-untrust 172.30.0.0/24"]
+        CLIENT["client<br/>multitool 利用者端末<br/>172.30.0.11｜P0"]
+        EXT["external<br/>multitool 外部/未管理端末<br/>172.30.0.12｜P0"]
+    end
+
+    subgraph DMZ["DMZ／認可層｜zt-dmz 172.30.10.0/24"]
+        IDP["keycloak<br/>ID統制 OIDC IdP<br/>172.30.10.11｜P1"]
+        IAP["pomerium / oauth2-proxy<br/>NWセキュリティ IAP<br/>172.30.10.21｜P2"]
+        SWG["mitmproxy（or squid+suricata）<br/>WEB(4)+DLP(5) 兼務<br/>172.30.10.31｜P4/P5"]
+        CA["step-ca<br/>デバイス統制 mTLS/posture<br/>172.30.10.41｜P6"]
+    end
+
+    subgraph TRUST["Trust／業務｜zt-trust 172.30.20.0/24"]
+        APP["app<br/>保護対象サービス<br/>172.30.20.21｜P0"]
+    end
+
+    subgraph OBS["可観測ゾーン｜zt-obs 172.30.30.0/24"]
+        LOKI["loki + promtail<br/>SIEM ログ集約<br/>172.30.30.41｜P3"]
+        GRAFANA["grafana<br/>SIEM 可視化<br/>172.30.30.43｜P3"]
+    end
+
+    %% 認証フロー
+    CLIENT -->|"(1) アクセス要求"| IAP
+    IAP -->|"(2) OIDC 委譲"| IDP
+    IAP -->|"(3) 認可済のみ転送"| APP
+    APP -->|"応答（IAP 経由）"| CLIENT
+
+    %% プロキシ／DLP フロー
+    CLIENT -.->|"外向き Web を強制経由"| SWG
+    SWG -.->|"検査/DLP 後に転送"| EXT
+
+    %% デバイス統制
+    CA -.->|"mTLS 証明書 / posture claim"| IAP
+
+    %% ログフロー（片方向で可観測へ集約）
+    IDP -->|"認証ログ"| LOKI
+    IAP -->|"認可ログ"| LOKI
+    SWG -->|"検査/DLP ログ"| LOKI
+    CA -->|"証明書ログ"| LOKI
+    LOKI --> GRAFANA
+
+    %% Phase 0 土台の直通（関所配置前の疎通確認用）
+    CLIENT -.->|"P0 疎通確認"| APP
+
+    classDef untrust fill:#f9ece8,stroke:#c88978,color:#17232d;
+    classDef dmz fill:#fff4df,stroke:#d3a75e,color:#17232d;
+    classDef trust fill:#e9f4ed,stroke:#8eb59b,color:#17232d;
+    classDef obs fill:#f0edf8,stroke:#9a8cbc,color:#17232d;
+    class CLIENT,EXT untrust;
+    class IDP,IAP,SWG,CA dmz;
+    class APP trust;
+    class LOKI,GRAFANA obs;

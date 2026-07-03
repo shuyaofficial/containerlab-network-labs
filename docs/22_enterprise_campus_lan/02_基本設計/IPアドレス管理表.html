@@ -1,0 +1,905 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>IPアドレス管理表（IPAM）— テーマ22: 大規模キャンパス社内LAN</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>22_enterprise_campus_lan</span>
+<span class="sep">/</span>
+<span>02_基本設計</span></nav>
+      <h1 class="doc-title">IPアドレス管理表（IPAM）— テーマ22: 大規模キャンパス社内LAN</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>本ドキュメントはアドレス割り当ての<strong>正本</strong>です。構成図・パラメータシートと食い違いが出た場合はこの表を優先し、表側を直す場合は構成図も同時に更新します。</p>
+<h2 id="1-アドレスプール全体ルール" tabindex="-1">1. アドレスプール全体ルール <a class="header-anchor" href="#1-アドレスプール全体ルール" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>プール</th>
+<th>範囲</th>
+<th>用途</th>
+<th>集約単位</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A棟ブロック</td>
+<td><code>10.10.0.0/16</code></td>
+<td>A棟全セグメント</td>
+<td>ABR(Dist-A1/A2)で/16集約</td>
+</tr>
+<tr>
+<td>B棟ブロック</td>
+<td><code>10.20.0.0/16</code></td>
+<td>B棟全セグメント</td>
+<td>ABR(Dist-B1)で/16集約</td>
+</tr>
+<tr>
+<td>支社ブロック</td>
+<td><code>10.2.0.0/16</code></td>
+<td>支社LAN</td>
+<td>—（OSPF外・VPN経由）</td>
+</tr>
+<tr>
+<td>バックボーンP2P</td>
+<td><code>10.0.0.0/24</code>（/30刻み）</td>
+<td>ルーテッドリンク</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Loopback</td>
+<td><code>10.255.0.0/24</code>（/32）</td>
+<td>機器管理・OSPFルーターID</td>
+<td>—</td>
+</tr>
+<tr>
+<td>VPNトンネル</td>
+<td><code>172.16.40.0/30</code></td>
+<td>FGT⇔BR-Edge VTI</td>
+<td>—</td>
+</tr>
+<tr>
+<td>WAN</td>
+<td><code>200.0.1.0/24</code>, <code>200.0.3.0/24</code></td>
+<td>グローバルIP相当</td>
+<td>—</td>
+</tr>
+<tr>
+<td>仮想GW</td>
+<td>各セグメント <code>.254</code></td>
+<td>デフォルトゲートウェイ予約</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="2-セグメントvlan一覧" tabindex="-1">2. セグメント（VLAN）一覧 <a class="header-anchor" href="#2-セグメントvlan一覧" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>セグメント名</th>
+<th>ネットワーク</th>
+<th>CIDR</th>
+<th>VLAN ID</th>
+<th>デフォルトGW</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A棟 営業部</td>
+<td>10.10.10.0</td>
+<td>/24</td>
+<td>10</td>
+<td>10.10.10.254（HSRP VIP）</td>
+<td></td>
+</tr>
+<tr>
+<td>A棟 開発部</td>
+<td>10.10.20.0</td>
+<td>/24</td>
+<td>20</td>
+<td>10.10.20.254（HSRP VIP）</td>
+<td></td>
+</tr>
+<tr>
+<td>A棟 ディストリ間L3連携</td>
+<td>10.10.255.0</td>
+<td>/30</td>
+<td>901</td>
+<td>—</td>
+<td>OSPF Area 1 隣接専用</td>
+</tr>
+<tr>
+<td>B棟 サーバ</td>
+<td>10.20.30.0</td>
+<td>/24</td>
+<td>30</td>
+<td>10.20.30.254（Dist-B1 SVI）</td>
+<td></td>
+</tr>
+<tr>
+<td>B棟 運用管理</td>
+<td>10.20.99.0</td>
+<td>/24</td>
+<td>99</td>
+<td>10.20.99.254（Dist-B1 SVI）</td>
+<td>将来の監視基盤用</td>
+</tr>
+<tr>
+<td>支社 LAN</td>
+<td>10.2.40.0</td>
+<td>/24</td>
+<td>40</td>
+<td>10.2.40.254（BR-Edge）</td>
+<td></td>
+</tr>
+<tr>
+<td>WAN（本社）</td>
+<td>200.0.1.0</td>
+<td>/24</td>
+<td>—</td>
+<td>200.0.1.254（ISP）</td>
+<td>FGT-Edge ⇔ ISP</td>
+</tr>
+<tr>
+<td>WAN（支社）</td>
+<td>200.0.3.0</td>
+<td>/24</td>
+<td>—</td>
+<td>200.0.3.254（ISP）</td>
+<td>BR-Edge ⇔ ISP</td>
+</tr>
+<tr>
+<td>インターネット模擬宛先</td>
+<td>8.8.8.8</td>
+<td>/32</td>
+<td>—</td>
+<td>—</td>
+<td>ISPのLoopback。疎通試験のping先</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="3-バックボーンp2pリンク割当1000024-を-30-刻み" tabindex="-1">3. バックボーンP2Pリンク割当（10.0.0.0/24 を /30 刻み） <a class="header-anchor" href="#3-バックボーンp2pリンク割当1000024-を-30-刻み" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>リンクID</th>
+<th>サブネット</th>
+<th>A側（IP）</th>
+<th>B側（IP）</th>
+<th>OSPFエリア</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P01</td>
+<td>10.0.0.0/30</td>
+<td>Core1: 10.0.0.1</td>
+<td>Core2: 10.0.0.2</td>
+<td>Area 0</td>
+</tr>
+<tr>
+<td>P02</td>
+<td>10.0.0.4/30</td>
+<td>Core1: 10.0.0.5</td>
+<td>Dist-A1: 10.0.0.6</td>
+<td>Area 0</td>
+</tr>
+<tr>
+<td>P03</td>
+<td>10.0.0.8/30</td>
+<td>Core1: 10.0.0.9</td>
+<td>Dist-A2: 10.0.0.10</td>
+<td>Area 0</td>
+</tr>
+<tr>
+<td>P04</td>
+<td>10.0.0.12/30</td>
+<td>Core2: 10.0.0.13</td>
+<td>Dist-A1: 10.0.0.14</td>
+<td>Area 0</td>
+</tr>
+<tr>
+<td>P05</td>
+<td>10.0.0.16/30</td>
+<td>Core2: 10.0.0.17</td>
+<td>Dist-A2: 10.0.0.18</td>
+<td>Area 0</td>
+</tr>
+<tr>
+<td>P06</td>
+<td>10.0.0.20/30</td>
+<td>Core1: 10.0.0.21</td>
+<td>Dist-B1: 10.0.0.22</td>
+<td>Area 0</td>
+</tr>
+<tr>
+<td>P07</td>
+<td>10.0.0.24/30</td>
+<td>Core2: 10.0.0.25</td>
+<td>Dist-B1: 10.0.0.26</td>
+<td>Area 0</td>
+</tr>
+<tr>
+<td>P08</td>
+<td>10.0.1.28/30</td>
+<td>Core1: 10.0.0.29</td>
+<td>FGT-Edge: 10.0.0.30</td>
+<td>Area 0</td>
+</tr>
+<tr>
+<td>P09</td>
+<td>10.0.1.32/30</td>
+<td>Core2: 10.0.0.33</td>
+<td>FGT-Edge: 10.0.0.34</td>
+<td>Area 0</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="4-loopback割当102550024すべて32" tabindex="-1">4. Loopback割当（10.255.0.0/24・すべて/32） <a class="header-anchor" href="#4-loopback割当102550024すべて32" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>機器</th>
+<th>Loopback0</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Core1</td>
+<td>10.255.0.1</td>
+<td>OSPFルーターID・管理</td>
+</tr>
+<tr>
+<td>Core2</td>
+<td>10.255.0.2</td>
+<td>〃</td>
+</tr>
+<tr>
+<td>Dist-A1</td>
+<td>10.255.0.11</td>
+<td>〃</td>
+</tr>
+<tr>
+<td>Dist-A2</td>
+<td>10.255.0.12</td>
+<td>〃</td>
+</tr>
+<tr>
+<td>Dist-B1</td>
+<td>10.255.0.21</td>
+<td>〃</td>
+</tr>
+<tr>
+<td>FGT-Edge</td>
+<td>10.255.0.254</td>
+<td>〃（任意。ルーターIDの明示を推奨）</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="5-機器ごとのipアドレス割り当て表" tabindex="-1">5. 機器ごとのIPアドレス割り当て表 <a class="header-anchor" href="#5-機器ごとのipアドレス割り当て表" aria-hidden="true">#</a></h2>
+<blockquote>
+<p>IOLの <code>ethN</code>（clab.yml）⇔ IOS上のIF名: eth1=E0/1, eth2=E0/2, eth3=E0/3, eth4=E1/0, eth5=E1/1, eth6=E1/2
+FortiGateの <code>ethN</code> ⇔ <code>portN</code> 対応は起動後に実機確認すること（eth0=管理。データはeth1→port2…とズレる）。</p>
+</blockquote>
+<h3 id="core1l3swルーテッドポートのみ" tabindex="-1">Core1（L3SW・ルーテッドポートのみ） <a class="header-anchor" href="#core1l3swルーテッドポートのみ" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF（clab）</th>
+<th>IP</th>
+<th>接続先</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>eth1 (E0/1)</td>
+<td>10.0.0.1/30</td>
+<td>Core2</td>
+<td>P01</td>
+</tr>
+<tr>
+<td>eth2 (E0/2)</td>
+<td>10.0.0.5/30</td>
+<td>Dist-A1</td>
+<td>P02</td>
+</tr>
+<tr>
+<td>eth3 (E0/3)</td>
+<td>10.0.0.9/30</td>
+<td>Dist-A2</td>
+<td>P03</td>
+</tr>
+<tr>
+<td>eth4 (E1/0)</td>
+<td>10.0.0.21/30</td>
+<td>Dist-B1</td>
+<td>P06</td>
+</tr>
+<tr>
+<td>eth5 (E1/1)</td>
+<td>10.0.1.29/30</td>
+<td>FGT-Edge</td>
+<td>P08</td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>10.255.0.1/32</td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="core2l3swルーテッドポートのみ" tabindex="-1">Core2（L3SW・ルーテッドポートのみ） <a class="header-anchor" href="#core2l3swルーテッドポートのみ" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF（clab）</th>
+<th>IP</th>
+<th>接続先</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>eth1 (E0/1)</td>
+<td>10.0.0.2/30</td>
+<td>Core1</td>
+<td>P01</td>
+</tr>
+<tr>
+<td>eth2 (E0/2)</td>
+<td>10.0.0.13/30</td>
+<td>Dist-A1</td>
+<td>P04</td>
+</tr>
+<tr>
+<td>eth3 (E0/3)</td>
+<td>10.0.0.17/30</td>
+<td>Dist-A2</td>
+<td>P05</td>
+</tr>
+<tr>
+<td>eth4 (E1/0)</td>
+<td>10.0.0.25/30</td>
+<td>Dist-B1</td>
+<td>P07</td>
+</tr>
+<tr>
+<td>eth5 (E1/1)</td>
+<td>10.0.1.33/30</td>
+<td>FGT-Edge</td>
+<td>P09</td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>10.255.0.2/32</td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="dist-a1l3swabrhsrp-activemstルート" tabindex="-1">Dist-A1（L3SW・ABR・HSRP Active・MSTルート） <a class="header-anchor" href="#dist-a1l3swabrhsrp-activemstルート" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF（clab）</th>
+<th>IP / モード</th>
+<th>接続先</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>eth1 (E0/1)</td>
+<td>10.0.0.6/30（ルーテッド）</td>
+<td>Core1</td>
+<td>P02</td>
+</tr>
+<tr>
+<td>eth2 (E0/2)</td>
+<td>10.0.0.14/30（ルーテッド）</td>
+<td>Core2</td>
+<td>P04</td>
+</tr>
+<tr>
+<td>eth5 (E1/1)</td>
+<td>トランク（Po1メンバー）</td>
+<td>Dist-A2</td>
+<td>LACP</td>
+</tr>
+<tr>
+<td>eth6 (E1/2)</td>
+<td>トランク（Po1メンバー）</td>
+<td>Dist-A2</td>
+<td>LACP</td>
+</tr>
+<tr>
+<td>eth3 (E0/3)</td>
+<td>トランク</td>
+<td>Acc-A1</td>
+<td></td>
+</tr>
+<tr>
+<td>eth4 (E1/0)</td>
+<td>トランク</td>
+<td>Acc-A2</td>
+<td></td>
+</tr>
+<tr>
+<td>SVI VLAN10</td>
+<td>10.10.10.1/24（HSRP VIP .254）</td>
+<td>—</td>
+<td>Active</td>
+</tr>
+<tr>
+<td>SVI VLAN20</td>
+<td>10.10.20.1/24（HSRP VIP .254）</td>
+<td>—</td>
+<td>Active</td>
+</tr>
+<tr>
+<td>SVI VLAN901</td>
+<td>10.10.255.1/30</td>
+<td>Dist-A2</td>
+<td>OSPF Area 1隣接</td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>10.255.0.11/32</td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="dist-a2l3swabrhsrp-standby" tabindex="-1">Dist-A2（L3SW・ABR・HSRP Standby） <a class="header-anchor" href="#dist-a2l3swabrhsrp-standby" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF（clab）</th>
+<th>IP / モード</th>
+<th>接続先</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>eth1 (E0/1)</td>
+<td>10.0.0.10/30（ルーテッド）</td>
+<td>Core1</td>
+<td>P03</td>
+</tr>
+<tr>
+<td>eth2 (E0/2)</td>
+<td>10.0.0.18/30（ルーテッド）</td>
+<td>Core2</td>
+<td>P05</td>
+</tr>
+<tr>
+<td>eth5 (E1/1)</td>
+<td>トランク（Po1メンバー）</td>
+<td>Dist-A1</td>
+<td>LACP</td>
+</tr>
+<tr>
+<td>eth6 (E1/2)</td>
+<td>トランク（Po1メンバー）</td>
+<td>Dist-A1</td>
+<td>LACP</td>
+</tr>
+<tr>
+<td>eth3 (E0/3)</td>
+<td>トランク</td>
+<td>Acc-A1</td>
+<td></td>
+</tr>
+<tr>
+<td>eth4 (E1/0)</td>
+<td>トランク</td>
+<td>Acc-A2</td>
+<td></td>
+</tr>
+<tr>
+<td>SVI VLAN10</td>
+<td>10.10.10.2/24（HSRP VIP .254）</td>
+<td>—</td>
+<td>Standby</td>
+</tr>
+<tr>
+<td>SVI VLAN20</td>
+<td>10.10.20.2/24（HSRP VIP .254）</td>
+<td>—</td>
+<td>Standby</td>
+</tr>
+<tr>
+<td>SVI VLAN901</td>
+<td>10.10.255.2/30</td>
+<td>Dist-A1</td>
+<td>OSPF Area 1隣接</td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>10.255.0.12/32</td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="dist-b1l3swabrb棟gw" tabindex="-1">Dist-B1（L3SW・ABR・B棟GW） <a class="header-anchor" href="#dist-b1l3swabrb棟gw" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF（clab）</th>
+<th>IP / モード</th>
+<th>接続先</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>eth1 (E0/1)</td>
+<td>10.0.0.22/30（ルーテッド）</td>
+<td>Core1</td>
+<td>P06</td>
+</tr>
+<tr>
+<td>eth2 (E0/2)</td>
+<td>10.0.0.26/30（ルーテッド）</td>
+<td>Core2</td>
+<td>P07</td>
+</tr>
+<tr>
+<td>eth5 (E1/1)</td>
+<td>トランク（Po1メンバー）</td>
+<td>Acc-B1</td>
+<td>LACP</td>
+</tr>
+<tr>
+<td>eth6 (E1/2)</td>
+<td>トランク（Po1メンバー）</td>
+<td>Acc-B1</td>
+<td>LACP</td>
+</tr>
+<tr>
+<td>SVI VLAN30</td>
+<td>10.20.30.254/24</td>
+<td>—</td>
+<td>サーバGW（単機）</td>
+</tr>
+<tr>
+<td>SVI VLAN99</td>
+<td>10.20.99.254/24</td>
+<td>—</td>
+<td>管理GW（単機）</td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>10.255.0.21/32</td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="acc-a1--acc-a2--acc-b1l2swipなし" tabindex="-1">Acc-A1 / Acc-A2 / Acc-B1（L2SW・IPなし） <a class="header-anchor" href="#acc-a1--acc-a2--acc-b1l2swipなし" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>機器</th>
+<th>IF（clab）</th>
+<th>モード</th>
+<th>接続先</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Acc-A1</td>
+<td>eth1 (E0/1)</td>
+<td>トランク</td>
+<td>Dist-A1</td>
+</tr>
+<tr>
+<td>Acc-A1</td>
+<td>eth2 (E0/2)</td>
+<td>トランク</td>
+<td>Dist-A2</td>
+</tr>
+<tr>
+<td>Acc-A1</td>
+<td>eth3 (E0/3)</td>
+<td>アクセス VLAN10＋ポートセキュリティ</td>
+<td>pc-sales</td>
+</tr>
+<tr>
+<td>Acc-A2</td>
+<td>eth1 (E0/1)</td>
+<td>トランク</td>
+<td>Dist-A1</td>
+</tr>
+<tr>
+<td>Acc-A2</td>
+<td>eth2 (E0/2)</td>
+<td>トランク</td>
+<td>Dist-A2</td>
+</tr>
+<tr>
+<td>Acc-A2</td>
+<td>eth3 (E0/3)</td>
+<td>アクセス VLAN20＋ポートセキュリティ</td>
+<td>pc-dev</td>
+</tr>
+<tr>
+<td>Acc-B1</td>
+<td>eth1 (E0/1)</td>
+<td>トランク（Po1メンバー）</td>
+<td>Dist-B1</td>
+</tr>
+<tr>
+<td>Acc-B1</td>
+<td>eth2 (E0/2)</td>
+<td>トランク（Po1メンバー）</td>
+<td>Dist-B1</td>
+</tr>
+<tr>
+<td>Acc-B1</td>
+<td>eth3 (E0/3)</td>
+<td>アクセス VLAN30＋ポートセキュリティ</td>
+<td>srv-portal</td>
+</tr>
+<tr>
+<td>Acc-B1</td>
+<td>eth4 (E1/0)</td>
+<td>アクセス VLAN30＋ポートセキュリティ</td>
+<td>srv-file</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="fgt-edgefortigate-72" tabindex="-1">FGT-Edge（FortiGate 7.2） <a class="header-anchor" href="#fgt-edgefortigate-72" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF（clab）</th>
+<th>FortiOS側（要実機確認）</th>
+<th>IP</th>
+<th>接続先</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>eth0</td>
+<td>port1（管理）</td>
+<td>（clab管理ネットワーク）</td>
+<td>—</td>
+<td>GUI/CLIアクセス</td>
+</tr>
+<tr>
+<td>eth1</td>
+<td>port2想定</td>
+<td>200.0.1.1/24</td>
+<td>ISP</td>
+<td>WAN・SNAT出口</td>
+</tr>
+<tr>
+<td>eth2</td>
+<td>port3想定</td>
+<td>10.0.1.30/30</td>
+<td>Core1</td>
+<td>P08・OSPF Area 0</td>
+</tr>
+<tr>
+<td>eth3</td>
+<td>port4想定</td>
+<td>10.0.1.34/30</td>
+<td>Core2</td>
+<td>P09・OSPF Area 0</td>
+</tr>
+<tr>
+<td>VTIトンネル</td>
+<td>—</td>
+<td>172.16.40.1/30</td>
+<td>BR-Edge</td>
+<td>IPsec（IKEv2）</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="ispciscoルーターインターネット模擬" tabindex="-1">ISP（Ciscoルーター・インターネット模擬） <a class="header-anchor" href="#ispciscoルーターインターネット模擬" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF（clab）</th>
+<th>IP</th>
+<th>接続先</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>eth1 (E0/1)</td>
+<td>200.0.1.254/24</td>
+<td>FGT-Edge</td>
+<td>本社向け</td>
+</tr>
+<tr>
+<td>eth2 (E0/2)</td>
+<td>200.0.3.254/24</td>
+<td>BR-Edge</td>
+<td>支社向け</td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>8.8.8.8/32</td>
+<td>—</td>
+<td>インターネット上のホスト模擬（ping先）</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="br-edgeciscoルーター支社" tabindex="-1">BR-Edge（Ciscoルーター・支社） <a class="header-anchor" href="#br-edgeciscoルーター支社" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF（clab）</th>
+<th>IP</th>
+<th>接続先</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>eth1 (E0/1)</td>
+<td>200.0.3.1/24</td>
+<td>ISP</td>
+<td>WAN・PAT出口</td>
+</tr>
+<tr>
+<td>eth2 (E0/2)</td>
+<td>10.2.40.254/24</td>
+<td>br-pc</td>
+<td>支社LAN GW</td>
+</tr>
+<tr>
+<td>Tunnel IF</td>
+<td>172.16.40.2/30</td>
+<td>FGT-Edge</td>
+<td>IPsec（IKEv2）</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="エンドポイントlinuxコンテナclaude提供部材" tabindex="-1">エンドポイント（Linuxコンテナ・Claude提供部材） <a class="header-anchor" href="#エンドポイントlinuxコンテナclaude提供部材" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>IF</th>
+<th>IP</th>
+<th>GW</th>
+<th>役割</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pc-sales</td>
+<td>eth1</td>
+<td>10.10.10.100/24</td>
+<td>10.10.10.254</td>
+<td>営業部PC</td>
+</tr>
+<tr>
+<td>pc-dev</td>
+<td>eth1</td>
+<td>10.10.20.100/24</td>
+<td>10.10.20.254</td>
+<td>開発部PC</td>
+</tr>
+<tr>
+<td>srv-file</td>
+<td>eth1</td>
+<td>10.20.30.10/24</td>
+<td>10.20.30.254</td>
+<td>ファイルサーバ（HTTP）</td>
+</tr>
+<tr>
+<td>srv-portal</td>
+<td>eth1</td>
+<td>10.20.30.20/24</td>
+<td>10.20.30.254</td>
+<td>社内ポータル（Web）</td>
+</tr>
+<tr>
+<td>br-pc</td>
+<td>eth1</td>
+<td>10.2.40.100/24</td>
+<td>10.2.40.254</td>
+<td>支社PC</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>💡 <strong>P2Pリンク/30の理由</strong>: ルーター間直結リンクはアドレスを2個しか使わないため、/30で無駄を省くのが実務のベストプラクティス（テーマ21から継承）。</p>
+</blockquote>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-アドレスプール全体ルール">1. アドレスプール全体ルール</a></li>
+<li class="lvl-2"><a href="#2-セグメントvlan一覧">2. セグメント（VLAN）一覧</a></li>
+<li class="lvl-2"><a href="#3-バックボーンp2pリンク割当1000024-を-30-刻み">3. バックボーンP2Pリンク割当（10.0.0.0/24 を /30 刻み）</a></li>
+<li class="lvl-2"><a href="#4-loopback割当102550024すべて32">4. Loopback割当（10.255.0.0/24・すべて/32）</a></li>
+<li class="lvl-2"><a href="#5-機器ごとのipアドレス割り当て表">5. 機器ごとのIPアドレス割り当て表</a></li>
+<li class="lvl-3"><a href="#core1l3swルーテッドポートのみ">Core1（L3SW・ルーテッドポートのみ）</a></li>
+<li class="lvl-3"><a href="#core2l3swルーテッドポートのみ">Core2（L3SW・ルーテッドポートのみ）</a></li>
+<li class="lvl-3"><a href="#dist-a1l3swabrhsrp-activemstルート">Dist-A1（L3SW・ABR・HSRP Active・MSTルート）</a></li>
+<li class="lvl-3"><a href="#dist-a2l3swabrhsrp-standby">Dist-A2（L3SW・ABR・HSRP Standby）</a></li>
+<li class="lvl-3"><a href="#dist-b1l3swabrb棟gw">Dist-B1（L3SW・ABR・B棟GW）</a></li>
+<li class="lvl-3"><a href="#acc-a1--acc-a2--acc-b1l2swipなし">Acc-A1 / Acc-A2 / Acc-B1（L2SW・IPなし）</a></li>
+<li class="lvl-3"><a href="#fgt-edgefortigate-72">FGT-Edge（FortiGate 7.2）</a></li>
+<li class="lvl-3"><a href="#ispciscoルーターインターネット模擬">ISP（Ciscoルーター・インターネット模擬）</a></li>
+<li class="lvl-3"><a href="#br-edgeciscoルーター支社">BR-Edge（Ciscoルーター・支社）</a></li>
+<li class="lvl-3"><a href="#エンドポイントlinuxコンテナclaude提供部材">エンドポイント（Linuxコンテナ・Claude提供部材）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

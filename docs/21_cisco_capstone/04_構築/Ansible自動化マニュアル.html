@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Ansible を用いた一括設定マニュアル</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>21_cisco_capstone</span>
+<span class="sep">/</span>
+<span>04_構築</span></nav>
+      <h1 class="doc-title">Ansible を用いた一括設定マニュアル</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>今回はシェルスクリプト (<code>configure_all.sh</code>) と Expectスクリプト で自動化を行いましたが、本番環境などで <strong>Ansible</strong> を使用して構成管理を行う場合のサンプルファイルを作成しました。</p>
+<h2 id="ディレクトリ構成" tabindex="-1">ディレクトリ構成 <a class="header-anchor" href="#ディレクトリ構成" aria-hidden="true">#</a></h2>
+<pre><code class="language-text">04_構築/ansible_demo/
+├── ansible.cfg       # Ansible の動作設定
+├── inventory.ini     # 接続先ルーター/スイッチのIP一覧
+├── site.yml          # 実行するPlaybook
+└── configs/          # 各機器に流し込むConfigファイル (.cfg)
+    ├── isp.cfg
+    ├── hq-edge1.cfg
+    └── ...
+</code></pre>
+<h2 id="事前準備" tabindex="-1">事前準備 <a class="header-anchor" href="#事前準備" aria-hidden="true">#</a></h2>
+<ol>
+<li>Ansible本体とCiscoモジュールがインストールされている必要があります。<pre><code class="language-bash">pip install ansible
+ansible-galaxy collection install cisco.ios
+</code></pre>
+</li>
+<li><code>configs/</code> ディレクトリ配下に、流し込みたい設定ファイル（例: <code>hq-edge1.cfg</code>）を機器のホスト名に合わせて作成・保存しておきます。</li>
+</ol>
+<h2 id="実行方法" tabindex="-1">実行方法 <a class="header-anchor" href="#実行方法" aria-hidden="true">#</a></h2>
+<p><code>ansible_demo</code> ディレクトリに移動し、以下のコマンドを実行します。</p>
+<pre><code class="language-bash"><span class="hljs-built_in">cd</span> 04_構築/ansible_demo/
+ansible-playbook -i inventory.ini site.yml
+</code></pre>
+<h3 id="処理内容" tabindex="-1">処理内容 <a class="header-anchor" href="#処理内容" aria-hidden="true">#</a></h3>
+<p>Playbook (<code>site.yml</code>) は以下の順序で動作します。</p>
+<ol>
+<li><code>inventory.ini</code> に記載された対象機器（172.20.20.X）にSSH接続します。</li>
+<li><code>configs/&lt;ホスト名&gt;.cfg</code> ファイルの中身を読み込み、ルーターの Running-Config に適用します（差分反映）。</li>
+<li>変更があった場合のみ、自動的に <code>write memory</code> (Save) を実行します。</li>
+</ol>
+<h2 id="注意点cisco-iol環境での制約" tabindex="-1">注意点（Cisco IOL環境での制約） <a class="header-anchor" href="#注意点cisco-iol環境での制約" aria-hidden="true">#</a></h2>
+<p>今回 Ansible をメインで使わなかった理由として、「L2スイッチ (<code>hq-core1</code>, <code>hq-core2</code>) がデフォルトで管理IPを受け取れない状態（スイッチポート）で起動する」という問題があったためです。
+AnsibleはSSHで通信できることが前提となるため、今回のような<strong>IPアドレスを持たない初期状態の機器</strong>に対しては、直接コンソール操作を行うツール（<code>expect</code> やコンソールケーブル経由でのスクリプト）で初期設定（アンダーレイ）を行う必要があります。</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#ディレクトリ構成">ディレクトリ構成</a></li>
+<li class="lvl-2"><a href="#事前準備">事前準備</a></li>
+<li class="lvl-2"><a href="#実行方法">実行方法</a></li>
+<li class="lvl-3"><a href="#処理内容">処理内容</a></li>
+<li class="lvl-2"><a href="#注意点cisco-iol環境での制約">注意点（Cisco IOL環境での制約）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

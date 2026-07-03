@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>要件定義書: 動的ルーティング深堀り</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>26_dynamic_routing_deep_dive</span>
+<span class="sep">/</span>
+<span>01_要件定義</span></nav>
+      <h1 class="doc-title">要件定義書: 動的ルーティング深堀り</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="1-背景と目的" tabindex="-1">1. 背景と目的 <a class="header-anchor" href="#1-背景と目的" aria-hidden="true">#</a></h2>
+<p>中規模企業ネットワーク（本社・支社）において、ネットワークセグメントの増加や外部（ISP）との接続に伴い、静的ルーティングだけでは運用負荷が高く、障害時の自動切り替えが困難になっている。本ラボでは、要件に応じて適切な動的ルーティングプロトコル（OSPF, EIGRP, BGP）を選択・設計し、高い可用性と拡張性を持つネットワーク基盤を構築する。</p>
+<h2 id="2-ネットワークゾーン要件" tabindex="-1">2. ネットワークゾーン要件 <a class="header-anchor" href="#2-ネットワークゾーン要件" aria-hidden="true">#</a></h2>
+<h3 id="21-本社hq" tabindex="-1">2.1 本社（HQ） <a class="header-anchor" href="#21-本社hq" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>Trustゾーン（社内LAN）</strong>: 社内ユーザーのPCや社内システムが収容される。可用性が高く、障害時に迅速に経路が切り替わるルーティング基盤が必要。</li>
+<li><strong>DMZゾーン</strong>: 外部向け公開サーバが収容される。Trustゾーンとはルーティング的に分離しつつ、必要な通信のみを許可する基盤とする。</li>
+<li><strong>Untrustゾーン（エッジ）</strong>: ISPとの接続点。社内（プライベートIP）からインターネットへのアクセスを提供するため、NAT機能が必須。</li>
+</ul>
+<h3 id="22-支社branch" tabindex="-1">2.2 支社（Branch） <a class="header-anchor" href="#22-支社branch" aria-hidden="true">#</a></h3>
+<ul>
+<li>最小限の機器構成でTrustゾーンを提供。本社やDMZゾーンへの安全なアクセスを確保する。</li>
+</ul>
+<h2 id="3-ルーティング要件" tabindex="-1">3. ルーティング要件 <a class="header-anchor" href="#3-ルーティング要件" aria-hidden="true">#</a></h2>
+<h3 id="31-内部ルーティングigp" tabindex="-1">3.1 内部ルーティング（IGP） <a class="header-anchor" href="#31-内部ルーティングigp" aria-hidden="true">#</a></h3>
+<ul>
+<li>本社のコアネットワークはマルチベンダー互換性を考慮し標準プロトコル（OSPF）を使用する。</li>
+<li>本社の一部フロア（ディストリビューション）はCisco独自のEIGRPで構成されており、コアのOSPFと相互接続（再配信）する必要がある。</li>
+<li>支社は設定の簡略化のためOSPFを使用する。</li>
+</ul>
+<h3 id="32-外部ルーティングegp" tabindex="-1">3.2 外部ルーティング（EGP） <a class="header-anchor" href="#32-外部ルーティングegp" aria-hidden="true">#</a></h3>
+<ul>
+<li>インターネット接続およびWAN（本社-支社間）接続にはBGPを使用する。</li>
+<li>BGPを利用して、自社の経路（プレフィックス）だけを外部に広告し、ISPからはデフォルトルートや必要な経路のみを受信するよう制御する（ルートフィルタリング）。</li>
+</ul>
+<h3 id="33-可用性負荷分散" tabindex="-1">3.3 可用性・負荷分散 <a class="header-anchor" href="#33-可用性負荷分散" aria-hidden="true">#</a></h3>
+<ul>
+<li>複数経路が存在する場合、等コストマルチパス（ECMP）を利用してトラフィックを分散させる。</li>
+<li>リンクダウン等の障害時には、数秒以内で迂回経路に切り替わること。</li>
+</ul>
+<h2 id="4-ipアドレス要件" tabindex="-1">4. IPアドレス要件 <a class="header-anchor" href="#4-ipアドレス要件" aria-hidden="true">#</a></h2>
+<ul>
+<li>内部ネットワークは <code>10.26.0.0/16</code> 空間を使用。</li>
+<li>本社: <code>10.26.1.0/24</code>〜<code>10.26.10.0/24</code></li>
+<li>支社: <code>10.26.20.0/24</code></li>
+<li>DMZ: <code>10.26.30.0/24</code></li>
+<li>インターネット/WAN接続用はパブリックIPを模擬した <code>198.51.100.0/24</code> を使用する。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-背景と目的">1. 背景と目的</a></li>
+<li class="lvl-2"><a href="#2-ネットワークゾーン要件">2. ネットワークゾーン要件</a></li>
+<li class="lvl-3"><a href="#21-本社hq">2.1 本社（HQ）</a></li>
+<li class="lvl-3"><a href="#22-支社branch">2.2 支社（Branch）</a></li>
+<li class="lvl-2"><a href="#3-ルーティング要件">3. ルーティング要件</a></li>
+<li class="lvl-3"><a href="#31-内部ルーティングigp">3.1 内部ルーティング（IGP）</a></li>
+<li class="lvl-3"><a href="#32-外部ルーティングegp">3.2 外部ルーティング（EGP）</a></li>
+<li class="lvl-3"><a href="#33-可用性負荷分散">3.3 可用性・負荷分散</a></li>
+<li class="lvl-2"><a href="#4-ipアドレス要件">4. IPアドレス要件</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

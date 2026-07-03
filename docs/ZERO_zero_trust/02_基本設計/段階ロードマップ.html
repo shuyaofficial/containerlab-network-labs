@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜段階ロードマップ</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>02_基本設計</span></nav>
+      <h1 class="doc-title">テーマZERO｜段階ロードマップ</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">roadmap</span><span class="tag">phase</span><span class="tag">arm64</span><span class="tag">oss</span></span>
+      </div>
+      
+      <div class="content">
+<p>ゼロトラスト6観点を <strong>依存順</strong> に Phase 化する。各 Phase は前 Phase のゲート条件を満たしてから着手する。
+今回スコープは Phase 0 土台と arm64 軽量検証まで。Phase 1-6 はデプロイせず、設計・ゲート条件・作業リストのみを確定する（<a href="../01_%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9/%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9%E6%9B%B8.html">要件定義書</a> のユーザー決定）。</p>
+<h2 id="phase-一覧" tabindex="-1">Phase 一覧 <a class="header-anchor" href="#phase-一覧" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>観点</th>
+<th>主コンポーネント</th>
+<th>依存</th>
+<th>ゲート条件（次へ進む条件）</th>
+<th>今回スコープ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>土台</td>
+<td>client / app / external（multitool）</td>
+<td>なし</td>
+<td><code>client</code> → <code>app</code> 疎通。規約（frontmatter / HTML ビルド / git）が回る</td>
+<td>デプロイ対象</td>
+</tr>
+<tr>
+<td>1</td>
+<td>ID統制</td>
+<td>Keycloak</td>
+<td>Phase 0</td>
+<td>OIDC トークンを <code>curl</code> / ブラウザで取得できる</td>
+<td>設計のみ</td>
+</tr>
+<tr>
+<td>2</td>
+<td>NWセキュリティ</td>
+<td>oauth2-proxy → Pomerium</td>
+<td>Phase 1</td>
+<td>未認証拒否・Keycloak ログイン後のみ <code>app</code> 到達</td>
+<td>設計のみ</td>
+</tr>
+<tr>
+<td>3</td>
+<td>SIEM</td>
+<td>Loki + Promtail + Grafana</td>
+<td>Phase 1, 2</td>
+<td>Phase 1/2 ログが Grafana で表示できる</td>
+<td>設計のみ</td>
+</tr>
+<tr>
+<td>4</td>
+<td>WEBセキュリティ</td>
+<td>mitmproxy（or Squid + Suricata）</td>
+<td>Phase 3</td>
+<td>proxy 経由強制・SSL bump 可視化・IDS 発報→Loki</td>
+<td>設計のみ</td>
+</tr>
+<tr>
+<td>5</td>
+<td>DLP</td>
+<td>mitmproxy Python アドオン</td>
+<td>Phase 4</td>
+<td>キーワード含むアップロード検知・ブロック・SIEM 記録</td>
+<td>設計のみ</td>
+</tr>
+<tr>
+<td>6</td>
+<td>デバイス統制</td>
+<td>step-ca（mTLS）→ Pomerium 連携</td>
+<td>Phase 2, 3</td>
+<td>証明書なし端末拒否・posture claim で条件分岐</td>
+<td>設計のみ</td>
+</tr>
+</tbody>
+</table></div>
+<p>依存関係の骨子:</p>
+<ul>
+<li><strong>ID（P1）が全ての起点</strong>。IAP（P2）は認証を Keycloak に委譲するため、P1 が先。</li>
+<li><strong>SIEM（P3）を早期投入</strong>（D-3）。P4 以降の「効いている証拠」を可視化するため、SWG/DLP より前に置く。</li>
+<li><strong>DLP（P5）は SWG（P4）の同一経路上</strong>。mitmproxy に兼務させる（D-2）ため P4 の後。</li>
+<li><strong>デバイス統制（P6）は IAP（P2）に posture を渡す</strong>構成。P2 と P3（ログ確認）が前提。</li>
+</ul>
+<pre class="mermaid">graph LR
+    P0[Phase 0&lt;br/&gt;土台] --&gt; P1[Phase 1&lt;br/&gt;ID / Keycloak]
+    P1 --&gt; P2[Phase 2&lt;br/&gt;IAP / Pomerium]
+    P1 --&gt; P3[Phase 3&lt;br/&gt;SIEM / Loki+Grafana]
+    P2 --&gt; P3
+    P3 --&gt; P4[Phase 4&lt;br/&gt;SWG / mitmproxy]
+    P4 --&gt; P5[Phase 5&lt;br/&gt;DLP / アドオン]
+    P2 --&gt; P6[Phase 6&lt;br/&gt;デバイス / step-ca]
+    P3 --&gt; P6
+</pre>
+<h2 id="phase-0--土台" tabindex="-1">Phase 0 — 土台 <a class="header-anchor" href="#phase-0--土台" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>目的</strong>: docker ネットワーク4ゾーンとエンドポイント3台で疎通の骨格を作り、規約一式（frontmatter / HTML ビルド / git）を回す。</li>
+<li><strong>コンポーネント</strong>: <code>client</code>（Untrust）/ <code>app</code>（Trust）/ <code>external</code>（Untrust）。いずれも <code>wbitt/network-multitool</code> を流用。</li>
+<li><strong>依存</strong>: なし。</li>
+<li><strong>ゲート条件</strong>: <code>client</code> → <code>app</code> の ping / curl が通る。<code>node 規約/ビルド/build.mjs --check</code> が pass する。</li>
+<li><strong>想定作業量</strong>: 小（既存イメージ流用のため。clab.yml + <a href="http://deploy.sh">deploy.sh</a> の記述が中心）。</li>
+<li><strong>学べること</strong>: docker bridge によるゾーン分離、containerlab のノード命名規約、Untrust→Trust 直通禁止の効き方。</li>
+</ul>
+<h2 id="phase-1--id統制keycloak" tabindex="-1">Phase 1 — ID統制（Keycloak） <a class="header-anchor" href="#phase-1--id統制keycloak" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>目的</strong>: OIDC IdP を立て、認可コードフローで ID/アクセストークンを発行できる状態を作る。以降の認可の土台。</li>
+<li><strong>コンポーネント</strong>: Keycloak（DMZ）。内蔵 DB でユーザー・ロールを管理（発展: OpenLDAP）。</li>
+<li><strong>依存</strong>: Phase 0（ネットワーク・DNS）。</li>
+<li><strong>ゲート条件</strong>: 管理画面で realm/client を作成し、token endpoint から <code>curl</code> またはブラウザで OIDC トークンを取得できる。</li>
+<li><strong>想定作業量</strong>: 中（realm/client/ユーザー設定、初期 PW の環境変数注入）。</li>
+<li><strong>学べること</strong>: OIDC 認可コードフロー、realm/client/scope の役割、IdP をアプリから分離する意味。</li>
+</ul>
+<h2 id="phase-2--nwセキュリティiap" tabindex="-1">Phase 2 — NWセキュリティ（IAP） <a class="header-anchor" href="#phase-2--nwセキュリティiap" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>目的</strong>: <code>app</code> の手前に関所を置き、未認証アクセスを拒否。認証を Keycloak に委譲し、認可済みのみ転送する。</li>
+<li><strong>コンポーネント</strong>: oauth2-proxy（最小の未認証拒否）→ Pomerium（認可ポリシーへ段階的に高度化）。DMZ 配置でマルチホーム。</li>
+<li><strong>依存</strong>: Phase 1（OIDC トークン取得が前提）。</li>
+<li><strong>ゲート条件</strong>: 未認証で <code>app</code> にアクセスすると拒否され、Keycloak ログイン後のみ到達できる。</li>
+<li><strong>想定作業量</strong>: 中（IdP 連携設定、リダイレクト URL、Trust への転送経路）。</li>
+<li><strong>学べること</strong>: IAP/ZTNA の「アプリ手前で毎回検証」の実装、認証委譲、認可ポリシーの入口を1点に集約する設計。</li>
+</ul>
+<h2 id="phase-3--siemloki--grafana" tabindex="-1">Phase 3 — SIEM（Loki + Grafana） <a class="header-anchor" href="#phase-3--siemloki--grafana" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>目的</strong>: 各観点のログを集約・可視化する基盤を早期に確保し、以降の「効いている証拠」を見えるようにする。</li>
+<li><strong>コンポーネント</strong>: Loki（保存）+ Promtail（収集）+ Grafana（可視化）。可観測ゾーン。</li>
+<li><strong>依存</strong>: Phase 1, 2（集約対象のログ源）。</li>
+<li><strong>ゲート条件</strong>: Phase 1/2 の認証・認可ログが Grafana のダッシュボードで表示できる。</li>
+<li><strong>想定作業量</strong>: 中（Promtail のログ収集設定、Loki データソース、基本ダッシュボード）。</li>
+<li><strong>学べること</strong>: ログ集約パイプライン、可観測ゾーンへの片方向流入、SIEM を効果測定の道具として使う考え方。</li>
+</ul>
+<h2 id="phase-4--webセキュリティswg" tabindex="-1">Phase 4 — WEBセキュリティ（SWG） <a class="header-anchor" href="#phase-4--webセキュリティswg" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>目的</strong>: 外向き Web 通信を proxy に強制経由させ、SSL bump で可視化し、不審通信を IDS で検知して SIEM に発報する。</li>
+<li><strong>コンポーネント</strong>: mitmproxy（第一候補、SSL bump）。代替: Squid + Suricata（arm64 可用性次第、<a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB.html">軽量検証計画</a> の代替ルール）。DMZ 配置。</li>
+<li><strong>依存</strong>: Phase 3（発報先の SIEM）。</li>
+<li><strong>ゲート条件</strong>: <code>client</code> の外向き通信が proxy 経由に強制され、SSL bump で内容が可視化でき、IDS 発報が Loki に届く。</li>
+<li><strong>想定作業量</strong>: 中〜大（proxy 強制経路、CA 証明書の端末信頼、SSL bump、IDS ルール）。</li>
+<li><strong>学べること</strong>: SWG の透過／明示プロキシ、TLS 復号の仕組みとリスク、IDS 発報から SIEM までの導線。</li>
+</ul>
+<h2 id="phase-5--dlp" tabindex="-1">Phase 5 — DLP <a class="header-anchor" href="#phase-5--dlp" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>目的</strong>: アップロード内容を検査し、機密キーワードを含むデータの持ち出しを検知・ブロックし、SIEM に記録する。</li>
+<li><strong>コンポーネント</strong>: mitmproxy Python アドオン（SWG と兼務、D-2）。代替: c-icap + ClamAV 不可なら mitmproxy DLP に一本化。</li>
+<li><strong>依存</strong>: Phase 4（SWG の同一プロキシ経路上）。</li>
+<li><strong>ゲート条件</strong>: キーワードを含むアップロードを検知・ブロックし、検知イベントを SIEM に記録できる。</li>
+<li><strong>想定作業量</strong>: 中（アドオン実装、キーワード定義、ブロック応答、ログ出力）。</li>
+<li><strong>学べること</strong>: DLP の内容検査、プロキシ経路への処理差し込み、検知と遮断の分離。</li>
+</ul>
+<h2 id="phase-6--デバイス統制" tabindex="-1">Phase 6 — デバイス統制 <a class="header-anchor" href="#phase-6--デバイス統制" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>目的</strong>: 端末証明書（mTLS）で「管理された端末か」を検証し、posture claim を認可判断の入力にして条件分岐する。</li>
+<li><strong>コンポーネント</strong>: step-ca（mTLS 証明書発行・posture claim モック）→ Pomerium 連携。osquery 補助。発展: Wazuh エージェント。DMZ 配置。</li>
+<li><strong>依存</strong>: Phase 2（posture を渡す先の IAP）、Phase 3（判定ログの確認）。</li>
+<li><strong>ゲート条件</strong>: 証明書を持たない端末を拒否し、posture claim（例: 準拠/非準拠）で到達可否を条件分岐できる。</li>
+<li><strong>想定作業量</strong>: 中〜大（CA 発行フロー、mTLS 検証、posture claim のモックと Pomerium ポリシー連携）。</li>
+<li><strong>学べること</strong>: デバイス識別の mTLS、posture ベース認可、ID＋デバイスの二軸で「明示的検証」を成立させる設計。</li>
+</ul>
+<h2 id="発展課題今回スコープ外" tabindex="-1">発展課題（今回スコープ外） <a class="header-anchor" href="#発展課題今回スコープ外" aria-hidden="true">#</a></h2>
+<ul>
+<li>IdP: Keycloak 内蔵 DB → OpenLDAP 連携。</li>
+<li>IAP: Pomerium → OpenZiti へ高度化。</li>
+<li>SIEM: Loki 先行 → Wazuh（統合 SIEM/EDR、2-4GB 級、要検証、D-4）。</li>
+<li>IOL（L2/L3）連携（D-1、別テーマ）。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88%E6%9B%B8.html">基本設計書</a></li>
+<li><a href="%E5%AE%9F%E8%A3%85%E5%8F%AF%E8%83%BD%E6%80%A7%E3%83%9E%E3%83%88%E3%83%AA%E3%82%AF%E3%82%B9.html">実装可能性マトリクス</a></li>
+<li><a href="%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a></li>
+<li><a href="IP%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9%E7%AE%A1%E7%90%86%E8%A1%A8.html">IPアドレス管理表</a></li>
+<li><a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB.html">軽量検証計画</a></li>
+<li><a href="../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#phase-一覧">Phase 一覧</a></li>
+<li class="lvl-2"><a href="#phase-0--土台">Phase 0 — 土台</a></li>
+<li class="lvl-2"><a href="#phase-1--id統制keycloak">Phase 1 — ID統制（Keycloak）</a></li>
+<li class="lvl-2"><a href="#phase-2--nwセキュリティiap">Phase 2 — NWセキュリティ（IAP）</a></li>
+<li class="lvl-2"><a href="#phase-3--siemloki--grafana">Phase 3 — SIEM（Loki + Grafana）</a></li>
+<li class="lvl-2"><a href="#phase-4--webセキュリティswg">Phase 4 — WEBセキュリティ（SWG）</a></li>
+<li class="lvl-2"><a href="#phase-5--dlp">Phase 5 — DLP</a></li>
+<li class="lvl-2"><a href="#phase-6--デバイス統制">Phase 6 — デバイス統制</a></li>
+<li class="lvl-2"><a href="#発展課題今回スコープ外">発展課題（今回スコープ外）</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

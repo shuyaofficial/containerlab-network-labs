@@ -1,0 +1,24 @@
+name: qos-diffserv
+
+topology:
+  nodes:
+    pc1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+    
+    r1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+
+    r2:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+
+    pc2:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+
+  links:
+    - endpoints: ["pc1:eth1", "r1:eth2"]
+    - endpoints: ["r1:eth1", "r2:eth1"]
+    - endpoints: ["r2:eth2", "pc2:eth1"]

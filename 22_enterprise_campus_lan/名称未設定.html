@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Theme 22 Logical Topology</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style type="text/css">
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e1e;
+            color: #fff;
+            margin: 0;
+            padding: 0;
+        }
+        #mynetwork {
+            width: 100vw;
+            height: 100vh;
+            background-color: #1e1e1e;
+        }
+        #title {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px 25px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 24px;
+            color: #4CAF50;
+        }
+        p {
+            margin: 0;
+            font-size: 14px;
+            color: #bbb;
+        }
+    </style>
+</head>
+<body>
+    <div id="title">
+        <h1>Theme 22: Enterprise Campus LAN</h1>
+        <p>Interactive Logical Topology</p>
+        <p style="font-size: 12px; margin-top: 5px; color: #888;">Drag nodes to rearrange. Scroll to zoom.</p>
+    </div>
+    <div id="mynetwork"></div>
+
+    <script type="text/javascript">
+        // ネットワークデータの作成
+        var nodes = new vis.DataSet([
+            // Internet Group
+            {id: 'isp', label: 'ISP\n(8.8.8.8)', group: 'internet', title: 'Internet Simulator'},
+
+            // Branch Group
+            {id: 'br-edge', label: 'BR-Edge\n(Cisco)', group: 'branch', title: 'Branch Edge Router'},
+            {id: 'br-pc', label: 'br-pc\n(10.2.40.100)', group: 'branch', title: 'Branch PC'},
+
+            // Backbone (Area 0)
+            {id: 'fgt-edge', label: 'FGT-Edge\n(FortiGate)', group: 'area0', title: 'Campus Firewall / Edge'},
+            {id: 'core1', label: 'Core1\n(L3SW)', group: 'area0', title: 'Core Switch 1'},
+            {id: 'core2', label: 'Core2\n(L3SW)', group: 'area0', title: 'Core Switch 2'},
+
+            // Area 1 (A-Building)
+            {id: 'dist-a1', label: 'Dist-A1\n(ABR/Active)', group: 'area1', title: 'Distribution Switch A1'},
+            {id: 'dist-a2', label: 'Dist-A2\n(ABR/Standby)', group: 'area1', title: 'Distribution Switch A2'},
+            {id: 'acc-a1', label: 'Acc-A1\n(L2SW)', group: 'area1', title: 'Access Switch A1'},
+            {id: 'acc-a2', label: 'Acc-A2\n(L2SW)', group: 'area1', title: 'Access Switch A2'},
+            {id: 'pc-sales', label: 'Sales PC\n(VLAN10)', group: 'area1', title: 'Sales Department'},
+            {id: 'pc-dev', label: 'Dev PC\n(VLAN20)', group: 'area1', title: 'Development Department'},
+
+            // Area 2 (B-Building)
+            {id: 'dist-b1', label: 'Dist-B1\n(ABR)', group: 'area2', title: 'Distribution Switch B1'},
+            {id: 'acc-b1', label: 'Acc-B1\n(L2SW)', group: 'area2', title: 'Access Switch B1'},
+            {id: 'srv-file', label: 'File Server\n(VLAN30)', group: 'area2', title: 'File Server'},
+            {id: 'srv-portal', label: 'Portal Server\n(VLAN30)', group: 'area2', title: 'Portal Server'}
+        ]);
+
+        var edges = new vis.DataSet([
+            // Internet to Edge
+            {from: 'isp', to: 'fgt-edge', label: 'WAN', color: {color: '#ff5722'}, width: 2},
+            {from: 'isp', to: 'br-edge', label: 'WAN', color: {color: '#ff5722'}, width: 2},
+            {from: 'fgt-edge', to: 'br-edge', label: 'IPsec VTI', color: {color: '#e91e63'}, dashes: true, width: 2},
+
+            // Branch LAN
+            {from: 'br-edge', to: 'br-pc', color: {color: '#00bcd4'}},
+
+            // Backbone Links (Area 0)
+            {from: 'fgt-edge', to: 'core1', label: 'P08', color: {color: '#4CAF50'}},
+            {from: 'fgt-edge', to: 'core2', label: 'P09', color: {color: '#4CAF50'}},
+            {from: 'core1', to: 'core2', label: 'P01', color: {color: '#4CAF50'}},
+
+            // Area 0 to Area 1
+            {from: 'core1', to: 'dist-a1', label: 'P02', color: {color: '#4CAF50'}},
+            {from: 'core1', to: 'dist-a2', label: 'P03', color: {color: '#4CAF50'}},
+            {from: 'core2', to: 'dist-a1', label: 'P04', color: {color: '#4CAF50'}},
+            {from: 'core2', to: 'dist-a2', label: 'P05', color: {color: '#4CAF50'}},
+
+            // Area 0 to Area 2
+            {from: 'core1', to: 'dist-b1', label: 'P06', color: {color: '#4CAF50'}},
+            {from: 'core2', to: 'dist-b1', label: 'P07', color: {color: '#4CAF50'}},
+
+            // Area 1 Distribution
+            {from: 'dist-a1', to: 'dist-a2', label: 'Po1 (Trunk)', width: 3, color: {color: '#2196f3'}},
+            {from: 'dist-a1', to: 'dist-a2', label: 'VLAN901 (L3)', dashes: true, color: {color: '#4CAF50'}},
+
+            // Area 1 Access
+            {from: 'dist-a1', to: 'acc-a1', color: {color: '#2196f3'}},
+            {from: 'dist-a2', to: 'acc-a1', color: {color: '#2196f3'}},
+            {from: 'dist-a1', to: 'acc-a2', color: {color: '#2196f3'}},
+            {from: 'dist-a2', to: 'acc-a2', color: {color: '#2196f3'}},
+            
+            // Area 1 Endpoints
+            {from: 'acc-a1', to: 'pc-sales', color: {color: '#00bcd4'}},
+            {from: 'acc-a2', to: 'pc-dev', color: {color: '#00bcd4'}},
+
+            // Area 2 Distribution to Access
+            {from: 'dist-b1', to: 'acc-b1', label: 'Po1 (Trunk)', width: 3, color: {color: '#2196f3'}},
+            
+            // Area 2 Endpoints
+            {from: 'acc-b1', to: 'srv-file', color: {color: '#00bcd4'}},
+            {from: 'acc-b1', to: 'srv-portal', color: {color: '#00bcd4'}}
+        ]);
+
+        var container = document.getElementById('mynetwork');
+        var data = {
+            nodes: nodes,
+            edges: edges
+        };
+        var options = {
+            nodes: {
+                shape: 'dot',
+                size: 25,
+                font: {
+                    size: 14,
+                    color: '#ffffff',
+                    face: 'Inter, sans-serif',
+                    multi: true
+                },
+                borderWidth: 2,
+                shadow: true
+            },
+            edges: {
+                font: {
+                    size: 12,
+                    color: '#aaaaaa',
+                    align: 'middle',
+                    strokeWidth: 0
+                },
+                smooth: {
+                    type: 'continuous'
+                }
+            },
+            groups: {
+                internet: {
+                    color: {background: '#e65100', border: '#ffb74d'}
+                },
+                branch: {
+                    color: {background: '#006064', border: '#4dd0e1'}
+                },
+                area0: {
+                    color: {background: '#1b5e20', border: '#81c784'},
+                    shape: 'hexagon'
+                },
+                area1: {
+                    color: {background: '#0d47a1', border: '#64b5f6'},
+                    shape: 'box',
+                    font: { color: '#ffffff' }
+                },
+                area2: {
+                    color: {background: '#4a148c', border: '#ba68c8'},
+                    shape: 'box',
+                    font: { color: '#ffffff' }
+                }
+            },
+            physics: {
+                forceAtlas2Based: {
+                    gravitationalConstant: -100,
+                    centralGravity: 0.005,
+                    springLength: 150,
+                    springConstant: 0.05
+                },
+                maxVelocity: 50,
+                solver: 'forceAtlas2Based',
+                timestep: 0.35,
+                stabilization: {iterations: 150}
+            },
+            layout: {
+                randomSeed: 2
+            }
+        };
+
+        var network = new vis.Network(container, data, options);
+    </script>
+</body>
+</html>

@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>パラメータシート（設定順ビュー）— Theme 25: Multi-Campus</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>25_campus_multi_site</span>
+<span class="sep">/</span>
+<span>03_詳細設計</span></nav>
+      <h1 class="doc-title">パラメータシート（設定順ビュー）— Theme 25: Multi-Campus</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p><strong>本書は「設定する順番」で並べた作業ビューです。</strong> 値の正本は <a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/IP%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9%E7%AE%A1%E7%90%86%E8%A1%A8.html">IPアドレス管理表</a>、
+ノード別の一覧は <a href="%E3%83%91%E3%83%A9%E3%83%A1%E3%83%BC%E3%82%BF%E3%82%B7%E3%83%BC%E3%83%88.html">パラメータシート.md</a> を参照。両者と数値は一致させています。</p>
+<p><strong>本書に IOS コンフィグコマンド／startup-config は記載しません。</strong> 設計値・投入順序・順序の根拠・確認観点までを示し、
+IOSコマンドへの変換は学習者が行います（<a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88%E6%9B%B8.html">基本設計書</a> §8 と同一方針）。</p>
+</blockquote>
+<h2 id="なぜ順番で並べ替えたか" tabindex="-1">なぜ「順番」で並べ替えたか <a class="header-anchor" href="#なぜ順番で並べ替えたか" aria-hidden="true">#</a></h2>
+<p>ノード別に値だけ並んでいると、投入順が見えず次の事故が起きやすい：</p>
+<ul>
+<li><strong>Router ID 事故</strong>: Loopback を作る前に OSPF を有効化すると、意図しない Router ID が選ばれ、
+直すのに <code>clear ip ospf process</code>（＝隣接の張り直し）が必要になる。</li>
+<li><strong>参照先不在</strong>: prefix-list / route-map を作る前に redistribute を書くと、参照先が無く挙動が崩れる。</li>
+</ul>
+<p>これを避けるため、Cisco のベストプラクティスに沿って次の3原則で並べています：</p>
+<ol>
+<li><strong>Router ID はプロセス有効化の前に確定</strong> — Loopback を先に作り、プロセス内で <code>router-id</code> を明示（自動選出に頼らない）。</li>
+<li><strong>prefix-list → route-map → redistribute の順</strong> — ポリシーオブジェクトを先に用意してから参照させる。</li>
+<li><strong>相互再配信はタグでループ防止</strong> — 片方向で tag 付与、逆方向で tag 一致を deny。</li>
+</ol>
+<p>参照:
+<a href="https://www.cisco.com/c/en/us/support/docs/ip/border-gateway-protocol-bgp/5242-bgp-ospf-redis.html">Redistribution of OSPF Routes into BGP (Cisco)</a> ／
+<a href="https://www.cisco.com/c/en/us/support/docs/ios-nx-os-software/ios-xr-software/IOS-XR-Best-Practices/IOSXR-Deployment-BestPractices.html">IOS XR Deployment Best Practices for OSPF/IS-IS and BGP (Cisco)</a> ／
+<a href="https://www.cisco.com/c/en/us/support/docs/ios-nx-os-software/nx-os-software/200185-Configure-Redistribution-of-iBGP-Routes.html">Redistribution of iBGP Routes Into OSPF (Cisco)</a></p>
+<hr>
+<h2 id="phase-0-事前確認環境側が用意済み" tabindex="-1">Phase 0. 事前確認（環境側が用意済み） <a class="header-anchor" href="#phase-0-事前確認環境側が用意済み" aria-hidden="true">#</a></h2>
+<p>投入対象は Cisco IOL 4台：<strong>main-core / main-edge / branch-edge / branch-core</strong>。
+次は <code>campus.clab.yml</code> が自動設定済みなので触らない。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>内容</th>
+<th>状態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>管理IP（4台＋PC2台）</td>
+<td><code>172.25.25.0/24</code> から固定</td>
+<td>✅ 自動</td>
+</tr>
+<tr>
+<td>PC側データプレーンIP・静的経路</td>
+<td>main-pc <code>10.50.10.10/24</code>、branch-pc <code>10.60.10.10/24</code> ほか</td>
+<td>✅ 自動</td>
+</tr>
+<tr>
+<td>ノード6台・仮想リンク5本・attach環境</td>
+<td>deploy 済み</td>
+<td>✅ 自動</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>管理ネットワーク <code>172.25.25.0/24</code> は OSPF/BGP へ広告しない。</p>
+</blockquote>
+<hr>
+<h2 id="phase-1-loopback0-を最初に作る4台" tabindex="-1">Phase 1. Loopback0 を最初に作る（4台） <a class="header-anchor" href="#phase-1-loopback0-を最初に作る4台" aria-hidden="true">#</a></h2>
+<p><strong>先に作る理由</strong>: Loopback0 は Router ID の供給源。プロセス起動前に up させておけば、
+OSPF/BGP が意図どおりの Router ID を選び、<code>clear ip ospf process</code> を回避できる。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>インターフェース</th>
+<th style="text-align:right">IP設計値</th>
+<th>用途</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>main-core</td>
+<td>Loopback0</td>
+<td style="text-align:right">10.50.255.1/32</td>
+<td>OSPF Router ID</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>main-edge</td>
+<td>Loopback0</td>
+<td style="text-align:right">10.50.255.254/32</td>
+<td>OSPF / BGP Router ID</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>branch-edge</td>
+<td>Loopback0</td>
+<td style="text-align:right">10.60.255.254/32</td>
+<td>OSPF / BGP Router ID</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>branch-core</td>
+<td>Loopback0</td>
+<td style="text-align:right">10.60.255.1/32</td>
+<td>OSPF Router ID</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="phase-2-物理ifのipを設定4台" tabindex="-1">Phase 2. 物理IFのIPを設定（4台） <a class="header-anchor" href="#phase-2-物理ifのipを設定4台" aria-hidden="true">#</a></h2>
+<p><strong>この順の理由</strong>: ルーティング有効化の前にリンクを up＝connected を揃える。
+隣接が即成立し、後の再配信元になる connected 経路も先に揃う。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>IF</th>
+<th>対向</th>
+<th>種別</th>
+<th style="text-align:right">IP設計値</th>
+<th>OSPF参加</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>main-core</td>
+<td>E0/1 (<code>eth1</code>)</td>
+<td>main-edge E0/1</td>
+<td>内部P2P</td>
+<td style="text-align:right">10.255.50.1/30</td>
+<td>○（Phase3）</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>main-core</td>
+<td>E0/2 (<code>eth2</code>)</td>
+<td>main-pc eth1</td>
+<td>利用者GW</td>
+<td style="text-align:right">10.50.10.1/24</td>
+<td>○（Phase3）</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>main-edge</td>
+<td>E0/1 (<code>eth1</code>)</td>
+<td>main-core E0/1</td>
+<td>内部P2P</td>
+<td style="text-align:right">10.255.50.2/30</td>
+<td>○（Phase3）</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>main-edge</td>
+<td>E0/2 (<code>eth2</code>)</td>
+<td>branch-edge E0/2</td>
+<td>WAN</td>
+<td style="text-align:right">198.51.100.1/30</td>
+<td><strong>✕ 不参加</strong></td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>branch-edge</td>
+<td>E0/1 (<code>eth1</code>)</td>
+<td>branch-core E0/1</td>
+<td>内部P2P</td>
+<td style="text-align:right">10.255.60.1/30</td>
+<td>○（Phase3）</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>branch-edge</td>
+<td>E0/2 (<code>eth2</code>)</td>
+<td>main-edge E0/2</td>
+<td>WAN</td>
+<td style="text-align:right">198.51.100.2/30</td>
+<td><strong>✕ 不参加</strong></td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>branch-core</td>
+<td>E0/1 (<code>eth1</code>)</td>
+<td>branch-edge E0/1</td>
+<td>内部P2P</td>
+<td style="text-align:right">10.255.60.2/30</td>
+<td>○（Phase3）</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>branch-core</td>
+<td>E0/2 (<code>eth2</code>)</td>
+<td>branch-pc eth1</td>
+<td>利用者GW</td>
+<td style="text-align:right">10.60.10.1/24</td>
+<td>○（Phase3）</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>WAN（<code>198.51.100.0/30</code>）は eBGP 専用。OSPF には参加させない。</p>
+</blockquote>
+<hr>
+<h2 id="phase-3-ospf-有効化router-id-明示--area-0-参加" tabindex="-1">Phase 3. OSPF 有効化（Router ID 明示 → area 0 参加） <a class="header-anchor" href="#phase-3-ospf-有効化router-id-明示--area-0-参加" aria-hidden="true">#</a></h2>
+<p><strong>この順の理由</strong>: Loopback 作成後・隣接形成前に Router ID を明示固定するのが最も安全（Phase1 の値をそのまま使う）。
+Main は process 10、Branch は process 20、いずれも area 0。参加対象は内部P2P・Loopback0・利用者セグメントのみ。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>OSPF Process</th>
+<th>Area</th>
+<th style="text-align:right">Router ID（明示）</th>
+<th>参加IF</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>main-core</td>
+<td>10</td>
+<td>0</td>
+<td style="text-align:right">10.50.255.1</td>
+<td>E0/1・E0/2・Loopback0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>main-edge</td>
+<td>10</td>
+<td>0</td>
+<td style="text-align:right">10.50.255.254</td>
+<td>E0/1・Loopback0（<strong>E0/2 WANは除外</strong>）</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>branch-edge</td>
+<td>20</td>
+<td>0</td>
+<td style="text-align:right">10.60.255.254</td>
+<td>E0/1・Loopback0（<strong>E0/2 WANは除外</strong>）</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>branch-core</td>
+<td>20</td>
+<td>0</td>
+<td style="text-align:right">10.60.255.1</td>
+<td>E0/1・E0/2・Loopback0</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>両キャンパスとも area 0 だが、BGP 境界を越えて同一 OSPF ドメインにはならない。プロセス番号は識別用で対向とは無関係。</p>
+</blockquote>
+<hr>
+<h2 id="phase-4--チェックポイントospf-隣接" tabindex="-1">Phase 4. ✔ チェックポイント：OSPF 隣接 <a class="header-anchor" href="#phase-4--チェックポイントospf-隣接" aria-hidden="true">#</a></h2>
+<p>先に進む前に、各キャンパス内の隣接が確立していることを確認する。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>確認</th>
+<th>対象</th>
+<th>期待</th>
+<th>確認</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Main OSPF 10 隣接</td>
+<td>main-core ⇔ main-edge</td>
+<td>FULL</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>Branch OSPF 20 隣接</td>
+<td>branch-core ⇔ branch-edge</td>
+<td>FULL</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="phase-5-ebgp-基本as--bgp-router-id--neighbor-edge-2台のみ" tabindex="-1">Phase 5. eBGP 基本（AS / BGP Router ID / neighbor）… edge 2台のみ <a class="header-anchor" href="#phase-5-ebgp-基本as--bgp-router-id--neighbor-edge-2台のみ" aria-hidden="true">#</a></h2>
+<p><strong>この順の理由</strong>: 再配信・集約の前に、まず土台の eBGP セッションを確立する。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>AS番号</th>
+<th style="text-align:right">BGP Router ID</th>
+<th>eBGPネイバー</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>main-edge</td>
+<td>65050</td>
+<td style="text-align:right">10.50.255.254</td>
+<td>198.51.100.2（AS 65060）</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>branch-edge</td>
+<td>65060</td>
+<td style="text-align:right">10.60.255.254</td>
+<td>198.51.100.1（AS 65050）</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="phase-6--チェックポイントebgp-established" tabindex="-1">Phase 6. ✔ チェックポイント：eBGP Established <a class="header-anchor" href="#phase-6--チェックポイントebgp-established" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>確認</th>
+<th>対象</th>
+<th>期待</th>
+<th>確認</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>eBGP セッション</td>
+<td>main-edge ⇔ branch-edge（<code>198.51.100.1/2</code>）</td>
+<td>Established</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="phase-7-ポリシーオブジェクト作成prefix-list--route-map-edge-2台" tabindex="-1">Phase 7. ポリシーオブジェクト作成（prefix-list → route-map）… edge 2台 <a class="header-anchor" href="#phase-7-ポリシーオブジェクト作成prefix-list--route-map-edge-2台" aria-hidden="true">#</a></h2>
+<p><strong>この順の理由</strong>: redistribute が参照する前に、必ず prefix-list と route-map を用意する（参照先不在を防ぐ）。
+この時点では作るだけで、適用は Phase 8/9。</p>
+<h3 id="main-edge" tabindex="-1">main-edge <a class="header-anchor" href="#main-edge" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>方向</th>
+<th>prefix-list（許可）</th>
+<th>route-map の要点</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OSPF→BGP用</td>
+<td>自拠点 <code>10.50.0.0/16 le 32</code> のみ許可</td>
+<td>tag 65060 の経路は <strong>deny</strong>（Branch由来をBGPへ戻さない）</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>BGP→OSPF用</td>
+<td>相手 <code>10.60.0.0/16</code> のみ許可</td>
+<td>再配信時に <strong>tag 65060</strong> を付与（Branch由来を識別）</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="branch-edge" tabindex="-1">branch-edge <a class="header-anchor" href="#branch-edge" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>方向</th>
+<th>prefix-list（許可）</th>
+<th>route-map の要点</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OSPF→BGP用</td>
+<td>自拠点 <code>10.60.0.0/16 le 32</code> のみ許可</td>
+<td>tag 65050 の経路は <strong>deny</strong>（Main由来をBGPへ戻さない）</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>BGP→OSPF用</td>
+<td>相手 <code>10.50.0.0/16</code> のみ許可</td>
+<td>再配信時に <strong>tag 65050</strong> を付与（Main由来を識別）</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="phase-8-ospfbgp-再配信--集約phase7-の-route-map-を適用-edge-2台" tabindex="-1">Phase 8. OSPF→BGP 再配信 ＋ 集約（Phase7 の route-map を適用）… edge 2台 <a class="header-anchor" href="#phase-8-ospfbgp-再配信--集約phase7-の-route-map-を適用-edge-2台" aria-hidden="true">#</a></h2>
+<p><strong>この順の理由</strong>: policy が揃ってから再配信を有効化。集約は <code>summary-only</code> で <code>/24</code> 個別広告を抑止する。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>redistribute</th>
+<th>aggregate-address</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>main-edge</td>
+<td>ospf 10 → bgp 65050（route-map 付き／tag 65060 deny）</td>
+<td>10.50.0.0/16 <strong>summary-only</strong></td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>branch-edge</td>
+<td>ospf 20 → bgp 65060（route-map 付き／tag 65050 deny）</td>
+<td>10.60.0.0/16 <strong>summary-only</strong></td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="phase-9-bgpospf-再配信phase7-の-tag-付与-route-map-を適用-edge-2台" tabindex="-1">Phase 9. BGP→OSPF 再配信（Phase7 の tag 付与 route-map を適用）… edge 2台 <a class="header-anchor" href="#phase-9-bgpospf-再配信phase7-の-tag-付与-route-map-を適用-edge-2台" aria-hidden="true">#</a></h2>
+<p><strong>この順の理由</strong>: 相手拠点の <code>/16</code> を自 OSPF に注入する。tag により、後で OSPF→BGP へ戻る際に deny できる（ループ防止）。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>redistribute</th>
+<th>prefix-list（許可）</th>
+<th>付与 tag</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>main-edge</td>
+<td>bgp 65050 → ospf 10（route-map 付き）</td>
+<td>10.60.0.0/16 のみ</td>
+<td>tag 65060</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>branch-edge</td>
+<td>bgp 65060 → ospf 20（route-map 付き）</td>
+<td>10.50.0.0/16 のみ</td>
+<td>tag 65050</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="phase-10--チェックポイント経路確認--漏洩なし" tabindex="-1">Phase 10. ✔ チェックポイント：経路確認 ＋ 漏洩なし <a class="header-anchor" href="#phase-10--チェックポイント経路確認--漏洩なし" aria-hidden="true">#</a></h2>
+<h3 id="期待する経路" tabindex="-1">期待する経路 <a class="header-anchor" href="#期待する経路" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>確認ノード</th>
+<th>宛先</th>
+<th>経路種別</th>
+<th>ネクストホップ</th>
+<th>確認</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>main-core</td>
+<td>10.60.0.0/16</td>
+<td>O E2</td>
+<td>main-edge</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>main-edge</td>
+<td>10.60.0.0/16</td>
+<td>BGP</td>
+<td>198.51.100.2</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>branch-core</td>
+<td>10.50.0.0/16</td>
+<td>O E2</td>
+<td>branch-edge</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>branch-edge</td>
+<td>10.50.0.0/16</td>
+<td>BGP</td>
+<td>198.51.100.1</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="漏洩していないこと16-集約のみ" tabindex="-1">漏洩していないこと（/16 集約のみ） <a class="header-anchor" href="#漏洩していないこと16-集約のみ" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>確認箇所</th>
+<th>確認対象</th>
+<th>期待結果</th>
+<th>確認</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>branch-edge <code>show ip bgp</code></td>
+<td>10.50.10.0/24</td>
+<td>存在しない</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>main-edge <code>show ip bgp</code></td>
+<td>10.60.10.0/24</td>
+<td>存在しない</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>main-core <code>show ip route</code></td>
+<td>10.60.10.0/24</td>
+<td>存在しない</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>branch-core <code>show ip route</code></td>
+<td>10.50.10.0/24</td>
+<td>存在しない</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="e2e-疎通" tabindex="-1">E2E 疎通 <a class="header-anchor" href="#e2e-疎通" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>確認</th>
+<th>期待</th>
+<th>確認</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>main-pc ↔ branch-pc</td>
+<td>到達</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="phase-11-保存" tabindex="-1">Phase 11. 保存 <a class="header-anchor" href="#phase-11-保存" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>内容</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>設定保存</td>
+<td>4台の running-config を保存</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>BGP停止・復旧試験 / AAR</td>
+<td><a href="../05_%E8%A9%A6%E9%A8%93/">試験計画書</a> 側で実施</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="順序早見表" tabindex="-1">順序早見表 <a class="header-anchor" href="#順序早見表" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>フェーズ</th>
+<th>対象</th>
+<th>一言</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Loopback0</td>
+<td>4台</td>
+<td>Router ID の源を先に作る</td>
+</tr>
+<tr>
+<td>2</td>
+<td>物理IF IP</td>
+<td>4台</td>
+<td>connected を先に揃える（WANはOSPF除外）</td>
+</tr>
+<tr>
+<td>3</td>
+<td>OSPF（RID明示）</td>
+<td>4台</td>
+<td>Loopback後・隣接前にRID固定</td>
+</tr>
+<tr>
+<td>4</td>
+<td>✔ OSPF隣接</td>
+<td>4台</td>
+<td>FULL 確認</td>
+</tr>
+<tr>
+<td>5</td>
+<td>eBGP基本</td>
+<td>edge2台</td>
+<td>まず土台のセッション</td>
+</tr>
+<tr>
+<td>6</td>
+<td>✔ eBGP</td>
+<td>edge2台</td>
+<td>Established 確認</td>
+</tr>
+<tr>
+<td>7</td>
+<td>prefix-list→route-map</td>
+<td>edge2台</td>
+<td>参照される前に作る</td>
+</tr>
+<tr>
+<td>8</td>
+<td>OSPF→BGP再配信＋集約</td>
+<td>edge2台</td>
+<td>summary-only で /24 隠す</td>
+</tr>
+<tr>
+<td>9</td>
+<td>BGP→OSPF再配信</td>
+<td>edge2台</td>
+<td>tag 付与で識別</td>
+</tr>
+<tr>
+<td>10</td>
+<td>✔ 経路＋漏洩なし</td>
+<td>全台</td>
+<td>O E2 / BGP / 集約のみ</td>
+</tr>
+<tr>
+<td>11</td>
+<td>保存</td>
+<td>4台</td>
+<td>保存→試験へ</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>順序を守る理由（再掲）</strong></p>
+<ol>
+<li><strong>Router ID 先出し</strong> … Loopback→RID明示で <code>clear ip ospf process</code> を回避。</li>
+<li><strong>policy オブジェクト先出し</strong> … prefix-list / route-map を先に作ってから redistribute。</li>
+<li><strong>タグでループ防止</strong> … 片方向で tag 付与、逆方向で tag deny。</li>
+</ol>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#なぜ順番で並べ替えたか">なぜ「順番」で並べ替えたか</a></li>
+<li class="lvl-2"><a href="#phase-0-事前確認環境側が用意済み">Phase 0. 事前確認（環境側が用意済み）</a></li>
+<li class="lvl-2"><a href="#phase-1-loopback0-を最初に作る4台">Phase 1. Loopback0 を最初に作る（4台）</a></li>
+<li class="lvl-2"><a href="#phase-2-物理ifのipを設定4台">Phase 2. 物理IFのIPを設定（4台）</a></li>
+<li class="lvl-2"><a href="#phase-3-ospf-有効化router-id-明示--area-0-参加">Phase 3. OSPF 有効化（Router ID 明示 → area 0 参加）</a></li>
+<li class="lvl-2"><a href="#phase-4--チェックポイントospf-隣接">Phase 4. ✔ チェックポイント：OSPF 隣接</a></li>
+<li class="lvl-2"><a href="#phase-5-ebgp-基本as--bgp-router-id--neighbor-edge-2台のみ">Phase 5. eBGP 基本（AS / BGP Router ID / neighbor）… edge 2台のみ</a></li>
+<li class="lvl-2"><a href="#phase-6--チェックポイントebgp-established">Phase 6. ✔ チェックポイント：eBGP Established</a></li>
+<li class="lvl-2"><a href="#phase-7-ポリシーオブジェクト作成prefix-list--route-map-edge-2台">Phase 7. ポリシーオブジェクト作成（prefix-list → route-map）… edge 2台</a></li>
+<li class="lvl-3"><a href="#main-edge">main-edge</a></li>
+<li class="lvl-3"><a href="#branch-edge">branch-edge</a></li>
+<li class="lvl-2"><a href="#phase-8-ospfbgp-再配信--集約phase7-の-route-map-を適用-edge-2台">Phase 8. OSPF→BGP 再配信 ＋ 集約（Phase7 の route-map を適用）… edge 2台</a></li>
+<li class="lvl-2"><a href="#phase-9-bgpospf-再配信phase7-の-tag-付与-route-map-を適用-edge-2台">Phase 9. BGP→OSPF 再配信（Phase7 の tag 付与 route-map を適用）… edge 2台</a></li>
+<li class="lvl-2"><a href="#phase-10--チェックポイント経路確認--漏洩なし">Phase 10. ✔ チェックポイント：経路確認 ＋ 漏洩なし</a></li>
+<li class="lvl-3"><a href="#期待する経路">期待する経路</a></li>
+<li class="lvl-3"><a href="#漏洩していないこと16-集約のみ">漏洩していないこと（/16 集約のみ）</a></li>
+<li class="lvl-3"><a href="#e2e-疎通">E2E 疎通</a></li>
+<li class="lvl-2"><a href="#phase-11-保存">Phase 11. 保存</a></li>
+<li class="lvl-2"><a href="#順序早見表">順序早見表</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

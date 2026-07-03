@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜切り分けシート</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>05_試験</span></nav>
+      <h1 class="doc-title">テーマZERO｜切り分けシート</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">troubleshoot</span><span class="tag">layer</span><span class="tag">aar</span><span class="tag">arm64</span></span>
+      </div>
+      
+      <div class="content">
+<p>ゲート条件を満たせない・想定外挙動が出たとき、このシートを<strong>複製して1事象ごとに埋める</strong>。
+原則: <strong>ライブ状態を先に採取</strong>（設定ファイル解析より先）。ゼロトラスト向けに層別を「コンテナ→到達→TLS→認証→認可→ログ」に定義する。</p>
+<h2 id="1-症状記録" tabindex="-1">1. 症状記録 <a class="header-anchor" href="#1-症状記録" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>記入欄</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>発生日時</td>
+<td></td>
+</tr>
+<tr>
+<td>対象 Phase / 試験ID</td>
+<td></td>
+</tr>
+<tr>
+<td>症状（何が・どうならない）</td>
+<td></td>
+</tr>
+<tr>
+<td>期待した挙動</td>
+<td></td>
+</tr>
+<tr>
+<td>再現手順</td>
+<td></td>
+</tr>
+<tr>
+<td>直前の変更</td>
+<td></td>
+</tr>
+<tr>
+<td>影響範囲（1ノード / ゾーン / 全体）</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="2-ライブ状態採取設定解析より先" tabindex="-1">2. ライブ状態採取（設定解析より先） <a class="header-anchor" href="#2-ライブ状態採取設定解析より先" aria-hidden="true">#</a></h2>
+<p>まず「今どうなっているか」を採る。設定ファイルの読み込みは後回し。</p>
+<pre><code class="language-bash"><span class="hljs-comment"># コンテナ状態</span>
+docker ps --format <span class="hljs-string">&#x27;table {{.Names}}\t{{.Image}}\t{{.Status}}&#x27;</span>
+docker logs --<span class="hljs-built_in">tail</span> 50 &lt;container&gt;
+
+<span class="hljs-comment"># ネットワーク到達</span>
+docker <span class="hljs-built_in">exec</span> &lt;src&gt; ping -c3 &lt;dst&gt;
+docker <span class="hljs-built_in">exec</span> &lt;src&gt; curl -sv http://&lt;dst&gt;/    <span class="hljs-comment"># ステータス・ヘッダを見る</span>
+docker network inspect zt-dmz               <span class="hljs-comment"># ゾーン所属・IP</span>
+
+<span class="hljs-comment"># TLS</span>
+docker <span class="hljs-built_in">exec</span> &lt;src&gt; curl -vk https://&lt;iap&gt;/   <span class="hljs-comment"># 証明書チェーン・handshake</span>
+docker <span class="hljs-built_in">exec</span> &lt;src&gt; openssl s_client -connect &lt;iap&gt;:443 -showcerts &lt;/dev/null
+
+<span class="hljs-comment"># 認証（IdP）</span>
+docker logs --<span class="hljs-built_in">tail</span> 50 clab-zero-keycloak    <span class="hljs-comment"># ログイン失敗・realm/client エラー</span>
+
+<span class="hljs-comment"># 認可（ポリシー）</span>
+docker logs --<span class="hljs-built_in">tail</span> 50 clab-zero-pomerium    <span class="hljs-comment"># allow/deny の判定行</span>
+
+<span class="hljs-comment"># ログ（SIEM）</span>
+docker <span class="hljs-built_in">exec</span> clab-zero-grafana wget -qO- http://loki:3100/ready   <span class="hljs-comment"># Loki 準備状態</span>
+</code></pre>
+<p>採取した生ログ・出力の要点をここに貼る:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>採取項目</th>
+<th>結果（要点）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>docker ps</code>（対象の Status）</td>
+<td></td>
+</tr>
+<tr>
+<td><code>docker logs</code>（エラー行）</td>
+<td></td>
+</tr>
+<tr>
+<td>ping / curl 応答</td>
+<td></td>
+</tr>
+<tr>
+<td>TLS handshake 結果</td>
+<td></td>
+</tr>
+<tr>
+<td>IdP ログの該当行</td>
+<td></td>
+</tr>
+<tr>
+<td>認可 allow/deny 行</td>
+<td></td>
+</tr>
+<tr>
+<td>Loki ready</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="3-層別切り分けzt-6層" tabindex="-1">3. 層別切り分け（ZT 6層） <a class="header-anchor" href="#3-層別切り分けzt-6層" aria-hidden="true">#</a></h2>
+<p>下から順に埋める。ある層が NG ならその層で止め、上位層は見ない（根本原因が下層にある）。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>層</th>
+<th>確認内容</th>
+<th>確認コマンド/観点</th>
+<th>結果 (OK/NG)</th>
+<th>メモ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>L1 コンテナ起動</td>
+<td>対象コンテナが Up か・crash ループしていないか</td>
+<td><code>docker ps</code> / <code>docker logs</code> の起動完了行</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>L2 ネットワーク到達</td>
+<td>送信元→宛先に L3 到達できるか・ゾーン所属は正しいか</td>
+<td><code>ping</code> / <code>docker network inspect</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>L3 TLS 証明書</td>
+<td>handshake 成功か・CA を端末が信頼しているか・SSL bump が成立するか</td>
+<td><code>curl -vk</code> / <code>openssl s_client</code></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>L4 認証 (IdP)</td>
+<td>Keycloak がトークンを発行するか・realm/client/redirect が一致するか</td>
+<td>Keycloak ログ / token endpoint 応答</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>L5 認可 (ポリシー)</td>
+<td>IAP が allow/deny を正しく判定するか・posture claim が渡っているか</td>
+<td>Pomerium/oauth2-proxy ログの判定行</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>L6 ログ (SIEM)</td>
+<td>Promtail が収集し Loki に届き Grafana で見えるか</td>
+<td>Loki ready / Grafana クエリ</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>層別の読み方:</p>
+<ul>
+<li><strong>下層 NG が根本</strong>: L2 が NG なら L4/L5 の失敗はその二次症状。まず L2 を直す。</li>
+<li><strong>TLS は認証の前提</strong>: SSL bump や mTLS が成立しないと L4/L5 は評価できない。L3 を先に確定する。</li>
+<li><strong>ログ層は独立</strong>: L6 は他層と独立に壊れうる（Promtail 設定・Loki 未 ready）。他が OK でも L6 単独で NG になりうる。</li>
+</ul>
+<h2 id="4-複数原因の並行仮説" tabindex="-1">4. 複数原因の並行仮説 <a class="header-anchor" href="#4-複数原因の並行仮説" aria-hidden="true">#</a></h2>
+<p>同一症状に<strong>独立した原因が2つ以上</strong>重なる前提で、仮説を並べる（1つ直しても再発する罠を防ぐ）。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>仮説（層）</th>
+<th>根拠（採取した事実）</th>
+<th>検証方法</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>H1</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>H2</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>H3</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>よくある重複パターン（ZT 特有）:</p>
+<ul>
+<li>「未認証拒否されない」= IAP 未経路（L2）＋ ポリシー未設定（L5）の二重。</li>
+<li>「ログイン後も app に行けない」= redirect URL 不一致（L4）＋ Trust 側転送経路欠落（L2）の二重。</li>
+<li>「ログが出ない」= Promtail のラベル設定（L6）＋ 対象コンテナのログ出力先（L1）の二重。</li>
+</ul>
+<h2 id="5-根本原因恒久対策" tabindex="-1">5. 根本原因・恒久対策 <a class="header-anchor" href="#5-根本原因恒久対策" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>記入欄</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>根本原因（層と具体）</td>
+<td></td>
+</tr>
+<tr>
+<td>直接原因 vs 誘発条件</td>
+<td></td>
+</tr>
+<tr>
+<td>恒久対策（設定/構成の変更）</td>
+<td></td>
+</tr>
+<tr>
+<td>再発防止（ゲート試験に追加すべき項目）</td>
+<td></td>
+</tr>
+<tr>
+<td>関連ドキュメント更新</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="6-aar振り返り" tabindex="-1">6. AAR（振り返り） <a class="header-anchor" href="#6-aar振り返り" aria-hidden="true">#</a></h2>
+<p>予測誤差で学ぶ。成功談ではなく「予想と現実のズレ」を起点にする。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>記入欄</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>①予想（着手前に立てた原因の見立て）</td>
+<td></td>
+</tr>
+<tr>
+<td>②実際（採取で判明した本当の原因）</td>
+<td></td>
+</tr>
+<tr>
+<td>③次どうする（次回に効く1手）</td>
+<td></td>
+</tr>
+<tr>
+<td>ズレの分類（設計ミス/理解不足/環境要因）</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>ズレが学び/ミスなら長期記憶 <code>Mistakes.md</code> へ、通常の進捗は <code>Daily/YYYY-MM-DD.md</code> へ記録する（グローバル運用ルール準拠）。</p>
+</blockquote>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a></li>
+<li><a href="../00_%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3/%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89.html">ログインコマンド</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-症状記録">1. 症状記録</a></li>
+<li class="lvl-2"><a href="#2-ライブ状態採取設定解析より先">2. ライブ状態採取（設定解析より先）</a></li>
+<li class="lvl-2"><a href="#3-層別切り分けzt-6層">3. 層別切り分け（ZT 6層）</a></li>
+<li class="lvl-2"><a href="#4-複数原因の並行仮説">4. 複数原因の並行仮説</a></li>
+<li class="lvl-2"><a href="#5-根本原因恒久対策">5. 根本原因・恒久対策</a></li>
+<li class="lvl-2"><a href="#6-aar振り返り">6. AAR（振り返り）</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

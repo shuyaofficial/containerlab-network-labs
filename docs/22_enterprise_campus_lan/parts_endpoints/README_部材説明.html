@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>エンドポイント部材の説明（Claude提供・あなたは触らなくてOK）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>22_enterprise_campus_lan</span>
+<span class="sep">/</span>
+<span>parts_endpoints</span></nav>
+      <h1 class="doc-title">エンドポイント部材の説明（Claude提供・あなたは触らなくてOK）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>「ネットワークはあなたが構築、サーバ・PCはClaudeが用意」という分担のための部品集です。
+これらを組み込むと、ラボが「ただの疎通試験環境」ではなく<strong>社内LANらしい環境</strong>になります。</p>
+<h2 id="部材一覧" tabindex="-1">部材一覧 <a class="header-anchor" href="#部材一覧" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>役割</th>
+<th>IP</th>
+<th>提供サービス</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pc-sales</td>
+<td>営業部の社員PC</td>
+<td>10.10.10.100</td>
+<td>—（試験の起点）</td>
+</tr>
+<tr>
+<td>pc-dev</td>
+<td>開発部の社員PC</td>
+<td>10.10.20.100</td>
+<td>—（試験の起点）</td>
+</tr>
+<tr>
+<td>srv-file</td>
+<td>ファイルサーバ</td>
+<td>10.20.30.10</td>
+<td>HTTP（共有ファイル配信。<code>shared_files/</code> の中身）</td>
+</tr>
+<tr>
+<td>srv-portal</td>
+<td>社内ポータル</td>
+<td>10.20.30.20</td>
+<td>HTTP（社内システムのWeb画面。<code>portal_html/</code> の中身）</td>
+</tr>
+<tr>
+<td>br-pc</td>
+<td>支社の社員PC</td>
+<td>10.2.40.100</td>
+<td>—（VPN試験の起点）</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="組み込み方あなたの作業は2ステップ" tabindex="-1">組み込み方（あなたの作業は2ステップ） <a class="header-anchor" href="#組み込み方あなたの作業は2ステップ" aria-hidden="true">#</a></h2>
+<ol>
+<li><a href="endpoints.partial.clab.yml"><code>endpoints.partial.clab.yml</code></a> の5ノード定義を、あなたが作る <code>campus.clab.yml</code> の <code>topology.nodes</code> 配下へコピー</li>
+<li>結線表（<code>02_基本設計/ネットワーク物理構成図_テキスト版.md</code> の #18〜21, #24）どおりに <code>links</code> を追記</li>
+</ol>
+<blockquote>
+<p>⚠️ <code>binds</code> のパスは <code>campus.clab.yml</code> を <strong>テーマフォルダ直下</strong>（<code>22_enterprise_campus_lan/</code>）に置く前提の相対パスです。別の場所に置く場合はパスを調整してください。</p>
+</blockquote>
+<h2 id="動作確認のしかたネットワーク完成後" tabindex="-1">動作確認のしかた（ネットワーク完成後） <a class="header-anchor" href="#動作確認のしかたネットワーク完成後" aria-hidden="true">#</a></h2>
+<pre><code class="language-bash"><span class="hljs-comment"># 営業部PCに入る</span>
+<span class="hljs-built_in">sudo</span> docker <span class="hljs-built_in">exec</span> -it clab-&lt;ラボ名&gt;-pc-sales bash
+
+<span class="hljs-comment"># 社内ポータルが見えるか（L3＋HTTPの確認）</span>
+curl http://10.20.30.20/
+
+<span class="hljs-comment"># ファイルサーバの一覧と、ファイルのダウンロード</span>
+curl http://10.20.30.10/
+curl -O http://10.20.30.10/全社共有_お知らせ.txt
+</code></pre>
+<p>ブラウザで見たい場合は、OrbStack側でポートフォワードするか、<code>curl</code> の出力で確認してください。</p>
+<h2 id="トラブル時の切り分けヒント" tabindex="-1">トラブル時の切り分けヒント <a class="header-anchor" href="#トラブル時の切り分けヒント" aria-hidden="true">#</a></h2>
+<ul>
+<li><code>curl</code> がダメで <code>ping</code> がOK → L3は生きている。サービス側（コンテナ）の問題か確認: <code>docker exec &lt;node&gt; netstat -tlnp</code></li>
+<li><code>ping</code> もダメ → ネットワーク側。GW（SVI/HSRP VIP）へのpingから順に切り分け（いつもの手順）</li>
+<li>エンドポイントのIP設定が消えた → コンテナ再起動時は <code>exec</code> が再実行されます。<code>docker exec &lt;node&gt; ip addr</code> で確認</li>
+<li>nginxはmultitoolイメージに内蔵・自動起動です（あなたが設定する必要はありません）</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#部材一覧">部材一覧</a></li>
+<li class="lvl-2"><a href="#組み込み方あなたの作業は2ステップ">組み込み方（あなたの作業は2ステップ）</a></li>
+<li class="lvl-2"><a href="#動作確認のしかたネットワーク完成後">動作確認のしかた（ネットワーク完成後）</a></li>
+<li class="lvl-2"><a href="#トラブル時の切り分けヒント">トラブル時の切り分けヒント</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>IPアドレス管理表 — Theme 25: Multi-Campus</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>25_campus_multi_site</span>
+<span class="sep">/</span>
+<span>02_基本設計</span></nav>
+      <h1 class="doc-title">IPアドレス管理表 — Theme 25: Multi-Campus</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>本表は設計値です。<code>campus.clab.yml</code>が自動投入するのは管理IPとPC側データプレーンIP/経路だけで、Cisco IOLのデータプレーンIPは未設定です。</p>
+</blockquote>
+<h2 id="1-管理ネットワーク" tabindex="-1">1. 管理ネットワーク <a class="header-anchor" href="#1-管理ネットワーク" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th style="text-align:right">管理IP</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>main-core</td>
+<td style="text-align:right">172.25.25.11/24</td>
+<td>containerlab管理</td>
+</tr>
+<tr>
+<td>main-edge</td>
+<td style="text-align:right">172.25.25.12/24</td>
+<td>containerlab管理</td>
+</tr>
+<tr>
+<td>branch-edge</td>
+<td style="text-align:right">172.25.25.21/24</td>
+<td>containerlab管理</td>
+</tr>
+<tr>
+<td>branch-core</td>
+<td style="text-align:right">172.25.25.22/24</td>
+<td>containerlab管理</td>
+</tr>
+<tr>
+<td>main-pc</td>
+<td style="text-align:right">172.25.25.101/24</td>
+<td>containerlab管理</td>
+</tr>
+<tr>
+<td>branch-pc</td>
+<td style="text-align:right">172.25.25.102/24</td>
+<td>containerlab管理</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="2-loopback--router-id" tabindex="-1">2. Loopback / Router ID <a class="header-anchor" href="#2-loopback--router-id" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>インターフェース</th>
+<th style="text-align:right">IPアドレス</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>main-core</td>
+<td>Loopback0</td>
+<td style="text-align:right">10.50.255.1/32</td>
+<td>OSPF Router ID</td>
+</tr>
+<tr>
+<td>main-edge</td>
+<td>Loopback0</td>
+<td style="text-align:right">10.50.255.254/32</td>
+<td>OSPF/BGP Router ID</td>
+</tr>
+<tr>
+<td>branch-edge</td>
+<td>Loopback0</td>
+<td style="text-align:right">10.60.255.254/32</td>
+<td>OSPF/BGP Router ID</td>
+</tr>
+<tr>
+<td>branch-core</td>
+<td>Loopback0</td>
+<td style="text-align:right">10.60.255.1/32</td>
+<td>OSPF Router ID</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="3-キャンパス内point-to-point" tabindex="-1">3. キャンパス内Point-to-Point <a class="header-anchor" href="#3-キャンパス内point-to-point" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>サブネット</th>
+<th>ノードA / IF</th>
+<th style="text-align:right">IP A</th>
+<th>ノードB / IF</th>
+<th style="text-align:right">IP B</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10.255.50.0/30</td>
+<td>main-core / E0/1 (<code>eth1</code>)</td>
+<td style="text-align:right">10.255.50.1</td>
+<td>main-edge / E0/1 (<code>eth1</code>)</td>
+<td style="text-align:right">10.255.50.2</td>
+</tr>
+<tr>
+<td>10.255.60.0/30</td>
+<td>branch-edge / E0/1 (<code>eth1</code>)</td>
+<td style="text-align:right">10.255.60.1</td>
+<td>branch-core / E0/1 (<code>eth1</code>)</td>
+<td style="text-align:right">10.255.60.2</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="4-wanリンク" tabindex="-1">4. WANリンク <a class="header-anchor" href="#4-wanリンク" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>サブネット</th>
+<th>ノードA / IF</th>
+<th style="text-align:right">IP A</th>
+<th>ノードB / IF</th>
+<th style="text-align:right">IP B</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>198.51.100.0/30</td>
+<td>main-edge / E0/2 (<code>eth2</code>)</td>
+<td style="text-align:right">198.51.100.1</td>
+<td>branch-edge / E0/2 (<code>eth2</code>)</td>
+<td style="text-align:right">198.51.100.2</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="5-利用者セグメント" tabindex="-1">5. 利用者セグメント <a class="header-anchor" href="#5-利用者セグメント" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>セグメント</th>
+<th>GWノード / IF</th>
+<th style="text-align:right">GW設計値</th>
+<th>端末 / IF</th>
+<th style="text-align:right">端末設計値</th>
+<th>自動設定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Main利用者</td>
+<td>main-core / E0/2 (<code>eth2</code>)</td>
+<td style="text-align:right">10.50.10.1/24</td>
+<td>main-pc / <code>eth1</code></td>
+<td style="text-align:right">10.50.10.10/24</td>
+<td>✅ PC側のみ</td>
+</tr>
+<tr>
+<td>Branch利用者</td>
+<td>branch-core / E0/2 (<code>eth2</code>)</td>
+<td style="text-align:right">10.60.10.1/24</td>
+<td>branch-pc / <code>eth1</code></td>
+<td style="text-align:right">10.60.10.10/24</td>
+<td>✅ PC側のみ</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="6-bgpアドレス" tabindex="-1">6. BGPアドレス <a class="header-anchor" href="#6-bgpアドレス" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th style="text-align:right">main-edge</th>
+<th style="text-align:right">branch-edge</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AS番号</td>
+<td style="text-align:right">65050</td>
+<td style="text-align:right">65060</td>
+</tr>
+<tr>
+<td>eBGPネイバーIP</td>
+<td style="text-align:right">198.51.100.2</td>
+<td style="text-align:right">198.51.100.1</td>
+</tr>
+<tr>
+<td>BGP Router ID</td>
+<td style="text-align:right">10.50.255.254</td>
+<td style="text-align:right">10.60.255.254</td>
+</tr>
+<tr>
+<td>集約広告</td>
+<td style="text-align:right">10.50.0.0/16</td>
+<td style="text-align:right">10.60.0.0/16</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="7-集約経路" tabindex="-1">7. 集約経路 <a class="header-anchor" href="#7-集約経路" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>拠点</th>
+<th>集約プレフィックス</th>
+<th>配下に含まれるネットワーク</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Main Campus</td>
+<td>10.50.0.0/16</td>
+<td>10.50.10.0/24, 10.50.255.1/32, 10.50.255.254/32</td>
+</tr>
+<tr>
+<td>Branch Campus</td>
+<td>10.60.0.0/16</td>
+<td>10.60.10.0/24, 10.60.255.1/32, 10.60.255.254/32</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="8-未使用予約" tabindex="-1">8. 未使用・予約 <a class="header-anchor" href="#8-未使用予約" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>範囲</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10.50.20.0/24以降</td>
+<td>Main利用者セグメント拡張用</td>
+</tr>
+<tr>
+<td>10.60.20.0/24以降</td>
+<td>Branch利用者セグメント拡張用</td>
+</tr>
+<tr>
+<td>10.50.255.2〜10.50.255.253</td>
+<td>Main Loopback予約</td>
+</tr>
+<tr>
+<td>10.60.255.2〜10.60.255.253</td>
+<td>Branch Loopback予約</td>
+</tr>
+<tr>
+<td>10.255.50.4/30以降</td>
+<td>Main内部リンク拡張用</td>
+</tr>
+<tr>
+<td>10.255.60.4/30以降</td>
+<td>Branch内部リンク拡張用</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="9-重複境界確認" tabindex="-1">9. 重複・境界確認 <a class="header-anchor" href="#9-重複境界確認" aria-hidden="true">#</a></h2>
+<ul>
+<li><code>/30</code>のネットワークアドレスとブロードキャストアドレスを機器へ割り当てない。</li>
+<li>管理ネットワーク<code>172.25.25.0/24</code>をOSPF/BGPへ広告しない。</li>
+<li>WANリンク<code>198.51.100.0/30</code>はOSPFへ参加させない。</li>
+<li>Main（<code>10.50.0.0/16</code>）とBranch（<code>10.60.0.0/16</code>）のアドレス空間が重複しないことを確認する。</li>
+<li>実投入前に<a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E3%83%91%E3%83%A9%E3%83%A1%E3%83%BC%E3%82%BF%E3%82%B7%E3%83%BC%E3%83%88.html">パラメータシート</a>と照合する。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-管理ネットワーク">1. 管理ネットワーク</a></li>
+<li class="lvl-2"><a href="#2-loopback--router-id">2. Loopback / Router ID</a></li>
+<li class="lvl-2"><a href="#3-キャンパス内point-to-point">3. キャンパス内Point-to-Point</a></li>
+<li class="lvl-2"><a href="#4-wanリンク">4. WANリンク</a></li>
+<li class="lvl-2"><a href="#5-利用者セグメント">5. 利用者セグメント</a></li>
+<li class="lvl-2"><a href="#6-bgpアドレス">6. BGPアドレス</a></li>
+<li class="lvl-2"><a href="#7-集約経路">7. 集約経路</a></li>
+<li class="lvl-2"><a href="#8-未使用予約">8. 未使用・予約</a></li>
+<li class="lvl-2"><a href="#9-重複境界確認">9. 重複・境界確認</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

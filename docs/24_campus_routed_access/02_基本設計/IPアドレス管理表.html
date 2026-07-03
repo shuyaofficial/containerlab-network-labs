@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>IPアドレス管理表 — Theme 24: Routed Access Campus LAN</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>24_campus_routed_access</span>
+<span class="sep">/</span>
+<span>02_基本設計</span></nav>
+      <h1 class="doc-title">IPアドレス管理表 — Theme 24: Routed Access Campus LAN</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>本表は設計値です。<code>campus.clab.yml</code>が自動投入するのは管理IPだけで、データプレーンIPは未設定です。</p>
+</blockquote>
+<h2 id="1-管理ネットワーク" tabindex="-1">1. 管理ネットワーク <a class="header-anchor" href="#1-管理ネットワーク" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th style="text-align:right">管理IP</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>core1</td>
+<td style="text-align:right">172.24.24.11/24</td>
+<td>containerlab管理</td>
+</tr>
+<tr>
+<td>core2</td>
+<td style="text-align:right">172.24.24.12/24</td>
+<td>containerlab管理</td>
+</tr>
+<tr>
+<td>access1</td>
+<td style="text-align:right">172.24.24.21/24</td>
+<td>containerlab管理</td>
+</tr>
+<tr>
+<td>access2</td>
+<td style="text-align:right">172.24.24.22/24</td>
+<td>containerlab管理</td>
+</tr>
+<tr>
+<td>pc-a</td>
+<td style="text-align:right">172.24.24.101/24</td>
+<td>containerlab管理</td>
+</tr>
+<tr>
+<td>pc-b</td>
+<td style="text-align:right">172.24.24.102/24</td>
+<td>containerlab管理</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="2-loopback--router-id" tabindex="-1">2. Loopback / Router ID <a class="header-anchor" href="#2-loopback--router-id" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>インターフェース</th>
+<th style="text-align:right">IPアドレス</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>core1</td>
+<td>Loopback0</td>
+<td style="text-align:right">10.24.255.1/32</td>
+<td>OSPF Router ID</td>
+</tr>
+<tr>
+<td>core2</td>
+<td>Loopback0</td>
+<td style="text-align:right">10.24.255.2/32</td>
+<td>OSPF Router ID</td>
+</tr>
+<tr>
+<td>access1</td>
+<td>Loopback0</td>
+<td style="text-align:right">10.24.255.11/32</td>
+<td>OSPF Router ID</td>
+</tr>
+<tr>
+<td>access2</td>
+<td>Loopback0</td>
+<td style="text-align:right">10.24.255.12/32</td>
+<td>OSPF Router ID</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="3-インフラpoint-to-point" tabindex="-1">3. インフラPoint-to-Point <a class="header-anchor" href="#3-インフラpoint-to-point" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>サブネット</th>
+<th>ノードA / IF</th>
+<th style="text-align:right">IP A</th>
+<th>ノードB / IF</th>
+<th style="text-align:right">IP B</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10.24.0.0/30</td>
+<td>core1 / E0/1 (<code>eth1</code>)</td>
+<td style="text-align:right">10.24.0.1</td>
+<td>access1 / E0/1 (<code>eth1</code>)</td>
+<td style="text-align:right">10.24.0.2</td>
+</tr>
+<tr>
+<td>10.24.0.4/30</td>
+<td>core2 / E0/1 (<code>eth1</code>)</td>
+<td style="text-align:right">10.24.0.5</td>
+<td>access1 / E0/2 (<code>eth2</code>)</td>
+<td style="text-align:right">10.24.0.6</td>
+</tr>
+<tr>
+<td>10.24.0.8/30</td>
+<td>core1 / E0/2 (<code>eth2</code>)</td>
+<td style="text-align:right">10.24.0.9</td>
+<td>access2 / E0/1 (<code>eth1</code>)</td>
+<td style="text-align:right">10.24.0.10</td>
+</tr>
+<tr>
+<td>10.24.0.12/30</td>
+<td>core2 / E0/2 (<code>eth2</code>)</td>
+<td style="text-align:right">10.24.0.13</td>
+<td>access2 / E0/2 (<code>eth2</code>)</td>
+<td style="text-align:right">10.24.0.14</td>
+</tr>
+<tr>
+<td>10.24.0.16/30</td>
+<td>core1 / E0/3 (<code>eth3</code>)</td>
+<td style="text-align:right">10.24.0.17</td>
+<td>core2 / E0/3 (<code>eth3</code>)</td>
+<td style="text-align:right">10.24.0.18</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="4-利用者セグメント" tabindex="-1">4. 利用者セグメント <a class="header-anchor" href="#4-利用者セグメント" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>セグメント</th>
+<th>GWノード / IF</th>
+<th style="text-align:right">GW設計値</th>
+<th>端末 / IF</th>
+<th style="text-align:right">端末設計値</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>access1利用者</td>
+<td>access1 / E0/3 (<code>eth3</code>)</td>
+<td style="text-align:right">10.24.10.1/24</td>
+<td>pc-a / <code>eth1</code></td>
+<td style="text-align:right">10.24.10.10/24</td>
+</tr>
+<tr>
+<td>access2利用者</td>
+<td>access2 / E0/3 (<code>eth3</code>)</td>
+<td style="text-align:right">10.24.20.1/24</td>
+<td>pc-b / <code>eth1</code></td>
+<td style="text-align:right">10.24.20.10/24</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="5-未使用予約" tabindex="-1">5. 未使用・予約 <a class="header-anchor" href="#5-未使用予約" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>範囲</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10.24.0.20/30〜10.24.0.28/30</td>
+<td>インフラリンク拡張用</td>
+</tr>
+<tr>
+<td>10.24.30.0/24以降</td>
+<td>利用者セグメント拡張用</td>
+</tr>
+<tr>
+<td>10.24.255.3〜10.24.255.10</td>
+<td>Core系Loopback予約</td>
+</tr>
+<tr>
+<td>10.24.255.13以降</td>
+<td>Access系Loopback予約</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="6-重複境界確認" tabindex="-1">6. 重複・境界確認 <a class="header-anchor" href="#6-重複境界確認" aria-hidden="true">#</a></h2>
+<ul>
+<li><code>/30</code>のネットワークアドレスとブロードキャストアドレスを機器へ割り当てない。</li>
+<li>管理ネットワーク<code>172.24.24.0/24</code>をOSPFへ広告しない。</li>
+<li>利用者セグメントとインフラPoint-to-Pointを同一インターフェースへ重複設定しない。</li>
+<li>実投入前に<a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E3%83%91%E3%83%A9%E3%83%A1%E3%83%BC%E3%82%BF%E3%82%B7%E3%83%BC%E3%83%88.html">パラメータシート</a>と照合する。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-管理ネットワーク">1. 管理ネットワーク</a></li>
+<li class="lvl-2"><a href="#2-loopback--router-id">2. Loopback / Router ID</a></li>
+<li class="lvl-2"><a href="#3-インフラpoint-to-point">3. インフラPoint-to-Point</a></li>
+<li class="lvl-2"><a href="#4-利用者セグメント">4. 利用者セグメント</a></li>
+<li class="lvl-2"><a href="#5-未使用予約">5. 未使用・予約</a></li>
+<li class="lvl-2"><a href="#6-重複境界確認">6. 重複・境界確認</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>構築ログ：テーマ16 SNMP/Syslogによる監視基盤の構築</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>16_cisco_monitoring</span></nav>
+      <h1 class="doc-title">構築ログ：テーマ16 SNMP/Syslogによる監視基盤の構築</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="1-構築概要" tabindex="-1">1. 構築概要 <a class="header-anchor" href="#1-構築概要" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>目的</strong>: 企業ネットワークにおいて必須となる「死活監視・トラフィック監視・ログ収集」の概念を学ぶため、Linuxサーバー(NMS)とルーター(R1)の間でSyslogとSNMPを用いた監視基盤を構築する。</li>
+<li><strong>使用技術</strong>: Syslog (UDP 514), SNMPv2c (UDP 161/162), Zabbix (途中発展課題として導入)</li>
+<li><strong>構成</strong>: PC1 (cisco_iol) --- R1 (cisco_iol) --- NMS (linux: network-multitool / zabbix-appliance)</li>
+</ul>
+<h2 id="2-実施内容" tabindex="-1">2. 実施内容 <a class="header-anchor" href="#2-実施内容" aria-hidden="true">#</a></h2>
+<ol>
+<li>
+<p><strong>Syslogの実装と検証</strong></p>
+<ul>
+<li>R1ルーターに <code>logging host</code> と <code>logging trap</code> を設定し、発生したイベントログをNMSへ転送。</li>
+<li>NMS（Linux）側で <code>nc -ul -p 514</code> を用いてログをリアルタイム受信するテストを実施。</li>
+<li>PC1側のインターフェース（R1と対向）をシャットダウンさせることで、「リンクダウン」という物理的イベントがどのようにSyslogとして生成され、伝達されるかのメカニズムを確認した。</li>
+</ul>
+</li>
+<li>
+<p><strong>SNMPv2cの実装と検証（ポーリングとトラップ）</strong></p>
+<ul>
+<li>R1にSNMPエージェント機能（<code>snmp-server community public RO</code>）と、トラップ送信機能（<code>snmp-server host</code>）を設定。</li>
+<li>NMSから <code>snmpwalk</code> コマンドを用いてR1の情報を手動で引き抜く（ポーリング）実験を実施。</li>
+</ul>
+</li>
+<li>
+<p><strong>【発展】Zabbixサーバーの導入と可視化</strong></p>
+<ul>
+<li>LinuxのNMSコンテナを一時的に破壊し、実務で広く使われている統合監視ソフトウェア「Zabbix」の公式コンテナ（<code>zabbix/zabbix-appliance:ubuntu-latest</code>）にすげ替えて再デプロイ。</li>
+<li>ブラウザからZabbixのWeb GUIにアクセスし、R1ルーターを監視対象ホストとして登録。</li>
+<li>ディスカバリ機能（LLD）によるインターフェースの自動探索を経て、通信トラフィックやICMP応答速度が視覚的なグラフとして自動描画されることを確認した。</li>
+<li>意図的にポートを遮断することでZabbixが「重度の障害」としてリアルタイム検知する様を体験。</li>
+</ul>
+</li>
+</ol>
+<h2 id="3-トラブルシューティングと学び" tabindex="-1">3. トラブルシューティングと学び <a class="header-anchor" href="#3-トラブルシューティングと学び" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>監視経路の断絶問題</strong>: PC1のインターフェースをシャットダウンした際、「ダウンした」というログ自体がPC1からNMSへ届かない（通信経路自体が遮断されるため）という事象を自ら発見。これにより、ネットワーク設計における「冗長化」と「Loopbackインターフェースの活用」の必要性を深く理解した。</li>
+<li><strong>Zabbixのグラフスケール問題</strong>: 全ての監視項目（10Gbpsのポート速度制限など）を1つのグラフに重畳させた結果、実際のトラフィックがゼロに張り付いて見える現象（スケール問題）を体験。適切な項目のみをフィルタリングして表示する運用の基本を学んだ。</li>
+<li><strong>L3 vs L7監視</strong>: SNMP（L3〜ハードウェア中心の監視）とZabbix Agent等の専用エージェント（L7/アプリケーション層の監視）の違いや、それぞれの得意分野・業務での使い分けについて理解を深めた。</li>
+</ul>
+<h2 id="4-次のステップ" tabindex="-1">4. 次のステップ <a class="header-anchor" href="#4-次のステップ" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>テーマ17</strong>: NETCONF/RESTCONF/YANG/Ansibleによるネットワーク自動化</li>
+<li>今回の「手動での設定と監視」を踏まえ、次回はそれらの運用を「コードで自動化」する手法（Network Programmability）へとステップアップする。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-構築概要">1. 構築概要</a></li>
+<li class="lvl-2"><a href="#2-実施内容">2. 実施内容</a></li>
+<li class="lvl-2"><a href="#3-トラブルシューティングと学び">3. トラブルシューティングと学び</a></li>
+<li class="lvl-2"><a href="#4-次のステップ">4. 次のステップ</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

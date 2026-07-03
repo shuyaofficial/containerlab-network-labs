@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Theme 25: Multi-Campus 構築・学習振り返り</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>25_campus_multi_site</span>
+<span class="sep">/</span>
+<span>ログ</span></nav>
+      <h1 class="doc-title">Theme 25: Multi-Campus 構築・学習振り返り</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="1-作業概要" tabindex="-1">1. 作業概要 <a class="header-anchor" href="#1-作業概要" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>実施内容</strong>: Theme 25 (Multi-Campus) のラボ環境構築、およびCisco IOL（ルーター）へのコンフィグ投入。</li>
+<li><strong>学習テーマ</strong>:
+<ul>
+<li>複数キャンパス間（OSPF 10 と OSPF 20）をeBGPで接続。</li>
+<li><code>prefix-list</code> と <code>route-map</code> を用いた経路集約（<code>/16</code>）と再配信制御。</li>
+<li><code>tag</code> を用いた経路のルーティングループ防止策。</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2 id="2-作業中の疑問点と解決内容" tabindex="-1">2. 作業中の疑問点と解決内容 <a class="header-anchor" href="#2-作業中の疑問点と解決内容" aria-hidden="true">#</a></h2>
+<p>コンフィグ投入にあたり、BGPとOSPFの再配信（redistribute）や経路制御について生じた疑問と、その解決・理解内容をまとめます。</p>
+<h3 id="①-route-map-は-acl-の-in-と同じようなもの" tabindex="-1">① <code>route-map</code> は ACL の <code>in</code> と同じようなもの？ <a class="header-anchor" href="#①-route-map-は-acl-の-in-と同じようなもの" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>疑問</strong>: <code>route-map</code> は物理インターフェースに適用するACL（パケットフィルタ）のようなものか？</li>
+<li><strong>解決</strong>:
+<ul>
+<li><strong>違う</strong>。ACLの <code>in</code> は「データプレーン（ユーザーのパケット）」を制御する。</li>
+<li><code>route-map</code> は「コントロールプレーン（経路情報）」を制御する。OSPFとBGPの間で経路をやり取りする連絡通路に立ち、経路を通すか捨てるか、スタンプ（タグ）を押すかを決める役割。</li>
+</ul>
+</li>
+</ul>
+<h3 id="②-tag-によるループブロックの仕組みとは" tabindex="-1">② <code>tag</code> によるループブロックの仕組みとは？ <a class="header-anchor" href="#②-tag-によるループブロックの仕組みとは" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>疑問</strong>: tagを付けると、どのようにして自分の出したパケット（経路）が戻ってきた時にブロックされるのか？</li>
+<li><strong>解決</strong>:
+<ul>
+<li>BGPからOSPFに経路を入れる際に、<code>set tag 65060</code> のように「この経路はBranch(AS 65060)から来た」という目印を付ける。</li>
+<li>その経路がOSPF内を一周して再びBGPへ出ようとした際、出口の <code>route-map</code> で <code>match tag 65060</code> → <code>deny</code> と設定しておくことで、「元々Branchから来た経路をBranchに送り返す」という無限ループを未然に防ぐことができる。</li>
+</ul>
+</li>
+</ul>
+<h3 id="③-エラー-set-tag-not-supported" tabindex="-1">③ エラー: <code>set tag not supported</code> <a class="header-anchor" href="#③-エラー-set-tag-not-supported" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>事象</strong>: <code>redistribute ospf 20 route-map OSPF-TO-BGP</code> を適用しようとした際、以下のエラーが発生した。
+<code>% &quot;OSPF-TO-BGP&quot; used as redistribute ospf into bgp route-map, set tag not supported</code></li>
+<li><strong>原因と解決</strong>:
+<ul>
+<li><strong>原因</strong>: <code>route-map OSPF-TO-BGP</code> の設定内で、<code>match tag 65050</code>（タグを見て捨てる条件）と書くべきところを、誤って <code>set tag 65050</code>（タグを付ける処理）と書いてしまっていた。</li>
+<li><strong>理由</strong>: BGPというプロトコルにはOSPFのような「タグ」を付ける機能（属性）が無いため、BGPへ向かう再配信で <code>set tag</code> を行おうとするとIOSがエラーを出す。</li>
+<li><strong>解決</strong>: <code>no set tag 65050</code> で削除し、<code>match tag 65050</code> に修正することで正常に適用できた。</li>
+</ul>
+</li>
+</ul>
+<h3 id="④-show-route-map-のカウントが増えない" tabindex="-1">④ <code>show route-map</code> のカウントが増えない <a class="header-anchor" href="#④-show-route-map-のカウントが増えない" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>事象</strong>: <code>show route-map BGP-to-OSPF</code> を確認したが、<code>Policy routing matches: 0 packets, 0 bytes</code> となっておりカウントされていなかった。</li>
+<li><strong>原因と解決</strong>:
+<ul>
+<li><strong>原因</strong>: Cisco IOSの仕様。このカウントは「ポリシーベースルーティング（PBR）」としてユーザーのパケットを処理した回数を示すものであり、今回のような「経路の再配信」で処理した回数はここにはカウントされない。</li>
+<li><strong>解決</strong>: 再配信が成功したかを確認するには、<code>show ip ospf database external</code> や <code>show ip route</code> を使い、実際にタグ付きの経路がルーティングテーブル等に入っているかを直接確認するのが正しいアプローチである。</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2 id="3-重要なコマンドまとめ" tabindex="-1">3. 重要なコマンドまとめ <a class="header-anchor" href="#3-重要なコマンドまとめ" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>経路が正しくBGPで隣に送られているか確認</strong><pre><code class="language-cisco">show ip bgp neighbors 198.51.100.2 advertised-routes
+</code></pre>
+</li>
+<li><strong>OSPFデータベース内で外部経路（とタグ）を確認</strong><pre><code class="language-cisco">show ip ospf database external
+</code></pre>
+</li>
+<li><strong>再配信時の重要オプション（BGP→OSPF）</strong><pre><code class="language-cisco">redistribute bgp 65050 subnets route-map BGP-to-OSPF
+</code></pre>
+※ <code>subnets</code> をつけないとクラスフルネットワークしか再配信されないため必須。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-作業概要">1. 作業概要</a></li>
+<li class="lvl-2"><a href="#2-作業中の疑問点と解決内容">2. 作業中の疑問点と解決内容</a></li>
+<li class="lvl-3"><a href="#①-route-map-は-acl-の-in-と同じようなもの">① route-map は ACL の in と同じようなもの？</a></li>
+<li class="lvl-3"><a href="#②-tag-によるループブロックの仕組みとは">② tag によるループブロックの仕組みとは？</a></li>
+<li class="lvl-3"><a href="#③-エラー-set-tag-not-supported">③ エラー: set tag not supported</a></li>
+<li class="lvl-3"><a href="#④-show-route-map-のカウントが増えない">④ show route-map のカウントが増えない</a></li>
+<li class="lvl-2"><a href="#3-重要なコマンドまとめ">3. 重要なコマンドまとめ</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>構築ログ: 動的ルーティング深堀り</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>26_dynamic_routing_deep_dive</span>
+<span class="sep">/</span>
+<span>04_構築</span></nav>
+      <h1 class="doc-title">構築ログ: 動的ルーティング深堀り</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="日付-202x-xx-xx" tabindex="-1">日付: 202X-XX-XX <a class="header-anchor" href="#日付-202x-xx-xx" aria-hidden="true">#</a></h2>
+<h2 id="実施者" tabindex="-1">実施者: <a class="header-anchor" href="#実施者" aria-hidden="true">#</a></h2>
+<h3 id="1-トポロジのデプロイ" tabindex="-1">1. トポロジのデプロイ <a class="header-anchor" href="#1-トポロジのデプロイ" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-comment"># 実行コマンドと結果</span>
+</code></pre>
+<h3 id="2-ospf設定mission-1" tabindex="-1">2. OSPF設定（Mission 1） <a class="header-anchor" href="#2-ospf設定mission-1" aria-hidden="true">#</a></h3>
+<pre><code class="language-text"># hq-core
+
+# hq-edge
+
+# hq-dmz
+
+</code></pre>
+<h3 id="3-eigrp設定と再配信mission-2" tabindex="-1">3. EIGRP設定と再配信（Mission 2） <a class="header-anchor" href="#3-eigrp設定と再配信mission-2" aria-hidden="true">#</a></h3>
+<pre><code class="language-text"># hq-dist
+
+# hq-core (再配信)
+
+</code></pre>
+<h3 id="4-bgp設定とnatmission-3" tabindex="-1">4. BGP設定とNAT（Mission 3） <a class="header-anchor" href="#4-bgp設定とnatmission-3" aria-hidden="true">#</a></h3>
+<pre><code class="language-text"># isp
+
+# hq-edge
+
+</code></pre>
+<h3 id="5-支社設定mission-4" tabindex="-1">5. 支社設定（Mission 4） <a class="header-anchor" href="#5-支社設定mission-4" aria-hidden="true">#</a></h3>
+<pre><code class="language-text"># br-edge
+
+# br-core
+
+</code></pre>
+<h3 id="6-トラブルシューティングメモ" tabindex="-1">6. トラブルシューティングメモ <a class="header-anchor" href="#6-トラブルシューティングメモ" aria-hidden="true">#</a></h3>
+<ul>
+<li>[発生した問題]</li>
+<li>[原因と解決策]</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#日付-202x-xx-xx">日付: 202X-XX-XX</a></li>
+<li class="lvl-2"><a href="#実施者">実施者:</a></li>
+<li class="lvl-3"><a href="#1-トポロジのデプロイ">1. トポロジのデプロイ</a></li>
+<li class="lvl-3"><a href="#2-ospf設定mission-1">2. OSPF設定（Mission 1）</a></li>
+<li class="lvl-3"><a href="#3-eigrp設定と再配信mission-2">3. EIGRP設定と再配信（Mission 2）</a></li>
+<li class="lvl-3"><a href="#4-bgp設定とnatmission-3">4. BGP設定とNAT（Mission 3）</a></li>
+<li class="lvl-3"><a href="#5-支社設定mission-4">5. 支社設定（Mission 4）</a></li>
+<li class="lvl-3"><a href="#6-トラブルシューティングメモ">6. トラブルシューティングメモ</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

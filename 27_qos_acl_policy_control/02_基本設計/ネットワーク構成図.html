@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Theme 27｜QoS/ACL/route-map Applied 構成図</title>
+<style>
+  :root {
+    --ink: #2c3e50;
+    --muted: #5b6b82;
+    --faint: #94a3b8;
+    --line: #cbd5e1;
+    --paper: #fcfbf9; /* 目に優しいクリーム・紙色 */
+    --bg: #f3f4f6;
+    --accent: #2563eb;
+    --accent-soft: #eff6ff;
+    --core: #3b82f6;
+    --edge: #8b5cf6;
+    --pc: #10b981;
+    --voip: #f59e0b;
+    --srv: #ec4899;
+    --fail: #ef4444;
+    --radius: 12px;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    color: var(--ink);
+    background: var(--bg);
+    font-family: "Hiragino Sans", "Noto Sans JP", -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.6;
+    font-size: 15px;
+  }
+
+  .shell { max-width: 1400px; margin: 0 auto; padding: 32px 24px 64px; }
+
+  header.masthead { margin-bottom: 22px; }
+
+  .kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: .76rem;
+    font-weight: 700;
+  }
+
+  h1 { margin: 0 0 8px; font-size: 1.6rem; color: #1e293b; }
+  .subtitle { margin: 0 0 14px; color: var(--muted); font-size: .94rem; max-width: 800px; }
+
+  .panel {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px 32px;
+    margin-bottom: 24px;
+  }
+
+  /* Scenario Tabs */
+  .scenario-nav {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    background: #f1f5f9;
+    padding: 6px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+  }
+
+  .s-tab {
+    padding: 8px 16px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-weight: 700;
+    font-size: .9rem;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  .s-tab:hover { color: var(--ink); background: #e2e8f0; }
+  .s-tab[aria-selected="true"] { background: #ffffff; color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+  /* SVG Topology */
+  .diagram-wrap {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #ffffff;
+    padding: 16px;
+    overflow-x: auto;
+  }
+
+  svg.topology { display: block; width: 100%; height: auto; min-width: 1000px; }
+
+  .zone-rect { rx: 12px; fill: #f8fafc; stroke: #e2e8f0; stroke-width: 1.5; }
+  .zone-label { font-size: 14px; font-weight: 800; fill: #475569; }
+
+  .link-line { stroke: #cbd5e1; stroke-width: 4; stroke-linecap: round; transition: stroke 0.3s; }
+  .link-bg { fill: #ffffff; stroke: #e2e8f0; rx: 4px; }
+  .link-text { font-size: 11px; fill: #334155; font-weight: 700; text-anchor: middle; }
+  .link-sub { font-size: 10px; fill: #64748b; text-anchor: middle; font-family: monospace; }
+  .iface-text { font-size: 10px; fill: #94a3b8; font-weight: 600; }
+
+  .node-rect { fill: #ffffff; stroke: #94a3b8; stroke-width: 1.5; rx: 8px; }
+  .node-core .node-accent { fill: var(--core); }
+  .node-edge .node-accent { fill: var(--edge); }
+  .node-pc .node-accent { fill: var(--pc); }
+  .node-voip .node-accent { fill: var(--voip); }
+  .node-srv .node-accent { fill: var(--srv); }
+  .node-name { font-size: 15px; font-weight: 800; text-anchor: middle; fill: #1e293b; }
+  .node-sub { font-size: 11px; text-anchor: middle; fill: #64748b; font-family: monospace; }
+
+  /* Traffic Path Lines */
+  .path-line { fill: none; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+  .path-pc { stroke: #10b981; stroke-dasharray: 8 6; }
+  .path-voip { stroke: #f59e0b; stroke-dasharray: 8 6; }
+  .path-backup { stroke: #8b5cf6; stroke-dasharray: 8 6; }
+
+  /* States controlled by data-scenario attribute */
+  .route-layer { display: none; }
+  
+  [data-scenario="normal"] .route-normal { display: block; }
+  [data-scenario="fail-pbr"] .route-fail-pbr { display: block; }
+  [data-scenario="fail-pbr"] #link-core-edge { stroke: var(--fail); stroke-dasharray: 6 6; }
+
+  .legend-box { fill: #ffffff; stroke: #cbd5e1; rx: 6px; }
+</style>
+</head>
+<body>
+<main class="shell">
+  <header class="masthead">
+    <span class="kicker">Theme 27 · QoS/ACL/route-map Applied</span>
+    <h1>論理・物理ネットワーク構成図（PBR/QoS可視化版）</h1>
+    <p class="subtitle">VoIPとPCのトラフィックがroute-mapにより別々の経路（PBR）を通る様子や、迂回時の経路変更を文字被りなくクリーンに表現しています。</p>
+  </header>
+
+  <div class="panel">
+    <nav class="scenario-nav" role="tablist">
+      <button class="s-tab" role="tab" aria-selected="true" data-target="normal">正常時: PBRによる経路振り分け</button>
+      <button class="s-tab" role="tab" aria-selected="false" data-target="fail-pbr">障害時: hq-core - hq-edge リンクダウン迂回</button>
+    </nav>
+
+    <div class="diagram-wrap" id="diagram-container" data-scenario="normal">
+      <svg class="topology" viewBox="0 0 1340 500">
+        <!-- ZONES -->
+        <rect class="zone-rect" x="20" y="20" width="560" height="460" />
+        <text class="zone-label" x="40" y="50">本社 (HQ) - QoS マーキング / PBR</text>
+
+        <rect class="zone-rect" x="600" y="20" width="160" height="460" fill="#fffaf0" stroke="#fed7aa" />
+        <text class="zone-label" x="680" y="50" text-anchor="middle" fill="#c2410c">ISP (Untrust)</text>
+
+        <rect class="zone-rect" x="780" y="20" width="540" height="460" />
+        <text class="zone-label" x="800" y="50">支社 (Branch) - BGP Filter / ACL</text>
+
+        <!-- LINKS -->
+        <!-- HQ PC to Dist -->
+        <line class="link-line" x1="160" y1="120" x2="210" y2="150" />
+        <!-- HQ VoIP to Dist -->
+        <line class="link-line" x1="160" y1="240" x2="210" y2="180" />
+        
+        <!-- Dist to Core -->
+        <line class="link-line" x1="330" y1="170" x2="380" y2="170" />
+        <g transform="translate(355, 170)">
+          <rect class="link-bg" x="-35" y="-14" width="70" height="28" />
+          <text class="link-text" y="0">10.27.1.0/30</text>
+        </g>
+
+        <!-- Core to Edge -->
+        <line id="link-core-edge" class="link-line" x1="500" y1="170" x2="550" y2="170" />
+        <g transform="translate(525, 170)">
+          <rect class="link-bg" x="-35" y="-14" width="70" height="28" />
+          <text class="link-text" y="0">10.27.1.4/30</text>
+        </g>
+
+        <!-- Core to DMZ -->
+        <line class="link-line" x1="440" y1="200" x2="440" y2="350" />
+        <g transform="translate(440, 275)">
+          <rect class="link-bg" x="-35" y="-14" width="70" height="28" />
+          <text class="link-text" y="0">10.27.1.8/30</text>
+        </g>
+
+        <!-- DMZ to Server -->
+        <line class="link-line" x1="330" y1="380" x2="380" y2="380" />
+        <text class="iface-text" x="335" y="370">eth1</text>
+        <text class="iface-text" x="350" y="370">eth2</text>
+
+        <!-- Edge to DMZ (Backup PBR route) -->
+        <line class="link-line" x1="610" y1="200" x2="480" y2="350" stroke-dasharray="4 4" stroke="#cbd5e1" />
+
+        <!-- Edge to ISP -->
+        <line class="link-line" x1="670" y1="170" x2="720" y2="170" />
+        <g transform="translate(695, 170)">
+          <rect class="link-bg" x="-45" y="-14" width="90" height="28" />
+          <text class="link-text" y="0">198.51.100.8/30</text>
+          <text class="link-sub" y="10">LLQ Applied</text>
+        </g>
+
+        <!-- ISP to Branch Edge -->
+        <line class="link-line" x1="840" y1="170" x2="890" y2="170" />
+        <g transform="translate(865, 170)">
+          <rect class="link-bg" x="-45" y="-14" width="90" height="28" />
+          <text class="link-text" y="0">198.51.100.12/30</text>
+        </g>
+
+        <!-- Branch Edge to Core -->
+        <line class="link-line" x1="1010" y1="170" x2="1060" y2="170" />
+        <g transform="translate(1035, 170)">
+          <rect class="link-bg" x="-35" y="-14" width="70" height="28" />
+          <text class="link-text" y="0">10.27.2.0/30</text>
+        </g>
+
+        <!-- Branch Core to PC -->
+        <line class="link-line" x1="1180" y1="170" x2="1230" y2="170" />
+
+        <!-- ROUTES: Normal (PBR active) -->
+        <g class="route-layer route-normal">
+          <!-- PC flow (Best Effort) -->
+          <path class="path-line path-pc" d="M 100,90 C 180,90 270,140 380,140 C 490,140 550,140 610,140 C 680,140 760,140 830,140 C 930,140 1010,140 1120,140 C 1170,140 1230,140 1280,140" />
+          <!-- VoIP flow (EF / Priority) -->
+          <path class="path-line path-voip" d="M 100,210 C 180,210 270,190 380,190 C 490,190 550,190 610,190 C 680,190 760,190 830,190 C 930,190 1010,190 1120,190 C 1170,190 1230,190 1280,190" />
+        </g>
+
+        <!-- ROUTES: PBR Failover -->
+        <g class="route-layer route-fail-pbr">
+          <!-- Both PC and VoIP use backup route via DMZ due to core-edge link down -->
+          <path class="path-line path-backup" d="M 100,90 C 180,90 270,140 380,140 C 440,140 440,320 500,380 C 560,440 610,240 610,170 C 680,170 760,170 830,170 C 930,170 1010,170 1120,170 C 1170,170 1230,170 1280,170" />
+          <path class="path-line path-backup" d="M 100,210 C 180,210 270,190 380,190 C 420,190 420,320 480,380 C 540,440 590,240 590,170 C 660,170 740,170 810,170 C 910,170 990,170 1100,170 C 1150,170 1210,170 1260,170" />
+        </g>
+
+        <!-- NODES -->
+        <!-- HQ PC -->
+        <g transform="translate(40, 90)">
+          <rect class="node-rect node-pc" x="0" y="0" width="120" height="60" />
+          <rect class="node-accent" x="0" y="0" width="120" height="6" rx="3" />
+          <text class="node-name" x="60" y="28">hq-pc</text>
+          <text class="node-sub" x="60" y="44">10.27.10.10/24</text>
+        </g>
+
+        <!-- HQ VoIP -->
+        <g transform="translate(40, 210)">
+          <rect class="node-rect node-voip" x="0" y="0" width="120" height="60" />
+          <rect class="node-accent" x="0" y="0" width="120" height="6" rx="3" />
+          <text class="node-name" x="60" y="28">hq-voip</text>
+          <text class="node-sub" x="60" y="44">10.27.50.10/24</text>
+        </g>
+
+        <!-- HQ Dist -->
+        <g transform="translate(210, 140)">
+          <rect class="node-rect node-core" x="0" y="0" width="120" height="60" />
+          <rect class="node-accent" x="0" y="0" width="120" height="6" rx="3" />
+          <text class="node-name" x="60" y="28">hq-dist</text>
+          <text class="node-sub" x="60" y="44">route-map PBR</text>
+        </g>
+
+        <!-- HQ Core -->
+        <g transform="translate(380, 140)">
+          <rect class="node-rect node-core" x="0" y="0" width="120" height="60" />
+          <rect class="node-accent" x="0" y="0" width="120" height="6" rx="3" />
+          <text class="node-name" x="60" y="28">hq-core</text>
+          <text class="node-sub" x="60" y="44">OSPF Area 0</text>
+        </g>
+
+        <!-- HQ Edge -->
+        <g transform="translate(550, 140)">
+          <rect class="node-rect node-edge" x="0" y="0" width="120" height="60" />
+          <rect class="node-accent" x="0" y="0" width="120" height="6" rx="3" />
+          <text class="node-name" x="60" y="28">hq-edge</text>
+          <text class="node-sub" x="60" y="44">LLQ / QoS / NAT</text>
+        </g>
+
+        <!-- DMZ Srv -->
+        <g transform="translate(210, 350)">
+          <rect class="node-rect node-srv" x="0" y="0" width="120" height="60" />
+          <rect class="node-accent" x="0" y="0" width="120" height="6" rx="3" />
+          <text class="node-name" x="60" y="28">dmz-srv</text>
+          <text class="node-sub" x="60" y="44">10.27.30.10/24</text>
+        </g>
+
+        <!-- HQ DMZ -->
+        <g transform="translate(380, 350)">
+          <rect class="node-rect node-core" x="0" y="0" width="120" height="60" />
+          <rect class="node-accent" x="0" y="0" width="120" height="6" rx="3" />
+          <text class="node-name" x="60" y="28">hq-dmz</text>
+          <text class="node-sub" x="60" y="44">Zone ACL</text>
+        </g>
+
+        <!-- ISP -->
+        <g transform="translate(720, 140)">
+          <rect class="node-rect node-edge" x="0" y="0" width="120" height="60" />
+          <rect class="node-accent" x="0" y="0" width="120" height="6" rx="3" />
+          <text class="node-name" x="60" y="28">isp</text>
+          <text class="node-sub" x="60" y="44">Untrust</text>
+        </g>
+
+        <!-- Branch Edge -->
+        <g transform="translate(890, 140)">
+          <rect class="node-rect node-edge" x="0" y="0" width="120" height="60" />
+          <rect class="node-accent" x="0" y="0" width="120" height="6" rx="3" />
+          <text class="node-name" x="60" y="28">br-edge</text>
+          <text class="node-sub" x="60" y="44">BGP Policy</text>
+        </g>
+
+        <!-- Branch Core -->
+        <g transform="translate(1060, 140)">
+          <rect class="node-rect node-core" x="0" y="0" width="120" height="60" />
+          <rect class="node-accent" x="0" y="0" width="120" height="6" rx="3" />
+          <text class="node-name" x="60" y="28">br-core</text>
+          <text class="node-sub" x="60" y="44">OSPF Area 0</text>
+        </g>
+
+        <!-- Branch PC -->
+        <g transform="translate(1230, 140)">
+          <rect class="node-rect node-pc" x="0" y="0" width="120" height="60" />
+          <rect class="node-accent" x="0" y="0" width="120" height="6" rx="3" />
+          <text class="node-name" x="60" y="28">br-pc</text>
+          <text class="node-sub" x="60" y="44">10.27.20.10/24</text>
+        </g>
+
+        <!-- Legend -->
+        <g transform="translate(20, 390)">
+          <rect class="legend-box" x="0" y="0" width="220" height="80" />
+          <line class="path-line path-pc" x1="10" y1="20" x2="40" y2="20" />
+          <text x="50" y="24" font-size="12" fill="#334155">PCデータ通信 (Best Effort)</text>
+          
+          <line class="path-line path-voip" x1="10" y1="45" x2="40" y2="45" />
+          <text x="50" y="49" font-size="12" fill="#334155">VoIP音声通信 (EF Priority)</text>
+
+          <line class="path-line path-backup" x1="10" y1="70" x2="40" y2="70" />
+          <text x="50" y="74" font-size="12" fill="#334155">迂回時の統合通信</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+</main>
+
+<script>
+  const tabs = document.querySelectorAll('.s-tab');
+  const container = document.getElementById('diagram-container');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      // 選択状態の更新
+      tabs.forEach(t => t.setAttribute('aria-selected', 'false'));
+      tab.setAttribute('aria-selected', 'true');
+      
+      // シナリオ属性の切り替え
+      container.setAttribute('data-scenario', tab.getAttribute('data-target'));
+    });
+  });
+</script>
+</body>
+</html>

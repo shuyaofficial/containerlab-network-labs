@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>今後の環境構築・設計に向けた改善ポイント</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ロードマップ</span>
+<span class="sep">/</span>
+<span>tech_notes</span></nav>
+      <h1 class="doc-title">今後の環境構築・設計に向けた改善ポイント</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="1-エッジルーターおよびispルーターのイメージ選定" tabindex="-1">1. エッジルーターおよびISPルーターのイメージ選定 <a class="header-anchor" href="#1-エッジルーターおよびispルーターのイメージ選定" aria-hidden="true">#</a></h2>
+<p>現状、エッジ（br-edge）やISP（isp）のルーターとして、L2スイッチ用のイメージ（<code>vrnetlab/cisco_iol:L2-advipservices-2017</code>）を使用している。
+このイメージはデフォルトで <code>ip routing</code> が無効になっており、純粋なルーティング処理において余計なトラブル（ルーティングされない等）を招く原因となる。</p>
+<p><strong>【次回のアクション】</strong>
+ルーターの役割を持つノードには、必ず適切なL3ルーターイメージ（例: <code>L3-adventerprisek9</code> など）を選定し、デフォルトでルーティングが有効な状態のものを利用する。</p>
+<h2 id="2-fortigate等のアプライアンスにおける管理ポートのルーティング管理" tabindex="-1">2. FortiGate等のアプライアンスにおける管理ポートのルーティング管理 <a class="header-anchor" href="#2-fortigate等のアプライアンスにおける管理ポートのルーティング管理" aria-hidden="true">#</a></h2>
+<p>FortiGateなどのアプライアンス製品をラボ環境で展開する際、管理ポート（port1等）がDHCP経由でデフォルトルートを取得してしまうケースが多発する。
+これがWANポートのルーティングと競合し、通信がブラックホール化する原因となる。</p>
+<p><strong>【次回のアクション】</strong>
+ラボ環境を初期構築する際、管理ポートのDHCP設定において以下のような「デフォルトゲートウェイを取得しない」設定を明示的に行うか、WAN向けのスタティックルートのディスタンス（優先度）を強制的に下げる（例: <code>distance 1</code>）設計をあらかじめ組み込む。</p>
+<pre><code class="language-text">config system interface
+    edit &quot;port1&quot;
+        set defaultgw disable
+    next
+end
+</code></pre>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-エッジルーターおよびispルーターのイメージ選定">1. エッジルーターおよびISPルーターのイメージ選定</a></li>
+<li class="lvl-2"><a href="#2-fortigate等のアプライアンスにおける管理ポートのルーティング管理">2. FortiGate等のアプライアンスにおける管理ポートのルーティング管理</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

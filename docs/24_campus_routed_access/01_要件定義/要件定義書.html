@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>要件定義書 — Theme 24: Routed Access Campus LAN</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>24_campus_routed_access</span>
+<span class="sep">/</span>
+<span>01_要件定義</span></nav>
+      <h1 class="doc-title">要件定義書 — Theme 24: Routed Access Campus LAN</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="1-プロジェクトの目的" tabindex="-1">1. プロジェクトの目的 <a class="header-anchor" href="#1-プロジェクトの目的" aria-hidden="true">#</a></h2>
+<p>株式会社XXX（架空・社員約100名）は、フロアアクセス層までL2を延伸する従来構成から、アクセス層までL3ルーティングを適用するRouted Accessへ移行する。</p>
+<p>目的は、STPのブロッキングポートと再計算への依存を減らし、OSPFとECMPを用いて全アップリンクを利用しながら、単一リンク・単一コア障害時の高速な経路切替を実現することである。</p>
+<h2 id="2-対象範囲" tabindex="-1">2. 対象範囲 <a class="header-anchor" href="#2-対象範囲" aria-hidden="true">#</a></h2>
+<h3 id="21-対象" tabindex="-1">2.1 対象 <a class="header-anchor" href="#21-対象" aria-hidden="true">#</a></h3>
+<ul>
+<li>Core/Distribution役2台</li>
+<li>L3 Access役2台</li>
+<li>Access配下の試験端末2台</li>
+<li>インフラ間のRouted Port</li>
+<li>OSPF area 0</li>
+<li>等コスト経路によるECMP</li>
+<li>単一リンク・単一コア障害試験</li>
+</ul>
+<h3 id="22-対象外" tabindex="-1">2.2 対象外 <a class="header-anchor" href="#22-対象外" aria-hidden="true">#</a></h3>
+<ul>
+<li>STP、VLAN Trunk、HSRPによる冗長化</li>
+<li>インターネット接続、NAT、Firewall</li>
+<li>BGP、拠点間WAN、IPsec</li>
+<li>VXLAN/EVPN Overlay</li>
+<li>実機Catalyst固有の機能・性能評価</li>
+</ul>
+<h2 id="3-業務通信要件" tabindex="-1">3. 業務・通信要件 <a class="header-anchor" href="#3-業務通信要件" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>送信元</th>
+<th>宛先</th>
+<th>要件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R-01</td>
+<td>pc-a</td>
+<td>pc-b</td>
+<td>双方向にIP疎通できること</td>
+</tr>
+<tr>
+<td>R-02</td>
+<td>access1</td>
+<td>access2の利用者セグメント</td>
+<td>core1/core2の等コスト2経路を利用できること</td>
+</tr>
+<tr>
+<td>R-03</td>
+<td>全L3ノード</td>
+<td>全Loopback</td>
+<td>OSPF学習後に疎通できること</td>
+</tr>
+<tr>
+<td>R-04</td>
+<td>pc-a</td>
+<td>pc-b</td>
+<td>単一アップリンク障害後に残存経路で復旧すること</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="4-機能要件" tabindex="-1">4. 機能要件 <a class="header-anchor" href="#4-機能要件" aria-hidden="true">#</a></h2>
+<h3 id="41-物理論理構成" tabindex="-1">4.1 物理・論理構成 <a class="header-anchor" href="#41-物理論理構成" aria-hidden="true">#</a></h3>
+<ul>
+<li>core1/core2とaccess1/access2を相互に二重接続する。</li>
+<li>core1とcore2間にもL3リンクを設ける。</li>
+<li>インフラ間5リンクはすべて<code>/30</code>のPoint-to-Pointネットワークとする。</li>
+<li>利用者セグメントはaccess1配下とaccess2配下に1つずつ設ける。</li>
+</ul>
+<h3 id="42-ルーティング" tabindex="-1">4.2 ルーティング <a class="header-anchor" href="#42-ルーティング" aria-hidden="true">#</a></h3>
+<ul>
+<li>全L3ノードをOSPF area 0へ収容する。</li>
+<li>Router IDは各ノードのLoopback0を使用する。</li>
+<li>利用者セグメントはOSPFで広告するが、端末側へOSPF Helloを送らない設計とする。</li>
+<li>access1/access2から対向利用者セグメントへの経路を等コストにする。</li>
+</ul>
+<h3 id="43-障害対応" tabindex="-1">4.3 障害対応 <a class="header-anchor" href="#43-障害対応" aria-hidden="true">#</a></h3>
+<ul>
+<li>単一Access-Coreリンク障害で、もう一方のCore経由へ自動収束すること。</li>
+<li>core1停止時もcore2経由でAccess間通信を復旧できること。</li>
+<li>障害復旧後にOSPF隣接とECMPが正常状態へ戻ること。</li>
+</ul>
+<h2 id="5-非機能要件" tabindex="-1">5. 非機能要件 <a class="header-anchor" href="#5-非機能要件" aria-hidden="true">#</a></h2>
+<h3 id="51-可用性" tabindex="-1">5.1 可用性 <a class="header-anchor" href="#51-可用性" aria-hidden="true">#</a></h3>
+<ul>
+<li>単一のインフラリンク障害でネットワーク全体が停止しないこと。</li>
+<li>単一のCore障害でAccess間通信経路が完全に失われないこと。</li>
+<li>通信断時間とping欠落数を試験結果へ記録できること。</li>
+</ul>
+<h3 id="52-運用性" tabindex="-1">5.2 運用性 <a class="header-anchor" href="#52-運用性" aria-hidden="true">#</a></h3>
+<ul>
+<li>STPではなく、OSPFネイバー、RIB、CEFの情報で障害を切り分けられること。</li>
+<li>機器名、管理IP、データプレーンIP、接続先が文書間で一致していること。</li>
+<li>第三者がREADMEから要件、設計、構築、試験の順に追えること。</li>
+</ul>
+<h3 id="53-学習上の要件" tabindex="-1">5.3 学習上の要件 <a class="header-anchor" href="#53-学習上の要件" aria-hidden="true">#</a></h3>
+<ul>
+<li>IOSコンフィグは自動投入しない。</li>
+<li>startup-configや模範解答を同梱しない。</li>
+<li>端末のデータプレーンIPと静的経路も自動投入しない。</li>
+<li>学習者自身が設計値をIOS/Linuxコマンドへ変換する。</li>
+</ul>
+<h2 id="6-ラボ制約" tabindex="-1">6. ラボ制約 <a class="header-anchor" href="#6-ラボ制約" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>制約</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>実行場所</td>
+<td>OrbStack Linux VM <code>clab</code></td>
+</tr>
+<tr>
+<td>ホスト</td>
+<td>Apple Silicon / aarch64</td>
+</tr>
+<tr>
+<td>仮想ネットワーク</td>
+<td>containerlab</td>
+</tr>
+<tr>
+<td>L3ノード</td>
+<td>Cisco IOL <code>vrnetlab/cisco_iol:15.7.3M2</code> ×4</td>
+</tr>
+<tr>
+<td>端末</td>
+<td><code>wbitt/network-multitool:latest</code> ×2</td>
+</tr>
+<tr>
+<td>管理ネットワーク</td>
+<td><code>172.24.24.0/24</code></td>
+</tr>
+<tr>
+<td>ローカル表現</td>
+<td>Catalyst L3 AccessをIOLルーターモードで模擬</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="7-完了条件" tabindex="-1">7. 完了条件 <a class="header-anchor" href="#7-完了条件" aria-hidden="true">#</a></h2>
+<ul>
+<li>6ノードが起動し、7リンクが生成されること。</li>
+<li><code>docker attach</code>による初期コンソールアクセスが可能であること。</li>
+<li>学習者がデータプレーン設定を投入する前は、OSPF・Loopback・利用者IPが未設定であること。</li>
+<li><a href="../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a>の正常系・障害系を実施できる土台があること。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-プロジェクトの目的">1. プロジェクトの目的</a></li>
+<li class="lvl-2"><a href="#2-対象範囲">2. 対象範囲</a></li>
+<li class="lvl-3"><a href="#21-対象">2.1 対象</a></li>
+<li class="lvl-3"><a href="#22-対象外">2.2 対象外</a></li>
+<li class="lvl-2"><a href="#3-業務通信要件">3. 業務・通信要件</a></li>
+<li class="lvl-2"><a href="#4-機能要件">4. 機能要件</a></li>
+<li class="lvl-3"><a href="#41-物理論理構成">4.1 物理・論理構成</a></li>
+<li class="lvl-3"><a href="#42-ルーティング">4.2 ルーティング</a></li>
+<li class="lvl-3"><a href="#43-障害対応">4.3 障害対応</a></li>
+<li class="lvl-2"><a href="#5-非機能要件">5. 非機能要件</a></li>
+<li class="lvl-3"><a href="#51-可用性">5.1 可用性</a></li>
+<li class="lvl-3"><a href="#52-運用性">5.2 運用性</a></li>
+<li class="lvl-3"><a href="#53-学習上の要件">5.3 学習上の要件</a></li>
+<li class="lvl-2"><a href="#6-ラボ制約">6. ラボ制約</a></li>
+<li class="lvl-2"><a href="#7-完了条件">7. 完了条件</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

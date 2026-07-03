@@ -1,0 +1,154 @@
+name: interop-shownet
+
+mgmt:
+  network: interop-mgmt
+  ipv4-subnet: 172.20.30.0/24
+  ipv6-subnet: 3fff:172:20:30::/64
+
+topology:
+  nodes:
+    ext-bbix:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+      mgmt-ipv4: 172.20.30.11
+      startup-config: config/ext-bbix.cfg
+      labels:
+        graph-level: 6
+        graph-icon: router
+
+    ext-jpix:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+      mgmt-ipv4: 172.20.30.12
+      startup-config: config/ext-jpix.cfg
+      labels:
+        graph-level: 6
+        graph-icon: router
+
+    edge-n1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+      mgmt-ipv4: 172.20.30.21
+      startup-config: config/edge-n1.cfg
+      labels:
+        graph-level: 5
+        graph-icon: router
+
+    edge-n2:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+      mgmt-ipv4: 172.20.30.22
+      startup-config: config/edge-n2.cfg
+      labels:
+        graph-level: 5
+        graph-icon: router
+
+    core-n3a:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+      mgmt-ipv4: 172.20.30.31
+      startup-config: config/core-n3a.cfg
+      labels:
+        graph-level: 4
+        graph-icon: router
+
+    core-n3b:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+      mgmt-ipv4: 172.20.30.32
+      startup-config: config/core-n3b.cfg
+      labels:
+        graph-level: 4
+        graph-icon: router
+
+    transport-n4:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+      mgmt-ipv4: 172.20.30.41
+      startup-config: config/transport-n4.cfg
+      labels:
+        graph-level: 3
+        graph-icon: router
+
+    sec-s4:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+      mgmt-ipv4: 172.20.30.54
+      startup-config: config/sec-s4.cfg
+      labels:
+        graph-level: 3
+        graph-icon: firewall
+
+    remote-s5:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+      mgmt-ipv4: 172.20.30.55
+      startup-config: config/remote-s5.cfg
+      labels:
+        graph-level: 2
+        graph-icon: router
+
+    media-x:
+      kind: linux
+      image: wbitt/network-multitool
+      mgmt-ipv4: 172.20.30.101
+      labels:
+        graph-level: 1
+        graph-icon: host
+      exec:
+        - ip addr add 10.90.40.10/24 dev eth1
+        - ip route del default
+        - ip route add default via 10.90.40.1 dev eth1
+
+    yokohama-foh:
+      kind: linux
+      image: wbitt/network-multitool
+      mgmt-ipv4: 172.20.30.102
+      labels:
+        graph-level: 1
+        graph-icon: host
+      exec:
+        - ip addr add 10.90.41.10/24 dev eth1
+        - ip route del default
+        - ip route add default via 10.90.41.1 dev eth1
+
+    hamamatsu-mocap:
+      kind: linux
+      image: wbitt/network-multitool
+      mgmt-ipv4: 172.20.30.103
+      labels:
+        graph-level: 1
+        graph-icon: host
+      exec:
+        - ip addr add 10.90.42.10/24 dev eth1
+        - ip route del default
+        - ip route add default via 10.90.42.1 dev eth1
+
+    monitor-ai:
+      kind: linux
+      image: wbitt/network-multitool
+      mgmt-ipv4: 172.20.30.110
+      labels:
+        graph-level: 2
+        graph-icon: server
+      exec:
+        - ip addr add 10.90.60.10/24 dev eth1
+        - ip route del default
+        - ip route add default via 10.90.60.1 dev eth1
+
+  links:
+    - endpoints: ["ext-bbix:eth1", "edge-n1:eth1"]
+    - endpoints: ["ext-jpix:eth1", "edge-n2:eth1"]
+    - endpoints: ["edge-n1:eth2", "core-n3a:eth1"]
+    - endpoints: ["edge-n1:eth3", "core-n3b:eth1"]
+    - endpoints: ["edge-n2:eth2", "core-n3a:eth2"]
+    - endpoints: ["edge-n2:eth3", "core-n3b:eth2"]
+    - endpoints: ["core-n3a:eth3", "core-n3b:eth3"]
+    - endpoints: ["core-n3a:eth4", "transport-n4:eth1"]
+    - endpoints: ["core-n3b:eth4", "transport-n4:eth2"]
+    - endpoints: ["transport-n4:eth3", "media-x:eth1"]
+    - endpoints: ["transport-n4:eth4", "yokohama-foh:eth1"]
+    - endpoints: ["transport-n4:eth5", "hamamatsu-mocap:eth1"]
+    - endpoints: ["core-n3a:eth5", "monitor-ai:eth1"]
+    - endpoints: ["core-n3b:eth5", "sec-s4:eth1"]
+    - endpoints: ["sec-s4:eth2", "remote-s5:eth1"]

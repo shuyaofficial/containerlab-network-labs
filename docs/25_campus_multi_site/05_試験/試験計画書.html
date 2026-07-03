@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>試験計画書 — Theme 25 Multi-Campus</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>25_campus_multi_site</span>
+<span class="sep">/</span>
+<span>05_試験</span></nav>
+      <h1 class="doc-title">試験計画書 — Theme 25 Multi-Campus</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>コマンドはすべてOrbStack Linux VMへ<code>ssh clab@orb</code>で接続後に実行します。IOSの<code>show</code>コマンドは対象ノードへSSH接続して実行します。</p>
+</blockquote>
+<h2 id="判定" tabindex="-1">判定 <a class="header-anchor" href="#判定" aria-hidden="true">#</a></h2>
+<ul>
+<li>✅ 合格</li>
+<li>❌ 不合格</li>
+<li>— 未実施</li>
+</ul>
+<h2 id="t-1xx-起動igp" tabindex="-1">T-1xx 起動・IGP <a class="header-anchor" href="#t-1xx-起動igp" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>試験</th>
+<th>期待結果</th>
+<th>証跡</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-101</td>
+<td>containerlab起動</td>
+<td>6ノードがrunning</td>
+<td><code>containerlab inspect -t 04_構築/campus.clab.yml</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-102</td>
+<td>Main OSPF</td>
+<td>main-core/main-edgeがFULL</td>
+<td><code>show ip ospf neighbor</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-103</td>
+<td>Branch OSPF</td>
+<td>branch-core/branch-edgeがFULL</td>
+<td><code>show ip ospf neighbor</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-104</td>
+<td>OSPF分離</td>
+<td>WANリンクがOSPFへ参加していない</td>
+<td><code>show ip ospf interface brief</code></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="t-2xx-ebgp集約再配信" tabindex="-1">T-2xx eBGP・集約・再配信 <a class="header-anchor" href="#t-2xx-ebgp集約再配信" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>試験</th>
+<th>期待結果</th>
+<th>証跡</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-201</td>
+<td>eBGP隣接</td>
+<td>Edge間がEstablished</td>
+<td><code>show ip bgp summary</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-202</td>
+<td>Main広告</td>
+<td>Branchで10.50.0.0/16のみ受信</td>
+<td><code>show ip bgp</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-203</td>
+<td>Branch広告</td>
+<td>Mainで10.60.0.0/16のみ受信</td>
+<td><code>show ip bgp</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-204</td>
+<td>more-specific抑止</td>
+<td>相手拠点の10.x.10.0/24がBGPにない</td>
+<td><code>show ip bgp</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-205</td>
+<td>OSPFへの注入</td>
+<td>Coreが相手拠点/16を外部経路として学習</td>
+<td><code>show ip route ospf</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-206</td>
+<td>再配信制御</td>
+<td>route-map、prefix-list、tagが設定どおり</td>
+<td><code>show route-map</code>、<code>show ip prefix-list</code></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="t-3xx-e2e障害" tabindex="-1">T-3xx E2E・障害 <a class="header-anchor" href="#t-3xx-e2e障害" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>試験</th>
+<th>期待結果</th>
+<th>証跡</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-301</td>
+<td>Main→Branch</td>
+<td>main-pcからbranch-pcへ疎通</td>
+<td><code>docker exec clab-campus-multi-site-main-pc ping -c 5 10.60.10.10</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-302</td>
+<td>Branch→Main</td>
+<td>branch-pcからmain-pcへ疎通</td>
+<td><code>docker exec clab-campus-multi-site-branch-pc ping -c 5 10.50.10.10</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-303</td>
+<td>BGP停止</td>
+<td>相手拠点経路がRIBから消える</td>
+<td>連続ping、<code>show ip route</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-304</td>
+<td>BGP復旧</td>
+<td>eBGPと相手拠点経路が復元</td>
+<td><code>show ip bgp summary</code>、<code>show ip route</code></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="実測記録" tabindex="-1">実測記録 <a class="header-anchor" href="#実測記録" aria-hidden="true">#</a></h2>
+<ul>
+<li>BGP停止時刻:</li>
+<li>経路消失までの時間:</li>
+<li>復旧までの時間:</li>
+<li>予想と実際の差:</li>
+<li>次回の改善:</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#判定">判定</a></li>
+<li class="lvl-2"><a href="#t-1xx-起動igp">T-1xx 起動・IGP</a></li>
+<li class="lvl-2"><a href="#t-2xx-ebgp集約再配信">T-2xx eBGP・集約・再配信</a></li>
+<li class="lvl-2"><a href="#t-3xx-e2e障害">T-3xx E2E・障害</a></li>
+<li class="lvl-2"><a href="#実測記録">実測記録</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

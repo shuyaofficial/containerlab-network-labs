@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>イメージマニフェスト — clab VM稼働イメージ棚卸し</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>環境</span></nav>
+      <h1 class="doc-title">イメージマニフェスト — clab VM稼働イメージ棚卸し</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">runbook</span><span class="tag">docker</span><span class="tag">image</span><span class="tag">inventory</span></span>
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>2026-06-15のVM消失事故（<a href="../22_enterprise_campus_lan/%E7%92%B0%E5%A2%83_%E5%9C%9F%E5%8F%B0%E5%86%8D%E6%A7%8B%E7%AF%89_2026-06-15.html">../22_enterprise_campus_lan/環境_土台再構築_2026-06-15.md</a>、再構築手順は<a href="rebuild_runbook.html">rebuild_runbook.md</a>）の再発対策として、VM上に存在するDockerイメージの全量を定期的に棚卸しし、再取得方法を明記しておく。VMが再度消失しても、本ファイルを見れば「何を・どこから取り直せばよいか」がすぐ分かる状態を維持する。</p>
+</blockquote>
+<h2 id="vm既存イメージ一覧2026-07-04時点" tabindex="-1">VM既存イメージ一覧（2026-07-04時点） <a class="header-anchor" href="#vm既存イメージ一覧2026-07-04時点" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>リポジトリ:タグ</th>
+<th>サイズ</th>
+<th>分類</th>
+<th>出所</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>debian:bookworm-slim</code></td>
+<td>254MB</td>
+<td>ビルド土台</td>
+<td>DockerHub（公式、そのままpull可）</td>
+</tr>
+<tr>
+<td><code>public.ecr.aws/docker/library/debian:bookworm-slim</code></td>
+<td>254MB</td>
+<td>ビルド土台</td>
+<td>AWS ECR Public（公式ミラー、そのままpull可）</td>
+</tr>
+<tr>
+<td><code>freeradius/freeradius-server:latest</code></td>
+<td>363MB</td>
+<td>NW機器（AAA/RADIUS）</td>
+<td>DockerHub（公式、そのままpull可）</td>
+</tr>
+<tr>
+<td><code>freeradius/freeradius-server:latest-alpine</code></td>
+<td>73.5MB</td>
+<td>NW機器（AAA/RADIUS、軽量版）</td>
+<td>DockerHub（公式、そのままpull可）</td>
+</tr>
+<tr>
+<td><code>osquery/osquery:latest</code></td>
+<td>207MB</td>
+<td>エンドポイント（デバイス統制、ただしarm64非対応=amd64実体）</td>
+<td>DockerHub（公式、pull可だが<strong>arm64非対応</strong>。詳細は<a href="../ZERO_zero_trust/03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果_2026-07-04.md</a>参照）</td>
+</tr>
+<tr>
+<td><code>ubuntu/bind9:9.18-24.04_beta</code></td>
+<td>217MB</td>
+<td>NW機器（DNS）</td>
+<td>DockerHub（Canonical公式、そのままpull可）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/arista_veos:4.29.2F</code></td>
+<td>645MB</td>
+<td>NW機器（Arista vEOS）</td>
+<td>vrnetlabビルド（ライセンス素材の手動投入が必要、DockerHub非公開）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/canonical_ubuntu:jammy</code></td>
+<td>764MB</td>
+<td>ビルド土台</td>
+<td>vrnetlabビルド</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_asav:9-18-1</code></td>
+<td>436MB</td>
+<td>NW機器（Cisco ASAv）</td>
+<td>vrnetlabビルド（ライセンス素材の手動投入が必要）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_c8000v:17.06.03</code></td>
+<td>2.2GB</td>
+<td>NW機器（Cisco C8000v）</td>
+<td>vrnetlabビルド（ライセンス素材の手動投入が必要）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_c8000v:controller-17.06.03</code></td>
+<td>1.73GB</td>
+<td>NW機器（Cisco C8000v controller）</td>
+<td>vrnetlabビルド（ライセンス素材の手動投入が必要）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_c9800cl:17.17.01</code></td>
+<td>3.47GB</td>
+<td>NW機器（Cisco WLCコントローラ）</td>
+<td>vrnetlabビルド（ライセンス素材の手動投入が必要）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_csr1000v:16.12.05</code></td>
+<td>1.09GB</td>
+<td>NW機器（Cisco CSR1000v）</td>
+<td>vrnetlabビルド（ライセンス素材の手動投入が必要）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_csr1000v:17.03.05</code></td>
+<td>1.19GB</td>
+<td>NW機器（Cisco CSR1000v）</td>
+<td>vrnetlabビルド（ライセンス素材の手動投入が必要）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_iol:15.6.3M3a</code></td>
+<td>500MB</td>
+<td>NW機器（Cisco IOL）</td>
+<td>vrnetlabビルド（ライセンス素材の手動投入が必要）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_iol:15.7.3M2</code></td>
+<td>500MB</td>
+<td>NW機器（Cisco IOL）</td>
+<td>vrnetlabビルド（ライセンス素材の手動投入が必要）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_iol:L2-15.2</code></td>
+<td>421MB</td>
+<td>NW機器（Cisco IOL L2）</td>
+<td>vrnetlabビルド（ライセンス素材の手動投入が必要）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_iol:L2-advipservices-2017</code></td>
+<td>393MB</td>
+<td>NW機器（Cisco IOL L2）</td>
+<td>vrnetlabビルド（ライセンス素材の手動投入が必要）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_nxostitanium:7.3.0.D1.1</code></td>
+<td>320MB</td>
+<td>NW機器（Cisco NX-OS）</td>
+<td>vrnetlabビルド（ライセンス素材の手動投入が必要）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_vios:159-3.M6</code></td>
+<td>203MB</td>
+<td>NW機器（Cisco vIOS）</td>
+<td>vrnetlabビルド（ライセンス素材の手動投入が必要）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_vios:L2-20200929</code></td>
+<td>236MB</td>
+<td>NW機器（Cisco vIOS L2）</td>
+<td>vrnetlabビルド（ライセンス素材の手動投入が必要）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/fortinet_fortios:7.4.2.F</code></td>
+<td>1.65GB</td>
+<td>NW機器（FortiGate）</td>
+<td>vrnetlabビルド（ライセンス素材の手動投入が必要）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/juniper_vsrx:24.4R1.9</code></td>
+<td>949MB</td>
+<td>NW機器（Juniper vSRX）</td>
+<td>vrnetlabビルド（ライセンス素材の手動投入が必要）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/mikrotik_routeros:7.5</code></td>
+<td>475MB</td>
+<td>NW機器（MikroTik RouterOS）</td>
+<td>vrnetlabビルド（ライセンス素材の手動投入が必要）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/mikrotik_routeros:7.5-amd64</code></td>
+<td>475MB</td>
+<td>NW機器（MikroTik RouterOS、amd64版）</td>
+<td>vrnetlabビルド（要確認: arm64環境でのamd64タグ残存理由）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/vr-fortios:7.4.2.F</code></td>
+<td>1.65GB</td>
+<td>NW機器（FortiGate、別ビルド名）</td>
+<td>vrnetlabビルド（要確認: fortinet_fortiosとの重複可能性）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/vr-ubuntu:jammy</code></td>
+<td>764MB</td>
+<td>ビルド土台</td>
+<td>vrnetlabビルド（要確認: canonical_ubuntu:jammyとの重複可能性）</td>
+</tr>
+<tr>
+<td><code>wbitt/network-multitool:latest</code></td>
+<td>457MB</td>
+<td>その他（NWデバッグツール、arm64対応済み）</td>
+<td>DockerHub（公式、そのままpull可）</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="再取得方法の注記" tabindex="-1">再取得方法の注記 <a class="header-anchor" href="#再取得方法の注記" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>DockerHub / ECR Public公式イメージ</strong>（debian, freeradius, osquery, bind9, network-multitool）: <code>docker pull &lt;repository&gt;:&lt;tag&gt;</code> で即座に再取得可能。ネットワーク疎通のみで完結する。</li>
+<li><strong>vrnetlabビルドイメージ</strong>（<code>vrnetlab/*</code>）: DockerHub非公開のため、単純な<code>docker pull</code>では復元できない。vrnetlabのビルドスクリプト＋各ベンダーのライセンス提供イメージ（ISO/qcow2等）を手動で用意し、<code>make</code>等でローカルビルドし直す必要がある。素材の格納場所・再DL手順は<a href="rebuild_runbook.html">rebuild_runbook.md</a>を参照。2026-06-15のVM消失事故では、この素材再DL待ちが復旧のボトルネックになった。</li>
+<li><strong>要確認項目</strong>: <code>mikrotik_routeros:7.5</code> と <code>mikrotik_routeros:7.5-amd64</code> の2タグ併存、および <code>vr-fortios</code> と <code>fortinet_fortios</code>、<code>vr-ubuntu</code> と <code>canonical_ubuntu:jammy</code> の重複疑いは、ビルドスクリプトの命名規則差異による可能性がある。次回VM整理時にどちらか不要な方を削除するか判断すること。</li>
+<li><strong>osquery/osquery:latest</strong>: arm64非対応（amd64実体）のため、Apple Silicon上ではQEMUエミュレーション経由で動作している可能性が高い。性能・安定性に問題が出る場合は代替手段の検討が必要（詳細: <a href="../ZERO_zero_trust/03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果_2026-07-04.md</a>）。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#vm既存イメージ一覧2026-07-04時点">VM既存イメージ一覧（2026-07-04時点）</a></li>
+<li class="lvl-2"><a href="#再取得方法の注記">再取得方法の注記</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

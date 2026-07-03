@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜ゼロトラストラボ Lab Challenge</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span></nav>
+      <h1 class="doc-title">テーマZERO｜ゼロトラストラボ Lab Challenge</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-03</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">arm64</span><span class="tag">oss</span><span class="tag">containerlab</span><span class="tag">roadmap</span></span>
+      </div>
+      
+      <div class="content">
+<p>商用ゼロトラスト製品（Cisco Secure Access / Palo Alto Prisma / Zscaler 等）はライセンス上、個人環境で検証できない。
+本ラボは <strong>OSS × arm64</strong> だけでゼロトラストの6観点（ID統制・デバイス統制・NWセキュリティ・WEBセキュリティ・DLP・SIEM）が成立するかを先行検証する土台である。
+ロードマップ PHASE2（テーマ28-44）の前哨に位置づく。</p>
+<h2 id="概要" tabindex="-1">概要 <a class="header-anchor" href="#概要" aria-hidden="true">#</a></h2>
+<ul>
+<li>目的: 商用ZT製品を <strong>OSSで代替</strong>できるかを、6観点それぞれで実装可能性まで確かめる。</li>
+<li>到達点（今回スコープ）: 設計書一式 ＋ Phase 0 土台（docker network + multitool）＋ arm64 可用性の軽量検証まで。Phase 1-6 はデプロイしない（見込みが立てば十分、というユーザー決定）。</li>
+<li>実行基盤: OrbStack VM <code>clab</code>（Ubuntu 24.04 / arm64、containerlab 0.76.1）。</li>
+<li>完結範囲: <strong>docker ネットワークのみで完結</strong>。IOL（IOS-XE エミュレータ）とは連携しない。理由は <a href="#%E8%A8%AD%E8%A8%88%E5%88%A4%E6%96%AD%E3%81%AE%E8%A6%81%E6%97%A8">設計判断</a> を参照。</li>
+</ul>
+<h2 id="トポロジ" tabindex="-1">トポロジ <a class="header-anchor" href="#トポロジ" aria-hidden="true">#</a></h2>
+<p>4ゾーン（Untrust / DMZ=認可層 / Trust=業務 / 可観測）にコンポーネントを配置する。
+下図は Phase 6 まで実装したときの目標像。今回デプロイするのは Phase 0（<code>client</code> / <code>app</code> / <code>external</code>）のみ。</p>
+<pre class="mermaid">graph TB
+    subgraph UNTRUST[&quot;Untrust ゾーン 172.30.0.0/24&quot;]
+        CLIENT[&quot;client&lt;br/&gt;multitool&lt;br/&gt;利用者端末&quot;]
+        EXT[&quot;external&lt;br/&gt;multitool&lt;br/&gt;外部/未管理端末&quot;]
+    end
+
+    subgraph DMZ[&quot;DMZ ／ 認可層 172.30.10.0/24&quot;]
+        IAP[&quot;Pomerium / oauth2-proxy&lt;br/&gt;(P2 IAP)&quot;]
+        IDP[&quot;Keycloak&lt;br/&gt;(P1 IdP / OIDC)&quot;]
+        SWG[&quot;mitmproxy / Squid+Suricata&lt;br/&gt;(P4 SWG ／ P5 DLP)&quot;]
+        CA[&quot;step-ca&lt;br/&gt;(P6 デバイス証明書)&quot;]
+    end
+
+    subgraph TRUST[&quot;Trust ／ 業務 172.30.20.0/24&quot;]
+        APP[&quot;app&lt;br/&gt;multitool&lt;br/&gt;保護対象サービス&quot;]
+    end
+
+    subgraph OBS[&quot;可観測ゾーン 172.30.30.0/24&quot;]
+        LOKI[&quot;Loki + Promtail&lt;br/&gt;(P3 ログ集約)&quot;]
+        GRAFANA[&quot;Grafana&lt;br/&gt;(P3 可視化)&quot;]
+    end
+
+    CLIENT --&gt;|&quot;認証要求&quot;| IAP
+    IAP --&gt;|&quot;OIDC 委譲&quot;| IDP
+    IAP --&gt;|&quot;認可済のみ通す&quot;| APP
+    CLIENT -.-&gt;|&quot;Web通信を強制経由&quot;| SWG
+    SWG --&gt;|&quot;検査/DLP後に転送&quot;| EXT
+    CA -.-&gt;|&quot;mTLS 証明書検証&quot;| IAP
+    IAP --&gt;|&quot;アクセスログ&quot;| LOKI
+    SWG --&gt;|&quot;検査/DLPログ&quot;| LOKI
+    IDP --&gt;|&quot;認証ログ&quot;| LOKI
+    LOKI --&gt; GRAFANA
+</pre>
+<h2 id="前提環境" tabindex="-1">前提環境 <a class="header-anchor" href="#前提環境" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>値</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ホスト</td>
+<td>macOS（Apple Silicon / arm64）</td>
+</tr>
+<tr>
+<td>VM</td>
+<td>OrbStack VM <code>clab</code>（<code>ssh clab@orb</code>）</td>
+</tr>
+<tr>
+<td>OS</td>
+<td>Ubuntu 24.04 LTS / arm64</td>
+</tr>
+<tr>
+<td>containerlab</td>
+<td>0.76.1</td>
+</tr>
+<tr>
+<td>コンテナランタイム</td>
+<td>Docker（OrbStack 提供）</td>
+</tr>
+<tr>
+<td>ネットワーク</td>
+<td>docker bridge のみ（IOL 非連携）</td>
+</tr>
+<tr>
+<td>イメージ制約</td>
+<td><strong>arm64 マニフェスト必須</strong>。x86 アプライアンスは不可</td>
+</tr>
+<tr>
+<td>エンドポイント</td>
+<td><code>wbitt/network-multitool</code> を <code>client</code> / <code>app</code> / <code>external</code> に流用</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="開始手順" tabindex="-1">開始手順 <a class="header-anchor" href="#開始手順" aria-hidden="true">#</a></h2>
+<ol>
+<li>VM に接続する。詳細は <a href="00_%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3/%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89.html">00_ログイン/ログインコマンド.md</a>。</li>
+<li>設計書を読む順序: <a href="01_%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9/%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9%E6%9B%B8.html">要件定義書</a> → <a href="02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88%E6%9B%B8.html">基本設計書</a> → <a href="02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a> → <a href="02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a>。</li>
+<li>arm64 可用性を確認する。<a href="03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB.html">軽量検証計画</a> と <a href="03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果_2026-07-04</a>（17イメージ中15がarm64対応と実測確定）。</li>
+<li>Phase 0 の土台を起動する。<a href="04_%E6%A7%8B%E7%AF%89/phase0_base/README.html">04_構築/phase0_base/README.md</a> を参照（2026-07-04 デプロイ・疎通ゲート合格・撤収済み）。</li>
+<li>Phase 1 以降に進む場合は該当 Phase の <code>04_構築/phaseN_*/README.md</code> のゲート条件を満たしながら実装する。</li>
+</ol>
+<h2 id="mission" tabindex="-1">Mission <a class="header-anchor" href="#mission" aria-hidden="true">#</a></h2>
+<p>各 Phase を段階課題とする。<strong>次の Phase に進む条件（ゲート条件）を満たしてから前に進む</strong>。ゲート条件を満たせない場合は <a href="05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a> で層別に切り分ける。</p>
+<h3 id="phase-0-ゲート--土台疎通" tabindex="-1">Phase 0 ゲート — 土台疎通 <a class="header-anchor" href="#phase-0-ゲート--土台疎通" aria-hidden="true">#</a></h3>
+<p><code>client</code> から <code>app</code> へ疎通できること。規約（frontmatter / HTML ビルド / git 一式）が回ること。</p>
+<h3 id="phase-1-ゲート--id統制keycloak" tabindex="-1">Phase 1 ゲート — ID統制（Keycloak） <a class="header-anchor" href="#phase-1-ゲート--id統制keycloak" aria-hidden="true">#</a></h3>
+<p>Keycloak が起動し、OIDC トークンを <code>curl</code> またはブラウザで取得できること。</p>
+<h3 id="phase-2-ゲート--iapoauth2-proxy--pomerium" tabindex="-1">Phase 2 ゲート — IAP（oauth2-proxy → Pomerium） <a class="header-anchor" href="#phase-2-ゲート--iapoauth2-proxy--pomerium" aria-hidden="true">#</a></h3>
+<p>未認証アクセスが拒否され、Keycloak ログイン後のみ <code>app</code> に到達できること。</p>
+<h3 id="phase-3-ゲート--siemloki--grafana" tabindex="-1">Phase 3 ゲート — SIEM（Loki + Grafana） <a class="header-anchor" href="#phase-3-ゲート--siemloki--grafana" aria-hidden="true">#</a></h3>
+<p>Phase 1 / Phase 2 のログが Grafana で表示できること。以降の「効いている証拠」を可視化する基盤。</p>
+<h3 id="phase-4-ゲート--swgmitmproxy--squid--suricata" tabindex="-1">Phase 4 ゲート — SWG（mitmproxy / Squid + Suricata） <a class="header-anchor" href="#phase-4-ゲート--swgmitmproxy--squid--suricata" aria-hidden="true">#</a></h3>
+<p>Web 通信が proxy 経由に強制され、SSL bump による可視化ができ、IDS 発報が Loki に届くこと。</p>
+<h3 id="phase-5-ゲート--dlpmitmproxy-アドオン" tabindex="-1">Phase 5 ゲート — DLP（mitmproxy アドオン） <a class="header-anchor" href="#phase-5-ゲート--dlpmitmproxy-アドオン" aria-hidden="true">#</a></h3>
+<p>キーワードを含むアップロードを検知・ブロックし、SIEM に記録できること。</p>
+<h3 id="phase-6-ゲート--デバイス統制step-ca-mtls--pomerium-連携" tabindex="-1">Phase 6 ゲート — デバイス統制（step-ca mTLS → Pomerium 連携） <a class="header-anchor" href="#phase-6-ゲート--デバイス統制step-ca-mtls--pomerium-連携" aria-hidden="true">#</a></h3>
+<p>証明書を持たない端末を拒否し、posture claim で条件分岐できること。</p>
+<h2 id="禁止事項" tabindex="-1">禁止事項 <a class="header-anchor" href="#禁止事項" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong><code>ZERO_zero_trust/</code> 以外への書き込み禁止</strong>（本ラボの成果物はこのフォルダに閉じる）。</li>
+<li><strong>絶対パス（<code>/Users/…</code>）の埋め込み禁止</strong>（GitHub 移植性のため相対リンクのみ）。</li>
+<li><strong>x86 専用イメージの使用禁止</strong>（arm64 マニフェストを持つものだけ）。</li>
+<li><strong>設定値の答えを最終的に手で埋めない</strong>（各 Phase のゲート条件を満たす実装で確認する）。</li>
+<li>ファイル名は <strong>NFC 正規化必須</strong>（NFD 混入は検索・ビルドの偽陰性を生む）。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="01_%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9/%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9%E6%9B%B8.html">要件定義書</a></li>
+<li><a href="02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88%E6%9B%B8.html">基本設計書</a></li>
+<li><a href="02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E5%AE%9F%E8%A3%85%E5%8F%AF%E8%83%BD%E6%80%A7%E3%83%9E%E3%83%88%E3%83%AA%E3%82%AF%E3%82%B9.html">実装可能性マトリクス</a></li>
+<li><a href="02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a></li>
+<li><a href="02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a></li>
+<li><a href="02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/IP%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9%E7%AE%A1%E7%90%86%E8%A1%A8.html">IPアドレス管理表</a></li>
+<li><a href="02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E3%83%8D%E3%83%83%E3%83%88%E3%83%AF%E3%83%BC%E3%82%AF%E6%A7%8B%E6%88%90%E5%9B%B3.html">ネットワーク構成図（HTML）</a></li>
+<li><a href="03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB.html">軽量検証計画</a></li>
+<li><a href="05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a></li>
+<li><a href="05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a></li>
+</ul>
+<h2 id="設計判断の要旨" tabindex="-1">設計判断の要旨 <a class="header-anchor" href="#設計判断の要旨" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>IOL 非連携</strong>: ZT の主眼は L7 認可であり L2/L3 ではない。IOL は x86 エミュで重い（1ノード起動 約2分）。arm64 OSS だけで閉じる方が再現性が高い。IOL 連携は発展課題として明記。</li>
+<li><strong>共通基盤の集約</strong>: mitmproxy（SWG/DLP 兼務）・Keycloak・Pomerium に機能を集約し、arm64 VM のリソースを圧縮する。</li>
+<li><strong>SIEM を早期投入（Phase 3）</strong>: Phase 4 以降で「セキュリティ機構が効いている証拠」を可視化するため、SWG/DLP より前に Loki+Grafana を入れる。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#概要">概要</a></li>
+<li class="lvl-2"><a href="#トポロジ">トポロジ</a></li>
+<li class="lvl-2"><a href="#前提環境">前提環境</a></li>
+<li class="lvl-2"><a href="#開始手順">開始手順</a></li>
+<li class="lvl-2"><a href="#mission">Mission</a></li>
+<li class="lvl-3"><a href="#phase-0-ゲート--土台疎通">Phase 0 ゲート — 土台疎通</a></li>
+<li class="lvl-3"><a href="#phase-1-ゲート--id統制keycloak">Phase 1 ゲート — ID統制（Keycloak）</a></li>
+<li class="lvl-3"><a href="#phase-2-ゲート--iapoauth2-proxy--pomerium">Phase 2 ゲート — IAP（oauth2-proxy → Pomerium）</a></li>
+<li class="lvl-3"><a href="#phase-3-ゲート--siemloki--grafana">Phase 3 ゲート — SIEM（Loki + Grafana）</a></li>
+<li class="lvl-3"><a href="#phase-4-ゲート--swgmitmproxy--squid--suricata">Phase 4 ゲート — SWG（mitmproxy / Squid + Suricata）</a></li>
+<li class="lvl-3"><a href="#phase-5-ゲート--dlpmitmproxy-アドオン">Phase 5 ゲート — DLP（mitmproxy アドオン）</a></li>
+<li class="lvl-3"><a href="#phase-6-ゲート--デバイス統制step-ca-mtls--pomerium-連携">Phase 6 ゲート — デバイス統制（step-ca mTLS → Pomerium 連携）</a></li>
+<li class="lvl-2"><a href="#禁止事項">禁止事項</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+<li class="lvl-2"><a href="#設計判断の要旨">設計判断の要旨</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

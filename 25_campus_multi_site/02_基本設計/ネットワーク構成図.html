@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Theme 25｜Multi-Campus ネットワーク構成図</title>
+<style>
+  :root {
+    --ink: #0f172a;
+    --muted: #5b6b82;
+    --faint: #94a3b8;
+    --line: #e2e8f0;
+    --paper: #ffffff;
+    --bg: #f4f6f9;
+    --accent: #4338ca;
+    --accent-soft: #eef2ff;
+    --core: #2563eb;
+    --edge: #7c3aed;
+    --pc: #16a34a;
+    --ok: #15803d;
+    --warn: #b45309;
+    --radius: 12px;
+    --shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 8px 24px rgba(15, 23, 42, .06);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    color: var(--ink);
+    background: var(--bg);
+    font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height: 1.65;
+    font-size: 15px;
+  }
+
+  .mono { font-family: "SF Mono", SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
+
+  .shell { max-width: 1240px; margin: 0 auto; padding: 32px 24px 64px; }
+
+  header.masthead { margin-bottom: 22px; }
+
+  .kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: .74rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+  }
+
+  h1 { margin: 0 0 8px; font-size: 1.6rem; letter-spacing: -.01em; }
+  .subtitle { margin: 0 0 14px; color: var(--muted); font-size: .94rem; max-width: 760px; }
+
+  .doc-links { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: .82rem; }
+  .doc-links a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; }
+  .doc-links a:hover, .doc-links a:focus-visible { border-bottom-color: var(--accent); }
+
+  nav.tab-nav {
+    display: inline-flex;
+    gap: 4px;
+    margin: 24px 0 18px;
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--paper);
+    box-shadow: var(--shadow);
+  }
+
+  .tab {
+    padding: 9px 20px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-weight: 700;
+    font-size: .9rem;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+
+  .tab:hover { color: var(--ink); }
+  .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .tab[aria-selected="true"] { background: var(--accent); color: #fff; }
+
+  section.panel {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 26px clamp(16px, 3vw, 34px) 34px;
+    margin-bottom: 20px;
+  }
+
+  section.panel[hidden] { display: none; }
+
+  .panel h2 { margin: 0 0 4px; font-size: 1.2rem; }
+  .panel > p.lead { margin: 0 0 20px; color: var(--muted); font-size: .88rem; max-width: 800px; }
+
+  .diagram-wrap {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fbfcfe;
+    padding: 8px;
+    margin-bottom: 22px;
+    overflow-x: auto;
+  }
+
+  svg.topology { display: block; width: 100%; height: auto; min-width: 760px; }
+
+  .zone-rect { rx: 14px; }
+  .zone-label { font-size: 13px; font-weight: 800; letter-spacing: .06em; }
+  .zone-sub { font-size: 10.5px; fill: var(--muted); }
+
+  .link-line { stroke: #94a3b8; stroke-width: 3; stroke-linecap: round; }
+  .link-line.ebgp { stroke: #7c3aed; stroke-width: 3; stroke-dasharray: 8 6; }
+  .link-label-box { fill: #ffffff; stroke: #e2e8f0; }
+  .link-label-text { font-size: 11px; fill: #334155; text-anchor: middle; font-weight: 700; }
+  .link-label-sub { font-size: 10px; fill: #64748b; text-anchor: middle; }
+
+  .node-rect { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.4; }
+  .node-accent { }
+  .node-core .node-accent { fill: var(--core); }
+  .node-edge .node-accent { fill: var(--edge); }
+  .node-pc .node-accent { fill: var(--pc); }
+  .node-name { font-size: 15px; font-weight: 800; text-anchor: middle; fill: #0f172a; }
+  .node-role { font-size: 10.5px; text-anchor: middle; fill: #64748b; }
+  .node-sub { font-size: 10.5px; text-anchor: middle; fill: #475569; font-family: "SF Mono", SFMono-Regular, Menlo, Consolas, monospace; }
+  .node-sub.flow-out { fill: #1d4ed8; font-weight: 700; }
+  .node-sub.flow-in { fill: #7c3aed; font-weight: 700; }
+
+  .badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: .72rem;
+    font-weight: 700;
+  }
+  .badge.na { background: #fef2f2; color: #b91c1c; }
+
+  table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .84rem;
+    margin: 0 0 26px;
+  }
+
+  table.data-table caption {
+    text-align: left;
+    font-weight: 800;
+    font-size: .92rem;
+    margin-bottom: 8px;
+    color: var(--ink);
+  }
+
+  table.data-table th, table.data-table td {
+    border: 1px solid var(--line);
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  table.data-table thead th {
+    background: #f8fafc;
+    font-weight: 800;
+    color: #334155;
+    font-size: .78rem;
+    letter-spacing: .02em;
+  }
+
+  table.data-table tbody tr:nth-child(even) { background: #fbfcfe; }
+
+  .table-scroll { overflow-x: auto; margin-bottom: 26px; }
+  .table-scroll table.data-table { margin-bottom: 0; min-width: 640px; }
+
+  .note {
+    font-size: .8rem;
+    color: var(--muted);
+    padding: 10px 14px;
+    border-left: 3px solid var(--faint);
+    background: #f8fafc;
+    border-radius: 0 8px 8px 0;
+    margin: 0 0 26px;
+  }
+
+  ul.na-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  ul.na-list li {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fbfcfe;
+    font-size: .86rem;
+  }
+  ul.na-list strong { min-width: 190px; flex: 0 0 auto; }
+  ul.na-list span.reason { color: var(--muted); }
+
+  footer.page-footer {
+    margin-top: 8px;
+    font-size: .78rem;
+    color: var(--faint);
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+  }
+
+  @media (max-width: 720px) {
+    .shell { padding: 20px 14px 44px; }
+    ul.na-list li { flex-direction: column; }
+    ul.na-list strong { min-width: 0; }
+  }
+
+  @media print {
+    body { background: #fff; }
+    nav.tab-nav { display: none; }
+    section.panel[hidden] { display: block !important; }
+    section.panel { box-shadow: none; break-inside: avoid; }
+    section.panel + section.panel { page-break-before: always; }
+    .diagram-wrap { overflow: visible; }
+  }
+</style>
+</head>
+<body>
+<main class="shell">
+  <header class="masthead">
+    <span class="kicker">Theme 25 · Multi-Campus</span>
+    <h1>ネットワーク構成図（物理／論理）</h1>
+    <p class="subtitle">独立したOSPFドメイン（Main: Process 10 / Branch: Process 20）を、境界ルーター間のeBGPで接続し、<span class="mono">/16</span>集約のみを相互広告するマルチキャンパス構成。物理的な結線・機器情報と、論理的なアドレス／ルーティング設計を分けて確認する。</p>
+    <nav class="doc-links" aria-label="関連ドキュメント">
+      <a href="基本設計書.md">基本設計書.md</a>
+      <a href="IPアドレス管理表.md">IPアドレス管理表.md</a>
+      <a href="../03_詳細設計/パラメータシート.md">パラメータシート.md</a>
+      <a href="ネットワーク物理構成図.mermaid">物理構成図（Mermaid原本）</a>
+    </nav>
+  </header>
+
+  <nav class="tab-nav" role="tablist" aria-label="構成図の種類">
+    <button class="tab" id="tab-physical" role="tab" aria-selected="true" aria-controls="panel-physical" tabindex="0" data-panel="physical">物理構成図</button>
+    <button class="tab" id="tab-logical" role="tab" aria-selected="false" aria-controls="panel-logical" tabindex="-1" data-panel="logical">論理構成図</button>
+  </nav>
+
+  <!-- ============ PHYSICAL ============ -->
+  <section class="panel" id="panel-physical" role="tabpanel" aria-labelledby="tab-physical">
+    <h2>物理構成図</h2>
+    <p class="lead">機器の設置場所・筐体イメージ・物理インターフェースとケーブル（仮想リンク）の対応を示す。ラッキング作業やリンク断のケーブル特定を目的とした図。</p>
+
+    <div class="diagram-wrap">
+      <svg class="topology" viewBox="0 0 1220 340" role="img" aria-labelledby="phys-title phys-desc">
+        <title id="phys-title">Theme 25 物理構成図</title>
+        <desc id="phys-desc">main-pc、main-core、main-edgeがMain Campusゾーンに、branch-edge、branch-core、branch-pcがBranch Campusゾーンにあり、main-edgeとbranch-edgeの間をWANゾーンの仮想リンクが接続する。</desc>
+
+        <!-- zones -->
+        <rect class="zone-rect" x="20" y="30" width="535" height="230" rx="14" fill="#f8fafc" stroke="#e2e8f0"/>
+        <text class="zone-label" x="40" y="55" fill="#334155">Main Campus</text>
+        <text class="zone-sub" x="40" y="70">containerlab: campus-multi-site（main側）</text>
+
+        <rect class="zone-rect" x="560" y="30" width="80" height="230" rx="10" fill="#fff7ed" stroke="#fed7aa"/>
+        <text class="zone-label" x="600" y="55" fill="#9a3412" text-anchor="middle">WAN</text>
+        <text class="zone-sub" x="600" y="70" text-anchor="middle">拠点間</text>
+
+        <rect class="zone-rect" x="645" y="30" width="535" height="230" rx="14" fill="#f8fafc" stroke="#e2e8f0"/>
+        <text class="zone-label" x="665" y="55" fill="#334155">Branch Campus</text>
+        <text class="zone-sub" x="665" y="70">containerlab: campus-multi-site（branch側）</text>
+
+        <!-- links -->
+        <g>
+          <line class="link-line" x1="164" y1="140" x2="226" y2="140"/>
+          <g transform="translate(195,110)"><rect class="link-label-box" x="-58" y="-16" width="116" height="32" rx="6"/><text class="link-label-text" y="-2">eth1 ↔ E0/2</text><text class="link-label-sub" y="11">10.50.10.0/24</text></g>
+        </g>
+        <g>
+          <line class="link-line" x1="354" y1="140" x2="416" y2="140"/>
+          <g transform="translate(385,110)"><rect class="link-label-box" x="-58" y="-16" width="116" height="32" rx="6"/><text class="link-label-text" y="-2">E0/1 ↔ E0/1</text><text class="link-label-sub" y="11">10.255.50.0/30</text></g>
+        </g>
+        <g>
+          <line class="link-line" x1="544" y1="140" x2="656" y2="140"/>
+          <g transform="translate(600,110)"><rect class="link-label-box" x="-58" y="-16" width="116" height="32" rx="6" fill="#fff7ed" stroke="#fed7aa"/><text class="link-label-text" y="-2" fill="#9a3412">E0/2 ↔ E0/2</text><text class="link-label-sub" y="11">198.51.100.0/30</text></g>
+        </g>
+        <g>
+          <line class="link-line" x1="784" y1="140" x2="846" y2="140"/>
+          <g transform="translate(815,110)"><rect class="link-label-box" x="-58" y="-16" width="116" height="32" rx="6"/><text class="link-label-text" y="-2">E0/1 ↔ E0/1</text><text class="link-label-sub" y="11">10.255.60.0/30</text></g>
+        </g>
+        <g>
+          <line class="link-line" x1="974" y1="140" x2="1036" y2="140"/>
+          <g transform="translate(1005,110)"><rect class="link-label-box" x="-58" y="-16" width="116" height="32" rx="6"/><text class="link-label-text" y="-2">E0/2 ↔ eth1</text><text class="link-label-sub" y="11">10.60.10.0/24</text></g>
+        </g>
+
+        <!-- nodes -->
+        <g class="node node-pc" transform="translate(0,0)">
+          <rect class="node-rect" x="36" y="110" width="128" height="60" rx="10"/>
+          <rect class="node-accent" x="36" y="110" width="128" height="6" rx="3"/>
+          <text class="node-name" x="100" y="132">main-pc</text>
+          <text class="node-role" x="100" y="150">Linux Endpoint</text>
+          <text class="node-sub" x="100" y="190">172.25.25.101/24</text>
+          <text class="node-sub" x="100" y="206">multitool:latest</text>
+        </g>
+
+        <g class="node node-core">
+          <rect class="node-rect" x="226" y="110" width="128" height="60" rx="10"/>
+          <rect class="node-accent" x="226" y="110" width="128" height="6" rx="3"/>
+          <text class="node-name" x="290" y="132">main-core</text>
+          <text class="node-role" x="290" y="150">Core Router</text>
+          <text class="node-sub" x="290" y="190">172.25.25.11/24</text>
+          <text class="node-sub" x="290" y="206">IOL 15.7.3M2</text>
+        </g>
+
+        <g class="node node-edge">
+          <rect class="node-rect" x="416" y="110" width="128" height="60" rx="10"/>
+          <rect class="node-accent" x="416" y="110" width="128" height="6" rx="3"/>
+          <text class="node-name" x="480" y="132">main-edge</text>
+          <text class="node-role" x="480" y="150">Edge Router（BGP境界）</text>
+          <text class="node-sub" x="480" y="190">172.25.25.12/24</text>
+          <text class="node-sub" x="480" y="206">IOL 15.7.3M2</text>
+        </g>
+
+        <g class="node node-edge">
+          <rect class="node-rect" x="656" y="110" width="128" height="60" rx="10"/>
+          <rect class="node-accent" x="656" y="110" width="128" height="6" rx="3"/>
+          <text class="node-name" x="720" y="132">branch-edge</text>
+          <text class="node-role" x="720" y="150">Edge Router（BGP境界）</text>
+          <text class="node-sub" x="720" y="190">172.25.25.21/24</text>
+          <text class="node-sub" x="720" y="206">IOL 15.7.3M2</text>
+        </g>
+
+        <g class="node node-core">
+          <rect class="node-rect" x="846" y="110" width="128" height="60" rx="10"/>
+          <rect class="node-accent" x="846" y="110" width="128" height="6" rx="3"/>
+          <text class="node-name" x="910" y="132">branch-core</text>
+          <text class="node-role" x="910" y="150">Core Router</text>
+          <text class="node-sub" x="910" y="190">172.25.25.22/24</text>
+          <text class="node-sub" x="910" y="206">IOL 15.7.3M2</text>
+        </g>
+
+        <g class="node node-pc">
+          <rect class="node-rect" x="1036" y="110" width="128" height="60" rx="10"/>
+          <rect class="node-accent" x="1036" y="110" width="128" height="6" rx="3"/>
+          <text class="node-name" x="1100" y="132">branch-pc</text>
+          <text class="node-role" x="1100" y="150">Linux Endpoint</text>
+          <text class="node-sub" x="1100" y="190">172.25.25.102/24</text>
+          <text class="node-sub" x="1100" y="206">multitool:latest</text>
+        </g>
+
+        <!-- legend -->
+        <g transform="translate(40,300)" font-size="10.5" fill="#64748b">
+          <rect x="0" y="-9" width="12" height="4" fill="#2563eb"/><text x="18" y="-4">Core</text>
+          <rect x="70" y="-9" width="12" height="4" fill="#7c3aed"/><text x="88" y="-4">Edge（BGP境界）</text>
+          <rect x="230" y="-9" width="12" height="4" fill="#16a34a"/><text x="248" y="-4">Endpoint</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="table-scroll">
+    <table class="data-table">
+      <caption>機器物理情報</caption>
+      <thead>
+        <tr><th>ホスト名</th><th>役割</th><th>HW・イメージ</th><th>OS・バージョン</th><th>管理IP</th><th>設置</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="mono">main-core</td><td>Core Router（Main）</td><td>Cisco IOL</td><td class="mono">15.7.3M2</td><td class="mono">172.25.25.11/24</td><td>containerlabホスト上（mgmt bridge: <span class="mono">campus-multi-site-mgmt</span>）</td></tr>
+        <tr><td class="mono">main-edge</td><td>Edge Router（Main／BGP境界）</td><td>Cisco IOL</td><td class="mono">15.7.3M2</td><td class="mono">172.25.25.12/24</td><td>同上</td></tr>
+        <tr><td class="mono">branch-edge</td><td>Edge Router（Branch／BGP境界）</td><td>Cisco IOL</td><td class="mono">15.7.3M2</td><td class="mono">172.25.25.21/24</td><td>同上</td></tr>
+        <tr><td class="mono">branch-core</td><td>Core Router（Branch）</td><td>Cisco IOL</td><td class="mono">15.7.3M2</td><td class="mono">172.25.25.22/24</td><td>同上</td></tr>
+        <tr><td class="mono">main-pc</td><td>Linux Endpoint（Main）</td><td>wbitt/network-multitool</td><td class="mono">latest</td><td class="mono">172.25.25.101/24</td><td>同上</td></tr>
+        <tr><td class="mono">branch-pc</td><td>Linux Endpoint（Branch）</td><td>wbitt/network-multitool</td><td class="mono">latest</td><td class="mono">172.25.25.102/24</td><td>同上</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <div class="table-scroll">
+    <table class="data-table">
+      <caption>リンク・ケーブル情報</caption>
+      <thead>
+        <tr><th>リンク</th><th>サブネット</th><th>ノードA / IF / IP</th><th>ノードB / IF / IP</th><th>リンク種別</th><th>備考</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>main-core—main-edge</td><td class="mono">10.255.50.0/30</td><td class="mono">main-core E0/1 (eth1) 10.255.50.1</td><td class="mono">main-edge E0/1 (eth1) 10.255.50.2</td><td>仮想P2Pリンク（veth, containerlab）</td><td>OSPF Process10 隣接用</td></tr>
+        <tr><td>main-edge—branch-edge</td><td class="mono">198.51.100.0/30</td><td class="mono">main-edge E0/2 (eth2) 198.51.100.1</td><td class="mono">branch-edge E0/2 (eth2) 198.51.100.2</td><td>仮想P2Pリンク（veth, containerlab）</td><td>WAN／eBGP専用。OSPFは不参加</td></tr>
+        <tr><td>branch-edge—branch-core</td><td class="mono">10.255.60.0/30</td><td class="mono">branch-edge E0/1 (eth1) 10.255.60.1</td><td class="mono">branch-core E0/1 (eth1) 10.255.60.2</td><td>仮想P2Pリンク（veth, containerlab）</td><td>OSPF Process20 隣接用</td></tr>
+        <tr><td>main-core—main-pc</td><td class="mono">10.50.10.0/24</td><td class="mono">main-core E0/2 (eth2) 10.50.10.1</td><td class="mono">main-pc eth1 10.50.10.10</td><td>仮想P2Pリンク（veth, containerlab）</td><td>利用者セグメント。PC側は環境が自動設定済み</td></tr>
+        <tr><td>branch-core—branch-pc</td><td class="mono">10.60.10.0/24</td><td class="mono">branch-core E0/2 (eth2) 10.60.10.1</td><td class="mono">branch-pc eth1 10.60.10.10</td><td>仮想P2Pリンク（veth, containerlab）</td><td>利用者セグメント。PC側は環境が自動設定済み</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <p class="note">本ラボはcontainerlab上の仮想リンク（veth）で構成されており、物理ラック・RU配置・電源系統・トランシーバ種別（SFP等）・ケーブル種別（UTP／光ファイバ）は存在しない。実機へ展開する場合はCat6以上のUTP、または想定帯域に応じたSFP/SFP+光モジュールを別途選定すること。</p>
+  </section>
+
+  <!-- ============ LOGICAL ============ -->
+  <section class="panel" id="panel-logical" role="tabpanel" aria-labelledby="tab-logical" hidden>
+    <h2>論理構成図</h2>
+    <p class="lead">物理的な結線ではなく、OSPFドメイン境界・eBGP境界・アドレス集約と再配信の流れを示す。ケーブルの配線状況に関わらず、パケットが論理的にどう流れるかを確認する目的の図。</p>
+
+    <div class="diagram-wrap">
+      <svg class="topology" viewBox="0 0 1220 360" role="img" aria-labelledby="log-title log-desc">
+        <title id="log-title">Theme 25 論理構成図</title>
+        <desc id="log-desc">main-pc、main-core、main-edgeはOSPF Process10ドメインに属し、branch-edge、branch-core、branch-pcはOSPF Process20ドメインに属する。main-edgeとbranch-edgeの間はeBGP境界であり、それぞれ10.50.0.0/16、10.60.0.0/16の集約経路のみを相手ドメインへ広告する。</desc>
+
+        <!-- zones -->
+        <rect class="zone-rect" x="20" y="30" width="535" height="250" rx="14" fill="#eff6ff" stroke="#93c5fd"/>
+        <text class="zone-label" x="40" y="55" fill="#1d4ed8">OSPF Process 10 — Main Campus（Area 0）</text>
+        <text class="zone-sub" x="40" y="70">AS 65050 ／ 集約広告: 10.50.0.0/16 (summary-only)</text>
+
+        <rect class="zone-rect" x="560" y="30" width="80" height="250" rx="10" fill="#faf5ff" stroke="#d8b4fe"/>
+        <text class="zone-label" x="600" y="55" fill="#7c3aed" text-anchor="middle">eBGP</text>
+        <text class="zone-sub" x="600" y="70" text-anchor="middle" fill="#7c3aed">境界</text>
+
+        <rect class="zone-rect" x="645" y="30" width="535" height="250" rx="14" fill="#f0fdf4" stroke="#86efac"/>
+        <text class="zone-label" x="665" y="55" fill="#15803d">OSPF Process 20 — Branch Campus（Area 0）</text>
+        <text class="zone-sub" x="665" y="70">AS 65060 ／ 集約広告: 10.60.0.0/16 (summary-only)</text>
+
+        <!-- links -->
+        <g>
+          <line class="link-line" x1="164" y1="140" x2="226" y2="140"/>
+          <g transform="translate(195,110)"><rect class="link-label-box" x="-52" y="-16" width="104" height="32" rx="6"/><text class="link-label-text" y="-2">10.50.10.0/24</text><text class="link-label-sub" y="11">OSPF 10</text></g>
+        </g>
+        <g>
+          <line class="link-line" x1="354" y1="140" x2="416" y2="140"/>
+          <g transform="translate(385,110)"><rect class="link-label-box" x="-58" y="-16" width="116" height="32" rx="6"/><text class="link-label-text" y="-2">10.255.50.0/30</text><text class="link-label-sub" y="11">OSPF 10 Area0</text></g>
+        </g>
+        <g>
+          <line class="link-line ebgp" x1="544" y1="140" x2="656" y2="140"/>
+          <g transform="translate(600,105)"><rect class="link-label-box" x="-62" y="-16" width="124" height="32" rx="6" fill="#faf5ff" stroke="#d8b4fe"/><text class="link-label-text" y="-2" fill="#6d28d9">198.51.100.0/30</text><text class="link-label-sub" y="11" fill="#7c3aed">eBGP AS65050⇄65060</text></g>
+        </g>
+        <g>
+          <line class="link-line" x1="784" y1="140" x2="846" y2="140"/>
+          <g transform="translate(815,110)"><rect class="link-label-box" x="-58" y="-16" width="116" height="32" rx="6"/><text class="link-label-text" y="-2">10.255.60.0/30</text><text class="link-label-sub" y="11">OSPF 20 Area0</text></g>
+        </g>
+        <g>
+          <line class="link-line" x1="974" y1="140" x2="1036" y2="140"/>
+          <g transform="translate(1005,110)"><rect class="link-label-box" x="-52" y="-16" width="104" height="32" rx="6"/><text class="link-label-text" y="-2">10.60.10.0/24</text><text class="link-label-sub" y="11">OSPF 20</text></g>
+        </g>
+
+        <!-- nodes -->
+        <g class="node node-pc">
+          <rect class="node-rect" x="36" y="110" width="128" height="60" rx="10"/>
+          <rect class="node-accent" x="36" y="110" width="128" height="6" rx="3"/>
+          <text class="node-name" x="100" y="132">main-pc</text>
+          <text class="node-role" x="100" y="150">利用者端末</text>
+          <text class="node-sub" x="100" y="190">10.50.10.10/24</text>
+          <text class="node-sub" x="100" y="206">GW 10.50.10.1</text>
+        </g>
+
+        <g class="node node-core">
+          <rect class="node-rect" x="226" y="110" width="128" height="60" rx="10"/>
+          <rect class="node-accent" x="226" y="110" width="128" height="6" rx="3"/>
+          <text class="node-name" x="290" y="132">main-core</text>
+          <text class="node-role" x="290" y="150">OSPF 10 内部</text>
+          <text class="node-sub" x="290" y="190">Lo0 10.50.255.1/32</text>
+          <text class="node-sub" x="290" y="206">RID 10.50.255.1</text>
+        </g>
+
+        <g class="node node-edge">
+          <rect class="node-rect" x="416" y="110" width="128" height="88" rx="10"/>
+          <rect class="node-accent" x="416" y="110" width="128" height="6" rx="3"/>
+          <text class="node-name" x="480" y="132">main-edge</text>
+          <text class="node-role" x="480" y="150">OSPF 10 ⇄ BGP AS65050</text>
+          <text class="node-sub" x="480" y="190">Lo0 10.50.255.254/32</text>
+          <text class="node-sub" x="480" y="206">RID 10.50.255.254</text>
+          <text class="node-sub flow-out" x="480" y="222">→ 広告 10.50.0.0/16</text>
+          <text class="node-sub flow-in" x="480" y="238">← 受信 10.60.0.0/16 (tag 65060)</text>
+        </g>
+
+        <g class="node node-edge">
+          <rect class="node-rect" x="656" y="110" width="128" height="88" rx="10"/>
+          <rect class="node-accent" x="656" y="110" width="128" height="6" rx="3"/>
+          <text class="node-name" x="720" y="132">branch-edge</text>
+          <text class="node-role" x="720" y="150">OSPF 20 ⇄ BGP AS65060</text>
+          <text class="node-sub" x="720" y="190">Lo0 10.60.255.254/32</text>
+          <text class="node-sub" x="720" y="206">RID 10.60.255.254</text>
+          <text class="node-sub flow-out" x="720" y="222">→ 広告 10.60.0.0/16</text>
+          <text class="node-sub flow-in" x="720" y="238">← 受信 10.50.0.0/16 (tag 65050)</text>
+        </g>
+
+        <g class="node node-core">
+          <rect class="node-rect" x="846" y="110" width="128" height="60" rx="10"/>
+          <rect class="node-accent" x="846" y="110" width="128" height="6" rx="3"/>
+          <text class="node-name" x="910" y="132">branch-core</text>
+          <text class="node-role" x="910" y="150">OSPF 20 内部</text>
+          <text class="node-sub" x="910" y="190">Lo0 10.60.255.1/32</text>
+          <text class="node-sub" x="910" y="206">RID 10.60.255.1</text>
+        </g>
+
+        <g class="node node-pc">
+          <rect class="node-rect" x="1036" y="110" width="128" height="60" rx="10"/>
+          <rect class="node-accent" x="1036" y="110" width="128" height="6" rx="3"/>
+          <text class="node-name" x="1100" y="132">branch-pc</text>
+          <text class="node-role" x="1100" y="150">利用者端末</text>
+          <text class="node-sub" x="1100" y="190">10.60.10.10/24</text>
+          <text class="node-sub" x="1100" y="206">GW 10.60.10.1</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="table-scroll">
+    <table class="data-table">
+      <caption>L3アドレス設計</caption>
+      <thead>
+        <tr><th>セグメント</th><th>サブネット</th><th>GW / ノード・IF・IP</th><th>端末 IP</th><th>備考</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Main利用者</td><td class="mono">10.50.10.0/24</td><td class="mono">main-core E0/2 10.50.10.1</td><td class="mono">main-pc 10.50.10.10</td><td>OSPF 10 で広報</td></tr>
+        <tr><td>Branch利用者</td><td class="mono">10.60.10.0/24</td><td class="mono">branch-core E0/2 10.60.10.1</td><td class="mono">branch-pc 10.60.10.10</td><td>OSPF 20 で広報</td></tr>
+        <tr><td>Main内部P2P</td><td class="mono">10.255.50.0/30</td><td class="mono">main-core ⇄ main-edge</td><td>—</td><td>OSPF 10 Area0</td></tr>
+        <tr><td>Branch内部P2P</td><td class="mono">10.255.60.0/30</td><td class="mono">branch-edge ⇄ branch-core</td><td>—</td><td>OSPF 20 Area0</td></tr>
+        <tr><td>WANリンク</td><td class="mono">198.51.100.0/30</td><td class="mono">main-edge ⇄ branch-edge</td><td>—</td><td>eBGP専用、OSPF不参加（RFC 5737）</td></tr>
+        <tr><td>Main Loopback</td><td class="mono">10.50.255.0/24 帯から /32</td><td class="mono">main-core .1／main-edge .254</td><td>—</td><td>OSPF Router ID</td></tr>
+        <tr><td>Branch Loopback</td><td class="mono">10.60.255.0/24 帯から /32</td><td class="mono">branch-edge .254／branch-core .1</td><td>—</td><td>OSPF Router ID</td></tr>
+        <tr><td>Main集約</td><td class="mono">10.50.0.0/16</td><td class="mono">main-edge（BGP）</td><td>—</td><td>summary-only でBGP広報</td></tr>
+        <tr><td>Branch集約</td><td class="mono">10.60.0.0/16</td><td class="mono">branch-edge（BGP）</td><td>—</td><td>summary-only でBGP広報</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <div class="table-scroll">
+    <table class="data-table">
+      <caption>ルーティングドメイン</caption>
+      <thead>
+        <tr><th>種別</th><th>識別子</th><th>Router ID</th><th>ネイバー / 隣接AS</th><th>参加リンク・広告</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>OSPF</td><td>Process 10 / Area 0</td><td class="mono">main-core 10.50.255.1<br>main-edge 10.50.255.254</td><td>—</td><td class="mono">10.255.50.0/30, 10.50.10.0/24, Lo0</td></tr>
+        <tr><td>OSPF</td><td>Process 20 / Area 0</td><td class="mono">branch-edge 10.60.255.254<br>branch-core 10.60.255.1</td><td>—</td><td class="mono">10.255.60.0/30, 10.60.10.0/24, Lo0</td></tr>
+        <tr><td>eBGP</td><td>AS 65050（main-edge）</td><td class="mono">10.50.255.254</td><td class="mono">198.51.100.2（AS 65060）</td><td class="mono">10.50.0.0/16（summary-only）</td></tr>
+        <tr><td>eBGP</td><td>AS 65060（branch-edge）</td><td class="mono">10.60.255.254</td><td class="mono">198.51.100.1（AS 65050）</td><td class="mono">10.60.0.0/16（summary-only）</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <div class="table-scroll">
+    <table class="data-table">
+      <caption>集約・再配信設計</caption>
+      <thead>
+        <tr><th>方向</th><th>拠点 / ノード</th><th>prefix-list許可範囲</th><th>route-map 動作</th><th>tag</th><th>目的</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>OSPF → BGP</td><td>Main（main-edge）</td><td class="mono">10.50.0.0/16 le 32</td><td>redistribute ospf 10（prefix-list適用）</td><td>—</td><td>自拠点プレフィックスのみBGPへ渡す</td></tr>
+        <tr><td>OSPF → BGP</td><td>Branch（branch-edge）</td><td class="mono">10.60.0.0/16 le 32</td><td>redistribute ospf 20（prefix-list適用）</td><td>—</td><td>自拠点プレフィックスのみBGPへ渡す</td></tr>
+        <tr><td>集約</td><td>Main（main-edge）</td><td>—</td><td class="mono">aggregate-address 10.50.0.0/16 summary-only</td><td>—</td><td>/24以下の個別広告を抑止し/16のみ広報</td></tr>
+        <tr><td>集約</td><td>Branch（branch-edge）</td><td>—</td><td class="mono">aggregate-address 10.60.0.0/16 summary-only</td><td>—</td><td>/24以下の個別広告を抑止し/16のみ広報</td></tr>
+        <tr><td>BGP → OSPF</td><td>Main（main-edge）</td><td class="mono">10.60.0.0/16 のみ許可</td><td>redistribute bgp 65050（tag付与route-map）</td><td class="mono">65060</td><td>相手拠点/16のみOSPF10へ。再注入防止でループ回避</td></tr>
+        <tr><td>BGP → OSPF</td><td>Branch（branch-edge）</td><td class="mono">10.50.0.0/16 のみ許可</td><td>redistribute bgp 65060（tag付与route-map）</td><td class="mono">65050</td><td>相手拠点/16のみOSPF20へ。再注入防止でループ回避</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3 style="margin:0 0 10px; font-size:.92rem;">本テーマで対象外の項目（チェックリスト）</h3>
+    <ul class="na-list" aria-label="本テーマで対象外の項目">
+      <li><strong>VLAN設計 <span class="badge na">対象外</span></strong><span class="reason">Core—Edge／Core—PC間はすべてL3ルーテッドP2Pリンクであり、トランクVLANや複数VLAN収容は存在しない（Routed Access構成）。</span></li>
+      <li><strong>FHRP（HSRP／VRRP） <span class="badge na">対象外</span></strong><span class="reason">各キャンパスのCoreは単一ノード構成のため、仮想IPによるActive/Standby冗長化を行わない。</span></li>
+      <li><strong>FWゾーン／NAT <span class="badge na">対象外</span></strong><span class="reason">拠点間境界はeBGPのみで構成する。FWノードやNAT/PAT変換ルールは本テーマの範囲外。</span></li>
+    </ul>
+  </section>
+
+  <footer class="page-footer">
+    本図は設計値であり、実投入前に <a href="IPアドレス管理表.md">IPアドレス管理表.md</a> および <a href="../03_詳細設計/パラメータシート.md">パラメータシート.md</a> と照合すること。containerlab管理ネットワーク（<span class="mono">172.25.25.0/24</span>）はOSPF/BGPへ広告しない。
+  </footer>
+</main>
+
+<script>
+(() => {
+  "use strict";
+  const tabs = [...document.querySelectorAll(".tab")];
+  const panels = {
+    physical: document.getElementById("panel-physical"),
+    logical: document.getElementById("panel-logical")
+  };
+
+  function select(name) {
+    tabs.forEach((tab) => {
+      const active = tab.dataset.panel === name;
+      tab.setAttribute("aria-selected", String(active));
+      tab.tabIndex = active ? 0 : -1;
+    });
+    Object.entries(panels).forEach(([key, panel]) => {
+      panel.hidden = key !== name;
+    });
+  }
+
+  tabs.forEach((tab, index) => {
+    tab.addEventListener("click", () => select(tab.dataset.panel));
+    tab.addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      let next = index;
+      if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
+      if (event.key === "ArrowLeft") next = (index - 1 + tabs.length) % tabs.length;
+      if (event.key === "Home") next = 0;
+      if (event.key === "End") next = tabs.length - 1;
+      tabs[next].focus();
+      select(tabs[next].dataset.panel);
+    });
+  });
+})();
+</script>
+</body>
+</html>

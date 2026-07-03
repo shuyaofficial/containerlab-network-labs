@@ -1,0 +1,106 @@
+name: qos-acl-policy-lab
+
+mgmt:
+  network: qos-acl-policy-mgmt
+  ipv4-subnet: 172.27.27.0/24
+
+topology:
+  kinds:
+    cisco_iol:
+      image: vrnetlab/cisco_iol:15.7.3M2
+
+  nodes:
+    hq-core:
+      kind: cisco_iol
+      mgmt-ipv4: 172.27.27.11
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+    hq-dist:
+      kind: cisco_iol
+      mgmt-ipv4: 172.27.27.12
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+    hq-edge:
+      kind: cisco_iol
+      mgmt-ipv4: 172.27.27.13
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+    hq-dmz:
+      kind: cisco_iol
+      mgmt-ipv4: 172.27.27.14
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+
+    br-core:
+      kind: cisco_iol
+      mgmt-ipv4: 172.27.27.21
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+    br-edge:
+      kind: cisco_iol
+      mgmt-ipv4: 172.27.27.22
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+
+    isp:
+      kind: cisco_iol
+      mgmt-ipv4: 172.27.27.100
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+
+    hq-pc:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.27.27.101
+      exec:
+        - ip link set eth1 up
+        - ip address add 10.27.10.10/24 dev eth1
+        - ip route add default via 10.27.10.1 dev eth1
+    
+    hq-voip:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.27.27.104
+      exec:
+        - ip link set eth1 up
+        - ip address add 10.27.50.10/24 dev eth1
+        - ip route add default via 10.27.50.1 dev eth1
+
+    br-pc:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.27.27.102
+      exec:
+        - ip link set eth1 up
+        - ip address add 10.27.20.10/24 dev eth1
+        - ip route add default via 10.27.20.1 dev eth1
+    
+    dmz-srv:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.27.27.103
+      exec:
+        - ip link set eth1 up
+        - ip address add 10.27.30.10/24 dev eth1
+        - ip route add default via 10.27.30.1 dev eth1
+
+  links:
+    # HQ Core to Distribution
+    - endpoints: ["hq-core:eth1", "hq-dist:eth1"]
+    # HQ Core to Edge
+    - endpoints: ["hq-core:eth2", "hq-edge:eth1"]
+    # HQ Core to DMZ
+    - endpoints: ["hq-core:eth3", "hq-dmz:eth1"]
+    
+    # WAN / ISP Links
+    - endpoints: ["hq-edge:eth2", "isp:eth1"]
+    - endpoints: ["isp:eth2", "br-edge:eth1"]
+    
+    # Branch Edge to Core
+    - endpoints: ["br-edge:eth2", "br-core:eth1"]
+    
+    # Endpoints
+    - endpoints: ["hq-dist:eth2", "hq-pc:eth1"]
+    - endpoints: ["hq-dist:eth3", "hq-voip:eth1"]
+    - endpoints: ["hq-dmz:eth2", "dmz-srv:eth1"]
+    - endpoints: ["br-core:eth2", "br-pc:eth1"]

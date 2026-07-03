@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>IPアドレス管理表（IP Address Management / IPAM）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>21_cisco_capstone</span>
+<span class="sep">/</span>
+<span>02_基本設計</span></nav>
+      <h1 class="doc-title">IPアドレス管理表（IP Address Management / IPAM）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>本ドキュメントは、ネットワーク空間全体のアドレス割り当てルールを定義し、重複や枯渇を防ぐための一覧表です。
+実務においては、この表がExcel等で管理され、機器の追加・撤去のたびに更新されます。</p>
+<h2 id="1-アドレス空間の全体ルール" tabindex="-1">1. アドレス空間の全体ルール <a class="header-anchor" href="#1-アドレス空間の全体ルール" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>本社(HQ)</strong>: <code>10.1.X.X</code> (第2オクテットを <code>1</code> とする)</li>
+<li><strong>支社(BR)</strong>: <code>10.2.X.X</code> (第2オクテットを <code>2</code> とする)</li>
+<li><strong>バックボーン/P2P</strong>: <code>10.0.0.X</code></li>
+<li><strong>仮想IP(VIP)</strong>: 各セグメントの末尾 <code>.254</code> をデフォルトゲートウェイとして予約する。</li>
+</ul>
+<h2 id="2-セグメントvlan一覧" tabindex="-1">2. セグメント（VLAN）一覧 <a class="header-anchor" href="#2-セグメントvlan一覧" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>セグメント名</th>
+<th>ネットワークアドレス</th>
+<th>CIDR</th>
+<th>用途</th>
+<th>VLAN ID</th>
+<th>デフォルトGW</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>本社 営業部</td>
+<td>10.1.10.0</td>
+<td>/24</td>
+<td>営業部PC用</td>
+<td>10</td>
+<td>10.1.10.254 (HSRP)</td>
+</tr>
+<tr>
+<td>本社 開発部</td>
+<td>10.1.20.0</td>
+<td>/24</td>
+<td>開発部PC用</td>
+<td>20</td>
+<td>10.1.20.254 (HSRP)</td>
+</tr>
+<tr>
+<td>本社 サーバ</td>
+<td>10.1.30.0</td>
+<td>/24</td>
+<td>社内システム用</td>
+<td>30</td>
+<td>10.1.30.254 (HSRP)</td>
+</tr>
+<tr>
+<td>支社 LAN</td>
+<td>10.2.40.0</td>
+<td>/24</td>
+<td>支社全般</td>
+<td>40</td>
+<td>10.2.40.254</td>
+</tr>
+<tr>
+<td>WAN (ISP-A)</td>
+<td>200.0.1.0</td>
+<td>/24</td>
+<td>インターネット主回線</td>
+<td>-</td>
+<td>200.0.1.254 (ISP)</td>
+</tr>
+<tr>
+<td>WAN (ISP-B)</td>
+<td>200.0.2.0</td>
+<td>/24</td>
+<td>インターネット副回線</td>
+<td>-</td>
+<td>200.0.2.254 (ISP)</td>
+</tr>
+<tr>
+<td>WAN (Branch)</td>
+<td>200.0.3.0</td>
+<td>/24</td>
+<td>支社用インターネット</td>
+<td>-</td>
+<td>200.0.3.254 (ISP)</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="3-機器ごとのipアドレス割り当て表host-ip-allocation" tabindex="-1">3. 機器ごとのIPアドレス割り当て表（Host IP Allocation） <a class="header-anchor" href="#3-機器ごとのipアドレス割り当て表host-ip-allocation" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード名</th>
+<th>インターフェース</th>
+<th>割り当てIPアドレス</th>
+<th>サブネットマスク</th>
+<th>接続先・用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>HQ-Edge1</strong></td>
+<td>e0/1</td>
+<td>200.0.1.1</td>
+<td>255.255.255.0</td>
+<td>ISP-A向け (BGP/NAT)</td>
+</tr>
+<tr>
+<td></td>
+<td>e0/2</td>
+<td>10.0.0.1</td>
+<td>255.255.255.252</td>
+<td>HQ-Core1向け (OSPF)</td>
+</tr>
+<tr>
+<td></td>
+<td>e0/3</td>
+<td>10.0.0.5</td>
+<td>255.255.255.252</td>
+<td>HQ-Core2向け (OSPF)</td>
+</tr>
+<tr>
+<td><strong>HQ-Edge2</strong></td>
+<td>e0/1</td>
+<td>200.0.2.1</td>
+<td>255.255.255.0</td>
+<td>ISP-B向け (BGP/NAT)</td>
+</tr>
+<tr>
+<td></td>
+<td>e0/2</td>
+<td>10.0.0.9</td>
+<td>255.255.255.252</td>
+<td>HQ-Core1向け (OSPF)</td>
+</tr>
+<tr>
+<td></td>
+<td>e0/3</td>
+<td>10.0.0.13</td>
+<td>255.255.255.252</td>
+<td>HQ-Core2向け (OSPF)</td>
+</tr>
+<tr>
+<td><strong>HQ-Core1</strong></td>
+<td>e0/1</td>
+<td>10.0.0.2</td>
+<td>255.255.255.252</td>
+<td>HQ-Edge1向け (OSPF)</td>
+</tr>
+<tr>
+<td></td>
+<td>e0/2</td>
+<td>10.0.0.10</td>
+<td>255.255.255.252</td>
+<td>HQ-Edge2向け (OSPF)</td>
+</tr>
+<tr>
+<td></td>
+<td>Vlan10</td>
+<td>10.1.10.1</td>
+<td>255.255.255.0</td>
+<td>本社営業部 GW (HSRP Active)</td>
+</tr>
+<tr>
+<td><strong>HQ-Core2</strong></td>
+<td>e0/1</td>
+<td>10.0.0.6</td>
+<td>255.255.255.252</td>
+<td>HQ-Edge1向け (OSPF)</td>
+</tr>
+<tr>
+<td></td>
+<td>e0/2</td>
+<td>10.0.0.14</td>
+<td>255.255.255.252</td>
+<td>HQ-Edge2向け (OSPF)</td>
+</tr>
+<tr>
+<td></td>
+<td>Vlan10</td>
+<td>10.1.10.2</td>
+<td>255.255.255.0</td>
+<td>本社営業部 GW (HSRP Standby)</td>
+</tr>
+<tr>
+<td><strong>BR-Edge</strong></td>
+<td>e0/1</td>
+<td>200.0.3.1</td>
+<td>255.255.255.0</td>
+<td>ISP向け (支社WAN)</td>
+</tr>
+<tr>
+<td></td>
+<td>e0/2</td>
+<td>10.2.40.254</td>
+<td>255.255.255.0</td>
+<td>支社LAN GW</td>
+</tr>
+<tr>
+<td><strong>HQ-PC</strong></td>
+<td>eth1</td>
+<td>10.1.10.100</td>
+<td>255.255.255.0</td>
+<td>DHCP/Static (GW: 10.1.10.254)</td>
+</tr>
+<tr>
+<td><strong>BR-PC</strong></td>
+<td>eth1</td>
+<td>10.2.40.100</td>
+<td>255.255.255.0</td>
+<td>DHCP/Static (GW: 10.2.40.254)</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>💡 <strong>P2Pリンクの設計に関する注記</strong>:
+実務では、ルーター間の直結リンク（P2P）はIPの無駄を省くため <code>/30</code> (255.255.255.252) サブネットを使用します。本設計でもそのベストプラクティスを採用しています。</p>
+</blockquote>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-アドレス空間の全体ルール">1. アドレス空間の全体ルール</a></li>
+<li class="lvl-2"><a href="#2-セグメントvlan一覧">2. セグメント（VLAN）一覧</a></li>
+<li class="lvl-2"><a href="#3-機器ごとのipアドレス割り当て表host-ip-allocation">3. 機器ごとのIPアドレス割り当て表（Host IP Allocation）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

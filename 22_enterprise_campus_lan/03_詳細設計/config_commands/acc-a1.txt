@@ -1,0 +1,25 @@
+enable
+configure terminal
+hostname acc-a1
+no ip domain-lookup
+vlan 10
+name A_Sales
+vlan 20
+name A_Dev
+exit
+interface Ethernet0/1
+switchport trunk encapsulation dot1q
+switchport mode trunk
+switchport trunk allowed vlan 10,20
+no shutdown
+interface Ethernet0/2
+switchport trunk encapsulation dot1q
+switchport mode trunk
+switchport trunk allowed vlan 10,20
+no shutdown
+interface Ethernet0/3
+switchport mode access
+switchport access vlan 10
+no shutdown
+end
+write memory

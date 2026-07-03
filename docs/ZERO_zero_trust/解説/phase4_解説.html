@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Phase 4 解説 — WEBセキュリティ（SWG / mitmproxy）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>解説</span></nav>
+      <h1 class="doc-title">Phase 4 解説 — WEBセキュリティ（SWG / mitmproxy）</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">explainer</span><span class="tag">swg</span><span class="tag">mitmproxy</span><span class="tag">ssl-bump</span><span class="tag">ids</span></span>
+      </div>
+      
+      <div class="content">
+<h2 id="1-このフェーズで何が実現されるか" tabindex="-1">1. このフェーズで何が実現されるか <a class="header-anchor" href="#1-このフェーズで何が実現されるか" aria-hidden="true">#</a></h2>
+<p>Phase 4 では <code>client</code> の外向き Web 通信を SWG（Secure Web Gateway）に強制経由させ、SSL bump（TLS 復号）で通信内容を可視化し、不審通信を IDS で検知して SIEM（Phase 3）に発報する。第一候補は mitmproxy（SSL bump 一本）で、代替として Squid（SSL bump）+ Suricata（IDS）の組み合わせを検討する。</p>
+<ul>
+<li><strong>ビフォー</strong>: Phase 0 の状態では <code>client</code>→<code>external</code> の外向き通信は素通しで、内容は誰にも検査されない。</li>
+<li><strong>アフター</strong>: <code>client</code> の外向き通信はすべて mitmproxy（または Squid）を強制的に経由し、TLS で暗号化された内容も復号して中身が見える状態になる。不審な通信パターンは IDS が検知し、Loki に記録される。</li>
+</ul>
+<p>このフェーズは Phase 5（DLP）の土台にもなる。同一のプロキシ経路上に DLP アドオンを載せるため、Phase 4 で確立した「強制経由 + 復号」の経路がそのまま活用される。</p>
+<h2 id="2-なぜこの構成か" tabindex="-1">2. なぜこの構成か <a class="header-anchor" href="#2-なぜこの構成か" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>観点</th>
+<th>商用製品</th>
+<th>本ラボの OSS 選定</th>
+<th>選定理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>WEBセキュリティ（SWG/CASB）</td>
+<td>Zscaler ZIA, Netskope</td>
+<td><strong>mitmproxy</strong>（第一候補）。代替: Squid + Suricata</td>
+<td><a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果</a> で mitmproxy・squid・suricata すべて arm64 ネイティブ対応を実測確認（3つとも High、当初のMed見込みから確度が上がった）</td>
+</tr>
+</tbody>
+</table></div>
+<p>なぜ mitmproxy に集約するか（D-2）:</p>
+<ul>
+<li>mitmproxy 単体で SSL bump（TLS 復号）と Python アドオンによる内容検査の両方が可能。Squid + Suricata + c-icap のような多段構成に比べて、arm64 VM のリソースを節約できる。</li>
+<li>検証の結果、mitmproxy・Squid・Suricata のいずれも arm64 対応が確認されたため、実装時にどちらの構成でも成立する見込みだが、リソース効率と実装のシンプルさ（KISS）から mitmproxy 一本化が第一候補になっている。</li>
+</ul>
+<p><strong>実務でこの知識がどこで効くか</strong>: Zscaler ZIA や Netskope のような SWG/CASB 製品は「クラウド上でTLS復号して中身を見る」ブラックボックスとして使われることが多いが、その内部でやっていることは mitmproxy の SSL bump と本質的に同じ（自己署名 CA を端末に信頼させ、中間者として振る舞う）。この仕組みを手元で動かして体験しておくと、企業のプロキシ証明書がなぜ端末にインストールされているのか、なぜ特定のアプリ（証明書ピニングをするもの）だけプロキシ経由で失敗するのか、といった実務上のトラブルシュートの理解が深まる。</p>
+<h2 id="3-仕組みの核心" tabindex="-1">3. 仕組みの核心 <a class="header-anchor" href="#3-仕組みの核心" aria-hidden="true">#</a></h2>
+<p><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a> のフロー2（プロキシフロー）が Phase 4 の核心。</p>
+<pre class="mermaid">sequenceDiagram
+    participant C as client (Untrust)
+    participant M as mitmproxy (DMZ:SWG)
+    participant E as external (Untrust)
+    C-&gt;&gt;M: (1) 外向き HTTP(S)（proxy 強制経由）
+    M-&gt;&gt;M: (2) SSL bump で復号・検査
+    M-&gt;&gt;E: (3) 検査後に転送
+    E--&gt;&gt;C: (4) 応答（SWG 経由）
+</pre>
+<p>SSL bump（TLS 復号）の仕組み:</p>
+<ol>
+<li><code>client</code> が <code>https://external/</code> へアクセスしようとすると、実際には mitmproxy へ接続する（プロキシ強制経由設定、または透過プロキシ）。</li>
+<li>mitmproxy は <code>client</code> に対して<strong>自分が発行した証明書</strong>を提示し、TLS セッションを確立する（&quot;サーバーのふり&quot;）。</li>
+<li>同時に mitmproxy は本物の <code>external</code> に対して別の TLS セッションを張る（&quot;クライアントのふり&quot;）。</li>
+<li>結果として <code>client</code>↔mitmproxy↔<code>external</code> の2本の TLS セッションが繋がり、mitmproxy はその中間で平文の中身を読める。</li>
+</ol>
+<p>この仕組みが成立する前提は**<code>client</code> が mitmproxy の CA 証明書を信頼している**こと。信頼していなければブラウザは証明書エラーを出す。これは「正規の中間者攻撃」を意図的に構築しているのと同義であり、なぜラボ限定の前提が重要かの理由になる（後述）。</p>
+<h2 id="4-自分で触って確認する手順実装後にこの手順で確認" tabindex="-1">4. 自分で触って確認する手順（実装後にこの手順で確認） <a class="header-anchor" href="#4-自分で触って確認する手順実装後にこの手順で確認" aria-hidden="true">#</a></h2>
+<p>Phase 4 は今回スコープでは未デプロイ（設計値）。実装後、<a href="../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a> T-4-* に沿って以下を確認する想定。</p>
+<h3 id="手順1-外向き通信が-proxy-経由に強制されているか確認するt-4-1" tabindex="-1">手順1: 外向き通信が proxy 経由に強制されているか確認する（T-4-1） <a class="header-anchor" href="#手順1-外向き通信が-proxy-経由に強制されているか確認するt-4-1" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">docker <span class="hljs-built_in">exec</span> clab-zero-client <span class="hljs-built_in">env</span> | grep -i proxy
+docker <span class="hljs-built_in">exec</span> clab-zero-client curl -sv http://external/
+</code></pre>
+<p>期待結果: <code>HTTP_PROXY</code>/<code>HTTPS_PROXY</code> が mitmproxy を指している。curl のログ（<code>-v</code>）で mitmproxy を経由していることがわかる（Via ヘッダ等）。</p>
+<h3 id="手順2-mitmproxy-の-ca-証明書を-client-に信頼させる" tabindex="-1">手順2: mitmproxy の CA 証明書を <code>client</code> に信頼させる <a class="header-anchor" href="#手順2-mitmproxy-の-ca-証明書を-client-に信頼させる" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-comment"># mitmproxy が発行する CA 証明書を取得して client にインストール</span>
+docker <span class="hljs-built_in">exec</span> clab-zero-client curl -o /tmp/mitmproxy-ca.pem http://mitm.it/cert/pem
+docker <span class="hljs-built_in">exec</span> clab-zero-client update-ca-certificates  <span class="hljs-comment"># 証明書ストアに反映（ディストロによりコマンド差異あり）</span>
+</code></pre>
+<h3 id="手順3-ssl-bump-で-https-内容が可視化できることを確認するt-4-2学習の核心" tabindex="-1">手順3: SSL bump で HTTPS 内容が可視化できることを確認する（T-4-2、学習の核心） <a class="header-anchor" href="#手順3-ssl-bump-で-https-内容が可視化できることを確認するt-4-2学習の核心" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">docker <span class="hljs-built_in">exec</span> -it clab-zero-mitmproxy mitmweb --web-host 0.0.0.0
+</code></pre>
+<p>その後、<code>client</code> から <code>https://external/</code> へアクセスし、mitmweb の Web UI（<a href="../00_%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3/%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89.html">ログインコマンド</a> 想定 8081 番）でリクエスト/レスポンスの中身（ヘッダー、ボディ）が平文で見えることを確認する。**「TLS で暗号化されているはずの通信の中身が、経路の途中で丸見えになる」**ことを実際に見るのがこの手順の核心。</p>
+<h3 id="手順4-ids-発報が-loki-に届くことを確認するt-4-3" tabindex="-1">手順4: IDS 発報が Loki に届くことを確認する（T-4-3） <a class="header-anchor" href="#手順4-ids-発報が-loki-に届くことを確認するt-4-3" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">docker logs --<span class="hljs-built_in">tail</span> 50 clab-zero-suricata   <span class="hljs-comment"># または mitmproxy 側の検知ログ</span>
+</code></pre>
+<p>Grafana で以下のようなクエリを実行し、検知イベントが表示されることを確認する。</p>
+<pre><code class="language-logql">{container=&quot;clab-zero-suricata&quot;} |= &quot;ALERT&quot;
+</code></pre>
+<h2 id="5-考えどころ" tabindex="-1">5. 考えどころ <a class="header-anchor" href="#5-考えどころ" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>本番設計ならどうするか</strong>: 本番の SWG は全社員の全通信を扱うため、透過的なプロキシ配置（PAC ファイル配布や DNS/ルーティングでの強制）、証明書ピニングを行うアプリの例外リスト管理、SSL bump 対象外にすべき通信（銀行系など法規制対象）の除外設定が必須になる。</li>
+<li><strong>このラボの簡略化ポイント（特に重要）</strong>:
+<ul>
+<li><strong>SSL bump はラボ内通信に限定</strong>する前提を明記する（基本設計書のセキュリティ方針）。SSL bump は技術的には正規の中間者攻撃であり、実運用で無断に他人の通信を復号すれば違法・重大なプライバシー侵害になりうる。本ラボはあくまで自分が管理する検証環境内の通信のみを対象にする。</li>
+<li><strong>証明書ピニング対応アプリは考慮しない</strong>。実運用では mitmproxy が入っても復号できない通信（証明書ピニングされたアプリ）があり、それをどう扱うかが SWG 導入の実務上の課題になる。</li>
+<li><strong>IDS ルールは最小限</strong>。Suricata の商用相当のルールセット（有償フィード等）は使わず、基本的な検知のみで「検知→SIEM」の導線を確認する。</li>
+</ul>
+</li>
+</ul>
+<h2 id="6-つまずきポイント" tabindex="-1">6. つまずきポイント <a class="header-anchor" href="#6-つまずきポイント" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>SSL bump が失敗し証明書エラーになる</strong>: <code>client</code> が mitmproxy の CA 証明書を信頼していないことが最多の原因。<a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a> の L3（TLS 証明書）で <code>openssl s_client</code> を使い、証明書チェーンを確認する。</li>
+<li><strong>プロキシ経由にならず直接通信してしまう</strong>: 環境変数（<code>HTTP_PROXY</code>/<code>HTTPS_PROXY</code>）の設定漏れ、または透過プロキシのルーティング設定漏れ。L2（ネットワーク到達）ではなく経路の強制設定（アプリ層）の問題であることに注意。</li>
+<li><strong>Suricata/Squid が arm64 で不安定</strong>: <a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果</a> では arm64 対応を確認済みだが、実際の起動・ルール適用で問題が出た場合は mitmproxy 一本化のルール（D-2 の代替差し替え）に切り替える。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a>（プロキシフロー）</li>
+<li><a href="../04_%E6%A7%8B%E7%AF%89/phase4_swg/README.html">phase4_swg 構築スタブ</a></li>
+<li><a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果</a></li>
+<li><a href="../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a></li>
+<li><a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-このフェーズで何が実現されるか">1. このフェーズで何が実現されるか</a></li>
+<li class="lvl-2"><a href="#2-なぜこの構成か">2. なぜこの構成か</a></li>
+<li class="lvl-2"><a href="#3-仕組みの核心">3. 仕組みの核心</a></li>
+<li class="lvl-2"><a href="#4-自分で触って確認する手順実装後にこの手順で確認">4. 自分で触って確認する手順（実装後にこの手順で確認）</a></li>
+<li class="lvl-3"><a href="#手順1-外向き通信が-proxy-経由に強制されているか確認するt-4-1">手順1: 外向き通信が proxy 経由に強制されているか確認する（T-4-1）</a></li>
+<li class="lvl-3"><a href="#手順2-mitmproxy-の-ca-証明書を-client-に信頼させる">手順2: mitmproxy の CA 証明書を client に信頼させる</a></li>
+<li class="lvl-3"><a href="#手順3-ssl-bump-で-https-内容が可視化できることを確認するt-4-2学習の核心">手順3: SSL bump で HTTPS 内容が可視化できることを確認する（T-4-2、学習の核心）</a></li>
+<li class="lvl-3"><a href="#手順4-ids-発報が-loki-に届くことを確認するt-4-3">手順4: IDS 発報が Loki に届くことを確認する（T-4-3）</a></li>
+<li class="lvl-2"><a href="#5-考えどころ">5. 考えどころ</a></li>
+<li class="lvl-2"><a href="#6-つまずきポイント">6. つまずきポイント</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

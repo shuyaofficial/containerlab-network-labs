@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>社内ポータル | 株式会社XXX</title>
+<style>
+  :root {
+    --navy: #1b2a4a;
+    --accent: #2f6fed;
+    --bg: #f4f6fa;
+    --card: #ffffff;
+    --text: #22293a;
+    --muted: #6b7487;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Hiragino Sans", "Noto Sans JP", sans-serif; background: var(--bg); color: var(--text); }
+  header { background: var(--navy); color: #fff; padding: 1.1rem 2rem; display: flex; align-items: baseline; gap: 1rem; }
+  header h1 { font-size: 1.25rem; letter-spacing: 0.05em; }
+  header span { font-size: 0.8rem; opacity: 0.7; }
+  main { max-width: 880px; margin: 2rem auto; padding: 0 1.5rem; }
+  .notice { background: #fff7e0; border-left: 4px solid #e0a800; padding: 0.9rem 1.2rem; border-radius: 4px; margin-bottom: 2rem; font-size: 0.95rem; }
+  h2 { font-size: 1.05rem; color: var(--navy); margin: 1.8rem 0 0.8rem; border-left: 4px solid var(--accent); padding-left: 0.6rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+  .card { background: var(--card); border-radius: 8px; padding: 1.2rem 1.3rem; box-shadow: 0 1px 4px rgba(27,42,74,0.08); }
+  .card h3 { font-size: 0.98rem; margin-bottom: 0.4rem; }
+  .card p { font-size: 0.85rem; color: var(--muted); line-height: 1.6; }
+  .card a { color: var(--accent); text-decoration: none; font-size: 0.9rem; }
+  .card a:hover { text-decoration: underline; }
+  ul.news { list-style: none; background: var(--card); border-radius: 8px; box-shadow: 0 1px 4px rgba(27,42,74,0.08); }
+  ul.news li { padding: 0.85rem 1.2rem; border-bottom: 1px solid #eef1f6; font-size: 0.9rem; display: flex; gap: 1rem; }
+  ul.news li:last-child { border-bottom: none; }
+  ul.news time { color: var(--muted); font-size: 0.82rem; white-space: nowrap; }
+  footer { text-align: center; color: var(--muted); font-size: 0.78rem; padding: 2.5rem 0 2rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>株式会社XXX 社内ポータル</h1>
+  <span>intranet.example.co.jp（10.20.30.20 / B棟サーバ室）</span>
+</header>
+<main>
+  <div class="notice">
+    ⚠️ 【情報システム部】6/15(月) 22:00〜24:00 ネットワーク機器のメンテナンスを実施します。社内システムが一時的に利用できません。
+  </div>
+
+  <h2>社内システム</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>📁 ファイルサーバ</h3>
+      <p>全社共有・部署別の共有ファイル置き場です。</p>
+      <a href="http://10.20.30.10/">http://10.20.30.10/ を開く</a>
+    </div>
+    <div class="card">
+      <h3>🖥️ 勤怠管理システム</h3>
+      <p>出退勤の打刻・休暇申請はこちらから。（ダミー）</p>
+      <a href="#">準備中</a>
+    </div>
+    <div class="card">
+      <h3>🧾 経費精算システム</h3>
+      <p>交通費・立替経費の申請。（ダミー）</p>
+      <a href="#">準備中</a>
+    </div>
+  </div>
+
+  <h2>お知らせ</h2>
+  <ul class="news">
+    <li><time>2026-06-10</time>本社キャンパス（A棟・B棟）の新ネットワークが稼働開始しました。</li>
+    <li><time>2026-06-08</time>支社⇔本社間のVPN回線を増強しました。ファイルサーバへのアクセスが高速化しています。</li>
+    <li><time>2026-06-01</time>開発部フロアのレイアウト変更に伴い、座席のネットワークポートが変わります。</li>
+  </ul>
+</main>
+<footer>株式会社XXX 情報システム部 | このページは B棟サーバ室の srv-portal (10.20.30.20) から配信されています</footer>
+</body>
+</html>

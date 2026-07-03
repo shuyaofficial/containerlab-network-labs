@@ -1,0 +1,49 @@
+# =============================================================================
+# Challenge 08: VLAN / 802.1Q Trunk & STP/RSTP  (L2冗長の基礎)  ※雛形(骨子)
+# -----------------------------------------------------------------------------
+# スイッチ3台を三角形(物理ループ)に結線し、STPがどのポートをBlockingにするかを観測する。
+# PC2台を同一VLAN10に置き、ループ跨ぎの疎通と、リンク断時のRSTP高速収束を体験する。
+#
+# 注意(雛形段階):
+#  - インターフェース名(Ethernet0/x)は使用イメージで異なる場合あり。deploy後 `show ip int brief` で確認。
+#  - スイッチの初期コンフィグ(VLAN/trunk/STP)は startup-config か手動投入で追加する(challenge_guide参照)。
+#  - PCは軽量linux(alpine)。IPは手動付与(challenge_guide Mission1)。
+#  - clabマシン側(ssh clab@orb)で `sudo containerlab deploy -t cisco_l2_vlan_stp.clab.yml`。
+# =============================================================================
+
+name: cisco-l2-vlan-stp
+
+topology:
+  kinds:
+    cisco_iol:
+      image: vrnetlab/cisco_iol:L2-15.2   # L2スイッチ用IOLイメージ(環境説明.md §4)
+      type: l2                            # L2スイッチモード
+    linux:
+      image: alpine:latest
+
+  nodes:
+    sw1:
+      kind: cisco_iol
+      type: l2
+      # startup-config: configs/sw1.cfg   # ← 後で作成(VLAN/trunk/STP root等)
+    sw2:
+      kind: cisco_iol
+      type: l2
+      # startup-config: configs/sw2.cfg
+    sw3:
+      kind: cisco_iol
+      type: l2
+      # startup-config: configs/sw3.cfg
+    pc1:
+      kind: linux
+    pc2:
+      kind: linux
+
+  links:
+    # --- 三角ループ(全てトランク: 802.1Q, allow VLAN10,20) ---
+    - endpoints: ["sw1:Ethernet0/1", "sw2:Ethernet0/1"]
+    - endpoints: ["sw2:Ethernet0/2", "sw3:Ethernet0/1"]
+    - endpoints: ["sw3:Ethernet0/2", "sw1:Ethernet0/2"]
+    # --- アクセスポート(PC収容, VLAN10) ---
+    - endpoints: ["sw1:Ethernet0/3", "pc1:eth1"]
+    - endpoints: ["sw3:Ethernet0/3", "pc2:eth1"]

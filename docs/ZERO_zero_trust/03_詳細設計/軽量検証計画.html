@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜arm64 軽量検証計画</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>03_詳細設計</span></nav>
+      <h1 class="doc-title">テーマZERO｜arm64 軽量検証計画</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">feasibility</span><span class="tag">arm64</span><span class="tag">verification</span><span class="tag">oss</span></span>
+      </div>
+      
+      <div class="content">
+<p>Phase 1-6 をデプロイせずに、各観点の代替 OSS が <strong>arm64 で動くか</strong> を軽量に確かめる計画。
+判定結果は別タスクT7が <code>03_詳細設計/軽量検証結果_2026-07-04.md</code>（type: feasibility）に記録し、<a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E5%AE%9F%E8%A3%85%E5%8F%AF%E8%83%BD%E6%80%A7%E3%83%9E%E3%83%88%E3%83%AA%E3%82%AF%E3%82%B9.html">実装可能性マトリクス</a> の確度列を確定値に更新する。</p>
+<h2 id="検証の目的とスコープ" tabindex="-1">検証の目的とスコープ <a class="header-anchor" href="#検証の目的とスコープ" aria-hidden="true">#</a></h2>
+<ul>
+<li>目的: OSS 各イメージの <strong>arm64 マニフェスト有無</strong> と、要となる機能（起動・SSL bump 等）の<strong>実現見込み</strong>を確認する。</li>
+<li>スコープ内: manifest 確認（静的判定）＋ 必要に応じた pull/起動の実検証（軽量）。</li>
+<li>スコープ外: Phase 1-6 の本格デプロイ・機能結合試験（見込み確認で十分というユーザー決定）。</li>
+<li>前提: VM <code>clab</code>（Ubuntu 24.04 / arm64）。IOL 非連携。</li>
+</ul>
+<h2 id="判定基準" tabindex="-1">判定基準 <a class="header-anchor" href="#判定基準" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>判定</th>
+<th>条件</th>
+<th>次のアクション</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>High</strong></td>
+<td>公式 arm64 manifest が有る（<code>docker manifest inspect</code> に <code>arm64</code> が含まれる）</td>
+<td>採用確定。実検証は起動確認のみ</td>
+</tr>
+<tr>
+<td><strong>Med</strong></td>
+<td>manifest は有るが起動/機能に不確実性（SSL bump・重量・posture 等）</td>
+<td>pull して起動・軽量機能確認を実検証</td>
+</tr>
+<tr>
+<td><strong>Low</strong></td>
+<td>arm64 manifest が無い or 明示非対応</td>
+<td>代替差し替えルールを適用</td>
+</tr>
+</tbody>
+</table></div>
+<p>manifest 確認コマンド（設計値。実行はT7）:</p>
+<pre><code class="language-bash"><span class="hljs-comment"># arm64 対応の静的確認（イメージを pull せずに判定）</span>
+docker manifest inspect &lt;image&gt; | grep -i <span class="hljs-string">&#x27;arm64&#x27;</span>
+</code></pre>
+<h2 id="検証対象イメージ一覧" tabindex="-1">検証対象イメージ一覧 <a class="header-anchor" href="#検証対象イメージ一覧" aria-hidden="true">#</a></h2>
+<p>観点ごとの確定案・代替案を含む。arm64 見込みは検証前の想定で、確定はT7の結果ファイルによる。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>観点</th>
+<th>イメージ（役割）</th>
+<th>arm64 見込み</th>
+<th>判定見込み</th>
+<th>検証方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>ID統制</td>
+<td>keycloak（IdP）</td>
+<td>有（公式 arm64 提供）</td>
+<td>High</td>
+<td>manifest + 起動確認</td>
+</tr>
+<tr>
+<td>1</td>
+<td>ID統制（発展）</td>
+<td>osixia/openldap（ユーザー DB 発展）</td>
+<td>一部要確認</td>
+<td>Med</td>
+<td>manifest 確認</td>
+</tr>
+<tr>
+<td>3</td>
+<td>NWセキュリティ</td>
+<td>pomerium（IAP）</td>
+<td>有</td>
+<td>High</td>
+<td>manifest + 起動確認</td>
+</tr>
+<tr>
+<td>3</td>
+<td>NWセキュリティ</td>
+<td>oauth2-proxy（IAP 起点）</td>
+<td>有</td>
+<td>High</td>
+<td>manifest + 起動確認</td>
+</tr>
+<tr>
+<td>6</td>
+<td>SIEM 可視化</td>
+<td>grafana</td>
+<td>有（公式 arm64）</td>
+<td>High</td>
+<td>manifest + 起動確認</td>
+</tr>
+<tr>
+<td>6</td>
+<td>SIEM 保存</td>
+<td>loki</td>
+<td>有（公式 arm64）</td>
+<td>High</td>
+<td>manifest + 起動確認</td>
+</tr>
+<tr>
+<td>6</td>
+<td>SIEM 収集</td>
+<td>promtail</td>
+<td>有（公式 arm64）</td>
+<td>High</td>
+<td>manifest + 起動確認</td>
+</tr>
+<tr>
+<td>4/5</td>
+<td>WEB+DLP</td>
+<td>mitmproxy</td>
+<td>有</td>
+<td>High</td>
+<td>manifest + SSL bump / アドオン軽量確認</td>
+</tr>
+<tr>
+<td>2</td>
+<td>デバイス統制</td>
+<td>step-ca（smallstep）</td>
+<td>有</td>
+<td>Med</td>
+<td>manifest + mTLS 発行フロー確認</td>
+</tr>
+<tr>
+<td>4</td>
+<td>WEB 代替</td>
+<td>squid（SSL bump）</td>
+<td>一部要確認</td>
+<td>Med</td>
+<td>manifest + SSL bump 可否</td>
+</tr>
+<tr>
+<td>4</td>
+<td>WEB 代替</td>
+<td>suricata（IDS）</td>
+<td>一部要確認</td>
+<td>Med</td>
+<td>manifest + 起動確認</td>
+</tr>
+<tr>
+<td>6</td>
+<td>SIEM 発展</td>
+<td>wazuh-manager</td>
+<td>要確認・重量</td>
+<td>Med/Low</td>
+<td>manifest + メモリ実測</td>
+</tr>
+<tr>
+<td>5</td>
+<td>DLP 代替</td>
+<td>clamav（AV）</td>
+<td>一部要確認</td>
+<td>Med</td>
+<td>manifest 確認</td>
+</tr>
+<tr>
+<td>3</td>
+<td>NW 発展</td>
+<td>openziti（ZTNA 発展）</td>
+<td>要確認</td>
+<td>Med</td>
+<td>manifest 確認</td>
+</tr>
+<tr>
+<td>2</td>
+<td>デバイス補助</td>
+<td>osquery</td>
+<td>一部要確認</td>
+<td>Med</td>
+<td>manifest 確認</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>上表は設計時の見込み。T7が manifest と軽量起動を実施し、判定を確定値に更新する。</p>
+</blockquote>
+<h2 id="代替差し替えルール" tabindex="-1">代替差し替えルール <a class="header-anchor" href="#代替差し替えルール" aria-hidden="true">#</a></h2>
+<p>Low（arm64 非対応）または重量ブロッカーが出た場合の差し替え方針。基本設計書の設計判断（D-2 / D-4）と整合させる。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>対象</th>
+<th>事象</th>
+<th>差し替え</th>
+<th>根拠</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SIEM</td>
+<td>Wazuh が arm64 不可 or 重すぎる</td>
+<td><strong>Loki 一本</strong>（Grafana+Loki+Promtail のみ）</td>
+<td>D-4。SIEM は早期投入が目的で、軽量が優先</td>
+</tr>
+<tr>
+<td>WEB</td>
+<td>squid の SSL bump が arm64 で成立しない</td>
+<td><strong>mitmproxy 一本化</strong>（SWG を mitmproxy に集約）</td>
+<td>D-2。同一経路で検査・DLP を兼務</td>
+</tr>
+<tr>
+<td>WEB IDS</td>
+<td>suricata が arm64 不可</td>
+<td>mitmproxy のログ + Loki 側の検知ルールで代替</td>
+<td>IDS 発報の目的（SIEM へ通知）は維持</td>
+</tr>
+<tr>
+<td>DLP</td>
+<td>c-icap + ClamAV が arm64 不可</td>
+<td><strong>mitmproxy DLP アドオンに一本化</strong></td>
+<td>D-2。DLP は SWG の通信を検査する同一経路上</td>
+</tr>
+<tr>
+<td>ID発展</td>
+<td>OpenLDAP が不可</td>
+<td>Keycloak 内蔵 DB のまま（OpenLDAP 連携は見送り）</td>
+<td>発展課題。今回は内蔵 DB で完結</td>
+</tr>
+<tr>
+<td>デバイス</td>
+<td>posture の実収集が難しい</td>
+<td>posture claim を <strong>モック</strong>（固定属性で分岐を示す）</td>
+<td>要件 FR-2。実装可能性の確認が目的</td>
+</tr>
+</tbody>
+</table></div>
+<p>差し替えの優先原則:</p>
+<ol>
+<li><strong>arm64 で動くこと</strong>を最優先（NFR-1）。動かないものは代替する。</li>
+<li><strong>観点の目的を維持</strong>する（例: IDS 不可でも「検知→SIEM 通知」の導線は残す）。</li>
+<li><strong>軽量・集約を選ぶ</strong>（重量級は Loki 一本・mitmproxy 一本化へ寄せる）。</li>
+</ol>
+<h2 id="検証手順t7-が実施" tabindex="-1">検証手順（T7 が実施） <a class="header-anchor" href="#検証手順t7-が実施" aria-hidden="true">#</a></h2>
+<ol>
+<li>上表の各イメージに <code>docker manifest inspect</code> を実行し、arm64 有無を記録する。</li>
+<li>Med 判定のものは pull → 起動 → 要機能の軽量確認（Keycloak 起動 / mitmproxy SSL bump / step-ca 発行 等）。</li>
+<li>起動時 RSS を実測し、リソース見積（<a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E5%AE%9F%E8%A3%85%E5%8F%AF%E8%83%BD%E6%80%A7%E3%83%9E%E3%83%88%E3%83%AA%E3%82%AF%E3%82%B9.html">実装可能性マトリクス</a>）を更新する。</li>
+<li>Low / ブロッカーは代替差し替えルールを適用し、差し替え後の見込みを記録する。</li>
+<li>結果を <code>03_詳細設計/軽量検証結果_2026-07-04.md</code> に記録し、マトリクスの確度列を確定する。</li>
+</ol>
+<h2 id="合格の考え方" tabindex="-1">合格の考え方 <a class="header-anchor" href="#合格の考え方" aria-hidden="true">#</a></h2>
+<ul>
+<li>各観点で「arm64 で成立する実装候補が1つ以上ある」ことを合格とする（<a href="../01_%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9/%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9%E6%9B%B8.html">要件定義書</a> AC-検証）。</li>
+<li>全観点が代替を含めて成立すれば、Phase 1-6 の本格実装（後続テーマ）に進む見込みが立ったと判断する。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E5%AE%9F%E8%A3%85%E5%8F%AF%E8%83%BD%E6%80%A7%E3%83%9E%E3%83%88%E3%83%AA%E3%82%AF%E3%82%B9.html">実装可能性マトリクス</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a></li>
+<li><a href="../01_%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9/%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9%E6%9B%B8.html">要件定義書</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#検証の目的とスコープ">検証の目的とスコープ</a></li>
+<li class="lvl-2"><a href="#判定基準">判定基準</a></li>
+<li class="lvl-2"><a href="#検証対象イメージ一覧">検証対象イメージ一覧</a></li>
+<li class="lvl-2"><a href="#代替差し替えルール">代替差し替えルール</a></li>
+<li class="lvl-2"><a href="#検証手順t7-が実施">検証手順（T7 が実施）</a></li>
+<li class="lvl-2"><a href="#合格の考え方">合格の考え方</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

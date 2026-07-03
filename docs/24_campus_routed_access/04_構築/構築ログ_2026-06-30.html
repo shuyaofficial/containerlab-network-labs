@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>構築ログ — Theme 24: Routed Access環境起動</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>24_campus_routed_access</span>
+<span class="sep">/</span>
+<span>04_構築</span></nav>
+      <h1 class="doc-title">構築ログ — Theme 24: Routed Access環境起動</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="1-実施内容" tabindex="-1">1. 実施内容 <a class="header-anchor" href="#1-実施内容" aria-hidden="true">#</a></h2>
+<ul>
+<li>実施日: 2026-06-30</li>
+<li>実行場所: OrbStack Linux VM <code>clab</code></li>
+<li>対象: <code>24_campus_routed_access/04_構築/campus.clab.yml</code></li>
+<li>実施範囲: ノード・リンク・管理ネットワークの作成のみ</li>
+<li>未実施: IOSデータプレーン、OSPF、Loopback、端末IP、静的経路</li>
+</ul>
+<h2 id="2-起動結果" tabindex="-1">2. 起動結果 <a class="header-anchor" href="#2-起動結果" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>containerlabバージョン</td>
+<td>0.77.0</td>
+</tr>
+<tr>
+<td>ラボ名</td>
+<td><code>campus-routed-access</code></td>
+</tr>
+<tr>
+<td>Cisco IOL</td>
+<td>core1、core2、access1、access2の4台がrunning</td>
+</tr>
+<tr>
+<td>Linux端末</td>
+<td>pc-a、pc-bの2台がrunning</td>
+</tr>
+<tr>
+<td>仮想リンク</td>
+<td>7本作成成功</td>
+</tr>
+<tr>
+<td>管理ネットワーク</td>
+<td><code>campus-routed-access-mgmt</code> / <code>172.24.24.0/24</code></td>
+</tr>
+<tr>
+<td>IOL起動</td>
+<td>4台で<code>qemu-i386 /iol/iol.bin</code>をPID1として確認</td>
+</tr>
+<tr>
+<td>iouyap</td>
+<td>deploy後に4台で<code>iouyap 513</code>を起動</td>
+</tr>
+<tr>
+<td>初期状態</td>
+<td>Cisco System Configuration Dialogで待機</td>
+</tr>
+<tr>
+<td>attach検証</td>
+<td>core1/core2/access1/access2の4台でEnter入力と初期設定プロンプトを確認</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="3-未設定確認" tabindex="-1">3. 未設定確認 <a class="header-anchor" href="#3-未設定確認" aria-hidden="true">#</a></h2>
+<ul>
+<li><code>campus.clab.yml</code>に<code>startup-config</code>なし。</li>
+<li><code>campus.clab.yml</code>に<code>exec</code>なし。</li>
+<li><code>entrypoint_attach.sh</code>はIOLをPID1で起動するだけで、IOSコンフィグを投入しない。</li>
+<li>pc-aの<code>eth1</code>にIPv4アドレスなし、データプレーン経路なし。</li>
+<li>pc-bの<code>eth1</code>にIPv4アドレスなし、データプレーン経路なし。</li>
+<li>OSPF、Loopback、インフラIP、端末IPは未投入。</li>
+</ul>
+<h2 id="4-初回操作" tabindex="-1">4. 初回操作 <a class="header-anchor" href="#4-初回操作" aria-hidden="true">#</a></h2>
+<h3 id="実行場所-orbstack-linux-vm-clab" tabindex="-1">実行場所: OrbStack Linux VM <code>clab</code> <a class="header-anchor" href="#実行場所-orbstack-linux-vm-clab" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker attach --sig-proxy=<span class="hljs-literal">false</span> clab-campus-routed-access-core1
+</code></pre>
+<ul>
+<li>初期セットアップダイアログへの回答は学習者が選択する。</li>
+<li>IOS設定コマンドは本ログに記載しない。</li>
+<li>コンテナを停止せず離脱する場合は<code>Ctrl-p</code>、続けて<code>Ctrl-q</code>。</li>
+</ul>
+<h2 id="5-aar" tabindex="-1">5. AAR <a class="header-anchor" href="#5-aar" aria-hidden="true">#</a></h2>
+<ul>
+<li>予想: 6ノード・7リンクを起動し、データプレーン未設定で引き渡せる。</li>
+<li>実際: 全ノード・リンクは起動し、端末データプレーンは空。Theme 23方式のentrypointへ揃えた後、4台すべてでattach入力を確認した。</li>
+<li>次回: 学習者がコンソールから設定し、<a href="../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a>へ結果を記録する。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-実施内容">1. 実施内容</a></li>
+<li class="lvl-2"><a href="#2-起動結果">2. 起動結果</a></li>
+<li class="lvl-2"><a href="#3-未設定確認">3. 未設定確認</a></li>
+<li class="lvl-2"><a href="#4-初回操作">4. 初回操作</a></li>
+<li class="lvl-3"><a href="#実行場所-orbstack-linux-vm-clab">実行場所: OrbStack Linux VM clab</a></li>
+<li class="lvl-2"><a href="#5-aar">5. AAR</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

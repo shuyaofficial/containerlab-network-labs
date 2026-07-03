@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>🎓 第7章：統合キャプストン（卒業制作）</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>21_cisco_capstone</span></nav>
+      <h1 class="doc-title">🎓 第7章：統合キャプストン（卒業制作）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>お疲れ様でした！いよいよネットワーク技術の総決算となる「統合キャプストン」に挑戦します。
+これまでに学んだすべての知識を駆使し、<strong>要件定義書に沿って、ゼロから本社・支社ネットワークを構築</strong>してください。</p>
+<hr>
+<h2 id="-ネットワーク構成とシナリオ" tabindex="-1">🏗️ ネットワーク構成とシナリオ <a class="header-anchor" href="#-ネットワーク構成とシナリオ" aria-hidden="true">#</a></h2>
+<p>あなたは、中堅企業（社員120名）のインフラエンジニアです。
+今回、<strong>「絶対に止まらない本社ネットワーク」</strong> と <strong>「本社へ安全に繋がる支社ネットワーク」</strong> の構築を任されました。</p>
+<p>構成図（論理イメージ）：</p>
+<pre><code class="language-text">      [インターネット (ISP)]
+        /          |         \
+  [HQ-Edge1]  [HQ-Edge2]    [BR-Edge] (支社ルーター)
+      \           /             |
+    [HQ-Core1]===[HQ-Core2]    [BR-PC] (支社PC)
+        |
+   [HQ-PC-Sales] (本社PC)
+</code></pre>
+<hr>
+<h2 id="-フェーズ1要件とパラメータの確認" tabindex="-1">🛠️ フェーズ1：要件とパラメータの確認 <a class="header-anchor" href="#-フェーズ1要件とパラメータの確認" aria-hidden="true">#</a></h2>
+<h3 id="1-ipアドレス設計要件" tabindex="-1">1. IPアドレス設計（要件） <a class="header-anchor" href="#1-ipアドレス設計要件" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード/インターフェース</th>
+<th>用途</th>
+<th>IPアドレス</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ISP</strong> (e0/1)</td>
+<td>本社向けメイン回線</td>
+<td><code>200.0.1.254/24</code></td>
+<td>グローバルIP相当</td>
+</tr>
+<tr>
+<td><strong>ISP</strong> (e0/2)</td>
+<td>本社向けサブ回線</td>
+<td><code>200.0.2.254/24</code></td>
+<td>グローバルIP相当</td>
+</tr>
+<tr>
+<td><strong>ISP</strong> (e0/3)</td>
+<td>支社向け回線</td>
+<td><code>200.0.3.254/24</code></td>
+<td>グローバルIP相当</td>
+</tr>
+<tr>
+<td><strong>HQ-Edge1</strong> (e0/1)</td>
+<td>ISPメイン接続</td>
+<td><code>200.0.1.1/24</code></td>
+<td>NAT(PAT)変換の出口</td>
+</tr>
+<tr>
+<td><strong>HQ-Edge2</strong> (e0/1)</td>
+<td>ISPサブ接続</td>
+<td><code>200.0.2.1/24</code></td>
+<td>NAT(PAT)変換の出口</td>
+</tr>
+<tr>
+<td><strong>BR-Edge</strong> (e0/1)</td>
+<td>ISP支社接続</td>
+<td><code>200.0.3.1/24</code></td>
+<td>NAT(PAT)変換の出口</td>
+</tr>
+<tr>
+<td><strong>本社 コア間</strong></td>
+<td>内部OSPF用リンク</td>
+<td><code>10.0.0.0/24</code> 帯で任意</td>
+<td>Edge1/2, Core1/2 を接続</td>
+</tr>
+<tr>
+<td><strong>HQ-Core (VLAN 10)</strong></td>
+<td>営業部用セグメント</td>
+<td><code>10.1.10.0/24</code></td>
+<td>HSRP仮想IP: <code>10.1.10.254</code></td>
+</tr>
+<tr>
+<td><strong>HQ-PC-Sales</strong></td>
+<td>営業部PC</td>
+<td><code>10.1.10.100/24</code></td>
+<td>GW: <code>10.1.10.254</code></td>
+</tr>
+<tr>
+<td><strong>BR-Edge</strong> (e0/2)</td>
+<td>支社内LAN</td>
+<td><code>10.2.40.254/24</code></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>BR-PC</strong></td>
+<td>支社PC</td>
+<td><code>10.2.40.100/24</code></td>
+<td>GW: <code>10.2.40.254</code></td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="-フェーズ2構築ミッション" tabindex="-1">🚀 フェーズ2：構築ミッション <a class="header-anchor" href="#-フェーズ2構築ミッション" aria-hidden="true">#</a></h2>
+<p>以下のミッションを、<strong>あなたがこれまで培った知識で、自分の好きな順番で</strong> 構築してください。
+（わからなくなった時は、過去のフォルダのREADMEやコマンド履歴を見返して構いません！）</p>
+<h3 id="ミッション①本社の冗長化lan構築l2l3ospfhsrp" tabindex="-1">ミッション①：本社の冗長化LAN構築（L2/L3・OSPF・HSRP） <a class="header-anchor" href="#ミッション①本社の冗長化lan構築l2l3ospfhsrp" aria-hidden="true">#</a></h3>
+<ol>
+<li><code>HQ-Core1</code> と <code>HQ-Core2</code> の間に VLAN 10 を作成し、PCを接続する。</li>
+<li>コアスイッチ間のリンクを EtherChannel（トランク）で冗長化する。</li>
+<li><code>HQ-Core1</code> を STP のルートブリッジ、かつ HSRP の Active（仮想IP: <code>10.1.10.254</code>）に設定する。</li>
+<li><code>HQ-Edge1</code>, <code>HQ-Edge2</code>, <code>HQ-Core1</code>, <code>HQ-Core2</code> の間で <strong>OSPF (Area 0)</strong> を構成し、社内のルーティングを確立する。</li>
+</ol>
+<h3 id="ミッション②インターネット境界とbgpデュアルホーム" tabindex="-1">ミッション②：インターネット境界とBGPデュアルホーム <a class="header-anchor" href="#ミッション②インターネット境界とbgpデュアルホーム" aria-hidden="true">#</a></h3>
+<ol>
+<li><code>HQ-Edge1</code> と <code>HQ-Edge2</code> でインターネットに出るための <strong>NAT (PAT)</strong> を設定する。（内部の10.x.x.xを、外部インターフェースのIPに変換）</li>
+<li>ISPとの間で <strong>BGP</strong> を確立する。（ISPのAS番号を <code>65000</code>、本社のAS番号を <code>65001</code> とする）</li>
+<li>BGPの Local Preference 等を操作し、通常時は <code>HQ-Edge1</code>（メイン回線）を通ってインターネットに出るようにする。</li>
+</ol>
+<h3 id="ミッション③拠点間-ipsec-vpn" tabindex="-1">ミッション③：拠点間 IPsec VPN <a class="header-anchor" href="#ミッション③拠点間-ipsec-vpn" aria-hidden="true">#</a></h3>
+<ol>
+<li>本社（<code>HQ-Edge1</code>）と 支社（<code>BR-Edge</code>）の間にインターネット越し（200.x.x.x）の <strong>IPsec VPN</strong> を構築する。</li>
+<li>対象となる通信は「支社(10.2.40.0/24) ⇔ 本社営業部(10.1.10.0/24)」のみとする。</li>
+</ol>
+<hr>
+<h2 id="-フェーズ3最終試験テスト要件" tabindex="-1">🎯 フェーズ3：最終試験（テスト要件） <a class="header-anchor" href="#-フェーズ3最終試験テスト要件" aria-hidden="true">#</a></h2>
+<p>すべての構築が終わったら、以下のテストを実施し、すべてクリアできれば**合格（卒業）**です！</p>
+<p>✅ <strong>テスト1：インターネット疎通</strong>
+<code>HQ-PC-Sales</code> および <code>BR-PC</code> から、ISP（<code>200.0.1.254</code> など）に Ping が届くこと。（NATが成功している証拠）</p>
+<p>✅ <strong>テスト2：拠点間通信の暗号化</strong>
+<code>BR-PC</code> から <code>HQ-PC-Sales (10.1.10.100)</code> に Ping が届くこと。かつ、その通信がインターネット上（ISPのルーター）では暗号化されていて中身が見えないこと。</p>
+<p>✅ <strong>テスト3：究極の耐障害性テスト</strong>
+<code>HQ-PC-Sales</code> から ISP へ Ping を打ち続けている状態で、<strong><code>HQ-Edge1</code> のコンソールから e0/1 を shutdown する。</strong>
+数秒の断のあと、自動的にサブ回線（HQ-Edge2）へ経路が切り替わり、Pingが復活すること。</p>
+<hr>
+<h2 id="-はじめかた" tabindex="-1">🌟 はじめかた <a class="header-anchor" href="#-はじめかた" aria-hidden="true">#</a></h2>
+<p>まずは環境をデプロイし、機器にログインしてコンフィグを流し込み始めましょう！</p>
+<pre><code class="language-bash"><span class="hljs-built_in">cd</span> /Users/shuya/Documents/claude/Mac仮想環境構築/21_cisco_capstone
+<span class="hljs-built_in">sudo</span> containerlab deploy -t capstone.clab.yml
+</code></pre>
+<p>健闘を祈ります！！</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-ネットワーク構成とシナリオ">🏗️ ネットワーク構成とシナリオ</a></li>
+<li class="lvl-2"><a href="#-フェーズ1要件とパラメータの確認">🛠️ フェーズ1：要件とパラメータの確認</a></li>
+<li class="lvl-3"><a href="#1-ipアドレス設計要件">1. IPアドレス設計（要件）</a></li>
+<li class="lvl-2"><a href="#-フェーズ2構築ミッション">🚀 フェーズ2：構築ミッション</a></li>
+<li class="lvl-3"><a href="#ミッション①本社の冗長化lan構築l2l3ospfhsrp">ミッション①：本社の冗長化LAN構築（L2/L3・OSPF・HSRP）</a></li>
+<li class="lvl-3"><a href="#ミッション②インターネット境界とbgpデュアルホーム">ミッション②：インターネット境界とBGPデュアルホーム</a></li>
+<li class="lvl-3"><a href="#ミッション③拠点間-ipsec-vpn">ミッション③：拠点間 IPsec VPN</a></li>
+<li class="lvl-2"><a href="#-フェーズ3最終試験テスト要件">🎯 フェーズ3：最終試験（テスト要件）</a></li>
+<li class="lvl-2"><a href="#-はじめかた">🌟 はじめかた</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

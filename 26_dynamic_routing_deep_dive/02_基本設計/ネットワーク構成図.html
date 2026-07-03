@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Theme 26｜動的ルーティング ネットワーク構成図</title>
+  <style>
+    :root {
+      --ink: #17232d;
+      --muted: #5c6b75;
+      --faint: #87949c;
+      --paper: #fcfbf9;
+      --canvas: #f3f0ea;
+      --white: #fffefa;
+      --line: #d8d4cc;
+      --line-strong: #aaa69e;
+      --cisco: #087da8;
+      --cisco-dark: #075d7b;
+      --cisco-soft: #e8f4f7;
+      --trust: #e9f4ed;
+      --trust-line: #8eb59b;
+      --dmz: #fff4df;
+      --dmz-line: #d3a75e;
+      --untrust: #f9ece8;
+      --untrust-line: #c88978;
+      --wan: #f0edf8;
+      --wan-line: #9a8cbc;
+      --ospf: #147d64;
+      --eigrp: #b26b18;
+      --bgp: #7552a3;
+      --nat: #b64d46;
+      --focus: #ef9f1a;
+      --shadow: 0 12px 34px rgba(41, 51, 58, .08);
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      background: var(--canvas);
+      font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
+    }
+
+    button { font: inherit; }
+    a { color: var(--cisco-dark); text-underline-offset: 3px; }
+    a:hover { color: var(--cisco); }
+
+    :focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--focus) 70%, white);
+      outline-offset: 3px;
+    }
+
+    .shell { width: min(1500px, 100%); margin: 0 auto; padding: 30px clamp(14px, 3vw, 42px) 48px; }
+
+    .masthead {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 22px;
+      margin-bottom: 22px;
+    }
+
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      margin: 0 0 8px;
+      color: var(--cisco-dark);
+      font-size: .76rem;
+      font-weight: 800;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+    }
+
+    .kicker::before { content: ""; width: 28px; height: 3px; border-radius: 2px; background: var(--cisco); }
+    h1 { margin: 0; font-size: clamp(1.65rem, 3vw, 2.55rem); line-height: 1.2; letter-spacing: -.025em; }
+    .subtitle { max-width: 900px; margin: 8px 0 0; color: var(--muted); font-size: .94rem; }
+
+    .scope-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--paper);
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .scope-badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--cisco); }
+
+    .doc-links { display: flex; flex-wrap: wrap; gap: 7px 18px; margin: 0 0 18px; font-size: .8rem; }
+
+    .tabs {
+      display: inline-flex;
+      gap: 4px;
+      padding: 5px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #e9e6df;
+    }
+
+    .tab {
+      min-width: 150px;
+      padding: 10px 18px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 800;
+      transition: background .16s ease, color .16s ease, box-shadow .16s ease;
+    }
+
+    .tab:hover { color: var(--ink); }
+    .tab[aria-selected="true"] { background: var(--white); color: var(--cisco-dark); box-shadow: 0 2px 8px rgba(40, 49, 55, .10); }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 330px;
+      gap: 18px;
+      margin-top: 14px;
+      align-items: stretch;
+    }
+
+    .diagram-panel,
+    .detail-panel,
+    .status-panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+
+    .diagram-panel { min-width: 0; overflow: hidden; }
+    .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 20px 22px 14px; border-bottom: 1px solid var(--line); }
+    .panel-head h2 { margin: 0; font-size: 1.16rem; }
+    .panel-head p { margin: 3px 0 0; color: var(--muted); font-size: .82rem; }
+
+    .view-label { flex: 0 0 auto; padding: 4px 9px; border: 1px solid #bdd8df; border-radius: 999px; color: var(--cisco-dark); background: var(--cisco-soft); font-size: .7rem; font-weight: 800; }
+
+    .diagram-scroll { overflow-x: auto; background: #f8f6f1; }
+    .topology { display: block; width: 100%; min-width: 1120px; height: auto; }
+    [role="tabpanel"][hidden] { display: none; }
+
+    .zone { stroke-width: 1.5; }
+    .zone-hq { fill: #f6f8f6; stroke: #bdc8c0; }
+    .zone-isp { fill: var(--untrust); stroke: var(--untrust-line); }
+    .zone-branch { fill: #f4f7f5; stroke: #bdc8c0; }
+    .zone-trust { fill: var(--trust); stroke: var(--trust-line); }
+    .zone-dmz { fill: var(--dmz); stroke: var(--dmz-line); }
+    .zone-wan { fill: var(--wan); stroke: var(--wan-line); }
+    .zone-title { fill: #44535d; font-size: 14px; font-weight: 800; letter-spacing: .035em; }
+    .zone-sub { fill: #73808a; font-size: 10.5px; }
+
+    .link-line { fill: none; stroke: #87949c; stroke-width: 4; stroke-linecap: round; transition: stroke .16s ease, stroke-width .16s ease; }
+    .link-line.ospf { stroke: var(--ospf); }
+    .link-line.eigrp { stroke: var(--eigrp); stroke-dasharray: 10 6; }
+    .link-line.bgp { stroke: var(--bgp); stroke-dasharray: 4 6; }
+    .link-hit { fill: none; stroke: transparent; stroke-width: 24; cursor: pointer; }
+    .link-label rect { fill: #fffefa; stroke: #d5d1c9; }
+    .link-label text { fill: #35444e; font-size: 10.5px; font-weight: 700; text-anchor: middle; }
+    .link-label .minor { fill: #77838c; font-size: 9.5px; font-weight: 600; }
+
+    .device { cursor: pointer; }
+    .device .card { fill: #fffefa; stroke: #aeb8bd; stroke-width: 1.5; transition: stroke .16s ease, stroke-width .16s ease, filter .16s ease; }
+    .device .accent { fill: var(--cisco); }
+    .device.endpoint .accent { fill: #4d8b63; }
+    .device.edge .accent { fill: #7552a3; }
+    .device.isp .accent { fill: #b64d46; }
+    .device-name { fill: #17232d; font-size: 14px; font-weight: 850; text-anchor: middle; }
+    .device-role { fill: #5e6c75; font-size: 10.5px; text-anchor: middle; }
+    .device-meta { fill: #6f7d86; font-size: 9.5px; text-anchor: middle; font-family: "SFMono-Regular", Consolas, monospace; }
+    .device-icon { fill: none; stroke: #fff; stroke-width: 1.6; stroke-linecap: round; }
+
+    .selectable:hover .card,
+    .selectable:focus .card,
+    .selectable.is-selected .card { stroke: var(--focus); stroke-width: 3; filter: drop-shadow(0 4px 5px rgba(40, 49, 55, .16)); }
+    .selectable:hover .link-line,
+    .selectable:focus .link-line,
+    .selectable.is-selected .link-line { stroke: var(--focus); stroke-width: 7; }
+
+    .diagram-foot { display: flex; flex-wrap: wrap; gap: 9px 18px; padding: 12px 20px 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: .75rem; }
+    .legend-item { display: inline-flex; align-items: center; gap: 7px; }
+    .legend-line { width: 27px; height: 0; border-top: 4px solid #87949c; border-radius: 3px; }
+    .legend-line.ospf { border-color: var(--ospf); }
+    .legend-line.eigrp { border-color: var(--eigrp); border-top-style: dashed; }
+    .legend-line.bgp { border-color: var(--bgp); border-top-style: dotted; }
+    .legend-chip { width: 14px; height: 10px; border-radius: 2px; border: 1px solid; }
+
+    .detail-panel { padding: 22px; min-height: 100%; }
+    .detail-eyebrow { margin: 0 0 5px; color: var(--cisco-dark); font-size: .7rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    .detail-panel h2 { margin: 0; font-size: 1.24rem; line-height: 1.35; }
+    .detail-summary { margin: 9px 0 18px; color: var(--muted); font-size: .84rem; }
+    .detail-list { display: grid; gap: 0; margin: 0; }
+    .detail-row { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
+    .detail-row dt { color: var(--faint); font-size: .73rem; font-weight: 700; }
+    .detail-row dd { margin: 0; color: #33424c; font-size: .79rem; overflow-wrap: anywhere; }
+    .detail-note { margin: 18px 0 0; padding: 11px 12px; border-left: 3px solid var(--cisco); border-radius: 0 7px 7px 0; background: var(--cisco-soft); color: #38515c; font-size: .76rem; }
+
+    .status-panel { margin-top: 18px; padding: 18px 22px; }
+    .status-panel h2 { margin: 0 0 12px; font-size: 1rem; }
+    .status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .status-item { padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: #f8f6f1; }
+    .status-item strong { display: block; margin-bottom: 2px; font-size: .78rem; }
+    .status-item span { color: var(--muted); font-size: .73rem; }
+
+    footer { margin-top: 18px; color: var(--faint); font-size: .72rem; }
+
+    @media (max-width: 1050px) {
+      .workspace { grid-template-columns: 1fr; }
+      .detail-panel { min-height: auto; }
+      .status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 680px) {
+      .shell { padding-top: 20px; }
+      .masthead { grid-template-columns: 1fr; }
+      .scope-badge { justify-self: start; }
+      .tabs { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+      .tab { min-width: 0; padding-inline: 10px; }
+      .panel-head { padding: 16px; }
+      .status-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+
+    @media print {
+      body { background: #fff; }
+      .shell { width: 100%; padding: 0; }
+      .tabs, .scope-badge { display: none; }
+      .workspace { display: block; }
+      .diagram-panel, .detail-panel, .status-panel { box-shadow: none; break-inside: avoid; }
+      .detail-panel { margin-top: 12px; }
+      .diagram-scroll { overflow: visible; }
+      .topology { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+<main class="shell">
+  <header class="masthead">
+    <div>
+      <p class="kicker">Theme 26 · Dynamic Routing Deep Dive</p>
+      <h1>物理・論理ネットワーク構成図</h1>
+      <p class="subtitle">containerlab上の実接続と、OSPF・EIGRP・BGP・NAT/PATの論理関係を分離して確認できます。機器またはリンクを選択すると詳細が表示されます。</p>
+    </div>
+    <span class="scope-badge">Phase 1 · 基礎構成</span>
+  </header>
+
+  <nav class="doc-links" aria-label="関連ドキュメント">
+    <a href="基本設計書.md">基本設計書</a>
+    <a href="IPアドレス管理表.md">IPアドレス管理表</a>
+    <a href="../03_詳細設計/パラメータシート.md">パラメータシート</a>
+    <a href="../04_構築/campus.clab.yml">containerlabトポロジ</a>
+  </nav>
+
+  <div class="tabs" role="tablist" aria-label="構成図の種類">
+    <button class="tab" id="tab-physical" role="tab" aria-selected="true" aria-controls="panel-physical" tabindex="0" data-view="physical">物理構成図</button>
+    <button class="tab" id="tab-logical" role="tab" aria-selected="false" aria-controls="panel-logical" tabindex="-1" data-view="logical">論理構成図</button>
+  </div>
+
+  <div class="workspace">
+    <section class="diagram-panel" aria-label="ネットワーク構成図">
+      <div id="panel-physical" role="tabpanel" aria-labelledby="tab-physical">
+        <div class="panel-head">
+          <div><h2>物理構成図</h2><p>仮想ノード、管理IP、containerlabポートとIOSインターフェースの対応</p></div>
+          <span class="view-label">Virtual Physical</span>
+        </div>
+        <div class="diagram-scroll">
+          <svg class="topology" viewBox="0 0 1180 670" role="img" aria-labelledby="physical-title physical-desc">
+            <title id="physical-title">Theme 26 物理構成図</title>
+            <desc id="physical-desc">本社、ISP、支社の10ノードを9本の仮想リンクで接続したcontainerlab構成</desc>
+
+            <rect class="zone zone-hq" x="18" y="24" width="532" height="620" rx="16"/>
+            <text class="zone-title" x="38" y="52">本社（HQ）</text><text class="zone-sub" x="38" y="70">containerlab nodes · 172.26.26.0/24</text>
+            <rect class="zone zone-isp" x="570" y="390" width="190" height="254" rx="16"/>
+            <text class="zone-title" x="590" y="418">ISP</text><text class="zone-sub" x="590" y="436">外部網模擬</text>
+            <rect class="zone zone-branch" x="780" y="24" width="382" height="620" rx="16"/>
+            <text class="zone-title" x="800" y="52">支社（Branch）</text><text class="zone-sub" x="800" y="70">containerlab nodes · 172.26.26.0/24</text>
+
+            <!-- Physical links -->
+            <g class="selectable" data-key="hq-pc--hq-dist" role="button" tabindex="0" aria-label="hq-pc と hq-dist のリンク">
+              <path class="link-line" d="M225 143 H300"/><path class="link-hit" d="M225 143 H300"/>
+              <g class="link-label" transform="translate(262 214)"><rect x="-42" y="-13" width="84" height="26" rx="5"/><text y="-1">eth1 ↔ eth2</text><text class="minor" y="10">E0/2</text></g>
+            </g>
+            <g class="selectable" data-key="hq-dist--hq-core" role="button" tabindex="0" aria-label="hq-dist と hq-core のリンク">
+              <path class="link-line" d="M385 186 V300"/><path class="link-hit" d="M385 186 V300"/>
+              <g class="link-label" transform="translate(456 243)"><rect x="-55" y="-15" width="110" height="30" rx="5"/><text y="-2">eth1 ↔ eth1</text><text class="minor" y="10">E0/1 ↔ E0/1</text></g>
+            </g>
+            <g class="selectable" data-key="hq-core--hq-edge" role="button" tabindex="0" aria-label="hq-core と hq-edge のリンク">
+              <path class="link-line" d="M385 386 V500"/><path class="link-hit" d="M385 386 V500"/>
+              <g class="link-label" transform="translate(456 440)"><rect x="-55" y="-15" width="110" height="30" rx="5"/><text y="-2">eth2 ↔ eth1</text><text class="minor" y="10">E0/2 ↔ E0/1</text></g>
+            </g>
+            <g class="selectable" data-key="hq-core--hq-dmz" role="button" tabindex="0" aria-label="hq-core と hq-dmz のリンク">
+              <path class="link-line" d="M225 343 H300"/><path class="link-hit" d="M225 343 H300"/>
+              <g class="link-label" transform="translate(262 414)"><rect x="-42" y="-13" width="84" height="26" rx="5"/><text y="-1">eth3 ↔ eth1</text><text class="minor" y="10">E0/3 ↔ E0/1</text></g>
+            </g>
+            <g class="selectable" data-key="hq-dmz--dmz-srv" role="button" tabindex="0" aria-label="hq-dmz と dmz-srv のリンク">
+              <path class="link-line" d="M140 386 V500"/><path class="link-hit" d="M140 386 V500"/>
+              <g class="link-label" transform="translate(215 443)"><rect x="-55" y="-15" width="110" height="30" rx="5"/><text y="-2">eth2 ↔ eth1</text><text class="minor" y="10">E0/2 ↔ Linux</text></g>
+            </g>
+            <g class="selectable" data-key="hq-edge--isp" role="button" tabindex="0" aria-label="hq-edge と isp のリンク">
+              <path class="link-line" d="M470 543 H600"/><path class="link-hit" d="M470 543 H600"/>
+              <g class="link-label" transform="translate(535 472)"><rect x="-55" y="-15" width="110" height="30" rx="5"/><text y="-2">eth2 ↔ eth1</text><text class="minor" y="10">E0/2 ↔ E0/1</text></g>
+            </g>
+            <g class="selectable" data-key="isp--br-edge" role="button" tabindex="0" aria-label="isp と br-edge のリンク">
+              <path class="link-line" d="M730 543 H830"/><path class="link-hit" d="M730 543 H830"/>
+              <g class="link-label" transform="translate(780 472)"><rect x="-55" y="-15" width="110" height="30" rx="5"/><text y="-2">eth2 ↔ eth1</text><text class="minor" y="10">E0/2 ↔ E0/1</text></g>
+            </g>
+            <g class="selectable" data-key="br-edge--br-core" role="button" tabindex="0" aria-label="br-edge と br-core のリンク">
+              <path class="link-line" d="M915 500 V386"/><path class="link-hit" d="M915 500 V386"/>
+              <g class="link-label" transform="translate(986 443)"><rect x="-55" y="-15" width="110" height="30" rx="5"/><text y="-2">eth2 ↔ eth1</text><text class="minor" y="10">E0/2 ↔ E0/1</text></g>
+            </g>
+            <g class="selectable" data-key="br-core--br-pc" role="button" tabindex="0" aria-label="br-core と br-pc のリンク">
+              <path class="link-line" d="M915 300 V186"/><path class="link-hit" d="M915 300 V186"/>
+              <g class="link-label" transform="translate(986 243)"><rect x="-55" y="-15" width="110" height="30" rx="5"/><text y="-2">eth2 ↔ eth1</text><text class="minor" y="10">E0/2 ↔ Linux</text></g>
+            </g>
+
+            <!-- Physical devices -->
+            <g class="device endpoint selectable" data-key="hq-pc" role="button" tabindex="0" aria-label="hq-pc">
+              <rect class="card" x="55" y="100" width="170" height="86" rx="9"/><rect class="accent" x="55" y="100" width="10" height="86" rx="5"/>
+              <text class="device-name" x="140" y="126">hq-pc</text><text class="device-role" x="140" y="146">Linux endpoint</text><text class="device-meta" x="140" y="166">mgmt 172.26.26.101</text>
+            </g>
+            <g class="device selectable" data-key="hq-dist" role="button" tabindex="0" aria-label="hq-dist">
+              <rect class="card" x="300" y="100" width="170" height="86" rx="9"/><rect class="accent" x="300" y="100" width="10" height="86" rx="5"/>
+              <text class="device-name" x="385" y="126">hq-dist</text><text class="device-role" x="385" y="146">Cisco IOL router</text><text class="device-meta" x="385" y="166">mgmt 172.26.26.12</text>
+            </g>
+            <g class="device selectable is-selected" data-key="hq-core" role="button" tabindex="0" aria-label="hq-core">
+              <rect class="card" x="300" y="300" width="170" height="86" rx="9"/><rect class="accent" x="300" y="300" width="10" height="86" rx="5"/>
+              <text class="device-name" x="385" y="326">hq-core</text><text class="device-role" x="385" y="346">Cisco IOL router</text><text class="device-meta" x="385" y="366">mgmt 172.26.26.11</text>
+            </g>
+            <g class="device edge selectable" data-key="hq-edge" role="button" tabindex="0" aria-label="hq-edge">
+              <rect class="card" x="300" y="500" width="170" height="86" rx="9"/><rect class="accent" x="300" y="500" width="10" height="86" rx="5"/>
+              <text class="device-name" x="385" y="526">hq-edge</text><text class="device-role" x="385" y="546">Cisco IOL · Edge/NAT</text><text class="device-meta" x="385" y="566">mgmt 172.26.26.13</text>
+            </g>
+            <g class="device selectable" data-key="hq-dmz" role="button" tabindex="0" aria-label="hq-dmz">
+              <rect class="card" x="55" y="300" width="170" height="86" rx="9"/><rect class="accent" x="55" y="300" width="10" height="86" rx="5"/>
+              <text class="device-name" x="140" y="326">hq-dmz</text><text class="device-role" x="140" y="346">Cisco IOL router</text><text class="device-meta" x="140" y="366">mgmt 172.26.26.14</text>
+            </g>
+            <g class="device endpoint selectable" data-key="dmz-srv" role="button" tabindex="0" aria-label="dmz-srv">
+              <rect class="card" x="55" y="500" width="170" height="86" rx="9"/><rect class="accent" x="55" y="500" width="10" height="86" rx="5"/>
+              <text class="device-name" x="140" y="526">dmz-srv</text><text class="device-role" x="140" y="546">Linux endpoint</text><text class="device-meta" x="140" y="566">mgmt 172.26.26.103</text>
+            </g>
+            <g class="device isp selectable" data-key="isp" role="button" tabindex="0" aria-label="isp">
+              <rect class="card" x="600" y="500" width="130" height="86" rx="9"/><rect class="accent" x="600" y="500" width="10" height="86" rx="5"/>
+              <text class="device-name" x="665" y="526">isp</text><text class="device-role" x="665" y="546">Cisco IOL</text><text class="device-meta" x="665" y="566">172.26.26.100</text>
+            </g>
+            <g class="device edge selectable" data-key="br-edge" role="button" tabindex="0" aria-label="br-edge">
+              <rect class="card" x="830" y="500" width="170" height="86" rx="9"/><rect class="accent" x="830" y="500" width="10" height="86" rx="5"/>
+              <text class="device-name" x="915" y="526">br-edge</text><text class="device-role" x="915" y="546">Cisco IOL · WAN Edge</text><text class="device-meta" x="915" y="566">mgmt 172.26.26.22</text>
+            </g>
+            <g class="device selectable" data-key="br-core" role="button" tabindex="0" aria-label="br-core">
+              <rect class="card" x="830" y="300" width="170" height="86" rx="9"/><rect class="accent" x="830" y="300" width="10" height="86" rx="5"/>
+              <text class="device-name" x="915" y="326">br-core</text><text class="device-role" x="915" y="346">Cisco IOL router</text><text class="device-meta" x="915" y="366">mgmt 172.26.26.21</text>
+            </g>
+            <g class="device endpoint selectable" data-key="br-pc" role="button" tabindex="0" aria-label="br-pc">
+              <rect class="card" x="830" y="100" width="170" height="86" rx="9"/><rect class="accent" x="830" y="100" width="10" height="86" rx="5"/>
+              <text class="device-name" x="915" y="126">br-pc</text><text class="device-role" x="915" y="146">Linux endpoint</text><text class="device-meta" x="915" y="166">mgmt 172.26.26.102</text>
+            </g>
+          </svg>
+        </div>
+        <div class="diagram-foot"><span class="legend-item"><span class="legend-line"></span>仮想Ethernetリンク</span><span>IOSポートはcontainerlabポートの下段に表示</span></div>
+      </div>
+
+      <div id="panel-logical" role="tabpanel" aria-labelledby="tab-logical" hidden>
+        <div class="panel-head">
+          <div><h2>論理構成図</h2><p>IPアドレス、ルーティングドメイン、再配信、NAT/PATとセキュリティゾーン</p></div>
+          <span class="view-label">L2 / L3 Logical</span>
+        </div>
+        <div class="diagram-scroll">
+          <svg class="topology" viewBox="0 0 1180 670" role="img" aria-labelledby="logical-title logical-desc">
+            <title id="logical-title">Theme 26 論理構成図</title>
+            <desc id="logical-desc">OSPF、EIGRP、BGP、再配信、NATおよびVLANを示した論理構成</desc>
+
+            <rect class="zone zone-trust" x="18" y="24" width="532" height="620" rx="16"/>
+            <text class="zone-title" x="38" y="52">HQ Trust</text><text class="zone-sub" x="38" y="70">OSPF Area 0 / EIGRP AS 100</text>
+            <rect class="zone zone-dmz" x="30" y="270" width="222" height="350" rx="13"/>
+            <text class="zone-title" x="48" y="291">DMZ</text>
+            <rect class="zone zone-isp" x="570" y="390" width="190" height="254" rx="16"/>
+            <text class="zone-title" x="590" y="418">Untrust / ISP</text><text class="zone-sub" x="590" y="436">AS 65100</text>
+            <rect class="zone zone-trust" x="780" y="24" width="382" height="620" rx="16"/>
+            <text class="zone-title" x="800" y="52">Branch Trust / WAN</text><text class="zone-sub" x="800" y="70">OSPF Area 1 · AS 65001</text>
+
+            <!-- Logical links -->
+            <g class="selectable" data-key="hq-pc--hq-dist" role="button" tabindex="0" aria-label="HQ VLAN 10">
+              <path class="link-line" d="M225 143 H300"/><path class="link-hit" d="M225 143 H300"/>
+              <g class="link-label" transform="translate(262 214)"><rect x="-55" y="-15" width="110" height="30" rx="5"/><text y="-2">10.26.10.0/24</text><text class="minor" y="10">VLAN 10 · Trust</text></g>
+            </g>
+            <g class="selectable" data-key="hq-dist--hq-core" role="button" tabindex="0" aria-label="HQ EIGRPリンク">
+              <path class="link-line eigrp" d="M385 186 V300"/><path class="link-hit" d="M385 186 V300"/>
+              <g class="link-label" transform="translate(466 243)"><rect x="-65" y="-17" width="130" height="34" rx="5"/><text y="-3">10.26.1.0/30</text><text class="minor" y="10">EIGRP AS 100</text></g>
+            </g>
+            <g class="selectable" data-key="hq-core--hq-edge" role="button" tabindex="0" aria-label="HQ OSPF Core Edgeリンク">
+              <path class="link-line ospf" d="M385 386 V500"/><path class="link-hit" d="M385 386 V500"/>
+              <g class="link-label" transform="translate(466 438)"><rect x="-65" y="-17" width="130" height="34" rx="5"/><text y="-3">10.26.1.4/30</text><text class="minor" y="10">OSPF Area 0</text></g>
+            </g>
+            <g class="selectable" data-key="hq-core--hq-dmz" role="button" tabindex="0" aria-label="HQ OSPF DMZリンク">
+              <path class="link-line ospf" d="M225 343 H300"/><path class="link-hit" d="M225 343 H300"/>
+              <g class="link-label" transform="translate(262 410)"><rect x="-58" y="-16" width="116" height="32" rx="5"/><text y="-3">10.26.1.8/30</text><text class="minor" y="10">OSPF Area 0</text></g>
+            </g>
+            <g class="selectable" data-key="hq-dmz--dmz-srv" role="button" tabindex="0" aria-label="DMZ VLAN 30">
+              <path class="link-line" d="M140 386 V500"/><path class="link-hit" d="M140 386 V500"/>
+              <g class="link-label" transform="translate(205 443)"><rect x="-55" y="-16" width="110" height="32" rx="5"/><text y="-3">10.26.30.0/24</text><text class="minor" y="10">VLAN 30 · DMZ</text></g>
+            </g>
+            <g class="selectable" data-key="hq-edge--isp" role="button" tabindex="0" aria-label="HQ ISP eBGPリンク">
+              <path class="link-line bgp" d="M470 543 H600"/><path class="link-hit" d="M470 543 H600"/>
+              <g class="link-label" transform="translate(535 472)"><rect x="-63" y="-17" width="126" height="34" rx="5"/><text y="-3">198.51.100.0/30</text><text class="minor" y="10">eBGP · NAT outside</text></g>
+            </g>
+            <g class="selectable" data-key="isp--br-edge" role="button" tabindex="0" aria-label="ISP Branch eBGPリンク">
+              <path class="link-line bgp" d="M730 543 H830"/><path class="link-hit" d="M730 543 H830"/>
+              <g class="link-label" transform="translate(780 472)"><rect x="-63" y="-17" width="126" height="34" rx="5"/><text y="-3">198.51.100.4/30</text><text class="minor" y="10">eBGP</text></g>
+            </g>
+            <g class="selectable" data-key="br-edge--br-core" role="button" tabindex="0" aria-label="Branch OSPFリンク">
+              <path class="link-line ospf" d="M915 500 V386"/><path class="link-hit" d="M915 500 V386"/>
+              <g class="link-label" transform="translate(996 443)"><rect x="-65" y="-17" width="130" height="34" rx="5"/><text y="-3">10.26.2.0/30</text><text class="minor" y="10">OSPF Area 1</text></g>
+            </g>
+            <g class="selectable" data-key="br-core--br-pc" role="button" tabindex="0" aria-label="Branch VLAN 20">
+              <path class="link-line" d="M915 300 V186"/><path class="link-hit" d="M915 300 V186"/>
+              <g class="link-label" transform="translate(996 243)"><rect x="-65" y="-17" width="130" height="34" rx="5"/><text y="-3">10.26.20.0/24</text><text class="minor" y="10">VLAN 20 · Trust</text></g>
+            </g>
+
+            <!-- Logical devices -->
+            <g class="device endpoint selectable" data-key="hq-pc" role="button" tabindex="0" aria-label="hq-pc 10.26.10.10">
+              <rect class="card" x="55" y="100" width="170" height="86" rx="9"/><rect class="accent" x="55" y="100" width="10" height="86" rx="5"/>
+              <text class="device-name" x="140" y="126">hq-pc</text><text class="device-role" x="140" y="146">HQ Trust client</text><text class="device-meta" x="140" y="166">10.26.10.10/24</text>
+            </g>
+            <g class="device selectable" data-key="hq-dist" role="button" tabindex="0" aria-label="hq-dist EIGRP AS 100">
+              <rect class="card" x="300" y="100" width="170" height="86" rx="9"/><rect class="accent" x="300" y="100" width="10" height="86" rx="5"/>
+              <text class="device-name" x="385" y="126">hq-dist</text><text class="device-role" x="385" y="146">EIGRP AS 100</text><text class="device-meta" x="385" y="166">GW 10.26.10.1</text>
+            </g>
+            <g class="device selectable is-selected" data-key="hq-core" role="button" tabindex="0" aria-label="hq-core 再配信ポイント">
+              <rect class="card" x="300" y="300" width="170" height="86" rx="9"/><rect class="accent" x="300" y="300" width="10" height="86" rx="5"/>
+              <text class="device-name" x="385" y="326">hq-core</text><text class="device-role" x="385" y="346">OSPF ↔ EIGRP再配信</text><text class="device-meta" x="385" y="366">RID 10.26.255.1</text>
+            </g>
+            <g class="device edge selectable" data-key="hq-edge" role="button" tabindex="0" aria-label="hq-edge BGP AS 65000 NAT">
+              <rect class="card" x="300" y="500" width="170" height="86" rx="9"/><rect class="accent" x="300" y="500" width="10" height="86" rx="5"/>
+              <text class="device-name" x="385" y="526">hq-edge</text><text class="device-role" x="385" y="546">AS 65000 · NAT/PAT</text><text class="device-meta" x="385" y="566">RID 10.26.255.254</text>
+            </g>
+            <g class="device selectable" data-key="hq-dmz" role="button" tabindex="0" aria-label="hq-dmz OSPF Area 0">
+              <rect class="card" x="55" y="300" width="170" height="86" rx="9"/><rect class="accent" x="55" y="300" width="10" height="86" rx="5"/>
+              <text class="device-name" x="140" y="326">hq-dmz</text><text class="device-role" x="140" y="346">OSPF Area 0</text><text class="device-meta" x="140" y="366">RID 10.26.255.3</text>
+            </g>
+            <g class="device endpoint selectable" data-key="dmz-srv" role="button" tabindex="0" aria-label="dmz-srv 10.26.30.10">
+              <rect class="card" x="55" y="500" width="170" height="86" rx="9"/><rect class="accent" x="55" y="500" width="10" height="86" rx="5"/>
+              <text class="device-name" x="140" y="526">dmz-srv</text><text class="device-role" x="140" y="546">DMZ server</text><text class="device-meta" x="140" y="566">10.26.30.10/24</text>
+            </g>
+            <g class="device isp selectable" data-key="isp" role="button" tabindex="0" aria-label="isp BGP AS 65100">
+              <rect class="card" x="600" y="500" width="130" height="86" rx="9"/><rect class="accent" x="600" y="500" width="10" height="86" rx="5"/>
+              <text class="device-name" x="665" y="526">isp</text><text class="device-role" x="665" y="546">BGP AS 65100</text><text class="device-meta" x="665" y="566">Default originate</text>
+            </g>
+            <g class="device edge selectable" data-key="br-edge" role="button" tabindex="0" aria-label="br-edge BGP AS 65001">
+              <rect class="card" x="830" y="500" width="170" height="86" rx="9"/><rect class="accent" x="830" y="500" width="10" height="86" rx="5"/>
+              <text class="device-name" x="915" y="526">br-edge</text><text class="device-role" x="915" y="546">BGP AS 65001</text><text class="device-meta" x="915" y="566">RID 10.26.255.12</text>
+            </g>
+            <g class="device selectable" data-key="br-core" role="button" tabindex="0" aria-label="br-core OSPF Area 1">
+              <rect class="card" x="830" y="300" width="170" height="86" rx="9"/><rect class="accent" x="830" y="300" width="10" height="86" rx="5"/>
+              <text class="device-name" x="915" y="326">br-core</text><text class="device-role" x="915" y="346">OSPF Area 1</text><text class="device-meta" x="915" y="366">RID 10.26.255.11</text>
+            </g>
+            <g class="device endpoint selectable" data-key="br-pc" role="button" tabindex="0" aria-label="br-pc 10.26.20.10">
+              <rect class="card" x="830" y="100" width="170" height="86" rx="9"/><rect class="accent" x="830" y="100" width="10" height="86" rx="5"/>
+              <text class="device-name" x="915" y="126">br-pc</text><text class="device-role" x="915" y="146">Branch Trust client</text><text class="device-meta" x="915" y="166">10.26.20.10/24</text>
+            </g>
+          </svg>
+        </div>
+        <div class="diagram-foot">
+          <span class="legend-item"><span class="legend-line ospf"></span>OSPF</span>
+          <span class="legend-item"><span class="legend-line eigrp"></span>EIGRP</span>
+          <span class="legend-item"><span class="legend-line bgp"></span>eBGP</span>
+          <span class="legend-item"><span class="legend-chip" style="background:var(--trust);border-color:var(--trust-line)"></span>Trust</span>
+          <span class="legend-item"><span class="legend-chip" style="background:var(--dmz);border-color:var(--dmz-line)"></span>DMZ</span>
+          <span class="legend-item"><span class="legend-chip" style="background:var(--untrust);border-color:var(--untrust-line)"></span>Untrust</span>
+        </div>
+      </div>
+    </section>
+
+    <aside class="detail-panel" aria-live="polite" aria-label="選択項目の詳細">
+      <p class="detail-eyebrow" id="detail-kind">Physical device</p>
+      <h2 id="detail-title">hq-core</h2>
+      <p class="detail-summary" id="detail-summary">本社の中核ルータ。物理接続上はDistribution、Edge、DMZの3方向を集約します。</p>
+      <dl class="detail-list" id="detail-list"></dl>
+      <p class="detail-note" id="detail-note">図の機器またはリンクを選択すると、この欄が切り替わります。</p>
+    </aside>
+  </div>
+
+  <section class="status-panel" aria-labelledby="scope-title">
+    <h2 id="scope-title">現行ラボでの対象範囲</h2>
+    <div class="status-grid">
+      <div class="status-item"><strong>ラック・電源</strong><span>仮想ラボのため対象外</span></div>
+      <div class="status-item"><strong>ケーブル・光モジュール</strong><span>Linux veth相当。物理媒体なし</span></div>
+      <div class="status-item"><strong>FHRP・LACP・VPN</strong><span>現行設計では未構成</span></div>
+      <div class="status-item"><strong>VLAN / Trunk</strong><span>VLANは論理ラベル。Trunk未構成</span></div>
+    </div>
+  </section>
+
+  <footer>情報源: 基本設計書、IPアドレス管理表、パラメータシート、campus.clab.yml。障害経路はPhase 2で追加予定。</footer>
+</main>
+
+<script>
+  const devices = {
+    "hq-core": {
+      physical: { kind: "Physical device", summary: "本社の中核ルータ。物理接続上はDistribution、Edge、DMZの3方向を集約します。", rows: [["種別", "Cisco IOL router"], ["イメージ", "vrnetlab/cisco_iol:15.7.3M2"], ["管理IP", "172.26.26.11"], ["接続ポート", "eth1 / eth2 / eth3（IOS: Ethernet0/1〜0/3）"], ["配置・電源", "仮想ノードのため対象外"]] },
+      logical: { kind: "Logical device", summary: "OSPF Area 0とEIGRP AS 100の境界で、双方向の経路再配信を担います。", rows: [["Router ID", "10.26.255.1/32"], ["OSPF", "Process 10 / Area 0: E0/2, E0/3, Lo0"], ["EIGRP", "AS 100: E0/1"], ["再配信", "OSPF ↔ EIGRP。route-mapで10.26.0.0/16のみ許可"], ["役割", "Trustコア / Redistribution point"]] }
+    },
+    "hq-dist": {
+      physical: { kind: "Physical device", summary: "HQ Trust端末を収容し、hq-coreへ接続する仮想Distributionルータです。", rows: [["種別", "Cisco IOL router"], ["イメージ", "vrnetlab/cisco_iol:15.7.3M2"], ["管理IP", "172.26.26.12"], ["接続ポート", "eth1→hq-core / eth2→hq-pc"], ["配置・電源", "仮想ノードのため対象外"]] },
+      logical: { kind: "Logical device", summary: "HQ Trustのデフォルトゲートウェイ兼EIGRPルータです。", rows: [["Router ID", "10.26.255.2/32"], ["EIGRP", "AS 100"], ["Core側", "10.26.1.2/30"], ["LAN側", "10.26.10.1/24"], ["Passive", "Ethernet0/2"]] }
+    },
+    "hq-edge": {
+      physical: { kind: "Physical device", summary: "HQ内部とISPを接続する境界ルータです。", rows: [["種別", "Cisco IOL router"], ["イメージ", "vrnetlab/cisco_iol:15.7.3M2"], ["管理IP", "172.26.26.13"], ["接続ポート", "eth1→hq-core / eth2→isp"], ["配置・電源", "仮想ノードのため対象外"]] },
+      logical: { kind: "Logical device", summary: "OSPFとeBGPの境界で、HQ内のプライベートIPをPAT変換します。", rows: [["Router ID", "10.26.255.254/32"], ["BGP", "AS 65000 / neighbor 198.51.100.2 AS 65100"], ["OSPF", "Process 10 / Area 0"], ["NAT inside", "Ethernet0/1 · 10.26.1.6/30"], ["NAT outside", "Ethernet0/2 · 198.51.100.1/30"], ["広告", "10.26.0.0/16 aggregate"]] }
+    },
+    "hq-dmz": {
+      physical: { kind: "Physical device", summary: "HQ CoreとDMZサーバを接続する仮想ルータです。", rows: [["種別", "Cisco IOL router"], ["イメージ", "vrnetlab/cisco_iol:15.7.3M2"], ["管理IP", "172.26.26.14"], ["接続ポート", "eth1→hq-core / eth2→dmz-srv"], ["配置・電源", "仮想ノードのため対象外"]] },
+      logical: { kind: "Logical device", summary: "OSPF Area 0にDMZセグメントを広告します。", rows: [["Router ID", "10.26.255.3/32"], ["OSPF", "Process 10 / Area 0"], ["Core側", "10.26.1.10/30"], ["DMZ GW", "10.26.30.1/24"], ["Passive", "Ethernet0/2"]] }
+    },
+    "isp": {
+      physical: { kind: "Physical device", summary: "HQと支社の外部接続を中継するISP模擬ルータです。", rows: [["種別", "Cisco IOL router"], ["イメージ", "vrnetlab/cisco_iol:15.7.3M2"], ["管理IP", "172.26.26.100"], ["接続ポート", "eth1→hq-edge / eth2→br-edge"], ["配置・電源", "仮想ノードのため対象外"]] },
+      logical: { kind: "Logical device", summary: "AS 65100としてHQと支社の2つのeBGPピアを収容し、デフォルトルートを広告します。", rows: [["Router ID", "10.26.255.100/32"], ["BGP", "AS 65100"], ["HQ neighbor", "198.51.100.1 / AS 65000"], ["Branch neighbor", "198.51.100.6 / AS 65001"], ["経路", "Default route originate"]] }
+    },
+    "br-edge": {
+      physical: { kind: "Physical device", summary: "ISPと支社内部を接続するWAN Edgeルータです。", rows: [["種別", "Cisco IOL router"], ["イメージ", "vrnetlab/cisco_iol:15.7.3M2"], ["管理IP", "172.26.26.22"], ["接続ポート", "eth1→isp / eth2→br-core"], ["配置・電源", "仮想ノードのため対象外"]] },
+      logical: { kind: "Logical device", summary: "支社OSPFとeBGPの境界で、支社プレフィックスだけをISPへ広告します。", rows: [["Router ID", "10.26.255.12/32"], ["BGP", "AS 65001 / neighbor 198.51.100.5 AS 65100"], ["OSPF", "Process 10 / Area 1"], ["WAN", "198.51.100.6/30"], ["フィルタ", "10.26.20.0/24など自拠点経路のみ広告"]] }
+    },
+    "br-core": {
+      physical: { kind: "Physical device", summary: "支社端末を収容し、br-edgeへ接続するCoreルータです。", rows: [["種別", "Cisco IOL router"], ["イメージ", "vrnetlab/cisco_iol:15.7.3M2"], ["管理IP", "172.26.26.21"], ["接続ポート", "eth1→br-edge / eth2→br-pc"], ["配置・電源", "仮想ノードのため対象外"]] },
+      logical: { kind: "Logical device", summary: "Branch Trustのデフォルトゲートウェイ兼OSPF Area 1ルータです。", rows: [["Router ID", "10.26.255.11/32"], ["OSPF", "Process 10 / Area 1"], ["Edge側", "10.26.2.2/30"], ["LAN側", "10.26.20.1/24"], ["Passive", "Ethernet0/2"]] }
+    },
+    "hq-pc": {
+      physical: { kind: "Physical endpoint", summary: "HQ Trustに配置されたLinuxクライアントです。", rows: [["種別", "Linux container"], ["イメージ", "wbitt/network-multitool:latest"], ["管理IP", "172.26.26.101"], ["接続", "eth1→hq-dist:eth2"], ["配置・電源", "仮想ノードのため対象外"]] },
+      logical: { kind: "Logical endpoint", summary: "HQ Trust VLAN 10の疎通確認元です。", rows: [["IP", "10.26.10.10/24"], ["Gateway", "10.26.10.1"], ["VLAN", "10 · HQ Trust（論理ラベル）"], ["Trunk", "未構成"]] }
+    },
+    "br-pc": {
+      physical: { kind: "Physical endpoint", summary: "Branch Trustに配置されたLinuxクライアントです。", rows: [["種別", "Linux container"], ["イメージ", "wbitt/network-multitool:latest"], ["管理IP", "172.26.26.102"], ["接続", "eth1→br-core:eth2"], ["配置・電源", "仮想ノードのため対象外"]] },
+      logical: { kind: "Logical endpoint", summary: "Branch Trust VLAN 20の疎通確認元です。", rows: [["IP", "10.26.20.10/24"], ["Gateway", "10.26.20.1"], ["VLAN", "20 · Branch Trust（論理ラベル）"], ["Trunk", "未構成"]] }
+    },
+    "dmz-srv": {
+      physical: { kind: "Physical endpoint", summary: "DMZに配置された公開サーバ模擬Linuxコンテナです。", rows: [["種別", "Linux container"], ["イメージ", "wbitt/network-multitool:latest"], ["管理IP", "172.26.26.103"], ["接続", "eth1→hq-dmz:eth2"], ["配置・電源", "仮想ノードのため対象外"]] },
+      logical: { kind: "Logical endpoint", summary: "DMZ VLAN 30のサービス到達性確認先です。", rows: [["IP", "10.26.30.10/24"], ["Gateway", "10.26.30.1"], ["VLAN", "30 · DMZ（論理ラベル）"], ["Zone", "DMZ"]] }
+    }
+  };
+
+  const links = {
+    "hq-pc--hq-dist": { physical: ["HQ PC収容リンク", [["端点A", "hq-pc:eth1"], ["端点B", "hq-dist:eth2 / Ethernet0/2"], ["媒体", "containerlab仮想Ethernet（veth相当）"], ["物理仕様", "SFP・ケーブル・ラック情報は対象外"]]], logical: ["HQ Trust LAN", [["Subnet", "10.26.10.0/24"], ["VLAN", "10（論理ラベル）"], ["Gateway", "10.26.10.1"], ["用途", "HQ Trust client access"]]] },
+    "hq-dist--hq-core": { physical: ["HQ Distribution–Coreリンク", [["端点A", "hq-dist:eth1 / Ethernet0/1"], ["端点B", "hq-core:eth1 / Ethernet0/1"], ["媒体", "containerlab仮想Ethernet（veth相当）"]]], logical: ["EIGRP内部リンク", [["Subnet", "10.26.1.0/30"], ["hq-core", "10.26.1.1"], ["hq-dist", "10.26.1.2"], ["Protocol", "EIGRP AS 100"]]] },
+    "hq-core--hq-edge": { physical: ["HQ Core–Edgeリンク", [["端点A", "hq-core:eth2 / Ethernet0/2"], ["端点B", "hq-edge:eth1 / Ethernet0/1"], ["媒体", "containerlab仮想Ethernet（veth相当）"]]], logical: ["OSPF Core–Edgeリンク", [["Subnet", "10.26.1.4/30"], ["hq-core", "10.26.1.5"], ["hq-edge", "10.26.1.6"], ["Protocol", "OSPF Process 10 / Area 0"], ["NAT", "hq-edge側はinside"]]] },
+    "hq-core--hq-dmz": { physical: ["HQ Core–DMZリンク", [["端点A", "hq-core:eth3 / Ethernet0/3"], ["端点B", "hq-dmz:eth1 / Ethernet0/1"], ["媒体", "containerlab仮想Ethernet（veth相当）"]]], logical: ["OSPF DMZ接続リンク", [["Subnet", "10.26.1.8/30"], ["hq-core", "10.26.1.9"], ["hq-dmz", "10.26.1.10"], ["Protocol", "OSPF Process 10 / Area 0"]]] },
+    "hq-dmz--dmz-srv": { physical: ["DMZサーバ収容リンク", [["端点A", "hq-dmz:eth2 / Ethernet0/2"], ["端点B", "dmz-srv:eth1"], ["媒体", "containerlab仮想Ethernet（veth相当）"]]], logical: ["DMZ LAN", [["Subnet", "10.26.30.0/24"], ["VLAN", "30（論理ラベル）"], ["Gateway", "10.26.30.1"], ["Zone", "DMZ"]]] },
+    "hq-edge--isp": { physical: ["HQ–ISPアップリンク", [["端点A", "hq-edge:eth2 / Ethernet0/2"], ["端点B", "isp:eth1 / Ethernet0/1"], ["媒体", "containerlab仮想Ethernet（veth相当）"]]], logical: ["HQ eBGPアップリンク", [["Subnet", "198.51.100.0/30"], ["hq-edge", "198.51.100.1 / AS 65000"], ["isp", "198.51.100.2 / AS 65100"], ["Protocol", "eBGP"], ["NAT", "hq-edge側はoutside"]]] },
+    "isp--br-edge": { physical: ["ISP–Branchアップリンク", [["端点A", "isp:eth2 / Ethernet0/2"], ["端点B", "br-edge:eth1 / Ethernet0/1"], ["媒体", "containerlab仮想Ethernet（veth相当）"]]], logical: ["Branch eBGPアップリンク", [["Subnet", "198.51.100.4/30"], ["isp", "198.51.100.5 / AS 65100"], ["br-edge", "198.51.100.6 / AS 65001"], ["Protocol", "eBGP"]]] },
+    "br-edge--br-core": { physical: ["Branch Edge–Coreリンク", [["端点A", "br-edge:eth2 / Ethernet0/2"], ["端点B", "br-core:eth1 / Ethernet0/1"], ["媒体", "containerlab仮想Ethernet（veth相当）"]]], logical: ["Branch OSPFリンク", [["Subnet", "10.26.2.0/30"], ["br-edge", "10.26.2.1"], ["br-core", "10.26.2.2"], ["Protocol", "OSPF Process 10 / Area 1"]]] },
+    "br-core--br-pc": { physical: ["Branch PC収容リンク", [["端点A", "br-core:eth2 / Ethernet0/2"], ["端点B", "br-pc:eth1"], ["媒体", "containerlab仮想Ethernet（veth相当）"]]], logical: ["Branch Trust LAN", [["Subnet", "10.26.20.0/24"], ["VLAN", "20（論理ラベル）"], ["Gateway", "10.26.20.1"], ["用途", "Branch Trust client access"]]] }
+  };
+
+  const state = { view: "physical", selection: "hq-core" };
+  const detailKind = document.getElementById("detail-kind");
+  const detailTitle = document.getElementById("detail-title");
+  const detailSummary = document.getElementById("detail-summary");
+  const detailList = document.getElementById("detail-list");
+  const detailNote = document.getElementById("detail-note");
+
+  function showDetail(key) {
+    state.selection = key;
+    document.querySelectorAll(".selectable").forEach(item => item.classList.toggle("is-selected", item.dataset.key === key && !item.closest("[hidden]")));
+    if (devices[key]) {
+      const detail = devices[key][state.view];
+      detailKind.textContent = detail.kind;
+      detailTitle.textContent = key;
+      detailSummary.textContent = detail.summary;
+      detailList.replaceChildren(...detail.rows.map(([term, value]) => makeRow(term, value)));
+    } else {
+      const [title, rows] = links[key][state.view];
+      detailKind.textContent = state.view === "physical" ? "Physical link" : "Logical link";
+      detailTitle.textContent = title;
+      detailSummary.textContent = state.view === "physical" ? "仮想配線とインターフェースの対応です。" : "このリンクのL2/L3属性です。";
+      detailList.replaceChildren(...rows.map(([term, value]) => makeRow(term, value)));
+    }
+    detailNote.textContent = state.view === "physical"
+      ? "物理図は仮想配線の正確な接続先を示します。媒体・ラック・電源はcontainerlabでは対象外です。"
+      : "VLAN 10/20/30は設計上の論理ラベルです。現行トポロジに802.1Q trunkやAllowed VLAN設定はありません。";
+  }
+
+  function makeRow(term, value) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "detail-row";
+    const dt = document.createElement("dt");
+    const dd = document.createElement("dd");
+    dt.textContent = term;
+    dd.textContent = value;
+    wrapper.append(dt, dd);
+    return wrapper;
+  }
+
+  function activateTab(tab, moveFocus = false) {
+    const view = tab.dataset.view;
+    state.view = view;
+    document.querySelectorAll("[role=tab]").forEach(item => {
+      const active = item === tab;
+      item.setAttribute("aria-selected", String(active));
+      item.tabIndex = active ? 0 : -1;
+    });
+    document.getElementById("panel-physical").hidden = view !== "physical";
+    document.getElementById("panel-logical").hidden = view !== "logical";
+    if (moveFocus) tab.focus();
+    showDetail(state.selection);
+  }
+
+  document.querySelectorAll("[role=tab]").forEach(tab => {
+    tab.addEventListener("click", () => activateTab(tab));
+    tab.addEventListener("keydown", event => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const tabs = [...document.querySelectorAll("[role=tab]")];
+      let index = tabs.indexOf(tab);
+      if (event.key === "ArrowLeft") index = (index - 1 + tabs.length) % tabs.length;
+      if (event.key === "ArrowRight") index = (index + 1) % tabs.length;
+      if (event.key === "Home") index = 0;
+      if (event.key === "End") index = tabs.length - 1;
+      activateTab(tabs[index], true);
+    });
+  });
+
+  document.querySelectorAll(".selectable").forEach(item => {
+    item.addEventListener("click", () => showDetail(item.dataset.key));
+    item.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        showDetail(item.dataset.key);
+      }
+    });
+  });
+
+  showDetail("hq-core");
+</script>
+</body>
+</html>

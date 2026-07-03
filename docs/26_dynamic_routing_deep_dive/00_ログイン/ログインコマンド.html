@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Theme 26 機器別ログインコマンド</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>26_dynamic_routing_deep_dive</span>
+<span class="sep">/</span>
+<span>00_ログイン</span></nav>
+      <h1 class="doc-title">Theme 26 機器別ログインコマンド</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="1-実行場所" tabindex="-1">1. 実行場所 <a class="header-anchor" href="#1-実行場所" aria-hidden="true">#</a></h2>
+<p>以下はすべてOrbStack Linux VM <code>clab</code>で実行します。</p>
+<pre><code class="language-bash">ssh clab@orb
+<span class="hljs-built_in">cd</span> /Users/shuya/Documents/claude/Mac仮想環境構築/26_dynamic_routing_deep_dive
+</code></pre>
+<h2 id="2-稼働確認" tabindex="-1">2. 稼働確認 <a class="header-anchor" href="#2-稼働確認" aria-hidden="true">#</a></h2>
+<pre><code class="language-bash"><span class="hljs-built_in">cd</span> 04_構築
+./deploy.sh inspect
+</code></pre>
+<p>すべてのノード（IOLおよびLinuxコンテナ）が<code>running</code>であることを確認します。</p>
+<h2 id="3-cisco-iolへのログイン" tabindex="-1">3. Cisco IOLへのログイン <a class="header-anchor" href="#3-cisco-iolへのログイン" aria-hidden="true">#</a></h2>
+<p>IOLをPID1として起動し、<code>docker attach</code>の標準入力をIOSへ直結しています。
+画面がすぐ表示されない場合は、接続後にEnterを1〜2回押してください。初回はCiscoの<code>System Configuration Dialog</code>が表示されます（noで抜ける）。</p>
+<h3 id="hq-core-ospf-core" tabindex="-1">hq-core (OSPF Core) <a class="header-anchor" href="#hq-core-ospf-core" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker attach --sig-proxy=<span class="hljs-literal">false</span> clab-dynamic-routing-lab-hq-core
+</code></pre>
+<h3 id="hq-dist-eigrp-distribution" tabindex="-1">hq-dist (EIGRP Distribution) <a class="header-anchor" href="#hq-dist-eigrp-distribution" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker attach --sig-proxy=<span class="hljs-literal">false</span> clab-dynamic-routing-lab-hq-dist
+</code></pre>
+<h3 id="hq-edge-ospfbgp-edge-nat" tabindex="-1">hq-edge (OSPF/BGP Edge, NAT) <a class="header-anchor" href="#hq-edge-ospfbgp-edge-nat" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker attach --sig-proxy=<span class="hljs-literal">false</span> clab-dynamic-routing-lab-hq-edge
+</code></pre>
+<h3 id="hq-dmz-dmz-switch" tabindex="-1">hq-dmz (DMZ Switch) <a class="header-anchor" href="#hq-dmz-dmz-switch" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker attach --sig-proxy=<span class="hljs-literal">false</span> clab-dynamic-routing-lab-hq-dmz
+</code></pre>
+<h3 id="br-core-branch-ospf-core" tabindex="-1">br-core (Branch OSPF Core) <a class="header-anchor" href="#br-core-branch-ospf-core" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker attach --sig-proxy=<span class="hljs-literal">false</span> clab-dynamic-routing-lab-br-core
+</code></pre>
+<h3 id="br-edge-branch-bgp-edge" tabindex="-1">br-edge (Branch BGP Edge) <a class="header-anchor" href="#br-edge-branch-bgp-edge" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker attach --sig-proxy=<span class="hljs-literal">false</span> clab-dynamic-routing-lab-br-edge
+</code></pre>
+<h3 id="isp-isp-router" tabindex="-1">isp (ISP Router) <a class="header-anchor" href="#isp-isp-router" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker attach --sig-proxy=<span class="hljs-literal">false</span> clab-dynamic-routing-lab-isp
+</code></pre>
+<h3 id="コンテナを止めずに離脱" tabindex="-1">コンテナを止めずに離脱 <a class="header-anchor" href="#コンテナを止めずに離脱" aria-hidden="true">#</a></h3>
+<p><code>Ctrl-p</code>を押し、続けて<code>Ctrl-q</code>を押します。<code>Ctrl-c</code>は離脱には使いません。</p>
+<h2 id="4-linux端末へのログイン" tabindex="-1">4. Linux端末へのログイン <a class="header-anchor" href="#4-linux端末へのログイン" aria-hidden="true">#</a></h2>
+<h3 id="hq-pc" tabindex="-1">hq-pc <a class="header-anchor" href="#hq-pc" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker <span class="hljs-built_in">exec</span> -it clab-dynamic-routing-lab-hq-pc bash
+</code></pre>
+<h3 id="dmz-srv" tabindex="-1">dmz-srv <a class="header-anchor" href="#dmz-srv" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker <span class="hljs-built_in">exec</span> -it clab-dynamic-routing-lab-dmz-srv bash
+</code></pre>
+<h3 id="br-pc" tabindex="-1">br-pc <a class="header-anchor" href="#br-pc" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker <span class="hljs-built_in">exec</span> -it clab-dynamic-routing-lab-br-pc bash
+</code></pre>
+<p>Linuxシェルからは<code>exit</code>で抜けます。</p>
+<h2 id="5-ログインできない場合" tabindex="-1">5. ログインできない場合 <a class="header-anchor" href="#5-ログインできない場合" aria-hidden="true">#</a></h2>
+<h3 id="51-コンテナ確認" tabindex="-1">5.1 コンテナ確認 <a class="header-anchor" href="#51-コンテナ確認" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker ps --format <span class="hljs-string">&#x27;table {{.Names}}\t{{.Status}}&#x27;</span> | grep dynamic-routing-lab
+</code></pre>
+<h3 id="52-起動ログ確認" tabindex="-1">5.2 起動ログ確認 <a class="header-anchor" href="#52-起動ログ確認" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker logs --<span class="hljs-built_in">tail</span> 50 clab-dynamic-routing-lab-hq-core
+</code></pre>
+<h3 id="53-ラボを作り直す場合" tabindex="-1">5.3 ラボを作り直す場合 <a class="header-anchor" href="#53-ラボを作り直す場合" aria-hidden="true">#</a></h3>
+<blockquote>
+<p>⚠️ 保存していないIOS設定は消えるため、必要な設定を保存してから実行します。</p>
+</blockquote>
+<pre><code class="language-bash"><span class="hljs-built_in">cd</span> 04_構築
+./deploy.sh destroy
+./deploy.sh deploy
+</code></pre>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-実行場所">1. 実行場所</a></li>
+<li class="lvl-2"><a href="#2-稼働確認">2. 稼働確認</a></li>
+<li class="lvl-2"><a href="#3-cisco-iolへのログイン">3. Cisco IOLへのログイン</a></li>
+<li class="lvl-3"><a href="#hq-core-ospf-core">hq-core (OSPF Core)</a></li>
+<li class="lvl-3"><a href="#hq-dist-eigrp-distribution">hq-dist (EIGRP Distribution)</a></li>
+<li class="lvl-3"><a href="#hq-edge-ospfbgp-edge-nat">hq-edge (OSPF/BGP Edge, NAT)</a></li>
+<li class="lvl-3"><a href="#hq-dmz-dmz-switch">hq-dmz (DMZ Switch)</a></li>
+<li class="lvl-3"><a href="#br-core-branch-ospf-core">br-core (Branch OSPF Core)</a></li>
+<li class="lvl-3"><a href="#br-edge-branch-bgp-edge">br-edge (Branch BGP Edge)</a></li>
+<li class="lvl-3"><a href="#isp-isp-router">isp (ISP Router)</a></li>
+<li class="lvl-3"><a href="#コンテナを止めずに離脱">コンテナを止めずに離脱</a></li>
+<li class="lvl-2"><a href="#4-linux端末へのログイン">4. Linux端末へのログイン</a></li>
+<li class="lvl-3"><a href="#hq-pc">hq-pc</a></li>
+<li class="lvl-3"><a href="#dmz-srv">dmz-srv</a></li>
+<li class="lvl-3"><a href="#br-pc">br-pc</a></li>
+<li class="lvl-2"><a href="#5-ログインできない場合">5. ログインできない場合</a></li>
+<li class="lvl-3"><a href="#51-コンテナ確認">5.1 コンテナ確認</a></li>
+<li class="lvl-3"><a href="#52-起動ログ確認">5.2 起動ログ確認</a></li>
+<li class="lvl-3"><a href="#53-ラボを作り直す場合">5.3 ラボを作り直す場合</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

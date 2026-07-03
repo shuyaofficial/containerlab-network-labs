@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>統合冗長（Track × HSRP × OSPF）チャレンジ</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>11_cisco_integrated_redundancy</span></nav>
+      <h1 class="doc-title">統合冗長（Track × HSRP × OSPF）チャレンジ</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>第2章の総仕上げです。
+下流（LAN側）の「HSRP」と、上流（WAN側）の「OSPF」を稼働させます。
+さらに、**「Track機能（IP SLA）」**を用いて「上流リンクの障害」を検知し、自動的にHSRPのActiveを切り替える（連動させる）という、エンタープライズネットワークで超頻出の構成を構築します。</p>
+<hr>
+<h2 id="-トポロジ設計とipアドレス" tabindex="-1">🎯 トポロジ設計とIPアドレス <a class="header-anchor" href="#-トポロジ設計とipアドレス" aria-hidden="true">#</a></h2>
+<h3 id="機器構成" tabindex="-1">機器構成 <a class="header-anchor" href="#機器構成" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>R1</strong>: インターネット側のコアルーター</li>
+<li><strong>SW1</strong>: メインルーター（HSRP Active）</li>
+<li><strong>SW2</strong>: サブルーター（HSRP Standby）</li>
+<li><strong>SW3</strong>: L2スイッチ</li>
+<li><strong>PC1</strong>: 検証用PC</li>
+</ul>
+<h3 id="ログインip一覧" tabindex="-1">ログインIP一覧 <a class="header-anchor" href="#ログインip一覧" aria-hidden="true">#</a></h3>
+<ul>
+<li>R1: <code>172.20.20.6</code> (telnet)</li>
+<li>SW1: <code>172.20.20.5</code> (telnet)</li>
+<li>SW2: <code>172.20.20.2</code> (telnet)</li>
+<li>SW3: <code>172.20.20.3</code> (telnet または ssh)</li>
+<li>PC1: <code>172.20.20.4</code> (telnet または ssh)
+※ユーザ/パスはすべて <code>admin</code> / <code>admin</code></li>
+</ul>
+<h3 id="ipアドレス設計" tabindex="-1">IPアドレス設計 <a class="header-anchor" href="#ipアドレス設計" aria-hidden="true">#</a></h3>
+<p><strong>【WAN側（OSPFネットワーク）】</strong></p>
+<ul>
+<li><strong>R1 - SW1 間</strong>: <code>10.1.1.0 /30</code> (R1: 10.1.1.1, SW1: 10.1.1.2)</li>
+<li><strong>R1 - SW2 間</strong>: <code>10.1.2.0 /30</code> (R1: 10.1.2.1, SW2: 10.1.2.2)</li>
+<li><strong>R1 の Loopback0</strong>: <code>8.8.8.8 /32</code> (インターネットの宛先として使用)</li>
+</ul>
+<p><strong>【LAN側（HSRPネットワーク）】</strong></p>
+<ul>
+<li><strong>VLAN</strong>: <code>VLAN 10</code></li>
+<li><strong>ネットワーク</strong>: <code>10.10.10.0 /24</code></li>
+<li><strong>仮想GW (HSRP VIP)</strong>: <code>10.10.10.254</code></li>
+<li><strong>SW1</strong>: <code>10.10.10.252</code></li>
+<li><strong>SW2</strong>: <code>10.10.10.253</code></li>
+<li><strong>PC1</strong>: <code>10.10.10.11</code> (デフォルトルートは 10.10.10.254 に向ける)</li>
+</ul>
+<hr>
+<h2 id="-構築要件" tabindex="-1">🏗️ 構築要件 <a class="header-anchor" href="#-構築要件" aria-hidden="true">#</a></h2>
+<h3 id="1-lan側l2--hsrpの構築" tabindex="-1">1. LAN側（L2 / HSRP）の構築 <a class="header-anchor" href="#1-lan側l2--hsrpの構築" aria-hidden="true">#</a></h3>
+<p>前回のテーマと同様に、SW3からPC1へのVLANアクセス設定と、SW1/SW2でのトランク設定、そしてHSRP（グループ10、PriorityはSW1が110でActive）を設定してください。
+※ 今回はTrackで切り替えるため、<strong>必ず <code>standby 10 preempt</code> を有効にしてください。</strong></p>
+<h3 id="2-wan側ospfの構築" tabindex="-1">2. WAN側（OSPF）の構築 <a class="header-anchor" href="#2-wan側ospfの構築" aria-hidden="true">#</a></h3>
+<ul>
+<li>R1, SW1, SW2 で OSPF（プロセスID <code>1</code>、エリア <code>0</code>）を稼働させます。</li>
+<li>各機器の物理インターフェースにIPアドレスを設定します。
+<ul>
+<li><strong>R1はルーター</strong>なので物理インターフェースにそのままIPを設定できます（<code>no switchport</code> は不要）。</li>
+<li><strong>SW1, SW2はL3スイッチ</strong>のため、R1と接続するインターフェースでは <strong><code>no switchport</code></strong> コマンドを入れて「ルーテッドポート」に変換してからIPを設定してください。</li>
+</ul>
+</li>
+<li><code>network</code> コマンドで接続しているネットワークをOSPFで広報してください。</li>
+</ul>
+<h3 id="3-track機能の構築今回のメイン" tabindex="-1">3. Track機能の構築（今回のメイン！） <a class="header-anchor" href="#3-track機能の構築今回のメイン" aria-hidden="true">#</a></h3>
+<p>SW1 の「上流リンク（R1側）」がダウンした際、自動的にHSRPのPriorityを下げる設定を行います。</p>
+<p><strong>【SW1での設定ヒント】</strong></p>
+<ol>
+<li>Trackオブジェクトの作成（例: インターフェースのLine Protocolを監視）<pre><code>track 1 interface Ethernet0/1 line-protocol
+</code></pre>
+</li>
+<li>HSRPにTrackを紐付ける（Track1がダウンしたらPriorityを20下げる）<pre><code>interface Vlan 10
+standby 10 track 1 decrement 20
+</code></pre>
+</li>
+</ol>
+<hr>
+<h2 id="-最終検証" tabindex="-1">✅ 最終検証 <a class="header-anchor" href="#-最終検証" aria-hidden="true">#</a></h2>
+<ol>
+<li>PC1 から <code>ping 8.8.8.8 repeat 100000</code> を実行。</li>
+<li>Pingが通っている最中に、<strong>SW1 の <code>Ethernet0/1</code>（R1側ポート）を <code>shutdown</code></strong> する。</li>
+<li>Trackが発動し、SW1のPriorityが110から90に下がり、SW2（Priority 100）がActiveに昇格する。</li>
+<li>OSPFの経路も自動的にSW2経由となり、Pingがほぼ無瞬断で復旧することを確認！</li>
+</ol>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-トポロジ設計とipアドレス">🎯 トポロジ設計とIPアドレス</a></li>
+<li class="lvl-3"><a href="#機器構成">機器構成</a></li>
+<li class="lvl-3"><a href="#ログインip一覧">ログインIP一覧</a></li>
+<li class="lvl-3"><a href="#ipアドレス設計">IPアドレス設計</a></li>
+<li class="lvl-2"><a href="#-構築要件">🏗️ 構築要件</a></li>
+<li class="lvl-3"><a href="#1-lan側l2--hsrpの構築">1. LAN側（L2 / HSRP）の構築</a></li>
+<li class="lvl-3"><a href="#2-wan側ospfの構築">2. WAN側（OSPF）の構築</a></li>
+<li class="lvl-3"><a href="#3-track機能の構築今回のメイン">3. Track機能の構築（今回のメイン！）</a></li>
+<li class="lvl-2"><a href="#-最終検証">✅ 最終検証</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+- [ ] Improve topology design: Replace L2 images (vrnetlab/cisco_iol:L2-advipservices-2017) with proper L3 router images (e.g., L3-adventerprisek9) for edge routers and ISP nodes.

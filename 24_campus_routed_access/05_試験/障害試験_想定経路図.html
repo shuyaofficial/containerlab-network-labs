@@ -1,0 +1,950 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Theme 24｜Routed Access 障害経路シミュレーター</title>
+  <style>
+    :root {
+      --ink: #eaf6f3;
+      --muted: #93aaa8;
+      --night: #071513;
+      --night-2: #0b211d;
+      --panel: rgba(10, 34, 30, .88);
+      --panel-solid: #0d2a25;
+      --line: rgba(177, 221, 209, .15);
+      --cyan: #64f2d2;
+      --cyan-2: #19bda8;
+      --amber: #ffc75f;
+      --coral: #ff725e;
+      --lime: #b6f36b;
+      --shadow: 0 22px 70px rgba(0, 0, 0, .34);
+      --ease: cubic-bezier(.22, 1, .36, 1);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 14% 8%, rgba(25, 189, 168, .13), transparent 28rem),
+        radial-gradient(circle at 92% 24%, rgba(255, 199, 95, .09), transparent 24rem),
+        linear-gradient(145deg, #06110f 0%, #081b18 52%, #061310 100%);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif;
+      line-height: 1.6;
+    }
+
+    button, select, input { font: inherit; }
+    button, [tabindex="0"] { -webkit-tap-highlight-color: transparent; }
+
+    button:focus-visible,
+    select:focus-visible,
+    input:focus-visible,
+    [tabindex="0"]:focus-visible {
+      outline: 3px solid rgba(100, 242, 210, .55);
+      outline-offset: 3px;
+    }
+
+    .shell { width: min(1600px, 100%); margin: 0 auto; padding: 28px clamp(16px, 3vw, 44px) 44px; }
+
+    .masthead {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    .kicker {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 8px;
+      color: var(--cyan);
+      font-size: .75rem;
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    .kicker::before { content: ""; width: 28px; height: 2px; background: currentColor; }
+
+    h1 {
+      margin: 0;
+      max-width: 920px;
+      font-size: clamp(1.7rem, 3.2vw, 3.3rem);
+      line-height: 1.08;
+      letter-spacing: -.045em;
+    }
+
+    .subtitle { margin: 12px 0 0; color: var(--muted); font-size: clamp(.88rem, 1.4vw, 1.02rem); }
+
+    .offline-badge {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: #bcd0cb;
+      background: rgba(4, 18, 15, .65);
+      font-size: .78rem;
+      font-weight: 700;
+    }
+
+    .offline-badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 12px var(--lime); }
+
+    .scenario-tabs {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(190px, 1fr));
+      gap: 8px;
+      margin-bottom: 14px;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+
+    .tab {
+      min-width: 190px;
+      padding: 13px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px 12px 4px 4px;
+      color: var(--muted);
+      background: rgba(7, 24, 21, .72);
+      text-align: left;
+      cursor: pointer;
+      transition: transform .2s var(--ease), color .2s, border-color .2s, background .2s;
+    }
+
+    .tab:hover { color: var(--ink); border-color: rgba(100, 242, 210, .35); transform: translateY(-2px); }
+    .tab[aria-selected="true"] { color: var(--ink); border-color: rgba(100, 242, 210, .6); background: linear-gradient(180deg, rgba(25, 189, 168, .2), rgba(10, 34, 30, .94)); }
+    .tab-id { display: block; color: var(--cyan); font-size: .72rem; font-weight: 900; letter-spacing: .12em; }
+    .tab-name { display: block; margin-top: 2px; font-weight: 800; font-size: .92rem; white-space: nowrap; }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+      min-height: 690px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      overflow: hidden;
+      background: rgba(5, 20, 17, .7);
+      box-shadow: var(--shadow);
+    }
+
+    .stage {
+      position: relative;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      background:
+        linear-gradient(rgba(100, 242, 210, .035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(100, 242, 210, .035) 1px, transparent 1px),
+        radial-gradient(ellipse at 50% 48%, rgba(25, 189, 168, .10), transparent 57%);
+      background-size: 32px 32px, 32px 32px, auto;
+    }
+
+    .stage-head {
+      position: absolute;
+      z-index: 5;
+      top: 20px;
+      left: 22px;
+      right: 22px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      pointer-events: none;
+    }
+
+    .stage-head h2 { margin: 0; font-size: clamp(1.1rem, 2vw, 1.5rem); letter-spacing: -.02em; }
+    .stage-head p { margin: 3px 0 0; max-width: 620px; color: var(--muted); font-size: .84rem; }
+
+    .state-pill {
+      flex: 0 0 auto;
+      padding: 7px 11px;
+      border: 1px solid currentColor;
+      border-radius: 999px;
+      color: var(--cyan);
+      background: rgba(6, 24, 20, .85);
+      font-size: .73rem;
+      font-weight: 900;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+
+    .state-pill[data-tone="danger"] { color: var(--coral); }
+    .state-pill[data-tone="working"] { color: var(--amber); }
+    .state-pill[data-tone="success"] { color: var(--lime); }
+
+    .topology-wrap { flex: 1 1 auto; min-height: 510px; display: grid; place-items: center; padding: 76px 12px 0; }
+    #topology { display: block; width: 100%; height: auto; max-height: 590px; overflow: visible; }
+
+    .floor { fill: rgba(18, 58, 50, .52); stroke: rgba(100, 242, 210, .12); stroke-width: 2; }
+    .floor-grid { fill: url(#floorGrid); opacity: .42; }
+    .zone-label { fill: #77928c; font-size: 13px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+
+    .link-base { fill: none; stroke: #31524b; stroke-width: 8; stroke-linecap: round; transition: stroke .45s var(--ease), opacity .45s var(--ease), filter .45s; }
+    .link-flow { fill: none; stroke: transparent; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 9 12; opacity: 0; transition: stroke .45s var(--ease), opacity .45s var(--ease); }
+    .link-hit { fill: none; stroke: transparent; stroke-width: 30; cursor: pointer; pointer-events: stroke; }
+    .link-group.active .link-base { stroke: var(--cyan-2); filter: drop-shadow(0 0 7px rgba(100, 242, 210, .48)); }
+    .link-group.active .link-flow { stroke: var(--cyan); opacity: 1; animation: dash 1.15s linear infinite; }
+    .link-group.candidate .link-base { stroke: #8c6d35; }
+    .link-group.candidate .link-flow { stroke: var(--amber); opacity: .78; animation: dash 1.7s linear infinite; }
+    .link-group.failed .link-base { stroke: var(--coral); opacity: .72; stroke-dasharray: 10 9; filter: drop-shadow(0 0 6px rgba(255, 114, 94, .38)); }
+    .link-group.failed .link-flow { opacity: 0; }
+    .link-group.forming .link-base { stroke: var(--amber); stroke-dasharray: 8 8; }
+    .link-group.forming .link-flow { stroke: var(--amber); opacity: .72; animation: dash 2s linear infinite reverse; }
+    .link-group.dim .link-base { opacity: .28; }
+    .link-group.selected .link-base { stroke-width: 12; }
+
+    @keyframes dash { to { stroke-dashoffset: -42; } }
+
+    .link-label rect { fill: rgba(4, 21, 17, .92); stroke: rgba(176, 221, 209, .14); }
+    .link-label text { fill: #9db5af; font-size: 11px; font-weight: 700; text-anchor: middle; }
+
+    .device { cursor: pointer; transition: opacity .35s var(--ease), filter .35s var(--ease); }
+    .device .shadow { fill: rgba(0, 0, 0, .32); }
+    .device .body { fill: #17463c; stroke: #40786c; stroke-width: 2; transition: fill .35s, stroke .35s; }
+    .device .top { fill: #27685a; stroke: #61a593; stroke-width: 2; transition: fill .35s, stroke .35s; }
+    .device.core .body { fill: #263f46; stroke: #56747a; }
+    .device.core .top { fill: #3b5d64; stroke: #83a5aa; }
+    .device.pc .body { fill: #3b4034; stroke: #7f846e; }
+    .device.pc .top { fill: #646953; stroke: #a9ae8b; }
+    .device .device-icon { fill: none; stroke: #d7f5ec; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+    .device .status-light { fill: var(--lime); filter: drop-shadow(0 0 5px var(--lime)); }
+    .device .name { fill: var(--ink); font-size: 17px; font-weight: 900; text-anchor: middle; }
+    .device .address { fill: #8da7a0; font-size: 11px; font-weight: 650; text-anchor: middle; }
+    .device:hover, .device.selected { filter: drop-shadow(0 0 12px rgba(100, 242, 210, .32)); }
+    .device.selected .top { stroke: var(--cyan); stroke-width: 4; }
+    .device.down { opacity: .42; filter: grayscale(.7); }
+    .device.down .body, .device.down .top { fill: #502c29; stroke: var(--coral); }
+    .device.down .status-light { fill: var(--coral); filter: drop-shadow(0 0 5px var(--coral)); }
+    .device.recovering .top { stroke: var(--amber); }
+    .device.recovering .status-light { fill: var(--amber); filter: drop-shadow(0 0 5px var(--amber)); animation: blink .8s steps(2, end) infinite; }
+    @keyframes blink { 50% { opacity: .2; } }
+
+    .packet { fill: #effffb; stroke: var(--cyan); stroke-width: 4; filter: drop-shadow(0 0 9px var(--cyan)); pointer-events: none; }
+    .packet-halo { fill: none; stroke: rgba(100, 242, 210, .35); stroke-width: 2; pointer-events: none; }
+    .drop-mark { opacity: 0; transition: opacity .25s; pointer-events: none; }
+    .drop-mark.visible { opacity: 1; }
+    .drop-mark circle { fill: rgba(75, 24, 20, .95); stroke: var(--coral); stroke-width: 3; }
+    .drop-mark path { stroke: white; stroke-width: 4; stroke-linecap: round; }
+
+    .legend {
+      position: absolute;
+      z-index: 4;
+      left: 22px;
+      bottom: 104px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px 15px;
+      padding: 8px 11px;
+      border-radius: 9px;
+      background: rgba(4, 18, 15, .76);
+      color: #9ab1ab;
+      font-size: .7rem;
+      pointer-events: none;
+    }
+
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .legend i { width: 17px; height: 3px; border-radius: 3px; background: currentColor; }
+    .legend .lg-active { color: var(--cyan); }
+    .legend .lg-candidate { color: var(--amber); }
+    .legend .lg-failed { color: var(--coral); }
+
+    .controls {
+      position: relative;
+      z-index: 6;
+      display: grid;
+      grid-template-columns: auto auto auto auto minmax(120px, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 18px;
+      border-top: 1px solid var(--line);
+      background: rgba(5, 23, 19, .94);
+    }
+
+    .icon-btn {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      color: var(--ink);
+      background: #102e28;
+      cursor: pointer;
+      transition: transform .16s var(--ease), border-color .16s, background .16s;
+    }
+
+    .icon-btn:hover:not(:disabled) { transform: translateY(-2px); border-color: rgba(100, 242, 210, .45); background: #163d34; }
+    .icon-btn:disabled { opacity: .35; cursor: not-allowed; }
+    .play-btn { width: 46px; color: #06201a; background: var(--cyan); border-color: var(--cyan); }
+    .play-btn:hover:not(:disabled) { color: #06201a; background: #92ffe7; }
+    .icon-btn svg { width: 18px; height: 18px; fill: currentColor; }
+
+    .timeline { min-width: 0; padding: 0 8px; }
+    .timeline-meta { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 4px; color: #b8ccc7; font-size: .72rem; font-weight: 800; }
+    input[type="range"] { width: 100%; accent-color: var(--cyan); cursor: pointer; }
+
+    .speed {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: .72rem;
+      font-weight: 800;
+    }
+
+    .speed select { padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #102e28; }
+
+    .inspector {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      border-left: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    .inspector-scroll { padding: 22px; overflow: auto; }
+    .scenario-code { color: var(--cyan); font-size: .74rem; font-weight: 900; letter-spacing: .14em; }
+    .inspector h2 { margin: 3px 0 7px; font-size: 1.26rem; line-height: 1.25; letter-spacing: -.02em; }
+    .scenario-summary { margin: 0; color: var(--muted); font-size: .86rem; }
+
+    .phase-block { margin: 20px 0 0; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .phase-label { margin: 0; color: var(--amber); font-size: .7rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    .phase-title { margin: 4px 0 3px; font-size: 1.04rem; }
+    .phase-detail { margin: 0; color: #adc1bc; font-size: .82rem; }
+
+    .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 16px 0 0; background: var(--line); }
+    .status-item { min-width: 0; padding: 11px 9px; background: var(--panel-solid); }
+    .status-item span { display: block; color: var(--muted); font-size: .65rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+    .status-item strong { display: block; margin-top: 3px; font-size: .8rem; overflow-wrap: anywhere; }
+    .tone-good { color: var(--lime); }
+    .tone-bad { color: var(--coral); }
+    .tone-work { color: var(--amber); }
+
+    .inspect-block { margin-top: 17px; }
+    .inspect-block h3 { margin: 0 0 7px; color: #c6d8d3; font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; }
+    .path-readout { padding-left: 13px; border-left: 3px solid var(--cyan); color: #d9eee8; font-size: .82rem; font-weight: 750; }
+
+    .mono-list, .check-list { margin: 0; padding: 0; list-style: none; }
+    .mono-list li { margin-top: 6px; padding: 8px 9px; border: 1px solid rgba(177, 221, 209, .1); border-radius: 7px; color: #d5e6e2; background: rgba(3, 17, 14, .52); font: 700 .71rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+    .check-list li { position: relative; margin-top: 7px; padding-left: 19px; color: #acbfba; font-size: .78rem; }
+    .check-list li::before { content: "✓"; position: absolute; left: 0; color: var(--lime); font-weight: 900; }
+
+    .selection {
+      margin-top: 18px;
+      padding: 13px;
+      border: 1px solid rgba(100, 242, 210, .2);
+      border-radius: 10px;
+      background: rgba(9, 42, 35, .58);
+    }
+    .selection-label { margin: 0; color: var(--cyan); font-size: .66rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    .selection h3 { margin: 3px 0; font-size: .9rem; }
+    .selection p { margin: 0; color: #a9bdb8; font-size: .75rem; white-space: pre-line; }
+
+    .accuracy-note { margin: auto 22px 20px; padding-top: 14px; border-top: 1px solid var(--line); color: #7f9892; font-size: .69rem; }
+
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+    @media (max-width: 1040px) {
+      .workspace { grid-template-columns: 1fr; }
+      .inspector { border-left: 0; border-top: 1px solid var(--line); }
+      .inspector-scroll { display: grid; grid-template-columns: minmax(240px, .85fr) minmax(280px, 1.15fr); gap: 0 26px; }
+      .inspector-scroll > .scenario-summary,
+      .inspector-scroll > .phase-block,
+      .inspector-scroll > .status-grid { grid-column: 1; }
+      .inspector-scroll > .inspect-block,
+      .inspector-scroll > .selection { grid-column: 2; }
+      .inspector-scroll > .inspect-block:first-of-type { grid-row: 1 / span 2; }
+      .accuracy-note { margin-top: 0; }
+    }
+
+    @media (max-width: 700px) {
+      .shell { padding: 17px 10px 28px; }
+      .masthead { align-items: flex-start; flex-direction: column; gap: 12px; }
+      .offline-badge { align-self: flex-start; }
+      .workspace { border-radius: 14px; }
+      .stage-head { top: 14px; left: 14px; right: 14px; }
+      .stage-head p { max-width: 72%; font-size: .73rem; }
+      .topology-wrap { min-height: 410px; padding: 90px 2px 24px; overflow: hidden; }
+      #topology { width: 132%; max-width: none; }
+      .legend { left: 12px; bottom: 117px; }
+      .controls { grid-template-columns: auto auto auto auto 1fr; padding: 12px; }
+      .timeline { grid-column: 1 / -1; grid-row: 1; padding: 0; }
+      .speed { justify-self: end; }
+      .inspector-scroll { display: block; padding: 18px; }
+      .accuracy-note { margin: 0 18px 18px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+      .packet-halo { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="masthead">
+      <div>
+        <p class="kicker">Theme 24 · Routed Access</p>
+        <h1>障害が起きた瞬間、<br>パケットはどこへ向かうのか。</h1>
+        <p class="subtitle">OSPFとECMPによる経路収束を、試験手順ごとに追体験するシミュレーター</p>
+      </div>
+      <span class="offline-badge">OFFLINE READY</span>
+    </header>
+
+    <nav class="scenario-tabs" role="tablist" aria-label="障害試験シナリオ">
+      <button class="tab" id="tab-t301" role="tab" aria-selected="true" aria-controls="simulator" tabindex="0" data-scenario="t301">
+        <span class="tab-id">T-301</span><span class="tab-name">access1—core1断</span>
+      </button>
+      <button class="tab" id="tab-t302" role="tab" aria-selected="false" aria-controls="simulator" tabindex="-1" data-scenario="t302">
+        <span class="tab-id">T-302</span><span class="tab-name">core1停止</span>
+      </button>
+      <button class="tab" id="tab-t303" role="tab" aria-selected="false" aria-controls="simulator" tabindex="-1" data-scenario="t303">
+        <span class="tab-id">T-303</span><span class="tab-name">core1復旧</span>
+      </button>
+      <button class="tab" id="tab-t304" role="tab" aria-selected="false" aria-controls="simulator" tabindex="-1" data-scenario="t304">
+        <span class="tab-id">T-304</span><span class="tab-name">STP非依存</span>
+      </button>
+    </nav>
+
+    <section class="workspace" id="simulator" role="tabpanel" aria-labelledby="tab-t301">
+      <div class="stage">
+        <div class="stage-head">
+          <div>
+            <h2 id="stage-title">access1—core1 リンク障害</h2>
+            <p id="stage-caption">1本のP2Pリンクだけを切断し、残存Coreへ収束する過程を追います。</p>
+          </div>
+          <span class="state-pill" id="state-pill" data-tone="normal">BASELINE</span>
+        </div>
+
+        <div class="topology-wrap">
+          <svg id="topology" viewBox="0 0 1100 570" role="img" aria-labelledby="topology-title topology-desc">
+            <title id="topology-title">Routed Accessキャンパスの通信経路</title>
+            <desc id="topology-desc">PC-Aからaccess1、core1またはcore2、access2を通ってPC-Bへ到達する構成です。</desc>
+            <defs>
+              <pattern id="floorGrid" width="38" height="38" patternUnits="userSpaceOnUse" patternTransform="skewX(-28)">
+                <path d="M 38 0 L 0 0 0 38" fill="none" stroke="#65aa99" stroke-width="1" opacity=".22"/>
+              </pattern>
+              <linearGradient id="floorFade" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#19483e" stop-opacity=".7"/>
+                <stop offset="1" stop-color="#0b2621" stop-opacity=".3"/>
+              </linearGradient>
+            </defs>
+
+            <path class="floor" d="M78 180 L547 55 L1025 180 L1025 440 L550 548 L78 440 Z" fill="url(#floorFade)"/>
+            <path class="floor-grid" d="M78 180 L547 55 L1025 180 L1025 440 L550 548 L78 440 Z"/>
+            <text class="zone-label" x="109" y="218">USER LAN 10.24.10.0/24</text>
+            <text class="zone-label" x="448" y="91">OSPF AREA 0</text>
+            <text class="zone-label" x="817" y="218">USER LAN 10.24.20.0/24</text>
+
+            <g id="links">
+              <g class="link-group" data-link="pcA-a1" tabindex="0" role="button" aria-label="PC-Aとaccess1のリンク">
+                <path class="link-base" d="M157 310 L240 310"/><path class="link-flow" d="M157 310 L240 310"/><path class="link-hit" d="M157 310 L240 310"/>
+              </g>
+              <g class="link-group" data-link="a1-c1" tabindex="0" role="button" aria-label="access1とcore1のリンク">
+                <path class="link-base" d="M313 286 L490 194"/><path class="link-flow" d="M313 286 L490 194"/><path class="link-hit" d="M313 286 L490 194"/>
+              </g>
+              <g class="link-group" data-link="a1-c2" tabindex="0" role="button" aria-label="access1とcore2のリンク">
+                <path class="link-base" d="M313 334 L490 426"/><path class="link-flow" d="M313 334 L490 426"/><path class="link-hit" d="M313 334 L490 426"/>
+              </g>
+              <g class="link-group" data-link="c1-a2" tabindex="0" role="button" aria-label="core1とaccess2のリンク">
+                <path class="link-base" d="M570 194 L747 286"/><path class="link-flow" d="M570 194 L747 286"/><path class="link-hit" d="M570 194 L747 286"/>
+              </g>
+              <g class="link-group" data-link="c2-a2" tabindex="0" role="button" aria-label="core2とaccess2のリンク">
+                <path class="link-base" d="M570 426 L747 334"/><path class="link-flow" d="M570 426 L747 334"/><path class="link-hit" d="M570 426 L747 334"/>
+              </g>
+              <g class="link-group" data-link="c1-c2" tabindex="0" role="button" aria-label="core1とcore2のリンク">
+                <path class="link-base" d="M530 236 L530 384"/><path class="link-flow" d="M530 236 L530 384"/><path class="link-hit" d="M530 236 L530 384"/>
+              </g>
+              <g class="link-group" data-link="a2-pcB" tabindex="0" role="button" aria-label="access2とPC-Bのリンク">
+                <path class="link-base" d="M820 310 L944 310"/><path class="link-flow" d="M820 310 L944 310"/><path class="link-hit" d="M820 310 L944 310"/>
+              </g>
+            </g>
+
+            <g class="link-label" transform="translate(397 225)"><rect x="-40" y="-14" width="80" height="24" rx="8"/><text y="3">10.24.0.0/30</text></g>
+            <g class="link-label" transform="translate(397 400)"><rect x="-40" y="-14" width="80" height="24" rx="8"/><text y="3">10.24.0.4/30</text></g>
+            <g class="link-label" transform="translate(664 225)"><rect x="-40" y="-14" width="80" height="24" rx="8"/><text y="3">10.24.0.8/30</text></g>
+            <g class="link-label" transform="translate(664 400)"><rect x="-44" y="-14" width="88" height="24" rx="8"/><text y="3">10.24.0.12/30</text></g>
+            <g class="link-label" transform="translate(530 310)"><rect x="-44" y="-14" width="88" height="24" rx="8"/><text y="3">10.24.0.16/30</text></g>
+
+            <g id="packet-layer">
+              <circle class="packet-halo" id="packet-halo" r="14" cx="157" cy="310"/>
+              <circle class="packet" id="packet" r="6" cx="157" cy="310"/>
+              <g class="drop-mark" id="drop-mark" transform="translate(360 260)">
+                <circle r="19"/><path d="M-7 -7 L7 7 M7 -7 L-7 7"/>
+              </g>
+            </g>
+
+            <g class="device pc" data-node="pcA" tabindex="0" role="button" aria-label="PC-A 10.24.10.10">
+              <ellipse class="shadow" cx="115" cy="343" rx="50" ry="14"/>
+              <path class="body" d="M76 284 L154 284 L154 329 Q115 348 76 329 Z"/>
+              <path class="top" d="M76 284 Q115 263 154 284 Q115 305 76 284 Z"/>
+              <path class="device-icon" d="M101 278 H129 V292 H101 Z M115 292 V299 M107 299 H123"/>
+              <circle class="status-light" cx="144" cy="292" r="4"/>
+              <text class="name" x="115" y="370">PC-A</text><text class="address" x="115" y="387">10.24.10.10/24</text>
+            </g>
+
+            <g class="device" data-node="a1" tabindex="0" role="button" aria-label="access1 10.24.255.11">
+              <ellipse class="shadow" cx="275" cy="356" rx="58" ry="16"/>
+              <path class="body" d="M230 288 L320 288 L320 337 Q275 360 230 337 Z"/>
+              <path class="top" d="M230 288 Q275 264 320 288 Q275 312 230 288 Z"/>
+              <path class="device-icon" d="M255 283 H295 M255 292 H295 M261 278 L255 283 261 288 M289 287 L295 292 289 297"/>
+              <circle class="status-light" cx="307" cy="298" r="4"/>
+              <text class="name" x="275" y="383">access1</text><text class="address" x="275" y="400">Lo0 10.24.255.11</text>
+            </g>
+
+            <g class="device core" data-node="c1" tabindex="0" role="button" aria-label="core1 10.24.255.1">
+              <ellipse class="shadow" cx="530" cy="241" rx="58" ry="16"/>
+              <path class="body" d="M485 173 L575 173 L575 222 Q530 245 485 222 Z"/>
+              <path class="top" d="M485 173 Q530 149 575 173 Q530 197 485 173 Z"/>
+              <path class="device-icon" d="M510 168 H550 M510 177 H550 M516 163 L510 168 516 173 M544 172 L550 177 544 182"/>
+              <circle class="status-light" cx="562" cy="183" r="4"/>
+              <text class="name" x="530" y="268">core1</text><text class="address" x="530" y="285">Lo0 10.24.255.1</text>
+            </g>
+
+            <g class="device core" data-node="c2" tabindex="0" role="button" aria-label="core2 10.24.255.2">
+              <ellipse class="shadow" cx="530" cy="473" rx="58" ry="16"/>
+              <path class="body" d="M485 405 L575 405 L575 454 Q530 477 485 454 Z"/>
+              <path class="top" d="M485 405 Q530 381 575 405 Q530 429 485 405 Z"/>
+              <path class="device-icon" d="M510 400 H550 M510 409 H550 M516 395 L510 400 516 405 M544 404 L550 409 544 414"/>
+              <circle class="status-light" cx="562" cy="415" r="4"/>
+              <text class="name" x="530" y="500">core2</text><text class="address" x="530" y="517">Lo0 10.24.255.2</text>
+            </g>
+
+            <g class="device" data-node="a2" tabindex="0" role="button" aria-label="access2 10.24.255.12">
+              <ellipse class="shadow" cx="785" cy="356" rx="58" ry="16"/>
+              <path class="body" d="M740 288 L830 288 L830 337 Q785 360 740 337 Z"/>
+              <path class="top" d="M740 288 Q785 264 830 288 Q785 312 740 288 Z"/>
+              <path class="device-icon" d="M765 283 H805 M765 292 H805 M771 278 L765 283 771 288 M799 287 L805 292 799 297"/>
+              <circle class="status-light" cx="817" cy="298" r="4"/>
+              <text class="name" x="785" y="383">access2</text><text class="address" x="785" y="400">Lo0 10.24.255.12</text>
+            </g>
+
+            <g class="device pc" data-node="pcB" tabindex="0" role="button" aria-label="PC-B 10.24.20.10">
+              <ellipse class="shadow" cx="985" cy="343" rx="50" ry="14"/>
+              <path class="body" d="M946 284 L1024 284 L1024 329 Q985 348 946 329 Z"/>
+              <path class="top" d="M946 284 Q985 263 1024 284 Q985 305 946 284 Z"/>
+              <path class="device-icon" d="M971 278 H999 V292 H971 Z M985 292 V299 M977 299 H993"/>
+              <circle class="status-light" cx="1014" cy="292" r="4"/>
+              <text class="name" x="985" y="370">PC-B</text><text class="address" x="985" y="387">10.24.20.10/24</text>
+            </g>
+          </svg>
+        </div>
+
+        <div class="legend" aria-hidden="true">
+          <span class="lg-active"><i></i>現在の通信経路</span>
+          <span class="lg-candidate"><i></i>ECMP候補</span>
+          <span class="lg-failed"><i></i>障害・停止</span>
+        </div>
+
+        <div class="controls" aria-label="シミュレーション操作">
+          <button class="icon-btn" id="reset-btn" type="button" aria-label="最初から" title="最初から (R)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5a7 7 0 1 1-6.32 4H3l3.5-4L10 9H7.77A5 5 0 1 0 12 7V5z"/></svg>
+          </button>
+          <button class="icon-btn" id="prev-btn" type="button" aria-label="前の段階" title="前の段階 (←)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 5 8.5 12l7 7V5z"/></svg>
+          </button>
+          <button class="icon-btn play-btn" id="play-btn" type="button" aria-label="再生" title="再生 / 一時停止 (Space)">
+            <svg id="play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+          <button class="icon-btn" id="next-btn" type="button" aria-label="次の段階" title="次の段階 (→)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8.5 5 7 7-7 7V5z"/></svg>
+          </button>
+          <div class="timeline">
+            <div class="timeline-meta"><span id="step-count">STEP 1 / 4</span><span id="step-name">正常時</span></div>
+            <label class="sr-only" for="timeline-range">シナリオ進行度</label>
+            <input id="timeline-range" type="range" min="0" max="3" value="0" step="1">
+          </div>
+          <label class="speed">速度
+            <select id="speed-select" aria-label="再生速度">
+              <option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <aside class="inspector" aria-label="試験の解説と観測ポイント">
+        <div class="inspector-scroll">
+          <span class="scenario-code" id="scenario-code">T-301</span>
+          <h2 id="scenario-title">access1—core1断</h2>
+          <p class="scenario-summary" id="scenario-summary">単一のRouted Port障害をOSPFが検知し、core2だけを使う経路へ収束します。</p>
+
+          <div class="phase-block">
+            <p class="phase-label">いま起きていること</p>
+            <h3 class="phase-title" id="phase-title">正常時：ECMP候補が2本</h3>
+            <p class="phase-detail" id="phase-detail">core1とcore2は等コストの候補です。1つのパケットを複製する動作ではありません。</p>
+          </div>
+
+          <div class="status-grid" aria-label="現在の状態">
+            <div class="status-item"><span>Ping</span><strong id="ping-state" class="tone-good">Reply</strong></div>
+            <div class="status-item"><span>OSPF</span><strong id="ospf-state" class="tone-good">FULL</strong></div>
+            <div class="status-item"><span>Route</span><strong id="route-state">2 next-hops</strong></div>
+            <div class="status-item"><span>STP</span><strong id="stp-state">対象外</strong></div>
+          </div>
+
+          <section class="inspect-block">
+            <h3>現在の通信経路</h3>
+            <div class="path-readout" id="path-readout">core1 / core2 の2候補</div>
+          </section>
+
+          <section class="inspect-block">
+            <h3>観測コマンド</h3>
+            <ul class="mono-list" id="command-list"></ul>
+          </section>
+
+          <section class="inspect-block">
+            <h3>合格判定</h3>
+            <ul class="check-list" id="pass-list"></ul>
+          </section>
+
+          <section class="selection" aria-live="polite">
+            <p class="selection-label">選択中の機器・リンク</p>
+            <h3 id="selection-title">access1—core1</h3>
+            <p id="selection-detail">E0/1 ↔ E0/1 · 10.24.0.0/30</p>
+          </section>
+        </div>
+        <p class="accuracy-note">時間の進行は概念表示です。実際の通信断時間とping欠落数は、試験時の実測値を採用してください。</p>
+      </aside>
+    </section>
+    <p class="sr-only" id="live-status" aria-live="polite"></p>
+    <noscript><p>このシミュレーターの操作にはJavaScriptが必要です。</p></noscript>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const routeLinks = {
+        core1: ["pcA-a1", "a1-c1", "c1-a2", "a2-pcB"],
+        core2: ["pcA-a1", "a1-c2", "c2-a2", "a2-pcB"]
+      };
+
+      const scenarios = {
+        t301: {
+          code: "T-301",
+          title: "access1—core1断",
+          stageTitle: "access1—core1 リンク障害",
+          caption: "1本のP2Pリンクだけを切断し、残存Coreへ収束する過程を追います。",
+          summary: "単一のRouted Port障害をOSPFが検知し、core2だけを使う経路へ収束します。",
+          commands: ["pc-a: ping 10.24.20.10", "access1: show ip ospf neighbor", "access1: show ip route 10.24.20.0"],
+          pass: ["access1—core1隣接だけが失われる", "10.24.20.0/24のnext-hopがcore2だけになる", "収束後にPC-A—PC-B疎通が復旧する"],
+          steps: [
+            { name: "正常時", phase: "正常時：ECMP候補が2本", detail: "core1とcore2は等コストの候補です。1つのパケットを複製する動作ではありません。", tone: "normal", pill: "BASELINE", route: "both", ping: "Reply", ospf: "FULL", rib: "2 next-hops", stp: "対象外", path: "PC-A → access1 → core1 または core2 → access2 → PC-B", focus: "a1-c1" },
+            { name: "リンク断", phase: "access1—core1の物理リンクがDown", detail: "core1本体とcore1—access2は正常なままです。切れたのは1本のP2Pリンクだけです。", tone: "danger", pill: "LINK DOWN", route: "none", ping: "Timeout", ospf: "Neighbor Down", rib: "再計算前", stp: "対象外", path: "旧経路のパケットが一時的に欠落", failed: ["a1-c1"], drop: true, focus: "a1-c1" },
+            { name: "SPF計算", phase: "OSPFがLSDB変更を受けてSPFを実行", detail: "STPではなく、OSPFの隣接消失と経路再計算として観測します。", tone: "working", pill: "CONVERGING", route: "none", ping: "一時欠落", ospf: "SPF running", rib: "更新中", stp: "動作なし", path: "代替経路を計算中", failed: ["a1-c1"], drop: true, focus: "a1" },
+            { name: "収束完了", phase: "core2経由の1経路へ収束", detail: "access1の経路表からcore1側next-hopが消え、残存するcore2側だけで疎通します。", tone: "success", pill: "RESTORED", route: "core2", ping: "Reply", ospf: "残存隣接 FULL", rib: "1 next-hop", stp: "動作なし", path: "PC-A → access1 → core2 → access2 → PC-B", failed: ["a1-c1"], focus: "a1-c2" }
+          ]
+        },
+        t302: {
+          code: "T-302",
+          title: "core1停止",
+          stageTitle: "core1 ノード障害",
+          caption: "core1全体を停止し、両Accessがcore2経由へ揃って収束する様子を確認します。",
+          summary: "ノード障害でcore1配下の隣接が失われても、残存するcore2経由で両Access間の疎通を維持します。",
+          commands: ["pc-a: ping 10.24.20.10", "access1: show ip route 10.24.20.0", "access2: show ip route 10.24.10.0"],
+          pass: ["core1の全隣接が失われる", "両Accessの経路がcore2側へ収束する", "収束後に双方向疎通が復旧する"],
+          steps: [
+            { name: "正常時", phase: "正常時：2台のCoreが利用可能", detail: "両Accessはcore1とcore2を等コストの候補として学習しています。", tone: "normal", pill: "BASELINE", route: "both", ping: "Reply", ospf: "FULL", rib: "2 next-hops", stp: "対象外", path: "PC-A → access1 → core1 または core2 → access2 → PC-B", focus: "c1" },
+            { name: "core1停止", phase: "core1本体が停止し、接続する全リンクがDown", detail: "access1側だけでなく、access2側とcore2側のcore1隣接も失われます。", tone: "danger", pill: "NODE DOWN", route: "none", ping: "Timeout", ospf: "core1 Down", rib: "旧経路あり", stp: "対象外", path: "core1へ送られたパケットが一時的に欠落", failed: ["a1-c1", "c1-a2", "c1-c2"], down: ["c1"], drop: true, focus: "c1" },
+            { name: "経路更新", phase: "両Accessがcore1経由の経路を削除", detail: "OSPFのSPF計算後、RIB/FIBからcore1側next-hopが取り除かれます。", tone: "working", pill: "CONVERGING", route: "none", ping: "一時欠落", ospf: "SPF running", rib: "更新中", stp: "動作なし", path: "core2への切替処理中", failed: ["a1-c1", "c1-a2", "c1-c2"], down: ["c1"], drop: true, focus: "a1" },
+            { name: "収束完了", phase: "core2経由で両Access間の疎通が復旧", detail: "単一Core構成になっていますが、PC-AとPC-Bのデータプレーンは復旧しています。", tone: "success", pill: "RESTORED", route: "core2", ping: "Reply", ospf: "core2 FULL", rib: "1 next-hop", stp: "動作なし", path: "PC-A → access1 → core2 → access2 → PC-B", failed: ["a1-c1", "c1-a2", "c1-c2"], down: ["c1"], focus: "c2" }
+          ]
+        },
+        t303: {
+          code: "T-303",
+          title: "core1復旧",
+          stageTitle: "core1 復旧とECMP再形成",
+          caption: "停止状態からOSPF隣接がFULLとなり、2本目のnext-hopが戻るまでを追います。",
+          summary: "core1の起動だけを合格にせず、OSPF隣接とECMP候補の復元まで段階的に確認します。",
+          commands: ["core1: show ip interface brief", "access1: show ip ospf neighbor", "access1: show ip route 10.24.20.0"],
+          pass: ["core1のインターフェースがup/upになる", "access1・access2とのOSPF隣接がFULLになる", "経路表に2つの等コストnext-hopが戻る"],
+          steps: [
+            { name: "停止状態", phase: "core1停止中：通信はcore2で継続", detail: "復旧開始前はcore2だけが有効なnext-hopです。", tone: "danger", pill: "CORE1 DOWN", route: "core2", ping: "Reply", ospf: "core1 Down", rib: "1 next-hop", stp: "対象外", path: "PC-A → access1 → core2 → access2 → PC-B", failed: ["a1-c1", "c1-a2", "c1-c2"], down: ["c1"], focus: "c1" },
+            { name: "起動", phase: "core1が起動処理を開始", detail: "まだデータプレーンの候補には入りません。通信はcore2経由のままです。", tone: "working", pill: "BOOTING", route: "core2", ping: "Reply", ospf: "core1未形成", rib: "1 next-hop", stp: "対象外", path: "PC-A → access1 → core2 → access2 → PC-B", failed: ["a1-c1", "c1-a2", "c1-c2"], recovering: ["c1"], focus: "c1" },
+            { name: "IF Up", phase: "Routed Portがup/up、OSPF隣接形成中", detail: "Hello交換が始まっても、FULLになるまではECMP復元と判定しません。", tone: "working", pill: "OSPF FORMING", route: "core2", ping: "Reply", ospf: "INIT / 2-WAY", rib: "1 next-hop", stp: "対象外", path: "通信は引き続きcore2経由", forming: ["a1-c1", "c1-a2", "c1-c2"], recovering: ["c1"], focus: "a1-c1" },
+            { name: "隣接FULL", phase: "OSPF隣接がFULL、SPFとRIB更新へ", detail: "制御プレーンは復旧しました。次に2本目のnext-hopがRIB/FIBへ入ることを確認します。", tone: "working", pill: "SPF UPDATE", route: "core2", ping: "Reply", ospf: "FULL", rib: "追加処理中", stp: "動作なし", path: "通信はcore2経由・経路追加処理中", forming: ["a1-c1", "c1-a2"], recovering: ["c1"], focus: "a1" },
+            { name: "ECMP復元", phase: "2つの等コストnext-hopが復元", detail: "core1とcore2が再び利用可能な候補になり、復旧試験の期待結果を満たします。", tone: "success", pill: "ECMP RESTORED", route: "both", ping: "Reply", ospf: "全隣接 FULL", rib: "2 next-hops", stp: "動作なし", path: "PC-A → access1 → core1 または core2 → access2 → PC-B", focus: "a1" }
+          ]
+        },
+        t304: {
+          code: "T-304",
+          title: "STP非依存",
+          stageTitle: "L2再計算ではなく、L3経路変更",
+          caption: "Routed Port障害を、OSPF Neighbor・LSDB・RIB/FIBの変化として観測します。",
+          summary: "Core—Access間はL3 P2Pです。STPの状態遷移ではなく、OSPFによる制御プレーン更新を確認します。",
+          commands: ["access1: show ip ospf neighbor", "access1: show ip route 10.24.20.0", "access1: show ip interface E0/1"],
+          pass: ["障害がOSPF隣接消失として観測できる", "RIB/FIBのnext-hop変更として確認できる", "STP再計算を前提とした判定を行っていない"],
+          steps: [
+            { name: "Routed Access", phase: "全インフラリンクはL3 Point-to-Point", detail: "ブロードキャストドメインをCoreまで延伸せず、各/30リンクでOSPF隣接を形成しています。", tone: "normal", pill: "L3 P2P", route: "both", ping: "Reply", ospf: "FULL", rib: "2 next-hops", stp: "経路選択に不使用", path: "2つのL3候補経路", focus: "a1-c1" },
+            { name: "障害検知", phase: "リンクDown → OSPF Neighbor Down", detail: "観測起点はSTP topology changeではなく、E0/1のDownとOSPF隣接消失です。", tone: "danger", pill: "OSPF DOWN", route: "none", ping: "一時欠落", ospf: "Neighbor Down", rib: "旧経路あり", stp: "再計算なし", path: "旧next-hopへの転送が一時的に失敗", failed: ["a1-c1"], drop: true, focus: "a1-c1" },
+            { name: "制御面更新", phase: "SPF → RIB → FIBの順で経路を更新", detail: "OSPFが到達可能性を再計算し、core1側next-hopを転送表から除外します。", tone: "working", pill: "RIB / FIB", route: "none", ping: "一時欠落", ospf: "SPF running", rib: "更新中", stp: "再計算なし", path: "core2への切替処理中", failed: ["a1-c1"], drop: true, focus: "a1" },
+            { name: "L3収束", phase: "core2だけを使うL3経路へ収束", detail: "復旧はポートのBlocking/Forwarding変化ではなく、next-hop変更として説明できます。", tone: "success", pill: "L3 RESTORED", route: "core2", ping: "Reply", ospf: "残存隣接 FULL", rib: "1 next-hop", stp: "再計算なし", path: "PC-A → access1 → core2 → access2 → PC-B", failed: ["a1-c1"], focus: "a1-c2" },
+            { name: "リンク復旧", phase: "リンク復旧後、OSPF隣接を再形成", detail: "物理Upだけでは完了ではありません。Neighbor FULLと経路追加を待ちます。", tone: "working", pill: "OSPF FORMING", route: "core2", ping: "Reply", ospf: "INIT → FULL", rib: "1 next-hop", stp: "動作なし", path: "通信はcore2で継続", forming: ["a1-c1"], focus: "a1-c1" },
+            { name: "復旧完了", phase: "OSPFとECMP候補が復元", detail: "障害から復旧までを一貫してL3の状態変化として観測できました。", tone: "success", pill: "ECMP RESTORED", route: "both", ping: "Reply", ospf: "全隣接 FULL", rib: "2 next-hops", stp: "動作なし", path: "2つのL3候補経路が復元", focus: "a1" }
+          ]
+        }
+      };
+
+      const details = {
+        pcA: { title: "PC-A", text: "eth1: 10.24.10.10/24\nGW相当: access1 10.24.10.1" },
+        a1: { title: "access1", text: "E0/1: 10.24.0.2/30 → core1\nE0/2: 10.24.0.6/30 → core2\nE0/3: 10.24.10.1/24 → PC-A\nLo0: 10.24.255.11/32" },
+        c1: { title: "core1", text: "E0/1: 10.24.0.1/30 → access1\nE0/2: 10.24.0.9/30 → access2\nE0/3: 10.24.0.17/30 → core2\nLo0: 10.24.255.1/32" },
+        c2: { title: "core2", text: "E0/1: 10.24.0.5/30 → access1\nE0/2: 10.24.0.13/30 → access2\nE0/3: 10.24.0.18/30 → core1\nLo0: 10.24.255.2/32" },
+        a2: { title: "access2", text: "E0/1: 10.24.0.10/30 → core1\nE0/2: 10.24.0.14/30 → core2\nE0/3: 10.24.20.1/24 → PC-B\nLo0: 10.24.255.12/32" },
+        pcB: { title: "PC-B", text: "eth1: 10.24.20.10/24\nGW相当: access2 10.24.20.1" },
+        "pcA-a1": { title: "PC-A—access1", text: "eth1 ↔ E0/3\n10.24.10.0/24（利用者LAN）" },
+        "a1-c1": { title: "access1—core1", text: "E0/1 ↔ E0/1\n10.24.0.0/30 · OSPF area 0" },
+        "a1-c2": { title: "access1—core2", text: "E0/2 ↔ E0/1\n10.24.0.4/30 · OSPF area 0" },
+        "c1-a2": { title: "core1—access2", text: "E0/2 ↔ E0/1\n10.24.0.8/30 · OSPF area 0" },
+        "c2-a2": { title: "core2—access2", text: "E0/2 ↔ E0/2\n10.24.0.12/30 · OSPF area 0" },
+        "c1-c2": { title: "core1—core2", text: "E0/3 ↔ E0/3\n10.24.0.16/30 · OSPF area 0\n通常のPC間ECMP経路として固定表示しない" },
+        "a2-pcB": { title: "access2—PC-B", text: "E0/3 ↔ eth1\n10.24.20.0/24（利用者LAN）" }
+      };
+
+      const routePoints = {
+        core1: [[157,310],[240,310],[275,310],[313,286],[490,194],[530,194],[570,194],[747,286],[785,310],[820,310],[944,310]],
+        core2: [[157,310],[240,310],[275,310],[313,334],[490,426],[530,426],[570,426],[747,334],[785,310],[820,310],[944,310]]
+      };
+
+      const $ = (selector) => document.querySelector(selector);
+      const $$ = (selector) => [...document.querySelectorAll(selector)];
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+      const lowEnd = (navigator.deviceMemory && navigator.deviceMemory <= 2) || (!navigator.deviceMemory && navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4);
+
+      let scenarioKey = "t301";
+      let stepIndex = 0;
+      let isPlaying = false;
+      let speed = 1;
+      let lastStepAt = 0;
+      let packetStart = performance.now();
+      let selectedId = "a1-c1";
+
+      const els = {
+        panel: $("#simulator"), stageTitle: $("#stage-title"), caption: $("#stage-caption"), pill: $("#state-pill"),
+        code: $("#scenario-code"), title: $("#scenario-title"), summary: $("#scenario-summary"),
+        phaseTitle: $("#phase-title"), phaseDetail: $("#phase-detail"), ping: $("#ping-state"),
+        ospf: $("#ospf-state"), route: $("#route-state"), stp: $("#stp-state"), path: $("#path-readout"),
+        commands: $("#command-list"), pass: $("#pass-list"), selectionTitle: $("#selection-title"),
+        selectionDetail: $("#selection-detail"), stepCount: $("#step-count"), stepName: $("#step-name"),
+        range: $("#timeline-range"), reset: $("#reset-btn"), prev: $("#prev-btn"), play: $("#play-btn"),
+        playIcon: $("#play-icon"), next: $("#next-btn"), speed: $("#speed-select"), live: $("#live-status"),
+        packet: $("#packet"), halo: $("#packet-halo"), drop: $("#drop-mark")
+      };
+
+      function statusTone(element, value) {
+        element.classList.remove("tone-good", "tone-bad", "tone-work");
+        if (/Reply|FULL|next-hop/.test(value) && !/更新|形成|未/.test(value)) element.classList.add("tone-good");
+        if (/Timeout|Down|欠落|旧経路/.test(value)) element.classList.add("tone-bad");
+        if (/running|更新|INIT|2-WAY|追加|再計算/.test(value)) element.classList.add("tone-work");
+      }
+
+      function renderList(element, items) {
+        element.replaceChildren(...items.map((text) => {
+          const li = document.createElement("li");
+          li.textContent = text;
+          return li;
+        }));
+      }
+
+      function setSelection(id, announce = false) {
+        selectedId = id;
+        $$(".device.selected, .link-group.selected").forEach((el) => el.classList.remove("selected"));
+        const target = document.querySelector(`[data-node="${id}"], [data-link="${id}"]`);
+        if (target) target.classList.add("selected");
+        const detail = details[id];
+        if (detail) {
+          els.selectionTitle.textContent = detail.title;
+          els.selectionDetail.textContent = detail.text;
+          if (announce) els.live.textContent = `${detail.title}を選択しました。${detail.text.replaceAll("\n", "、")}`;
+        }
+      }
+
+      function applyTopology(step) {
+        const active = step.route === "core1" ? routeLinks.core1 : step.route === "core2" ? routeLinks.core2 : [];
+        const candidate = step.route === "both" ? [...routeLinks.core1, ...routeLinks.core2] : [];
+        const failed = step.failed || [];
+        const forming = step.forming || [];
+
+        $$(".link-group").forEach((link) => {
+          const id = link.dataset.link;
+          link.classList.remove("active", "candidate", "failed", "forming", "dim");
+          if (active.includes(id)) link.classList.add("active");
+          else if (candidate.includes(id)) link.classList.add("candidate");
+          else if (failed.includes(id)) link.classList.add("failed");
+          else if (forming.includes(id)) link.classList.add("forming");
+          else if (id !== "c1-c2") link.classList.add("dim");
+        });
+
+        $$(".device").forEach((node) => {
+          const id = node.dataset.node;
+          node.classList.toggle("down", (step.down || []).includes(id));
+          node.classList.toggle("recovering", (step.recovering || []).includes(id));
+        });
+
+        els.drop.classList.toggle("visible", Boolean(step.drop));
+        els.packet.style.opacity = step.route === "none" ? "0" : "1";
+        els.halo.style.opacity = step.route === "none" || reduceMotion.matches ? "0" : "1";
+      }
+
+      function render() {
+        const scenario = scenarios[scenarioKey];
+        const step = scenario.steps[stepIndex];
+        els.panel.setAttribute("aria-labelledby", `tab-${scenarioKey}`);
+        els.stageTitle.textContent = scenario.stageTitle;
+        els.caption.textContent = scenario.caption;
+        els.code.textContent = scenario.code;
+        els.title.textContent = scenario.title;
+        els.summary.textContent = scenario.summary;
+        els.phaseTitle.textContent = step.phase;
+        els.phaseDetail.textContent = step.detail;
+        els.pill.textContent = step.pill;
+        els.pill.dataset.tone = step.tone;
+        els.ping.textContent = step.ping;
+        els.ospf.textContent = step.ospf;
+        els.route.textContent = step.rib;
+        els.stp.textContent = step.stp;
+        els.path.textContent = step.path;
+        [els.ping, els.ospf, els.route, els.stp].forEach((el) => statusTone(el, el.textContent));
+        renderList(els.commands, scenario.commands);
+        renderList(els.pass, scenario.pass);
+        els.stepCount.textContent = `STEP ${stepIndex + 1} / ${scenario.steps.length}`;
+        els.stepName.textContent = step.name;
+        els.range.max = String(scenario.steps.length - 1);
+        els.range.value = String(stepIndex);
+        els.prev.disabled = stepIndex === 0;
+        els.next.disabled = stepIndex === scenario.steps.length - 1;
+        applyTopology(step);
+        setSelection(step.focus || selectedId);
+        packetStart = performance.now();
+        els.live.textContent = `${scenario.code}、${step.name}。${step.phase}。${step.path}`;
+      }
+
+      function selectScenario(key) {
+        scenarioKey = key;
+        stepIndex = 0;
+        stop();
+        $$(".tab").forEach((tab) => {
+          const selected = tab.dataset.scenario === key;
+          tab.setAttribute("aria-selected", String(selected));
+          tab.tabIndex = selected ? 0 : -1;
+        });
+        render();
+      }
+
+      function setStep(index) {
+        const max = scenarios[scenarioKey].steps.length - 1;
+        stepIndex = Math.max(0, Math.min(max, index));
+        render();
+      }
+
+      function updatePlayButton() {
+        els.play.setAttribute("aria-label", isPlaying ? "一時停止" : "再生");
+        els.playIcon.innerHTML = isPlaying ? '<path d="M7 5h4v14H7zm6 0h4v14h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
+      }
+
+      function play() {
+        if (stepIndex === scenarios[scenarioKey].steps.length - 1) setStep(0);
+        isPlaying = true;
+        lastStepAt = performance.now();
+        packetStart = performance.now();
+        updatePlayButton();
+      }
+
+      function stop() { isPlaying = false; updatePlayButton(); }
+      function togglePlay() { isPlaying ? stop() : play(); }
+
+      function interpolate(points, t) {
+        const lengths = [];
+        let total = 0;
+        for (let i = 1; i < points.length; i++) {
+          const length = Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
+          lengths.push(length); total += length;
+        }
+        let target = t * total;
+        for (let i = 0; i < lengths.length; i++) {
+          if (target <= lengths[i]) {
+            const p = target / lengths[i];
+            return [points[i][0] + (points[i + 1][0] - points[i][0]) * p, points[i][1] + (points[i + 1][1] - points[i][1]) * p];
+          }
+          target -= lengths[i];
+        }
+        return points[points.length - 1];
+      }
+
+      function animate(now) {
+        const step = scenarios[scenarioKey].steps[stepIndex];
+        if (isPlaying) {
+          const interval = 2500 / speed;
+          if (now - lastStepAt >= interval) {
+            if (stepIndex < scenarios[scenarioKey].steps.length - 1) {
+              stepIndex += 1; lastStepAt = now; render();
+            } else stop();
+          }
+        }
+
+        if (step.route !== "none") {
+          const duration = (lowEnd ? 3900 : 3000) / speed;
+          const raw = reduceMotion.matches ? 0.52 : ((now - packetStart) % duration) / duration;
+          const cycle = Math.floor((now - packetStart) / duration);
+          const route = step.route === "both" ? (cycle % 2 === 0 ? "core1" : "core2") : step.route;
+          const [x, y] = interpolate(routePoints[route], raw);
+          els.packet.setAttribute("cx", x.toFixed(1)); els.packet.setAttribute("cy", y.toFixed(1));
+          els.halo.setAttribute("cx", x.toFixed(1)); els.halo.setAttribute("cy", y.toFixed(1));
+        }
+        requestAnimationFrame(animate);
+      }
+
+      $$(".tab").forEach((tab, index, tabs) => {
+        tab.addEventListener("click", () => selectScenario(tab.dataset.scenario));
+        tab.addEventListener("keydown", (event) => {
+          if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+          event.preventDefault();
+          let next = index;
+          if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
+          if (event.key === "ArrowLeft") next = (index - 1 + tabs.length) % tabs.length;
+          if (event.key === "Home") next = 0;
+          if (event.key === "End") next = tabs.length - 1;
+          tabs[next].focus(); selectScenario(tabs[next].dataset.scenario);
+        });
+      });
+
+      $$("[data-node], [data-link]").forEach((target) => {
+        const id = target.dataset.node || target.dataset.link;
+        target.addEventListener("click", () => setSelection(id, true));
+        target.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelection(id, true); }
+        });
+      });
+
+      els.reset.addEventListener("click", () => { stop(); setStep(0); });
+      els.prev.addEventListener("click", () => { stop(); setStep(stepIndex - 1); });
+      els.next.addEventListener("click", () => { stop(); setStep(stepIndex + 1); });
+      els.play.addEventListener("click", togglePlay);
+      els.range.addEventListener("input", () => { stop(); setStep(Number(els.range.value)); });
+      els.speed.addEventListener("change", () => { speed = Number(els.speed.value); packetStart = performance.now(); });
+
+      document.addEventListener("keydown", (event) => {
+        if (["INPUT", "SELECT", "BUTTON"].includes(document.activeElement.tagName)) return;
+        if (event.key === " ") { event.preventDefault(); togglePlay(); }
+        if (event.key === "ArrowLeft") { stop(); setStep(stepIndex - 1); }
+        if (event.key === "ArrowRight") { stop(); setStep(stepIndex + 1); }
+        if (event.key.toLowerCase() === "r") { stop(); setStep(0); }
+      });
+
+      reduceMotion.addEventListener?.("change", render);
+      render();
+      requestAnimationFrame(animate);
+    })();
+  </script>
+</body>
+</html>

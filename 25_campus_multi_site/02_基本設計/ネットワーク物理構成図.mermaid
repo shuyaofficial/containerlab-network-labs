@@ -1,0 +1,22 @@
+flowchart LR
+    subgraph MAIN["Main Campus — OSPF 10 / AS 65050"]
+        MP["main-pc\nMgmt: 172.25.25.101\nDesign: 10.50.10.10/24"]
+        MC["main-core\nMgmt: 172.25.25.11\nLo0: 10.50.255.1/32"]
+        ME["main-edge\nMgmt: 172.25.25.12\nLo0: 10.50.255.254/32"]
+    end
+
+    subgraph WAN["WAN Link"]
+        W["198.51.100.0/30\neBGP"]
+    end
+
+    subgraph BRANCH["Branch Campus — OSPF 20 / AS 65060"]
+        BE["branch-edge\nMgmt: 172.25.25.21\nLo0: 10.60.255.254/32"]
+        BC["branch-core\nMgmt: 172.25.25.22\nLo0: 10.60.255.1/32"]
+        BP["branch-pc\nMgmt: 172.25.25.102\nDesign: 10.60.10.10/24"]
+    end
+
+    MP ---|"eth1  10.50.10.0/24  E0/2"| MC
+    MC ---|"E0/1  10.255.50.0/30  E0/1"| ME
+    ME ---|"E0/2  198.51.100.0/30  E0/2"| BE
+    BE ---|"E0/1  10.255.60.0/30  E0/1"| BC
+    BC ---|"E0/2  10.60.10.0/24  eth1"| BP

@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>ネットワーク論理構成図（テキスト版）— テーマ22</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>22_enterprise_campus_lan</span>
+<span class="sep">/</span>
+<span>02_基本設計</span></nav>
+      <h1 class="doc-title">ネットワーク論理構成図（テキスト版）— テーマ22</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>正本のIP割当は <a href="IP%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9%E7%AE%A1%E7%90%86%E8%A1%A8.html">IPアドレス管理表.md</a> を参照。</p>
+</blockquote>
+<pre><code class="language-text">                        [ ISP (インターネット模擬) ]
+                          Lo0: 8.8.8.8/32
+                         /                  \
+              200.0.1.0/24                200.0.3.0/24
+                       /                      \
+            ┌─────[ FGT-Edge ]─────┐        [ BR-Edge ] (Cisco・支社)
+            │  FortiGate 7.2       │~~~~~~~~~~~ |  WAN: 200.0.3.1
+            │  WAN: 200.0.1.1      │ IPsec VTI  |  LAN GW: 10.2.40.254
+            │  SNAT / FWポリシー    │ (IKEv2)    |
+            │  デフォルトルート広報  │ 172.16.40.0/30
+            └──┬──────────────┬────┘            |
+        P08 .29│/30      P09 .33│/30        [ br-pc ] 10.2.40.100 (VLAN40)
+            .30│              .34│
+   ╔═══════════╧════════════════╧══════ OSPF Area 0 ═══════════════════╗
+   ║      [ Core1 ]══════ P01: 10.0.0.0/30 ══════[ Core2 ]             ║
+   ║      Lo .1                                   Lo .2                ║
+   ║      /    \                                  /   \                ║
+   ║  P02/  P03 \____________________________P04 /     \ P05           ║
+   ║    /        \                              /       \              ║
+   ║   /     P06  \                            /  P07    \             ║
+   ╚══╪═══════╪════╪══════════════════════════╪═══╪═══════╪════════════╝
+      │       │    │                          │   │       │
+   ┌──┴───────┼────┴──── Area 1 (A棟) ────────┴───┼───────┴───┐
+   │ [ Dist-A1 (ABR) ]═══ VLAN901 (OSPF隣接) ═══[ Dist-A2 (ABR) ]
+   │  HSRP Active            10.10.255.0/30      HSRP Standby  │
+   │  MST Root                                                 │
+   │   ├─ SVI VLAN10: 10.10.10.1  (VIP .254) ─┐   ├─ .2 ──────┤
+   │   └─ SVI VLAN20: 10.10.20.1  (VIP .254) ─┤   └─ .2 ──────┤
+   │                                          │                │
+   │  VLAN10 営業部 10.10.10.0/24 … pc-sales(.100)             │
+   │  VLAN20 開発部 10.10.20.0/24 … pc-dev(.100)               │
+   │  ★ABRで 10.10.0.0/16 に集約して Area 0 へ広報              │
+   └───────────────────────────────────────────────────────────┘
+      │       │
+   ┌──┴───────┴────────── Area 2 (B棟) ───────────────────────┐
+   │ [ Dist-B1 (ABR・単機 ※縮小モデル) ]                       │
+   │   ├─ SVI VLAN30: 10.20.30.254（サーバGW）                 │
+   │   └─ SVI VLAN99: 10.20.99.254（運用管理GW）               │
+   │                                                          │
+   │  VLAN30 サーバ 10.20.30.0/24 … srv-file(.10), srv-portal(.20)
+   │  VLAN99 運用管理 10.20.99.0/24 …（将来の監視基盤）          │
+   │  ★ABRで 10.20.0.0/16 に集約して Area 0 へ広報              │
+   └──────────────────────────────────────────────────────────┘
+</code></pre>
+<h2 id="ルーティングの要点" tabindex="-1">ルーティングの要点 <a class="header-anchor" href="#ルーティングの要点" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Area 0</td>
+<td>Core1/2・FGT-Edge・各ディストリの上位リンク・全Loopback</td>
+</tr>
+<tr>
+<td>Area 1（A棟）</td>
+<td>VLAN10/20/901。ABR=Dist-A1/A2 が <code>10.10.0.0/16</code> に集約</td>
+</tr>
+<tr>
+<td>Area 2（B棟）</td>
+<td>VLAN30/99。ABR=Dist-B1 が <code>10.20.0.0/16</code> に集約</td>
+</tr>
+<tr>
+<td>デフォルトルート</td>
+<td>FGT-EdgeがArea 0へ広報 → 全社内機器がFGT経由でインターネットへ</td>
+</tr>
+<tr>
+<td>支社経路</td>
+<td>FGT-EdgeのVTI宛スタティックをOSPFへ再配布（10.2.40.0/24）</td>
+</tr>
+<tr>
+<td>利用者VLANのSVI</td>
+<td>passive-interface（隣接はVLAN901とP2Pリンクのみ）</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="通信ポリシー要件23の論理配置" tabindex="-1">通信ポリシー（要件2.3の論理配置） <a class="header-anchor" href="#通信ポリシー要件23の論理配置" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>制御</th>
+<th>実装位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>社内→インターネット 許可＋SNAT</td>
+<td>FGT-Edge</td>
+</tr>
+<tr>
+<td>インターネット→社内 拒否</td>
+<td>FGT-Edge（ステートフル）</td>
+</tr>
+<tr>
+<td>営業⇔開発 制限</td>
+<td>Dist-A1/A2 のSVI着信ACL（<strong>両方に適用</strong>）</td>
+</tr>
+<tr>
+<td>支社→サーバVLANのみ許可</td>
+<td>FGT-EdgeのVPNポリシー（一元管理）</td>
+</tr>
+<tr>
+<td>支社→インターネット PAT</td>
+<td>BR-Edge</td>
+</tr>
+</tbody>
+</table></div>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#ルーティングの要点">ルーティングの要点</a></li>
+<li class="lvl-2"><a href="#通信ポリシー要件23の論理配置">通信ポリシー（要件2.3の論理配置）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

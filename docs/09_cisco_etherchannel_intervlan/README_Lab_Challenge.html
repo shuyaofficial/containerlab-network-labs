@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Cisco EtherChannel &amp; Inter-VLAN Routing Challenge</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>09_cisco_etherchannel_intervlan</span></nav>
+      <h1 class="doc-title">Cisco EtherChannel &amp; Inter-VLAN Routing Challenge</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>このドキュメントは、Mac上のContainerlab環境でCisco機器を用いた「EtherChannel」および「VLAN間ルーティング」の検証環境を構築するための要件と、これまでの検証で判明した環境依存のバグや注意点（トラブルシューティングログ）をまとめたものです。</p>
+<p>一からご自身で設定に挑戦される際のガイドラインとしてご活用ください。</p>
+<hr>
+<h2 id="-構築チャレンジ要件" tabindex="-1">🎯 構築チャレンジ要件 <a class="header-anchor" href="#-構築チャレンジ要件" aria-hidden="true">#</a></h2>
+<h3 id="1-機器構成トポロジ" tabindex="-1">1. 機器構成（トポロジ） <a class="header-anchor" href="#1-機器構成トポロジ" aria-hidden="true">#</a></h3>
+<p>以下の4台のCisco IOL機器を使用します。</p>
+<ul>
+<li><strong>SW1 (Core Switch)</strong>
+<ul>
+<li>役割: L3スイッチ（VLAN間ルーティングおよびL2アグリゲーション）</li>
+<li>イメージ: <code>vrnetlab/cisco_iol:L2-advipservices-2017</code> (L3ルーティング対応)</li>
+</ul>
+</li>
+<li><strong>SW2 (Access Switch)</strong>
+<ul>
+<li>役割: L2スイッチ（PCの収容）</li>
+<li>イメージ: <code>vrnetlab/cisco_iol:L2-15.2</code></li>
+</ul>
+</li>
+<li><strong>PC1 (End Host 1)</strong>
+<ul>
+<li>役割: VLAN 10 に所属するPC</li>
+<li>イメージ: <code>vrnetlab/cisco_iol:L2-15.2</code>（疑似PCとして使用）</li>
+</ul>
+</li>
+<li><strong>PC2 (End Host 2)</strong>
+<ul>
+<li>役割: VLAN 20 に所属するPC</li>
+<li>イメージ: <code>vrnetlab/cisco_iol:L2-15.2</code>（疑似PCとして使用）</li>
+</ul>
+</li>
+</ul>
+<h3 id="2-ネットワーク要件" tabindex="-1">2. ネットワーク要件 <a class="header-anchor" href="#2-ネットワーク要件" aria-hidden="true">#</a></h3>
+<ol>
+<li><strong>VLAN設定</strong>
+<ul>
+<li>VLAN 10 (PC1用) / ネットワーク: <code>10.10.10.0/24</code></li>
+<li>VLAN 20 (PC2用) / ネットワーク: <code>10.10.20.0/24</code></li>
+</ul>
+</li>
+<li><strong>EtherChannel (Port-Channel) 設定</strong>
+<ul>
+<li>SW1 と SW2 の間を2本のケーブルで接続し、<strong>LACP (mode active)</strong> で論理的に1本のリンク（Port-channel 1）として束ねる。</li>
+<li>該当ポートはトランクポート（Trunk）とし、VLAN 10, 20 の通信を許可する。</li>
+</ul>
+</li>
+<li><strong>アクセスポート設定</strong>
+<ul>
+<li>SW2 と PC1 の接続ポートは <strong>VLAN 10</strong> のアクセスポートとする。</li>
+<li>SW2 と PC2 の接続ポートは <strong>VLAN 20</strong> のアクセスポートとする。</li>
+<li>※可能であれば、PC接続ポートに <code>spanning-tree portfast</code> を設定する。</li>
+</ul>
+</li>
+<li><strong>VLAN間ルーティング (SVI)</strong>
+<ul>
+<li>SW1 に各VLANのSVI（デフォルトゲートウェイ）を作成する。
+<ul>
+<li>VLAN 10 SVI: <code>10.10.10.254</code></li>
+<li>VLAN 20 SVI: <code>10.10.20.254</code></li>
+</ul>
+</li>
+<li>SW1 でIPルーティングを有効化する。</li>
+</ul>
+</li>
+<li><strong>PCのIP設定</strong>
+<ul>
+<li>PC1: <code>10.10.10.11 /24</code>, ゲートウェイ: <code>10.10.10.254</code></li>
+<li>PC2: <code>10.10.20.12 /24</code>, ゲートウェイ: <code>10.10.20.254</code></li>
+</ul>
+</li>
+</ol>
+<h3 id="3-最終目標" tabindex="-1">3. 最終目標 <a class="header-anchor" href="#3-最終目標" aria-hidden="true">#</a></h3>
+<p><strong>PC1 から PC2 (10.10.20.12) に対してPingを送信し、通信が成功すること。</strong></p>
+<hr>
+<h2 id="-環境構築時のバグ注意点ログ-lessons-learned" tabindex="-1">⚠️ 環境構築時のバグ・注意点ログ (Lessons Learned) <a class="header-anchor" href="#-環境構築時のバグ注意点ログ-lessons-learned" aria-hidden="true">#</a></h2>
+<p>これまでの構築で発生した数々のトラブルと、Containerlab×Cisco IOL特有のバグ・回避策のまとめです。このトラップを避けることでスムーズに構築が可能です。</p>
+<h3 id="-1-linuxコンテナalpineとcisco-iol間の物理層バグ" tabindex="-1">🚨 1. Linuxコンテナ(Alpine)とCisco IOL間の物理層バグ <a class="header-anchor" href="#-1-linuxコンテナalpineとcisco-iol間の物理層バグ" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>事象</strong>: エンドホスト（PC）としてAlpine Linuxコンテナを使用し、Cisco IOLスイッチ（SW2）に接続してPingを打つと、SW2側で <code>%AMDP2_FE-6-EXCESSCOLL: Ethernet0/2 TDR=0, TRC=0</code> という大量のコリジョンエラーログが発生し、Pingが100%パケットロスする。</li>
+<li><strong>原因</strong>: 仮想環境におけるLinux vethインターフェースと、Cisco IOLのエミュレーションインターフェース間でのDuplex/Speedのミスマッチバグ。</li>
+<li><strong>回避策</strong>: エンドホスト（PC）にもLinuxではなく <strong>Cisco IOLイメージ</strong> を使用し、仮想的なPCとして扱うことで解決する。</li>
+</ul>
+<h3 id="-2-l2イメージでのipルーティングの罠" tabindex="-1">🚨 2. L2イメージでのIPルーティングの罠 <a class="header-anchor" href="#-2-l2イメージでのipルーティングの罠" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>事象</strong>: <code>vrnetlab/cisco_iol:L2-15.2</code> イメージで <code>ip routing</code> コマンドを入力でき、エラーも出ないが、VLAN間ルーティングが一切機能しない。</li>
+<li><strong>原因</strong>: L2専用イメージのため、コマンド自体はパースされるがルーティングエンジンが動作しない。</li>
+<li><strong>回避策</strong>: コアスイッチなどL3機能（VLAN間ルーティング）が必要なノードには、必ずL3機能が含まれたイメージ（例: <code>L2-advipservices-2017</code>）を使用する。</li>
+</ul>
+<h3 id="-3-containerlab-clabyml-でのインターフェース名の罠" tabindex="-1">🚨 3. Containerlab (clab.yml) でのインターフェース名の罠 <a class="header-anchor" href="#-3-containerlab-clabyml-でのインターフェース名の罠" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>事象</strong>: <code>cisco_etherchannel.clab.yml</code> の <code>endpoints</code> で <code>[&quot;sw1:Ethernet0/1&quot;, &quot;sw2:Ethernet0/1&quot;]</code> のようにCiscoのインターフェース名を直接指定すると、コンテナ間で正しく仮想ケーブルが結線されない。</li>
+<li><strong>原因</strong>: Containerlabは内部的に <code>ethX</code> というLinuxの命名規則で仮想インターフェース（veth）をバインドしているため。</li>
+<li><strong>回避策</strong>: トポロジファイル内では必ず <code>[&quot;sw1:eth1&quot;, &quot;sw2:eth1&quot;]</code> のように <code>eth1</code>, <code>eth2</code>... というフォーマットで記述する。※Cisco内部では <code>eth1</code> が <code>Ethernet0/1</code>、<code>eth2</code> が <code>Ethernet0/2</code> のようにマッピングされる。</li>
+</ul>
+<h3 id="-4-cisco-iolをpcとして扱う際の設定の罠" tabindex="-1">🚨 4. Cisco IOLを「PC」として扱う際の設定の罠 <a class="header-anchor" href="#-4-cisco-iolをpcとして扱う際の設定の罠" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>事象</strong>: Cisco IOLをPCとして使う際、ルーターとして動かないように <code>no ip routing</code> と <code>ip default-gateway</code> を設定したところ、Dockerが割り当てる管理用ネットワークのIP（通信）まで無効化され、外部からログインできなくなる（フリーズしたように見える）。</li>
+<li><strong>原因</strong>: IOL上でIPルーティングを完全にオフにしてしまうと、管理用ポート（eth0）も影響を受け、応答できなくなる。</li>
+<li><strong>回避策</strong>: PCとして使う場合でも <code>no ip routing</code> は設定せず、デフォルトルートをスタティックに設定する（<code>ip route 0.0.0.0 0.0.0.0 &lt;ゲートウェイIP&gt;</code>）ことで、ルーター化を防ぎつつ管理アクセスを維持できる。</li>
+</ul>
+<hr>
+<p><em>Good Luck! ぜひ一からの構築にチャレンジしてみてください！</em></p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-構築チャレンジ要件">🎯 構築チャレンジ要件</a></li>
+<li class="lvl-3"><a href="#1-機器構成トポロジ">1. 機器構成（トポロジ）</a></li>
+<li class="lvl-3"><a href="#2-ネットワーク要件">2. ネットワーク要件</a></li>
+<li class="lvl-3"><a href="#3-最終目標">3. 最終目標</a></li>
+<li class="lvl-2"><a href="#-環境構築時のバグ注意点ログ-lessons-learned">⚠️ 環境構築時のバグ・注意点ログ (Lessons Learned)</a></li>
+<li class="lvl-3"><a href="#-1-linuxコンテナalpineとcisco-iol間の物理層バグ">🚨 1. Linuxコンテナ(Alpine)とCisco IOL間の物理層バグ</a></li>
+<li class="lvl-3"><a href="#-2-l2イメージでのipルーティングの罠">🚨 2. L2イメージでのIPルーティングの罠</a></li>
+<li class="lvl-3"><a href="#-3-containerlab-clabyml-でのインターフェース名の罠">🚨 3. Containerlab (clab.yml) でのインターフェース名の罠</a></li>
+<li class="lvl-3"><a href="#-4-cisco-iolをpcとして扱う際の設定の罠">🚨 4. Cisco IOLを「PC」として扱う際の設定の罠</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

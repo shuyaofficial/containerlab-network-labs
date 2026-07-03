@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>🗺️ フェーズ1: ネットワーク構築の基礎（Cisco IOSベース）</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>ロードマップ</span></nav>
+      <h1 class="doc-title">🗺️ フェーズ1: ネットワーク構築の基礎（Cisco IOSベース）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>このドキュメントは、「<strong>企業の社内ネットワークを、要件定義 → 設計 → 構築 → 試験 まで一気通貫でやり切る</strong>」ための基礎カリキュラム（テーマ02〜27）のマスタードキュメントです。
+最新のモダン構成やマルチベンダー機器の導入は、<a href="PHASE2_MODERN_ENTERPRISE.html">フェーズ2: モダン構成・拡張編</a> を参照してください。</p>
+</blockquote>
+<p>最終更新: 2026-07-02</p>
+<hr>
+<h2 id="-フェーズ1のゴール" tabindex="-1">🎯 フェーズ1のゴール <a class="header-anchor" href="#-フェーズ1のゴール" aria-hidden="true">#</a></h2>
+<blockquote>
+<p><strong>企業の社内ネットワークを、要件定義 → 設計（論理／物理）→ 構築 → 試験 → ドキュメント化 まで、自力で一気通貫でやり切る。</strong></p>
+</blockquote>
+<p>キャプストン（第7章）は2段構えでスケールさせます：</p>
+<ul>
+<li><strong>基本形（テーマ21）</strong>: 「本社＋支社の2拠点」中堅企業ネットワーク（全機能を統合する練習台）</li>
+<li><strong>最終形（テーマ22）</strong>: そこから <strong>大規模な社内LAN</strong>（3階層＝コア/ディストリ/アクセス、マルチエリアOSPF、キャンパス/複数棟、経路集約、MST）へ<strong>スケールアップ</strong>する。</li>
+</ul>
+<p>その後、ポスト・キャプストンとしてキャンパス設計を3パターンで比較します：</p>
+<ul>
+<li><strong>テーマ23 / Pattern A</strong>: Collapsed Core</li>
+<li><strong>テーマ24 / Pattern B</strong>: Routed Access</li>
+<li><strong>テーマ25 / Pattern C</strong>: Multi-Campus</li>
+</ul>
+<p>さらに、デザインパターン本を参考にした応用テーマで深堀りします：</p>
+<ul>
+<li><strong>テーマ26</strong>: 動的ルーティング深堀り（OSPF/EIGRP/BGP使い分け・再配信・NAT）</li>
+<li><strong>テーマ27</strong>: QoS/ACL/route-map応用（トラフィック制御・ポリシーベースルーティング）</li>
+</ul>
+<p>ゴールの具体像とテンプレは <code>キャプストン/要件定義_設計_構築テンプレート.md</code> を参照。</p>
+<hr>
+<h2 id="-現在地テーマ25完了テーマ2627教材準備中" tabindex="-1">📍 現在地（テーマ25完了、テーマ26〜27教材準備中） <a class="header-anchor" href="#-現在地テーマ25完了テーマ2627教材準備中" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>テーマ21</strong>: 本社+支社2拠点を要件定義→設計→構築→試験まで完走。</li>
+<li><strong>テーマ22</strong>: 大規模キャンパスLANを部分達成で終了し、証跡と引継ぎを保存。</li>
+<li><strong>テーマ23</strong>: Collapsed Core環境を構築し、L2/HSRPの主要障害を解消。</li>
+<li><strong>テーマ24</strong>: Routed Port、OSPF/ECMP、双方向疎通、リンク/Core障害、復旧まで完了。</li>
+<li><strong>テーマ25</strong>: Multi-Campus（OSPF/eBGP境界、経路集約・再配信、拠点間障害試験）完了。</li>
+</ul>
+<hr>
+<h2 id="-全7章応用の構成" tabindex="-1">📚 全7章＋応用の構成 <a class="header-anchor" href="#-全7章応用の構成" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>章</th>
+<th>テーマ群</th>
+<th>狙い</th>
+<th>対応カテゴリ</th>
+<th>難易度</th>
+<th>状態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>1</strong></td>
+<td>02-07</td>
+<td>L3ルーティングとエッジ冗長（OSPF/BGP/BFD）</td>
+<td>ルーティング</td>
+<td>中〜上級</td>
+<td>✅ ほぼ完了</td>
+</tr>
+<tr>
+<td><strong>2</strong></td>
+<td>08-11</td>
+<td>LAN/L2 スイッチングと冗長（VLAN/STP/HSRP/統合）</td>
+<td>（IEEE/Cisco）</td>
+<td>初〜上級</td>
+<td>✅ 完了</td>
+</tr>
+<tr>
+<td><strong>3</strong></td>
+<td>12</td>
+<td>ネットワークサービス（DHCP/DNS/NTP）</td>
+<td>サービス・制御</td>
+<td>初級</td>
+<td>✅ 完了</td>
+</tr>
+<tr>
+<td><strong>4</strong></td>
+<td>13-15</td>
+<td>セキュリティ/QoS（ACL/NAT/IPsec/DiffServ）</td>
+<td>セキュリティ</td>
+<td>中級</td>
+<td>✅ 完了</td>
+</tr>
+<tr>
+<td><strong>5</strong></td>
+<td>16-17</td>
+<td>監視・運用・自動化（SNMP/Syslog/NETCONF/Ansible）</td>
+<td>管理・自動化</td>
+<td>中〜上級</td>
+<td>✅ 完了</td>
+</tr>
+<tr>
+<td><strong>6</strong></td>
+<td>18-20</td>
+<td>発展（IPv6/OSPFv3、MPLS/L3VPN、VXLAN/EVPN）※任意</td>
+<td>データプレーン</td>
+<td>上級</td>
+<td>⬜ 任意</td>
+</tr>
+<tr>
+<td><strong>7</strong></td>
+<td>21-22</td>
+<td>統合キャプストン（2拠点→大規模社内LANへスケール）</td>
+<td>全章の統合</td>
+<td>総合</td>
+<td>21完了・22部分達成</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="ポストキャプストン-キャンパスアーキテクチャ比較" tabindex="-1">ポスト・キャプストン: キャンパスアーキテクチャ比較 <a class="header-anchor" href="#ポストキャプストン-キャンパスアーキテクチャ比較" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>テーマ</th>
+<th>パターン</th>
+<th>主な技術</th>
+<th>ローカル実装範囲</th>
+<th>状態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>23</td>
+<td>A: Collapsed Core</td>
+<td>STP、HSRP、SVI</td>
+<td>L2/L3統合</td>
+<td>✅ 構築済み</td>
+</tr>
+<tr>
+<td>24</td>
+<td>B: Routed Access</td>
+<td>Routed Port、OSPF、ECMP</td>
+<td>フル実装可能</td>
+<td>✅ 完了</td>
+</tr>
+<tr>
+<td>25</td>
+<td>C: Multi-Campus</td>
+<td>OSPF、eBGP、集約、再配信</td>
+<td>L3 WANで実装</td>
+<td>✅ 完了</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="応用-社内lanデザインパターン実践" tabindex="-1">応用: 社内LANデザインパターン実践 <a class="header-anchor" href="#応用-社内lanデザインパターン実践" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>テーマ</th>
+<th>内容</th>
+<th>主な技術</th>
+<th>参考書籍</th>
+<th>状態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>26</td>
+<td>動的ルーティング深堀り</td>
+<td>OSPF/EIGRP/BGP使い分け、再配信、ECMP、NAT</td>
+<td>ネットワーク・デザインパターン Ch.1-5</td>
+<td>◐ 教材準備中</td>
+</tr>
+<tr>
+<td>27</td>
+<td>QoS/ACL/route-map応用</td>
+<td>ゾーン間ACL、PBR、DiffServ QoS、帯域制御</td>
+<td>ネットワーク・デザインパターン Ch.1-5</td>
+<td>◐ 教材準備中</td>
+</tr>
+</tbody>
+</table></div>
+<p>各章の詳細テーマは <code>章別アウトライン/第N章_*.md</code>、技術↔RFC対応は <code>00_カリキュラム対応表.md</code> を参照。</p>
+<hr>
+<h2 id="-1テーマの進め方学習サイクルの型" tabindex="-1">🔁 1テーマの進め方（学習サイクルの型） <a class="header-anchor" href="#-1テーマの進め方学習サイクルの型" aria-hidden="true">#</a></h2>
+<p>各テーマで以下を1周します：</p>
+<ol>
+<li><strong>設計を読む/書く</strong> … <code>challenge_guide.md</code>（トポロジ図・IP設計表・Mission）を用意</li>
+<li><strong>環境を起こす</strong> … <code>sudo containerlab deploy -t &lt;topo&gt;.clab.yml</code></li>
+<li><strong>手で構築する</strong> … <code>docker attach</code> でCLIに入り、自力でコマンド投入</li>
+<li><strong>障害試験で壊す</strong> … リンクを <code>shutdown</code> して、フェイルオーバ/収束を観測</li>
+<li><strong>振り返る</strong> … <code>振り返りシート/振り返りシート.md</code> に「教訓＋トラブルシュート」を残す</li>
+</ol>
+<blockquote>
+<p>鉄則: ①**復路（帰り道）**を必ず確認 ②新環境はまず <code>no shutdown</code> ③障害試験までやって初めて「できた」。</p>
+</blockquote>
+<hr>
+<h2 id="-次の一手テーマ26" tabindex="-1">▶️ 次の一手（テーマ26） <a class="header-anchor" href="#-次の一手テーマ26" aria-hidden="true">#</a></h2>
+<p><strong>テーマ25（Multi-Campus）</strong> は完了しました。</p>
+<p>次は**テーマ26（動的ルーティング深堀り）**で、デザインパターン本を参考にした中規模企業ネットワークを構築し、OSPF/EIGRP/BGPの使い分け、再配信制御、NAT、ECMP負荷分散を段階的に学びます。</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-フェーズ1のゴール">🎯 フェーズ1のゴール</a></li>
+<li class="lvl-2"><a href="#-現在地テーマ25完了テーマ2627教材準備中">📍 現在地（テーマ25完了、テーマ26〜27教材準備中）</a></li>
+<li class="lvl-2"><a href="#-全7章応用の構成">📚 全7章＋応用の構成</a></li>
+<li class="lvl-3"><a href="#ポストキャプストン-キャンパスアーキテクチャ比較">ポスト・キャプストン: キャンパスアーキテクチャ比較</a></li>
+<li class="lvl-3"><a href="#応用-社内lanデザインパターン実践">応用: 社内LANデザインパターン実践</a></li>
+<li class="lvl-2"><a href="#-1テーマの進め方学習サイクルの型">🔁 1テーマの進め方（学習サイクルの型）</a></li>
+<li class="lvl-2"><a href="#-次の一手テーマ26">▶️ 次の一手（テーマ26）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

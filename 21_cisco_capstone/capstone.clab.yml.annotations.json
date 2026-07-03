@@ -1,0 +1,74 @@
+{
+  "freeTextAnnotations": [],
+  "freeShapeAnnotations": [],
+  "trafficRateAnnotations": [],
+  "groupStyleAnnotations": [],
+  "networkNodeAnnotations": [],
+  "nodeAnnotations": [
+    {
+      "id": "isp",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 500,
+        "y": 100
+      }
+    },
+    {
+      "id": "br-edge",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 200,
+        "y": 250
+      }
+    },
+    {
+      "id": "br-pc",
+      "position": {
+        "x": 200,
+        "y": 400
+      }
+    },
+    {
+      "id": "hq-edge1",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 400,
+        "y": 250
+      }
+    },
+    {
+      "id": "hq-edge2",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 600,
+        "y": 250
+      }
+    },
+    {
+      "id": "hq-core1",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 400,
+        "y": 400
+      }
+    },
+    {
+      "id": "hq-core2",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 600,
+        "y": 400
+      }
+    },
+    {
+      "id": "hq-pc-sales",
+      "position": {
+        "x": 500,
+        "y": 550
+      }
+    }
+  ],
+  "edgeAnnotations": [],
+  "aliasEndpointAnnotations": [],
+  "viewerSettings": {}
+}

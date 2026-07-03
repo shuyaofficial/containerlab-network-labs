@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜ゼロトラストラボ ネットワーク構成図</title>
+  <style>
+    :root {
+      --ink: #17232d;
+      --muted: #5c6b75;
+      --faint: #87949c;
+      --paper: #fcfbf9;
+      --canvas: #f3f0ea;
+      --white: #fffefa;
+      --line: #d8d4cc;
+      --line-strong: #aaa69e;
+      --zt: #5a4b8a;
+      --zt-dark: #443a6b;
+      --zt-soft: #efeaf6;
+      --trust: #e9f4ed;
+      --trust-line: #8eb59b;
+      --dmz: #fff4df;
+      --dmz-line: #d3a75e;
+      --untrust: #f9ece8;
+      --untrust-line: #c88978;
+      --obs: #f0edf8;
+      --obs-line: #9a8cbc;
+      --auth: #087da8;
+      --proxy: #b26b18;
+      --log: #7552a3;
+      --focus: #ef9f1a;
+      --shadow: 0 12px 34px rgba(41, 51, 58, .08);
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      background: var(--canvas);
+      font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
+    }
+
+    button { font: inherit; }
+    a { color: var(--zt-dark); text-underline-offset: 3px; }
+    a:hover { color: var(--zt); }
+
+    :focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--focus) 70%, white);
+      outline-offset: 3px;
+    }
+
+    .shell { width: min(1500px, 100%); margin: 0 auto; padding: 30px clamp(14px, 3vw, 42px) 48px; }
+
+    .masthead {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 22px;
+      margin-bottom: 22px;
+    }
+
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      margin: 0 0 8px;
+      color: var(--zt-dark);
+      font-size: .76rem;
+      font-weight: 800;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+    }
+
+    .kicker::before { content: ""; width: 28px; height: 3px; border-radius: 2px; background: var(--zt); }
+    h1 { margin: 0; font-size: clamp(1.65rem, 3vw, 2.55rem); line-height: 1.2; letter-spacing: -.025em; }
+    .subtitle { max-width: 900px; margin: 8px 0 0; color: var(--muted); font-size: .94rem; }
+
+    .scope-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--paper);
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .scope-badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--zt); }
+
+    .doc-links { display: flex; flex-wrap: wrap; gap: 7px 18px; margin: 0 0 18px; font-size: .8rem; }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 330px;
+      gap: 18px;
+      margin-top: 14px;
+      align-items: stretch;
+    }
+
+    .diagram-panel,
+    .detail-panel,
+    .status-panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+
+    .diagram-panel { min-width: 0; overflow: hidden; }
+    .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 20px 22px 14px; border-bottom: 1px solid var(--line); }
+    .panel-head h2 { margin: 0; font-size: 1.16rem; }
+    .panel-head p { margin: 3px 0 0; color: var(--muted); font-size: .82rem; }
+
+    .view-label { flex: 0 0 auto; padding: 4px 9px; border: 1px solid #c6bddf; border-radius: 999px; color: var(--zt-dark); background: var(--zt-soft); font-size: .7rem; font-weight: 800; }
+
+    .diagram-scroll { overflow-x: auto; background: #f8f6f1; }
+    .topology { display: block; width: 100%; min-width: 1080px; height: auto; }
+
+    .zone { stroke-width: 1.5; }
+    .zone-untrust { fill: var(--untrust); stroke: var(--untrust-line); }
+    .zone-dmz { fill: var(--dmz); stroke: var(--dmz-line); }
+    .zone-trust { fill: var(--trust); stroke: var(--trust-line); }
+    .zone-obs { fill: var(--obs); stroke: var(--obs-line); }
+    .zone-title { fill: #44535d; font-size: 14px; font-weight: 800; letter-spacing: .035em; }
+    .zone-sub { fill: #73808a; font-size: 10.5px; font-family: "SFMono-Regular", Consolas, monospace; }
+
+    .link-line { fill: none; stroke: #87949c; stroke-width: 4; stroke-linecap: round; transition: stroke .16s ease, stroke-width .16s ease; }
+    .link-line.auth { stroke: var(--auth); }
+    .link-line.proxy { stroke: var(--proxy); stroke-dasharray: 10 6; }
+    .link-line.log { stroke: var(--log); stroke-dasharray: 3 6; }
+    .link-hit { fill: none; stroke: transparent; stroke-width: 24; cursor: pointer; }
+    .link-label rect { fill: #fffefa; stroke: #d5d1c9; }
+    .link-label text { fill: #35444e; font-size: 10.5px; font-weight: 700; text-anchor: middle; }
+    .link-label .minor { fill: #77838c; font-size: 9.5px; font-weight: 600; }
+
+    .device { cursor: pointer; }
+    .device .card { fill: #fffefa; stroke: #aeb8bd; stroke-width: 1.5; transition: stroke .16s ease, stroke-width .16s ease, filter .16s ease; }
+    .device .accent { fill: var(--zt); }
+    .device.endpoint .accent { fill: #c88978; }
+    .device.idp .accent { fill: var(--auth); }
+    .device.iap .accent { fill: #4d8b63; }
+    .device.swg .accent { fill: var(--proxy); }
+    .device.ca .accent { fill: #b64d46; }
+    .device.siem .accent { fill: var(--log); }
+    .device-name { fill: #17232d; font-size: 13.5px; font-weight: 850; text-anchor: middle; }
+    .device-role { fill: #5e6c75; font-size: 10px; text-anchor: middle; }
+    .device-meta { fill: #6f7d86; font-size: 9.5px; text-anchor: middle; font-family: "SFMono-Regular", Consolas, monospace; }
+    .phase-tag { fill: #fff; font-size: 9px; font-weight: 800; text-anchor: middle; }
+
+    .selectable:hover .card,
+    .selectable:focus .card,
+    .selectable.is-selected .card { stroke: var(--focus); stroke-width: 3; filter: drop-shadow(0 4px 5px rgba(40, 49, 55, .16)); }
+    .selectable:hover .link-line,
+    .selectable:focus .link-line,
+    .selectable.is-selected .link-line { stroke: var(--focus); stroke-width: 7; }
+
+    .diagram-foot { display: flex; flex-wrap: wrap; gap: 9px 18px; padding: 12px 20px 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: .75rem; }
+    .legend-item { display: inline-flex; align-items: center; gap: 7px; }
+    .legend-line { width: 27px; height: 0; border-top: 4px solid #87949c; border-radius: 3px; }
+    .legend-line.auth { border-color: var(--auth); }
+    .legend-line.proxy { border-color: var(--proxy); border-top-style: dashed; }
+    .legend-line.log { border-color: var(--log); border-top-style: dotted; }
+    .legend-chip { width: 14px; height: 10px; border-radius: 2px; border: 1px solid; }
+
+    .detail-panel { padding: 22px; min-height: 100%; }
+    .detail-eyebrow { margin: 0 0 5px; color: var(--zt-dark); font-size: .7rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    .detail-panel h2 { margin: 0; font-size: 1.24rem; line-height: 1.35; }
+    .detail-summary { margin: 9px 0 18px; color: var(--muted); font-size: .84rem; }
+    .detail-list { display: grid; gap: 0; margin: 0; }
+    .detail-row { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
+    .detail-row dt { color: var(--faint); font-size: .73rem; font-weight: 700; }
+    .detail-row dd { margin: 0; color: #33424c; font-size: .79rem; overflow-wrap: anywhere; }
+    .detail-note { margin: 18px 0 0; padding: 11px 12px; border-left: 3px solid var(--zt); border-radius: 0 7px 7px 0; background: var(--zt-soft); color: #3d3560; font-size: .76rem; }
+
+    .status-panel { margin-top: 18px; padding: 18px 22px; }
+    .status-panel h2 { margin: 0 0 12px; font-size: 1rem; }
+    .status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .status-item { padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: #f8f6f1; }
+    .status-item strong { display: block; margin-bottom: 2px; font-size: .78rem; }
+    .status-item span { color: var(--muted); font-size: .73rem; }
+
+    footer { margin-top: 18px; color: var(--faint); font-size: .72rem; }
+
+    @media (max-width: 1050px) {
+      .workspace { grid-template-columns: 1fr; }
+      .detail-panel { min-height: auto; }
+      .status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 680px) {
+      .shell { padding-top: 20px; }
+      .masthead { grid-template-columns: 1fr; }
+      .scope-badge { justify-self: start; }
+      .panel-head { padding: 16px; }
+      .status-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+
+    @media print {
+      body { background: #fff; }
+      .shell { width: 100%; padding: 0; }
+      .scope-badge { display: none; }
+      .workspace { display: block; }
+      .diagram-panel, .detail-panel, .status-panel { box-shadow: none; break-inside: avoid; }
+      .detail-panel { margin-top: 12px; }
+      .diagram-scroll { overflow: visible; }
+      .topology { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+<main class="shell">
+  <header class="masthead">
+    <div>
+      <p class="kicker">Theme ZERO · Zero Trust Lab</p>
+      <h1>ゼロトラストラボ ネットワーク構成図</h1>
+      <p class="subtitle">4ゾーン（Untrust / DMZ=認可層 / Trust / 可観測）に OSS を配置し、認証・プロキシ・ログの3フローを分離して確認できます。ノードまたはリンクを選択すると詳細が表示されます。図は Phase 6 までの目標像で、今回デプロイは Phase 0 のみです。</p>
+    </div>
+    <span class="scope-badge">今回スコープ · Phase 0 ＋ arm64 軽量検証</span>
+  </header>
+
+  <nav class="doc-links" aria-label="関連ドキュメント">
+    <a href="基本設計書.md">基本設計書</a>
+    <a href="論理構成設計.md">論理構成設計</a>
+    <a href="IPアドレス管理表.md">IPアドレス管理表</a>
+    <a href="段階ロードマップ.md">段階ロードマップ</a>
+    <a href="実装可能性マトリクス.md">実装可能性マトリクス</a>
+  </nav>
+
+  <div class="workspace">
+    <section class="diagram-panel" aria-label="ゼロトラスト論理構成図">
+      <div class="panel-head">
+        <div><h2>論理ネットワーク構成図</h2><p>docker bridge 4ゾーンとコンポーネント配置、認証／プロキシ／ログの主要フロー</p></div>
+        <span class="view-label">Logical · Phase 6 目標像</span>
+      </div>
+      <div class="diagram-scroll">
+        <svg class="topology" viewBox="0 0 1080 720" role="img" aria-labelledby="zt-title zt-desc">
+          <title id="zt-title">テーマZERO ゼロトラスト論理構成図</title>
+          <desc id="zt-desc">Untrust・DMZ・Trust・可観測の4ゾーンに OSS を配置し、認証フロー・プロキシフロー・ログフローを示した docker network 構成</desc>
+
+          <!-- Zones -->
+          <rect class="zone zone-untrust" x="18" y="60" width="240" height="600" rx="16"/>
+          <text class="zone-title" x="38" y="88">Untrust</text><text class="zone-sub" x="38" y="105">zt-untrust · 172.30.0.0/24</text>
+
+          <rect class="zone zone-dmz" x="290" y="60" width="470" height="600" rx="16"/>
+          <text class="zone-title" x="310" y="88">DMZ ／ 認可層</text><text class="zone-sub" x="310" y="105">zt-dmz · 172.30.10.0/24</text>
+
+          <rect class="zone zone-trust" x="792" y="60" width="266" height="330" rx="16"/>
+          <text class="zone-title" x="812" y="88">Trust ／ 業務</text><text class="zone-sub" x="812" y="105">zt-trust · 172.30.20.0/24</text>
+
+          <rect class="zone zone-obs" x="792" y="410" width="266" height="250" rx="16"/>
+          <text class="zone-title" x="812" y="438">可観測</text><text class="zone-sub" x="812" y="455">zt-obs · 172.30.30.0/24</text>
+
+          <!-- Links -->
+          <!-- auth: client -> iap -->
+          <g class="selectable" data-key="l-client-iap" role="button" tabindex="0" aria-label="client から IAP への認証要求">
+            <path class="link-line auth" d="M258 175 H430"/><path class="link-hit" d="M258 175 H430"/>
+            <g class="link-label" transform="translate(344 155)"><rect x="-52" y="-13" width="104" height="26" rx="5"/><text y="-1">(1) アクセス要求</text><text class="minor" y="10">認証フロー</text></g>
+          </g>
+          <!-- auth: iap -> idp -->
+          <g class="selectable" data-key="l-iap-idp" role="button" tabindex="0" aria-label="IAP から Keycloak への OIDC 委譲">
+            <path class="link-line auth" d="M525 210 V300"/><path class="link-hit" d="M525 210 V300"/>
+            <g class="link-label" transform="translate(605 255)"><rect x="-50" y="-13" width="100" height="26" rx="5"/><text y="-1">(2) OIDC 委譲</text><text class="minor" y="10">P1 IdP</text></g>
+          </g>
+          <!-- auth: iap -> app -->
+          <g class="selectable" data-key="l-iap-app" role="button" tabindex="0" aria-label="IAP から app への認可済転送">
+            <path class="link-line auth" d="M620 175 H920"/><path class="link-hit" d="M620 175 H920"/>
+            <g class="link-label" transform="translate(770 155)"><rect x="-58" y="-13" width="116" height="26" rx="5"/><text y="-1">(3) 認可済のみ転送</text><text class="minor" y="10">Untrust→Trust 直通禁止</text></g>
+          </g>
+          <!-- proxy: client -> swg -->
+          <g class="selectable" data-key="l-client-swg" role="button" tabindex="0" aria-label="client から SWG への外向き通信">
+            <path class="link-line proxy" d="M258 470 H430"/><path class="link-hit" d="M258 470 H430"/>
+            <g class="link-label" transform="translate(344 450)"><rect x="-58" y="-13" width="116" height="26" rx="5"/><text y="-1">外向き Web 強制経由</text><text class="minor" y="10">プロキシフロー</text></g>
+          </g>
+          <!-- proxy: swg -> external -->
+          <g class="selectable" data-key="l-swg-external" role="button" tabindex="0" aria-label="SWG から external への転送">
+            <path class="link-line proxy" d="M430 500 C 320 560, 200 560, 138 600"/><path class="link-hit" d="M430 500 C 320 560, 200 560, 138 600"/>
+            <g class="link-label" transform="translate(300 585)"><rect x="-58" y="-13" width="116" height="26" rx="5"/><text y="-1">検査/DLP 後に転送</text><text class="minor" y="10">P4/P5</text></g>
+          </g>
+          <!-- device: step-ca -> iap -->
+          <g class="selectable" data-key="l-ca-iap" role="button" tabindex="0" aria-label="step-ca から IAP への mTLS/posture">
+            <path class="link-line" d="M525 560 V590 H620 V210" stroke-dasharray="6 6"/><path class="link-hit" d="M525 560 V590 H620 V210"/>
+            <g class="link-label" transform="translate(672 400)"><rect x="-46" y="-13" width="92" height="26" rx="5"/><text y="-1">mTLS/posture</text><text class="minor" y="10">P6</text></g>
+          </g>
+          <!-- log: dmz -> loki -->
+          <g class="selectable" data-key="l-dmz-loki" role="button" tabindex="0" aria-label="DMZ 各所から可観測ゾーンへのログ集約">
+            <path class="link-line log" d="M700 480 H860 V490"/><path class="link-hit" d="M700 480 H860 V490"/>
+            <g class="link-label" transform="translate(780 465)"><rect x="-44" y="-13" width="88" height="26" rx="5"/><text y="-1">ログ集約</text><text class="minor" y="10">片方向 · P3</text></g>
+          </g>
+          <!-- log: loki -> grafana -->
+          <g class="selectable" data-key="l-loki-grafana" role="button" tabindex="0" aria-label="Loki から Grafana への可視化">
+            <path class="link-line log" d="M925 570 V600"/><path class="link-hit" d="M925 570 V600"/>
+          </g>
+
+          <!-- Devices -->
+          <!-- Untrust -->
+          <g class="device endpoint selectable" data-key="client" role="button" tabindex="0" aria-label="client 利用者端末">
+            <rect class="card" x="48" y="140" width="180" height="80" rx="9"/><rect class="accent" x="48" y="140" width="10" height="80" rx="5"/>
+            <text class="device-name" x="141" y="166">client</text><text class="device-role" x="141" y="184">利用者端末 (multitool)</text><text class="device-meta" x="141" y="202">172.30.0.11</text>
+            <circle cx="215" cy="150" r="9" fill="var(--untrust-line)"/><text class="phase-tag" x="215" y="153">P0</text>
+          </g>
+          <g class="device endpoint selectable" data-key="external" role="button" tabindex="0" aria-label="external 外部端末">
+            <rect class="card" x="48" y="560" width="180" height="80" rx="9"/><rect class="accent" x="48" y="560" width="10" height="80" rx="5"/>
+            <text class="device-name" x="141" y="586">external</text><text class="device-role" x="141" y="604">外部/未管理端末</text><text class="device-meta" x="141" y="622">172.30.0.12</text>
+            <circle cx="215" cy="570" r="9" fill="var(--untrust-line)"/><text class="phase-tag" x="215" y="573">P0</text>
+          </g>
+
+          <!-- DMZ -->
+          <g class="device iap selectable" data-key="iap" role="button" tabindex="0" aria-label="pomerium / oauth2-proxy IAP">
+            <rect class="card" x="430" y="140" width="190" height="80" rx="9"/><rect class="accent" x="430" y="140" width="10" height="80" rx="5"/>
+            <text class="device-name" x="525" y="166">pomerium / oauth2-proxy</text><text class="device-role" x="525" y="184">IAP · 未認証拒否/認可</text><text class="device-meta" x="525" y="202">172.30.10.21</text>
+            <circle cx="607" cy="150" r="9" fill="#4d8b63"/><text class="phase-tag" x="607" y="153">P2</text>
+          </g>
+          <g class="device idp selectable" data-key="idp" role="button" tabindex="0" aria-label="keycloak IdP">
+            <rect class="card" x="430" y="300" width="190" height="80" rx="9"/><rect class="accent" x="430" y="300" width="10" height="80" rx="5"/>
+            <text class="device-name" x="525" y="326">keycloak</text><text class="device-role" x="525" y="344">ID統制 · OIDC IdP</text><text class="device-meta" x="525" y="362">172.30.10.11</text>
+            <circle cx="607" cy="310" r="9" fill="var(--auth)"/><text class="phase-tag" x="607" y="313">P1</text>
+          </g>
+          <g class="device swg selectable" data-key="swg" role="button" tabindex="0" aria-label="mitmproxy SWG DLP">
+            <rect class="card" x="430" y="440" width="190" height="80" rx="9"/><rect class="accent" x="430" y="440" width="10" height="80" rx="5"/>
+            <text class="device-name" x="525" y="466">mitmproxy</text><text class="device-role" x="525" y="484">SWG(4) + DLP(5) 兼務</text><text class="device-meta" x="525" y="502">172.30.10.31</text>
+            <circle cx="607" cy="450" r="9" fill="var(--proxy)"/><text class="phase-tag" x="607" y="453">P4</text>
+          </g>
+          <g class="device ca selectable" data-key="ca" role="button" tabindex="0" aria-label="step-ca デバイス統制">
+            <rect class="card" x="430" y="560" width="190" height="80" rx="9"/><rect class="accent" x="430" y="560" width="10" height="80" rx="5"/>
+            <text class="device-name" x="525" y="586">step-ca</text><text class="device-role" x="525" y="604">デバイス統制 · mTLS/posture</text><text class="device-meta" x="525" y="622">172.30.10.41</text>
+            <circle cx="607" cy="570" r="9" fill="#b64d46"/><text class="phase-tag" x="607" y="573">P6</text>
+          </g>
+
+          <!-- Trust -->
+          <g class="device endpoint selectable" data-key="app" role="button" tabindex="0" aria-label="app 保護対象サービス">
+            <rect class="card" x="835" y="150" width="180" height="80" rx="9"/><rect class="accent" x="835" y="150" width="10" height="80" rx="5"/>
+            <text class="device-name" x="928" y="176">app</text><text class="device-role" x="928" y="194">保護対象サービス</text><text class="device-meta" x="928" y="212">172.30.20.21</text>
+            <circle cx="1002" cy="160" r="9" fill="var(--trust-line)"/><text class="phase-tag" x="1002" y="163">P0</text>
+          </g>
+
+          <!-- 可観測 -->
+          <g class="device siem selectable" data-key="siem" role="button" tabindex="0" aria-label="loki promtail ログ集約">
+            <rect class="card" x="835" y="480" width="180" height="80" rx="9"/><rect class="accent" x="835" y="480" width="10" height="80" rx="5"/>
+            <text class="device-name" x="928" y="506">loki + promtail</text><text class="device-role" x="928" y="524">SIEM · ログ集約</text><text class="device-meta" x="928" y="542">172.30.30.41</text>
+            <circle cx="1002" cy="490" r="9" fill="var(--log)"/><text class="phase-tag" x="1002" y="493">P3</text>
+          </g>
+          <g class="device siem selectable" data-key="grafana" role="button" tabindex="0" aria-label="grafana 可視化">
+            <rect class="card" x="835" y="580" width="180" height="60" rx="9"/><rect class="accent" x="835" y="580" width="10" height="60" rx="5"/>
+            <text class="device-name" x="928" y="606">grafana</text><text class="device-meta" x="928" y="624">172.30.30.43 · P3</text>
+          </g>
+        </svg>
+      </div>
+      <div class="diagram-foot">
+        <span class="legend-item"><span class="legend-line auth"></span>認証フロー</span>
+        <span class="legend-item"><span class="legend-line proxy"></span>プロキシ/DLP フロー</span>
+        <span class="legend-item"><span class="legend-line log"></span>ログフロー（片方向）</span>
+        <span class="legend-item"><span class="legend-chip" style="background:var(--untrust);border-color:var(--untrust-line)"></span>Untrust</span>
+        <span class="legend-item"><span class="legend-chip" style="background:var(--dmz);border-color:var(--dmz-line)"></span>DMZ</span>
+        <span class="legend-item"><span class="legend-chip" style="background:var(--trust);border-color:var(--trust-line)"></span>Trust</span>
+        <span class="legend-item"><span class="legend-chip" style="background:var(--obs);border-color:var(--obs-line)"></span>可観測</span>
+      </div>
+    </section>
+
+    <aside class="detail-panel" aria-live="polite" aria-label="選択項目の詳細">
+      <p class="detail-eyebrow" id="detail-kind">Zero Trust component</p>
+      <h2 id="detail-title">keycloak</h2>
+      <p class="detail-summary" id="detail-summary">DMZ の OIDC IdP。全観点の起点となる ID 統制を担います。</p>
+      <dl class="detail-list" id="detail-list"></dl>
+      <p class="detail-note" id="detail-note">図のノードまたはリンクを選択すると、この欄が切り替わります。</p>
+    </aside>
+  </div>
+
+  <section class="status-panel" aria-labelledby="scope-title">
+    <h2 id="scope-title">今回スコープと発展課題</h2>
+    <div class="status-grid">
+      <div class="status-item"><strong>Phase 0（デプロイ）</strong><span>client / app / external の疎通土台</span></div>
+      <div class="status-item"><strong>Phase 1-6（設計のみ）</strong><span>ゲート条件と作業リストを確定</span></div>
+      <div class="status-item"><strong>IOL 連携</strong><span>非連携。docker network で完結（D-1）</span></div>
+      <div class="status-item"><strong>SIEM 発展</strong><span>Loki 先行 → Wazuh は要検証（D-4）</span></div>
+    </div>
+  </section>
+
+  <footer>情報源: 基本設計書・論理構成設計・IPアドレス管理表・段階ロードマップ。アドレス・ポートは設計値で、各 Phase 実装時に確定します。</footer>
+</main>
+
+<script>
+  const nodes = {
+    client: { kind: "Endpoint · Untrust", title: "client", summary: "利用者端末。認証してアプリを使う側。Phase 0 でデプロイする。", rows: [["観点", "土台"], ["ゾーン", "Untrust (zt-untrust)"], ["IP", "172.30.0.11"], ["イメージ", "wbitt/network-multitool"], ["Phase", "0（デプロイ対象）"], ["役割", "認証フローの起点 / 外向き通信は SWG 経由"]] },
+    external: { kind: "Endpoint · Untrust", title: "external", summary: "外部/未管理端末。SWG 検査の外部先として使う。Phase 0 でデプロイする。", rows: [["観点", "土台"], ["ゾーン", "Untrust (zt-untrust)"], ["IP", "172.30.0.12"], ["イメージ", "wbitt/network-multitool"], ["Phase", "0（デプロイ対象）"], ["役割", "プロキシフローの転送先"]] },
+    app: { kind: "Endpoint · Trust", title: "app", summary: "保護対象サービス。IAP を通した認可済アクセスのみ到達できる。Phase 0 でデプロイする。", rows: [["観点", "土台"], ["ゾーン", "Trust (zt-trust)"], ["IP", "172.30.20.21"], ["イメージ", "wbitt/network-multitool"], ["Phase", "0（デプロイ対象）"], ["到達条件", "Untrust から直通禁止。DMZ の IAP 経由のみ"]] },
+    idp: { kind: "ID統制 · DMZ", title: "keycloak", summary: "OIDC IdP。認可コードフローでトークンを発行し、全観点の認証起点となる。", rows: [["観点", "ID統制 (1)"], ["ゾーン", "DMZ (zt-dmz)"], ["IP", "172.30.10.11"], ["待受", "8080/HTTP"], ["Phase", "1（設計のみ）"], ["ゲート", "OIDC トークンを curl/ブラウザで取得できる"]] },
+    iap: { kind: "NWセキュリティ · DMZ", title: "pomerium / oauth2-proxy", summary: "IAP（関所）。未認証を拒否し、認証を Keycloak に委譲、認可済のみ app へ転送する。マルチホーム。", rows: [["観点", "NWセキュリティ (3)"], ["ゾーン", "DMZ（Untrust/Trust に足）"], ["IP", "172.30.10.21"], ["待受", "443/80 (pomerium) · 4180 (oauth2-proxy)"], ["Phase", "2（設計のみ）"], ["ゲート", "未認証拒否・ログイン後のみ app 到達"]] },
+    swg: { kind: "WEB+DLP · DMZ", title: "mitmproxy", summary: "SWG と DLP を兼務。外向き通信を SSL bump で復号・検査し、キーワードを含むアップロードを検知・ブロックする。", rows: [["観点", "WEB(4) + DLP(5) 兼務"], ["ゾーン", "DMZ（Untrust に足）"], ["IP", "172.30.10.31"], ["待受", "8080 (proxy) · 8081 (web UI)"], ["Phase", "4/5（設計のみ）"], ["代替", "squid+suricata（arm64 次第）"]] },
+    ca: { kind: "デバイス統制 · DMZ", title: "step-ca", summary: "端末 mTLS 証明書を発行し、posture claim をモックして IAP の認可入力にする。", rows: [["観点", "デバイス統制 (2)"], ["ゾーン", "DMZ (zt-dmz)"], ["IP", "172.30.10.41"], ["待受", "9000/HTTPS (ACME)"], ["Phase", "6（設計のみ）"], ["ゲート", "証明書なし端末を拒否・posture で条件分岐"]] },
+    siem: { kind: "SIEM · 可観測", title: "loki + promtail", summary: "各ゾーンのログを片方向で集約・保存する。Promtail が収集し Loki が保存する。", rows: [["観点", "SIEM (6) 先行"], ["ゾーン", "可観測 (zt-obs)"], ["IP", "172.30.30.41"], ["待受", "3100/HTTP (loki)"], ["Phase", "3（設計のみ）"], ["発展", "Wazuh は 2-4GB 級で要検証（D-4）"]] },
+    grafana: { kind: "SIEM · 可観測", title: "grafana", summary: "Loki をデータソースに、拒否・許可・検知の件数を可視化するダッシュボード。", rows: [["観点", "SIEM (6) 可視化"], ["ゾーン", "可観測 (zt-obs)"], ["IP", "172.30.30.43"], ["待受", "3000/HTTP"], ["Phase", "3（設計のみ）"], ["ゲート", "Phase 1/2 ログが表示できる"]] }
+  };
+
+  const links = {
+    "l-client-iap": { kind: "認証フロー", title: "client → IAP", summary: "利用者端末が保護対象アプリにアクセスを要求する入口。関所で受ける。", rows: [["フロー", "(1) アクセス要求"], ["経路", "Untrust → DMZ"], ["プロトコル", "HTTP(S)"], ["Phase", "2"]] },
+    "l-iap-idp": { kind: "認証フロー", title: "IAP → keycloak", summary: "未認証リクエストの認証を Keycloak に委譲する（OIDC 認可コードフロー）。", rows: [["フロー", "(2) OIDC 委譲"], ["経路", "DMZ 内"], ["プロトコル", "OIDC / HTTP"], ["Phase", "1→2"]] },
+    "l-iap-app": { kind: "認証フロー", title: "IAP → app", summary: "認可済リクエストのみを Trust の app へ転送する。Untrust からの直通は禁止。", rows: [["フロー", "(3) 認可済のみ転送"], ["経路", "DMZ → Trust"], ["制約", "Untrust→Trust 直通禁止"], ["Phase", "2"]] },
+    "l-client-swg": { kind: "プロキシフロー", title: "client → SWG", summary: "client の外向き Web 通信を SWG（mitmproxy）に強制経由させる。", rows: [["フロー", "外向き強制経由"], ["経路", "Untrust → DMZ"], ["処理", "SSL bump で復号・検査"], ["Phase", "4"]] },
+    "l-swg-external": { kind: "プロキシ/DLP フロー", title: "SWG → external", summary: "検査・DLP 判定後に問題なければ external へ転送。キーワード検出時はブロック。", rows: [["フロー", "検査/DLP 後に転送"], ["経路", "DMZ → Untrust"], ["処理", "DLP アドオンで内容判定"], ["Phase", "4/5"]] },
+    "l-ca-iap": { kind: "デバイス統制", title: "step-ca → IAP", summary: "端末 mTLS 証明書と posture claim を IAP の認可判断に渡す。", rows: [["フロー", "mTLS / posture claim"], ["経路", "DMZ 内"], ["処理", "証明書なし拒否・posture 分岐"], ["Phase", "6"]] },
+    "l-dmz-loki": { kind: "ログフロー", title: "DMZ 各所 → Loki", summary: "keycloak・pomerium・mitmproxy・step-ca のログを可観測ゾーンへ片方向で集約する。", rows: [["フロー", "ログ集約（片方向）"], ["経路", "DMZ → 可観測"], ["方向", "生成元 → Loki のみ"], ["Phase", "3"]] },
+    "l-loki-grafana": { kind: "ログフロー", title: "Loki → grafana", summary: "集約したログを Grafana で可視化する。", rows: [["フロー", "可視化"], ["経路", "可観測 内"], ["用途", "拒否/許可/検知の件数"], ["Phase", "3"]] }
+  };
+
+  const data = Object.assign({}, nodes, links);
+  const elKind = document.getElementById("detail-kind");
+  const elTitle = document.getElementById("detail-title");
+  const elSummary = document.getElementById("detail-summary");
+  const elList = document.getElementById("detail-list");
+  const elNote = document.getElementById("detail-note");
+
+  function render(key) {
+    const d = data[key];
+    if (!d) return;
+    elKind.textContent = d.kind;
+    elTitle.textContent = d.title;
+    elSummary.textContent = d.summary;
+    elList.innerHTML = d.rows.map(([dt, dd]) =>
+      `<div class="detail-row"><dt>${dt}</dt><dd>${dd}</dd></div>`).join("");
+    elNote.textContent = nodes[key]
+      ? "アドレス・ポートは設計値です。Phase 実装時に確定します。"
+      : "フローの詳細は論理構成設計の通信フローを参照してください。";
+    document.querySelectorAll(".selectable.is-selected").forEach(n => n.classList.remove("is-selected"));
+    const target = document.querySelector(`[data-key="${key}"]`);
+    if (target) target.classList.add("is-selected");
+  }
+
+  document.querySelectorAll(".selectable").forEach(node => {
+    node.addEventListener("click", () => render(node.dataset.key));
+    node.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); render(node.dataset.key); }
+    });
+  });
+
+  render("idp");
+</script>
+</body>
+</html>

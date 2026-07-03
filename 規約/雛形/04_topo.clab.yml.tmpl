@@ -1,0 +1,45 @@
+name: {{TOPO_NAME}}
+
+mgmt:
+  network: {{TOPO_NAME}}-mgmt
+  ipv4-subnet: {{MGMT_SUBNET}}
+
+topology:
+  kinds:
+    # Cisco IOL使用時のkind定義。entrypoint_attach.shをbindしてIOLをPID1で起動する運用と組み合わせる。
+    cisco_iol:
+      image: vrnetlab/cisco_iol:15.7.3M2
+      env:
+        IOL_MEMORY: "1024"
+
+  nodes:
+    # --- cisco_iolノード例 ---
+    # mgmt-ipv4は固定IPで採番する（IPアドレス管理表と一致させる）。
+    # entrypoint_attach.shは「00_ログイン/ログインコマンド.md」のdocker attach運用に必須（IOLをPID1化）。
+    {{NODE_NAME_1}}:
+      kind: cisco_iol
+      mgmt-ipv4: {{MGMT_IP_1}}
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+
+    # {{NODE_NAME_2}}:
+    #   kind: cisco_iol
+    #   mgmt-ipv4: {{MGMT_IP_2}}
+    #   binds:
+    #     - ./entrypoint_attach.sh:/entrypoint.sh:ro
+
+    # --- linuxノード例（PC/サーバ役） ---
+    # execでデータプレーンIP・静的経路を自動設定しておくと、学習者はルータ側の設定に集中できる。
+    {{PC_NODE_NAME}}:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: {{MGMT_IP_PC}}
+      exec:
+        - ip link set eth1 up
+        - ip address add {{PC_IP_CIDR}} dev eth1
+        - ip route add default via {{PC_GATEWAY}} dev eth1
+
+  links:
+    # 接続関係をコメントで明示すると、パラメータシートとの突合が楽になる
+    # 例: - endpoints: ["{{NODE_NAME_1}}:eth1", "{{NODE_NAME_2}}:eth1"]
+    - endpoints: ["{{NODE_NAME_1}}:eth1", "{{PC_NODE_NAME}}:eth1"]

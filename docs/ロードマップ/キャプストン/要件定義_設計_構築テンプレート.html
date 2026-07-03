@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>🏛️ 統合キャプストン: 本社＋支社 2拠点ネットワーク（要件定義→設計→構築→試験→ドキュメント）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ロードマップ</span>
+<span class="sep">/</span>
+<span>キャプストン</span></nav>
+      <h1 class="doc-title">🏛️ 統合キャプストン: 本社＋支社 2拠点ネットワーク（要件定義→設計→構築→試験→ドキュメント）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>第1〜5章（＋任意で第6章）を総動員する最終演習の<strong>進め方テンプレ</strong>です。
+「□」は記入欄。実際に手を動かす時にここを埋めながら進めます。
+実務の上流〜下流（RFP→基本設計→詳細設計→構築→試験→納品）を仮想環境でなぞるのが狙い。</p>
+</blockquote>
+<hr>
+<h2 id="0-題材の前提自由に調整可" tabindex="-1">0. 題材の前提（自由に調整可） <a class="header-anchor" href="#0-題材の前提自由に調整可" aria-hidden="true">#</a></h2>
+<p>本キャプストンは <strong>2段構え</strong>：まず <strong>STEP1=基本形</strong> で全機能を統合し、次に <strong>STEP2=最終形</strong> で大規模化する。</p>
+<ul>
+<li><strong>STEP1 基本形</strong>（まずここを完成させる）
+<ul>
+<li>想定企業: 社員 約120名（本社100／支社20）の中堅企業</li>
+<li>拠点: <strong>本社(HQ)</strong> 2フロア、<strong>支社(BR)</strong> 1フロア</li>
+<li>接続: 本社はデュアルISP（冗長）、本社⇔支社は IPsec VPN（インターネットVPN）</li>
+<li>方針: 「<strong>止まらない・守られる・運用できる</strong>」社内LAN</li>
+</ul>
+</li>
+<li><strong>STEP2 最終形（大規模社内LAN）</strong>（STEP1の後に拡張）
+<ul>
+<li>本社を <strong>3階層（コア/ディストリ/アクセス）のキャンパスLAN</strong> へ拡張（複数棟・多数フロア）</li>
+<li>規模拡大への対応: <strong>マルチエリアOSPF・経路集約・MST・階層的IP設計</strong></li>
+<li>※ DC（VXLAN/EVPNファブリック）は対象外。詳細は末尾「付録: 大規模社内LANへのスケール設計」</li>
+<li>仮想環境では<strong>縮小モデルで原理確認 → 設計書で大規模を表現</strong>の二段構えで現実的に進める</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2 id="phase-a-要件定義" tabindex="-1">Phase A. 要件定義 <a class="header-anchor" href="#phase-a-要件定義" aria-hidden="true">#</a></h2>
+<h3 id="a-1-事業利用要件" tabindex="-1">A-1. 事業・利用要件 <a class="header-anchor" href="#a-1-事業利用要件" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>内容（記入）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>利用者数（拠点別）</td>
+<td>本社□／支社□</td>
+</tr>
+<tr>
+<td>部署/セグメント</td>
+<td>例: 営業・開発・サーバ・管理／支社LAN（□で確定）</td>
+</tr>
+<tr>
+<td>主要アプリ/通信</td>
+<td>例: ファイル共有, 業務Web, IP電話（□）</td>
+</tr>
+<tr>
+<td>拠点間で必要な通信</td>
+<td>□（例: 支社→本社サーバVLANのみ許可）</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="a-2-非機能要件" tabindex="-1">A-2. 非機能要件 <a class="header-anchor" href="#a-2-非機能要件" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>目標値（記入）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>可用性(SLA)</td>
+<td>例: コア/GW/境界は冗長、単一障害で無停止（□）</td>
+</tr>
+<tr>
+<td>障害切替時間</td>
+<td>例: 上流断はBFDでms級、GWは秒以内（□）</td>
+</tr>
+<tr>
+<td>拡張性</td>
+<td>例: VLAN/拠点の追加余地（□）</td>
+</tr>
+<tr>
+<td>セキュリティ方針</td>
+<td>例: 最小権限ACL、境界NAT、拠点間は暗号化必須（□）</td>
+</tr>
+<tr>
+<td>監視/運用</td>
+<td>例: SNMP/Syslog集約、構築はAnsible（□）</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="a-3-制約" tabindex="-1">A-3. 制約 <a class="header-anchor" href="#a-3-制約" aria-hidden="true">#</a></h3>
+<ul>
+<li>仮想環境（arm64/IOL）ゆえノード数は現実的に抑える（□ 上限ノード数を決める）</li>
+<li>使用イメージ: L3 <code>cisco_iol:15.6.3M3a</code> / L2 <code>cisco_iol:L2-15.2</code>（<code>../../環境/環境説明.md</code> §4）</li>
+</ul>
+<hr>
+<h2 id="phase-b-設計" tabindex="-1">Phase B. 設計 <a class="header-anchor" href="#phase-b-設計" aria-hidden="true">#</a></h2>
+<h3 id="b-1-論理設計" tabindex="-1">B-1. 論理設計 <a class="header-anchor" href="#b-1-論理設計" aria-hidden="true">#</a></h3>
+<p><strong>(1) IPアドレス設計</strong>（プライベート空間を体系的に。例: <code>10.0.0.0/8</code> を拠点/用途で分割）</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>用途</th>
+<th>セグメント</th>
+<th>VLAN</th>
+<th>ゲートウェイ</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>本社 営業</td>
+<td>10.1.10.0/24</td>
+<td>10</td>
+<td>HSRP仮想IP .1</td>
+<td>□</td>
+</tr>
+<tr>
+<td>本社 開発</td>
+<td>10.1.20.0/24</td>
+<td>20</td>
+<td>HSRP仮想IP .1</td>
+<td>□</td>
+</tr>
+<tr>
+<td>本社 サーバ</td>
+<td>10.1.30.0/24</td>
+<td>30</td>
+<td>HSRP仮想IP .1</td>
+<td>□</td>
+</tr>
+<tr>
+<td>本社 管理</td>
+<td>10.1.99.0/24</td>
+<td>99</td>
+<td>□</td>
+<td>SNMP/SSH管理用</td>
+</tr>
+<tr>
+<td>支社 LAN</td>
+<td>10.2.40.0/24</td>
+<td>40</td>
+<td>L3SW .1</td>
+<td>□</td>
+</tr>
+<tr>
+<td>コア間/P2P</td>
+<td>10.0.0.x/30</td>
+<td>—</td>
+<td>—</td>
+<td>OSPF</td>
+</tr>
+<tr>
+<td>境界/ISP</td>
+<td>グローバル相当</td>
+<td>—</td>
+<td>—</td>
+<td>BGP/NAT</td>
+</tr>
+<tr>
+<td>Loopback</td>
+<td>10.255.x.x/32</td>
+<td>—</td>
+<td>—</td>
+<td>ルータID/iBGP</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>(2) VLAN設計</strong>: 上表のVLAN番号・名前・所属スイッチ・トランク許可リスト（□）</p>
+<p><strong>(3) ルーティング設計</strong></p>
+<ul>
+<li>社内 IGP: <strong>OSPF</strong>（エリア設計□、コストで往路制御）</li>
+<li>インターネット境界: <strong>BGP</strong>（デュアルホーム、LP=往路 / AS Path Prepend=復路、BFD）</li>
+<li>拠点間: IPsec VPN上で □（スタティック or OSPF over tunnel）</li>
+<li>再配布ポリシー: □（どの経路をどこへ。第1章05の教訓を適用）</li>
+</ul>
+<p><strong>(4) 冗長設計</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>対象</th>
+<th>方式</th>
+<th>設計（記入）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>上流ISP</td>
+<td>BGPデュアルホーム＋BFD</td>
+<td>Primary=ISP-A / Backup=ISP-B（□）</td>
+</tr>
+<tr>
+<td>コアSW</td>
+<td>STP＋EtherChannel</td>
+<td>Root=CoreSW1（VLAN毎の分散も検討）（□）</td>
+</tr>
+<tr>
+<td>デフォルトGW</td>
+<td>HSRP/VRRP</td>
+<td>Active=CoreSW1, Preempt=on（□）</td>
+</tr>
+<tr>
+<td>上流↔GW連動</td>
+<td>Track×HSRP×IGP/BGP</td>
+<td>上流断→HSRP切替→迂回（第2章11）（□）</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>(5) QoS設計</strong>: 優先クラス（音声/業務/その他）とDSCP・信頼境界（□）</p>
+<p><strong>(6) セキュリティ設計</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>領域</th>
+<th>方針（記入）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>境界(ACL/NAT)</td>
+<td>内→外PAT、外→内はDMZ公開分のみ（□）</td>
+</tr>
+<tr>
+<td>DMZ</td>
+<td>公開サーバの隔離（□）</td>
+</tr>
+<tr>
+<td>拠点間</td>
+<td>IPsec（IKE/ESP）暗号化、proxy-idで対象限定（□）</td>
+</tr>
+<tr>
+<td>L2保護</td>
+<td>ポートセキュリティ、未使用ポートshut、native vlan変更（□）</td>
+</tr>
+<tr>
+<td>管理</td>
+<td>管理VLAN分離、SSH/SNMPv3（□）</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="b-2-物理設計" tabindex="-1">B-2. 物理設計 <a class="header-anchor" href="#b-2-物理設計" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>機器選定/役割割当</strong>（IOLイメージとノード名）（□）</li>
+<li><strong>結線表</strong>（ノード:IF ↔ ノード:IF、VLAN/トランク）（□）</li>
+<li><strong>構成図</strong>: 論理構成図（L3）／物理構成図（結線）を作成（テキスト図 or ドローイング）（□）</li>
+</ul>
+<hr>
+<h2 id="phase-c-構築" tabindex="-1">Phase C. 構築 <a class="header-anchor" href="#phase-c-構築" aria-hidden="true">#</a></h2>
+<ol>
+<li><strong>トポロジ定義</strong>: 上記をもとに <code>capstone.clab.yml</code> を作成（既存テーマのclab.ymlが雛形）</li>
+<li><strong>段階投入の順序</strong>（推奨）:
+<ol>
+<li>IF/IP・no shutdown → 2) L2(VLAN/Trunk/STP) → 3) L3SW/SVI/EtherChannel →</li>
+<li>IGP(OSPF) → 5) FHRP(HSRP) → 6) 境界BGP/BFD → 7) NAT/ACL/DMZ →</li>
+<li>拠点間IPsec → 9) サービス(DHCP/DNS/NTP) → 10) 監視(SNMP/Syslog)</li>
+</ol>
+<blockquote>
+<p>鉄則: 各段階で <code>show ip int brief</code>／疎通を確認してから次へ（06の教訓）。</p>
+</blockquote>
+</li>
+<li><strong>自動化</strong>: 第5章 Ansible/nornir で設定投入・取得を効率化（既存inventory流用）（□）</li>
+</ol>
+<hr>
+<h2 id="phase-d-試験" tabindex="-1">Phase D. 試験 <a class="header-anchor" href="#phase-d-試験" aria-hidden="true">#</a></h2>
+<h3 id="d-1-疎通試験" tabindex="-1">D-1. 疎通試験 <a class="header-anchor" href="#d-1-疎通試験" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>経路</th>
+<th>期待</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>各VLAN PC → インターネット(8.8.8.8相当)</td>
+<td>成功</td>
+<td>□</td>
+</tr>
+<tr>
+<td>2</td>
+<td>支社PC → 本社サーバVLAN(許可分)</td>
+<td>成功</td>
+<td>□</td>
+</tr>
+<tr>
+<td>3</td>
+<td>支社PC → 本社サーバVLAN(非許可分)</td>
+<td><strong>拒否</strong></td>
+<td>□</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="d-2-障害フェイルオーバ試験-最重要" tabindex="-1">D-2. 障害（フェイルオーバ）試験 ★最重要 <a class="header-anchor" href="#d-2-障害フェイルオーバ試験-最重要" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>故障注入</th>
+<th>期待動作</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>ISP-A リンク断</td>
+<td>BFD検知→ISP-Bへ無瞬断級迂回、復旧で戻る</td>
+<td>□</td>
+</tr>
+<tr>
+<td>2</td>
+<td>CoreSW1 停止</td>
+<td>HSRP→CoreSW2 Active、STP再収束、疎通維持</td>
+<td>□</td>
+</tr>
+<tr>
+<td>3</td>
+<td>拠点間VPN断</td>
+<td>検知/再確立、（設計次第で代替経路）</td>
+<td>□</td>
+</tr>
+<tr>
+<td>4</td>
+<td>上流断（第2章11連動）</td>
+<td>HSRP切替＋IGP/BGP迂回が連動</td>
+<td>□</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="d-3-性能セキュリティ検証" tabindex="-1">D-3. 性能/セキュリティ検証 <a class="header-anchor" href="#d-3-性能セキュリティ検証" aria-hidden="true">#</a></h3>
+<ul>
+<li>QoS: 輻輳時に優先クラスが守られるか（□）</li>
+<li>セキュリティ: ACL/NATが意図通り、VPNが暗号化されているか（capで確認）（□）</li>
+</ul>
+<hr>
+<h2 id="phase-e-ドキュメント納品物" tabindex="-1">Phase E. ドキュメント（納品物） <a class="header-anchor" href="#phase-e-ドキュメント納品物" aria-hidden="true">#</a></h2>
+<ul>
+<li>[ ] 要件定義書（Phase A）</li>
+<li>[ ] 基本/詳細設計書（Phase B：構成図・IP設計・VLAN設計・ルーティング/冗長/セキュリティ設計）</li>
+<li>[ ] パラメータシート（機器別の最終コンフィグ要点）</li>
+<li>[ ] 試験成績書（Phase D の結果表＋エビデンス）</li>
+<li>[ ] 運用手順書（起動/停止、障害時対応、バックアップ）</li>
+<li>[ ] 振り返りシート（教訓＋トラブルシュート）</li>
+</ul>
+<hr>
+<h2 id="-仕上げの問いできたら一人前" tabindex="-1">🎓 仕上げの問い（できたら一人前） <a class="header-anchor" href="#-仕上げの問いできたら一人前" aria-hidden="true">#</a></h2>
+<ul>
+<li>「なぜこの冗長方式を選んだか」を、コスト・収束時間・運用性の観点で説明できるか？</li>
+<li>単一障害点（SPOF）が残っていないか、構成図上で指差し確認できるか？</li>
+<li>この設計書だけ渡して、第三者が同じ環境を再構築できるか？</li>
+</ul>
+<hr>
+<h2 id="付録-大規模社内lanへのスケール設計step2-最終形" tabindex="-1">付録: 大規模社内LANへのスケール設計（STEP2 最終形） <a class="header-anchor" href="#付録-大規模社内lanへのスケール設計step2-最終形" aria-hidden="true">#</a></h2>
+<p>STEP1（2拠点）が完成したら、本社を<strong>3階層キャンパスLAN</strong>へ拡張し「大規模でも破綻しない設計」を学ぶ。</p>
+<h3 id="構成イメージ" tabindex="-1">構成イメージ <a class="header-anchor" href="#構成イメージ" aria-hidden="true">#</a></h3>
+<pre><code>              [ Core SW x2 ]                 ← L3中枢（ルーティング専念・全棟を束ねる）
+             /      |       \
+     [Distri-A]  [Distri-B]  [Distri-C]      ← 棟/フロア集約（L3境界・経路集約・STP(MST) root）
+        /|\         ...          ...
+  [ Access SW 群（各フロアでPC/AP/IP電話収容）]  ← VLAN・ポートセキュリティ
+</code></pre>
+<h3 id="設計記入欄step1からの差分" tabindex="-1">設計記入欄（STEP1からの差分） <a class="header-anchor" href="#設計記入欄step1からの差分" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>論点</th>
+<th>手法</th>
+<th>記入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>階層分割</td>
+<td>Core=ルーティングのみ / Distri=L2-L3境界 / Access=端末収容</td>
+<td>□</td>
+</tr>
+<tr>
+<td>ルーティング</td>
+<td>OSPF <strong>マルチエリア</strong>（Area0=コア、棟ごとにArea）</td>
+<td>□ エリア割当</td>
+</tr>
+<tr>
+<td>経路集約</td>
+<td>ABR（ディストリ）で棟内サブネットを集約</td>
+<td>□ 集約アドレス</td>
+</tr>
+<tr>
+<td>IPアドレス</td>
+<td>棟→フロア→VLAN で集約しやすい階層設計</td>
+<td>□ 体系</td>
+</tr>
+<tr>
+<td>STP</td>
+<td><strong>MST</strong>（VLAN群→インスタンス）、Root=ディストリ</td>
+<td>□ インスタンス設計</td>
+</tr>
+<tr>
+<td>冗長</td>
+<td>各階層二重化・上下リンク冗長（EtherChannel）</td>
+<td>□</td>
+</tr>
+<tr>
+<td>拠点横展開</td>
+<td>支社テンプレを標準化して複製</td>
+<td>□ 標準仕様</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="仮想環境での進め方" tabindex="-1">仮想環境での進め方 <a class="header-anchor" href="#仮想環境での進め方" aria-hidden="true">#</a></h3>
+<ul>
+<li>ノードは原理確認に必要な最小数（例: コア2＋ディストリ2＋アクセス2＋PC）に絞る。</li>
+<li>「縮小モデルで挙動確認（マルチエリア境界の集約・MSTのRoot）→ 設計書では本来規模を表現」。</li>
+</ul>
+<h3 id="追加の試験観点" tabindex="-1">追加の試験観点 <a class="header-anchor" href="#追加の試験観点" aria-hidden="true">#</a></h3>
+<ul>
+<li>[ ] エリア境界で経路が<strong>集約</strong>され、コアの経路数が抑えられているか</li>
+<li>[ ] アクセスSW増設時に、上位設計を変えずに収容拡張できるか（拡張性）</li>
+<li>[ ] ディストリ1台障害でも当該棟が縮退運転で生存するか</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#0-題材の前提自由に調整可">0. 題材の前提（自由に調整可）</a></li>
+<li class="lvl-2"><a href="#phase-a-要件定義">Phase A. 要件定義</a></li>
+<li class="lvl-3"><a href="#a-1-事業利用要件">A-1. 事業・利用要件</a></li>
+<li class="lvl-3"><a href="#a-2-非機能要件">A-2. 非機能要件</a></li>
+<li class="lvl-3"><a href="#a-3-制約">A-3. 制約</a></li>
+<li class="lvl-2"><a href="#phase-b-設計">Phase B. 設計</a></li>
+<li class="lvl-3"><a href="#b-1-論理設計">B-1. 論理設計</a></li>
+<li class="lvl-3"><a href="#b-2-物理設計">B-2. 物理設計</a></li>
+<li class="lvl-2"><a href="#phase-c-構築">Phase C. 構築</a></li>
+<li class="lvl-2"><a href="#phase-d-試験">Phase D. 試験</a></li>
+<li class="lvl-3"><a href="#d-1-疎通試験">D-1. 疎通試験</a></li>
+<li class="lvl-3"><a href="#d-2-障害フェイルオーバ試験-最重要">D-2. 障害（フェイルオーバ）試験 ★最重要</a></li>
+<li class="lvl-3"><a href="#d-3-性能セキュリティ検証">D-3. 性能/セキュリティ検証</a></li>
+<li class="lvl-2"><a href="#phase-e-ドキュメント納品物">Phase E. ドキュメント（納品物）</a></li>
+<li class="lvl-2"><a href="#-仕上げの問いできたら一人前">🎓 仕上げの問い（できたら一人前）</a></li>
+<li class="lvl-2"><a href="#付録-大規模社内lanへのスケール設計step2-最終形">付録: 大規模社内LANへのスケール設計（STEP2 最終形）</a></li>
+<li class="lvl-3"><a href="#構成イメージ">構成イメージ</a></li>
+<li class="lvl-3"><a href="#設計記入欄step1からの差分">設計記入欄（STEP1からの差分）</a></li>
+<li class="lvl-3"><a href="#仮想環境での進め方">仮想環境での進め方</a></li>
+<li class="lvl-3"><a href="#追加の試験観点">追加の試験観点</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

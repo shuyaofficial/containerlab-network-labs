@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>試験結果 — テーマZERO Phase 0 (2026-07-04)</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>05_試験</span></nav>
+      <h1 class="doc-title">試験結果 — テーマZERO Phase 0 (2026-07-04)</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">test-result</span><span class="tag">ZERO_zero_trust</span><span class="tag">phase0</span></span>
+      </div>
+      
+      <div class="content">
+<h2 id="1-判定" tabindex="-1">1. 判定 <a class="header-anchor" href="#1-判定" aria-hidden="true">#</a></h2>
+<ul>
+<li>終了区分: 完全合格</li>
+<li>終了日: 2026-07-04</li>
+<li>完全合格ではない理由（該当する場合）: 該当なし</li>
+<li>主な達成: T-0-1〜T-0-5 すべて合格。Phase 0 のゲート条件（<code>client</code>→<code>app</code> 疎通、規約ビルド pass）を満たした。</li>
+</ul>
+<h2 id="2-実施結果" tabindex="-1">2. 実施結果 <a class="header-anchor" href="#2-実施結果" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>試験ID</th>
+<th>結果</th>
+<th>確認できたこと</th>
+<th>根拠</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-0-1</td>
+<td>合格</td>
+<td>client / external / app の3ノードが Up</td>
+<td><code>docker ps</code> で <code>clab-zt-base-client</code> <code>clab-zt-base-external</code> <code>clab-zt-base-app</code> すべて <code>Up</code></td>
+</tr>
+<tr>
+<td>T-0-2</td>
+<td>合格</td>
+<td>client → app の ping 3/3 応答</td>
+<td><code>docker exec clab-zt-base-client ping -c3 172.30.20.21</code> → <code>3 packets transmitted, 3 received, 0% packet loss</code></td>
+</tr>
+<tr>
+<td>T-0-3</td>
+<td>合格</td>
+<td>client → app の HTTP 応答本文が返る</td>
+<td><code>docker exec clab-zt-base-client curl -sS -i http://172.30.20.21/</code> → <code>HTTP/1.1 200 OK</code>、body <code>WBITT Network MultiTool (with NGINX) - app - 172.30.99.21 ...</code></td>
+</tr>
+<tr>
+<td>T-0-4</td>
+<td>合格</td>
+<td>client が Untrust サブネット (172.30.0.0/24) 所属</td>
+<td><code>docker exec clab-zt-base-client ip -4 addr show eth1</code> → <code>inet 172.30.0.11/24</code>。app 側も <code>inet 172.30.20.21/24</code>（Trust）を確認</td>
+</tr>
+<tr>
+<td>T-0-5</td>
+<td>合格</td>
+<td>規約ビルドが pass（本テーマ起因のエラーなし）</td>
+<td><code>node 規約/ビルド/build.mjs --check</code> → 既存の他テーマ由来 NFD ファイル名警告のみ残存。ZERO_zero_trust 起因のエラーは解消</td>
+</tr>
+</tbody>
+</table></div>
+<p>合格基準: T-0-1〜T-0-5 すべて合格（要件定義書 AC-0 準拠）。</p>
+<h2 id="3-成功した通信経路" tabindex="-1">3. 成功した通信経路 <a class="header-anchor" href="#3-成功した通信経路" aria-hidden="true">#</a></h2>
+<pre><code class="language-text">client (Untrust, 172.30.0.11, zt-untrust bridge)
+  -&gt; zt-untrust bridge GW (172.30.0.1, ホスト)
+  -&gt; [ホスト L3 中継 / ip_forward=1]
+  -&gt; zt-trust bridge GW (172.30.20.1, ホスト)
+  -&gt; app (Trust, 172.30.20.21, zt-trust bridge)
+  -&gt; nginx (80/tcp) 応答
+</code></pre>
+<ul>
+<li>client の経路表: <code>172.30.20.0/24 via 172.30.0.1 dev eth1</code></li>
+<li>app の経路表（戻り）: <code>172.30.0.0/24 via 172.30.20.1 dev eth1</code></li>
+<li><code>external</code>（172.30.0.12）は Untrust ゾーンに同居するのみで、Phase 0 では通信試験対象外（Phase 4 SWG 検証用の外部先として起動確認のみ）。</li>
+</ul>
+<h2 id="4-この結果の読み方" tabindex="-1">4. この結果の読み方 <a class="header-anchor" href="#4-この結果の読み方" aria-hidden="true">#</a></h2>
+<ul>
+<li>「テーマZERO の全要件を完遂した」という結果ではない。<strong>Phase 0（土台）のみ完遂</strong>。Phase 1-6 は設計値のまま、今回はデプロイしていない。</li>
+<li><code>zt-untrust</code> / <code>zt-trust</code> は containerlab の <code>bridge</code> kind（ホスト Linux bridge）で表現し、ゾーン間は関所（Phase 2 の Pomerium/oauth2-proxy）がまだ無いため、<strong>ゲート確認限定でホスト L3 中継</strong>（ブリッジに GW IP 付与 + <code>ip_forward=1</code> + 各ノードへの静的経路）を暫定的に張った。論理構成設計の「Phase 0 では <code>client</code>→<code>app</code> 疎通はゲート確認のための設計上の許可経路」という記述に対応する実装判断であり、Phase 2 で関所が入った時点でこの暫定経路は関所転送に置き換える前提。</li>
+<li>本番の「Untrust→Trust 直通禁止」は Phase 2（IAP/関所）で実現するものであり、Phase 0 の暫定中継はその前段階の土台に過ぎない。</li>
+</ul>
+<h2 id="5-残課題" tabindex="-1">5. 残課題 <a class="header-anchor" href="#5-残課題" aria-hidden="true">#</a></h2>
+<ul>
+<li>Phase 1（Keycloak）以降は未着手（設計のみ、今回スコープ外）。</li>
+<li>Phase 0 の暫定 L3 中継（ホストでのブリッジ間ルーティング）は、Phase 2 で関所を導入する際に見直しが必要（関所のマルチホーム経由に置き換え、ホスト中継は撤去する）。</li>
+<li>撤収済み（<code>./deploy.sh destroy</code>）。VM はクリーンな状態に戻している。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a></li>
+<li><a href="../04_%E6%A7%8B%E7%AF%89/phase0_base/README.html">Phase 0 README</a></li>
+<li><a href="../04_%E6%A7%8B%E7%AF%89/%E6%A7%8B%E7%AF%89%E3%83%AD%E3%82%B0_2026-07-04_phase0.html">構築ログ_2026-07-04_phase0</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-判定">1. 判定</a></li>
+<li class="lvl-2"><a href="#2-実施結果">2. 実施結果</a></li>
+<li class="lvl-2"><a href="#3-成功した通信経路">3. 成功した通信経路</a></li>
+<li class="lvl-2"><a href="#4-この結果の読み方">4. この結果の読み方</a></li>
+<li class="lvl-2"><a href="#5-残課題">5. 残課題</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+name: campus-collapsed-core
+
+topology:
+  nodes:
+    # ---------------------------------------------------------
+    # Core & Distribution Layer (L3 Switches)
+    # ---------------------------------------------------------
+    coredist1:
+      kind: cisco_iol
+      type: l2
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      mgmt-ipv4: 172.20.20.11
+
+    coredist2:
+      kind: cisco_iol
+      type: l2
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      mgmt-ipv4: 172.20.20.12
+
+    # ---------------------------------------------------------
+    # Access Layer (L2 Switches)
+    # ---------------------------------------------------------
+    access1:
+      kind: cisco_iol
+      type: l2
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      mgmt-ipv4: 172.20.20.21
+
+    access2:
+      kind: cisco_iol
+      type: l2
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      mgmt-ipv4: 172.20.20.22
+
+    # ---------------------------------------------------------
+    # Endpoints (PCs)
+    # ---------------------------------------------------------
+    pc1:
+      kind: linux
+      image: wbitt/network-multitool
+      exec:
+        - ip addr add 10.10.10.1/24 dev eth1
+        - ip route del default
+        - ip route add default via 10.10.10.254 dev eth1
+
+    pc2:
+      kind: linux
+      image: wbitt/network-multitool
+      exec:
+        - ip addr add 10.10.20.2/24 dev eth1
+        - ip route del default
+        - ip route add default via 10.10.20.254 dev eth1
+
+    pc3:
+      kind: linux
+      image: wbitt/network-multitool
+      exec:
+        - ip addr add 10.10.10.3/24 dev eth1
+        - ip route del default
+        - ip route add default via 10.10.10.254 dev eth1
+
+  links:
+    # ---------------------------------------------------------
+    # Core to Core (L3/OSPF)
+    # ---------------------------------------------------------
+    - endpoints: ["coredist1:e0/1", "coredist2:e0/1"]
+
+    # ---------------------------------------------------------
+    # Trunks (L2)
+    # ---------------------------------------------------------
+    - endpoints: ["coredist1:e0/2", "access1:e0/1"]
+    - endpoints: ["coredist1:e0/3", "access2:e0/1"]
+    - endpoints: ["coredist2:e0/2", "access1:e0/2"]
+    - endpoints: ["coredist2:e0/3", "access2:e0/2"]
+
+    # ---------------------------------------------------------
+    # Access to Endpoints
+    # ---------------------------------------------------------
+    - endpoints: ["access1:e0/3", "pc1:eth1"]
+    - endpoints: ["access1:e1/0", "pc2:eth1"]
+    - endpoints: ["access2:e0/3", "pc3:eth1"]

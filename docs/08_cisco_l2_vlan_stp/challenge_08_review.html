@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Challenge 08: VLAN / 802.1Q Trunk &amp; STP/RSTP 振り返り</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>08_cisco_l2_vlan_stp</span></nav>
+      <h1 class="doc-title">Challenge 08: VLAN / 802.1Q Trunk &amp; STP/RSTP 振り返り</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="1-学んだこと達成したこと" tabindex="-1">1. 学んだこと・達成したこと <a class="header-anchor" href="#1-学んだこと達成したこと" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>VLANとトランクの基本</strong>: スイッチ間にVLAN 10を通すためのトランクポートの役割と、アクセスポートの違いを学びました。</li>
+<li><strong>STP (Spanning Tree Protocol) の挙動</strong>: スイッチを三角形（ループ）に結線した際、STPが自動的に「ルートブリッジ（ボス）」を選出し、ループを防ぐために1つのポートを「通行止め（Blocking）」にする動きを <code>show spanning-tree</code> と Wireshark のパケットから確認できました。</li>
+<li><strong>手動でのルートブリッジ選出</strong>: MACアドレス任せではなく、人間が意図的に優先度（Priority 4096）を下げてルートブリッジを指定する設定を行いました。</li>
+<li><strong>RSTPへの進化とPortFastの重要性</strong>: 旧式のSTPでは経路切り替えに約50秒の断（通信ロス）が発生しましたが、RSTPに変更することで劇的に速くなりました。さらに、PCが繋がる末端のポート（Edge）に <code>portfast</code> を設定することで、Sync処理の待ち時間をなくし、数秒（実質数回のPingロスのみ）で瞬時に経路が切り替わる「真のRSTP」の威力を体感しました。</li>
+</ul>
+<h2 id="2-苦戦した点間違えた箇所" tabindex="-1">2. 苦戦した点・間違えた箇所 <a class="header-anchor" href="#2-苦戦した点間違えた箇所" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>PCのIPアドレス設定ミスとLinuxでの削除方法</strong>:
+<ul>
+<li>誤ってPC2に <code>10.10.10.11</code> を設定してしまいました。Ciscoの <code>no</code> コマンドで消そうとしてエラーになり、Linux（Alpine）では <code>ip addr del 10.10.10.11/24 dev eth1</code> を使う必要があることを学びました。</li>
+</ul>
+</li>
+<li><strong>VLAN 10 の作成漏れによるSTPの罠</strong>:
+<ul>
+<li>SW2に対してトランクの設定だけを行い、<code>vlan 10</code> の作成を忘れていました。</li>
+<li>Ciscoスイッチの仕様上「VLANが存在しないとトランクで許可されていてもデータを無視する」ため、VLAN 10の世界ではループが完成しておらず、ブロッキングポートが現れないという事象が発生しました。これにより、PVST+の動作仕様を深く理解できました。</li>
+</ul>
+</li>
+<li><strong>RSTP設定後の30秒の断（Sync問題）</strong>:
+<ul>
+<li>全てをRSTPに設定したにもかかわらず、経路切替時に30秒以上のPingロスが発生しました。</li>
+<li>これは、PCが繋がっているポート（<code>Et0/3</code>）に <code>spanning-tree portfast</code> を設定していなかったため、スイッチがSTPの返事（Agreement）を待ち続けてしまい、旧式のタイマーにフォールバック（格下げ）してしまったことが原因でした。</li>
+</ul>
+</li>
+</ul>
+<h2 id="3-気になった点深掘りした知識" tabindex="-1">3. 気になった点・深掘りした知識 <a class="header-anchor" href="#3-気になった点深掘りした知識" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>VLAN 1（デフォルトVLAN）</strong>: 実は何も設定しなくてもVLAN 1として通信できてしまうが、セキュリティや設計の観点からあえてVLAN 10を作る必要があることを理解しました。</li>
+<li><strong>Wiresharkでのパケットキャプチャ</strong>: リンク切断時に <code>ARP</code> のブロードキャストが飛び交い、MACアドレステーブルの更新と経路の再構築が行われている生の流れを観察しました。また、Wireshark上ではRSTPであってもプロトコル名として <code>PVST+</code> と表示されることも確認しました。</li>
+<li><strong>P2p Edge</strong>: <code>show spanning-tree</code> で表示される <code>P2p</code>（全二重の1対1通信）と <code>Edge</code>（PortFast設定済み）の意味を理解し、RSTPが高速動作するための必須条件であることを学びました。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-学んだこと達成したこと">1. 学んだこと・達成したこと</a></li>
+<li class="lvl-2"><a href="#2-苦戦した点間違えた箇所">2. 苦戦した点・間違えた箇所</a></li>
+<li class="lvl-2"><a href="#3-気になった点深掘りした知識">3. 気になった点・深掘りした知識</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

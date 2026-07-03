@@ -1,0 +1,42 @@
+graph TD
+    %% Core & Distribution Layer
+    subgraph "Core & Distribution Layer (L3 Switches)"
+        CoreDist1["CoreDist-1<br>(Cisco IOL 15.7.3M2)"]
+        CoreDist2["CoreDist-2<br>(Cisco IOL 15.7.3M2)"]
+    end
+
+    %% Access Layer
+    subgraph "Access Layer (L2 Switches)"
+        Access1["Access-1<br>(Cisco IOL L2 2017)"]
+        Access2["Access-2<br>(Cisco IOL L2 2017)"]
+    end
+
+    %% Endpoints Layer
+    subgraph "Endpoints"
+        PC1["PC-1<br>(VLAN 10: 10.10.10.1)"]
+        PC2["PC-2<br>(VLAN 20: 10.10.20.2)"]
+        PC3["PC-3<br>(VLAN 10: 10.10.10.3)"]
+    end
+
+    %% L3 P2P Links
+    CoreDist1 -- "e0/1 - e0/1<br>(L3 Routed: 10.0.0.0/30)" --- CoreDist2
+
+    %% Uplinks (Trunks)
+    CoreDist1 -- "e0/2 - e0/1<br>(Trunk)" --- Access1
+    CoreDist1 -- "e0/3 - e0/1<br>(Trunk)" --- Access2
+    CoreDist2 -- "e0/2 - e0/2<br>(Trunk)" --- Access1
+    CoreDist2 -- "e0/3 - e0/2<br>(Trunk)" --- Access2
+
+    %% Access Links
+    Access1 -- "e0/3 - eth1<br>(VLAN 10)" --- PC1
+    Access1 -- "e1/0 - eth1<br>(VLAN 20)" --- PC2
+    Access2 -- "e0/3 - eth1<br>(VLAN 10)" --- PC3
+
+    %% Styling
+    classDef l3sw fill:#4a86e8,color:#ffffff,stroke:#2a5db0,stroke-width:2px;
+    classDef l2sw fill:#6aa84f,color:#ffffff,stroke:#38761d,stroke-width:2px;
+    classDef pc fill:#e69138,color:#ffffff,stroke:#b45f06,stroke-width:2px;
+
+    class CoreDist1,CoreDist2 l3sw;
+    class Access1,Access2 l2sw;
+    class PC1,PC2,PC3 pc;

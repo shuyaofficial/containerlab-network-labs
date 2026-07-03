@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Phase 5 解説 — DLP（mitmproxy アドオン）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>解説</span></nav>
+      <h1 class="doc-title">Phase 5 解説 — DLP（mitmproxy アドオン）</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">explainer</span><span class="tag">dlp</span><span class="tag">mitmproxy</span><span class="tag">addon</span></span>
+      </div>
+      
+      <div class="content">
+<h2 id="1-このフェーズで何が実現されるか" tabindex="-1">1. このフェーズで何が実現されるか <a class="header-anchor" href="#1-このフェーズで何が実現されるか" aria-hidden="true">#</a></h2>
+<p>Phase 5 では、Phase 4 の SWG（mitmproxy）に Python アドオンを同居させ、アップロード内容を検査する。機密キーワードを含むデータの持ち出しを検知・ブロックし、検知イベントを SIEM（Loki）に記録する。DLP（Data Loss Prevention）を OSS で代替する。</p>
+<ul>
+<li><strong>ビフォー</strong>: Phase 4 の状態では、外向き通信は SSL bump で可視化されているが、内容の是非を判断する仕組みは無い。中身は見えているが、誰も判断していない状態。</li>
+<li><strong>アフター</strong>: <code>client</code> が機密キーワードを含むファイルをアップロードしようとすると、mitmproxy のアドオンがリクエストボディを検査し、キーワードを検出した場合はブロック応答を返す。検知イベントは Loki に記録され、Grafana で確認できる。</li>
+</ul>
+<h2 id="2-なぜこの構成か" tabindex="-1">2. なぜこの構成か <a class="header-anchor" href="#2-なぜこの構成か" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>観点</th>
+<th>商用製品</th>
+<th>本ラボの OSS 選定</th>
+<th>選定理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DLP / IRM</td>
+<td>各種商用 DLP 製品</td>
+<td><strong>mitmproxy Python アドオン</strong>（SWG と兼務）。代替: c-icap + ClamAV</td>
+<td><a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果</a> で mitmproxy は arm64 対応済み（High、SWG と共用イメージ）。一方 <code>clamav/clamav</code> は arm64 manifest が amd64 のみで確定的に非対応（要代替）</td>
+</tr>
+</tbody>
+</table></div>
+<p>なぜ SWG と DLP を同一コンポーネントに集約するか（D-2）:</p>
+<ul>
+<li>DLP は「プロキシを通過する通信の内容を検査する」機能であり、Phase 4 で確立した SSL bump の経路（すでに中身が復号されている）にそのまま相乗りできる。別途 Suricata/c-icap のような検査エンジンを追加する必要がない。</li>
+<li>検証の結果、DLP/アンチウイルス系でよく使われる ClamAV は arm64 非対応（<code>clamav/clamav:latest</code> の manifest list が amd64 のみ）と確定した。ウイルススキャンを伴う本格的な c-icap + ClamAV 構成は本ラボでは組めないため、<strong>キーワードベースの内容検査に絞った mitmproxy アドオン一本化</strong>が現実的な選択になる。</li>
+</ul>
+<p><strong>実務でこの知識がどこで効くか</strong>: 商用 DLP 製品（例: Symantec DLP、Microsoft Purview）は「正規表現・辞書・機械学習分類器でコンテンツを判定し、ポリシーに応じてブロック/警告/監査ログのみ、を出し分ける」という設計。mitmproxy アドオンでのキーワード検知はこの最小構成版であり、DLP 製品のポリシーエンジンが内部で何をしているかの直感を養える。プロキシ経路への処理差し込み（アドオン、インターセプタ、フィルタ）というパターンは、CASB や API ゲートウェイの実装にも共通する考え方。</p>
+<h2 id="3-仕組みの核心" tabindex="-1">3. 仕組みの核心 <a class="header-anchor" href="#3-仕組みの核心" aria-hidden="true">#</a></h2>
+<p><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a> のフロー2（プロキシフロー）の分岐部分が Phase 5 の核心。</p>
+<pre class="mermaid">sequenceDiagram
+    participant C as client (Untrust)
+    participant M as mitmproxy (DMZ:SWG+DLP)
+    participant E as external (Untrust)
+    C-&gt;&gt;M: (1) 外向き HTTP(S)（アップロード含む、proxy 強制経由）
+    M-&gt;&gt;M: (2) SSL bump で復号 / DLP アドオンで内容判定
+    alt キーワード検出（DLP）
+        M--&gt;&gt;C: (3a) ブロック応答
+        M-&gt;&gt;M: (3b) 検知イベントをログ出力
+    else 問題なし
+        M-&gt;&gt;E: (4) 検査後に転送
+        E--&gt;&gt;C: (5) 応答（SWG 経由）
+    end
+</pre>
+<p>ポイント:</p>
+<ul>
+<li><strong>検知と遮断は分離された処理</strong>。mitmproxy のアドオンは <code>request()</code> フックでリクエストボディを検査し、キーワードが見つかれば <code>flow.response</code> を差し替えてブロック応答を返す（クライアントには到達させない）。一方でログ出力は検知した事実そのものを記録する処理であり、ブロックするかどうかとは独立して動く（監査ログとしての DLP の役割）。</li>
+<li><strong>アドオンは Phase 4 の同一プロセスに追加ロードされる</strong>だけで、新しいコンポーネントは増えない。<code>mitmdump -s dlp_addon.py</code> のように既存の mitmproxy 起動コマンドにアドオンスクリプトを渡すだけで機能が追加される。</li>
+<li><strong>内容検査の対象は「復号済みの平文」</strong>。Phase 4 の SSL bump が成立していることが Phase 5 の前提（依存関係: Phase 5 は Phase 4 の後）。TLS が復号されていなければアドオンはただの暗号化バイト列しか見えず、キーワード検査ができない。</li>
+</ul>
+<h2 id="4-自分で触って確認する手順実装後にこの手順で確認" tabindex="-1">4. 自分で触って確認する手順（実装後にこの手順で確認） <a class="header-anchor" href="#4-自分で触って確認する手順実装後にこの手順で確認" aria-hidden="true">#</a></h2>
+<p>Phase 5 は今回スコープでは未デプロイ（設計値）。実装後、<a href="../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a> T-5-* に沿って以下を確認する想定。</p>
+<h3 id="手順1-dlp-アドオンがロードされているか確認する" tabindex="-1">手順1: DLP アドオンがロードされているか確認する <a class="header-anchor" href="#手順1-dlp-アドオンがロードされているか確認する" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">docker logs --<span class="hljs-built_in">tail</span> 50 clab-zero-mitmproxy
+</code></pre>
+<p>期待結果: アドオンの起動ログ（キーワードリストの読み込み等）が出力されている。</p>
+<h3 id="手順2-機密キーワードを含むアップロードを試み検知されることを確認するt-5-1-t-5-2学習の核心" tabindex="-1">手順2: 機密キーワードを含むアップロードを試み、検知されることを確認する（T-5-1, T-5-2、学習の核心） <a class="header-anchor" href="#手順2-機密キーワードを含むアップロードを試み検知されることを確認するt-5-1-t-5-2学習の核心" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-comment"># 機密キーワードを含むダミーファイルを作成してアップロードを模擬</span>
+docker <span class="hljs-built_in">exec</span> clab-zero-client sh -c <span class="hljs-string">&#x27;echo &quot;confidential-keyword-here&quot; &gt; /tmp/secret.txt&#x27;</span>
+docker <span class="hljs-built_in">exec</span> clab-zero-client curl -sv -F <span class="hljs-string">&quot;file=@/tmp/secret.txt&quot;</span> http://external/upload
+</code></pre>
+<p>期待結果: 通常の 200 応答ではなく、ブロック応答（例: 403 や独自のブロックページ）が返る。ここで**「同じ curl コマンドでも、中身次第で結果が変わる」**ことを確認するのがこの手順のねらい。SWG（Phase 4）は経路を検査するだけだったが、DLP（Phase 5）は内容の意味を判断している違いを体感する。</p>
+<h3 id="手順3-キーワードを含まないアップロードは通ることを確認する対照実験" tabindex="-1">手順3: キーワードを含まないアップロードは通ることを確認する（対照実験） <a class="header-anchor" href="#手順3-キーワードを含まないアップロードは通ることを確認する対照実験" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">docker <span class="hljs-built_in">exec</span> clab-zero-client sh -c <span class="hljs-string">&#x27;echo &quot;just some normal text&quot; &gt; /tmp/normal.txt&#x27;</span>
+docker <span class="hljs-built_in">exec</span> clab-zero-client curl -sv -F <span class="hljs-string">&quot;file=@/tmp/normal.txt&quot;</span> http://external/upload
+</code></pre>
+<p>期待結果: 通常通り 200 が返る。手順2 とこの手順を両方試すことで、DLP が「常にブロックしているわけではなく、内容で判断している」ことを対照的に確認できる。</p>
+<h3 id="手順4-検知イベントが-siem-に記録されることを確認するt-5-3" tabindex="-1">手順4: 検知イベントが SIEM に記録されることを確認する（T-5-3） <a class="header-anchor" href="#手順4-検知イベントが-siem-に記録されることを確認するt-5-3" aria-hidden="true">#</a></h3>
+<p>Grafana で以下のクエリを実行する。</p>
+<pre><code class="language-logql">{container=&quot;clab-zero-mitmproxy&quot;} |= &quot;DLP_BLOCK&quot;
+</code></pre>
+<p>期待結果: 手順2 で発生させた検知イベントがログとして表示される。</p>
+<h2 id="5-考えどころ" tabindex="-1">5. 考えどころ <a class="header-anchor" href="#5-考えどころ" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>本番設計ならどうするか</strong>: 本番の DLP は正規表現・辞書だけでなく、機械学習によるコンテンツ分類（個人情報・機密文書のパターン認識）、ファイル形式を問わない中身抽出（Office 文書・PDF 内のテキスト抽出）、暗号化されたアーカイブへの対応まで踏み込む。本ラボはキーワード完全一致・正規表現レベルの最小実装に留まる。</li>
+<li><strong>このラボの簡略化ポイント</strong>:
+<ul>
+<li><strong>誤検知/未検知の閾値検証は PoC 範囲に限定</strong>。本番の DLP 導入では誤検知率（False Positive）を業務影響が出ない水準まで下げるチューニングに時間がかかるが、本ラボでは「検知の仕組みが動くこと」の確認に留める。</li>
+<li><strong>キーワード定義は設定で外部化</strong>し、値を直書きしない設計にするが、本番のような分類ラベル管理（機密度レベル、部署別ポリシーなど）までは実装しない。</li>
+<li><strong>暗号化ファイルへの対応なし</strong>。zip パスワード付きファイルなどはそのままでは中身を検査できない（本番でも共通の課題だが、対策は範囲外）。</li>
+</ul>
+</li>
+</ul>
+<h2 id="6-つまずきポイント" tabindex="-1">6. つまずきポイント <a class="header-anchor" href="#6-つまずきポイント" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>アドオンをロードしても検知が発火しない</strong>: リクエストボディのエンコーディング（multipart/form-data のパース漏れなど）が原因になりやすい。まず平文の <code>text/plain</code> ボディで検知するかを確認し、multipart のケースはその後に切り分ける。</li>
+<li><strong>ブロック応答は返るがログに記録されない</strong>: ブロック処理とログ出力処理が別のフック関数（<code>request()</code> と <code>response()</code> など）に分かれている実装だと、片方だけ実装漏れになることがある。</li>
+<li><strong>SSL bump が効いていないのに DLP を疑ってしまう</strong>: Phase 5 は Phase 4 に依存するため、まず <a href="phase4_%E8%A7%A3%E8%AA%AC.html">phase4_解説</a> の手順で SSL bump が成立しているかを確認する。復号できていなければ DLP アドオンには何も検査できるものがない。<a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a> の層別で「下層 NG が根本」の原則に従い、L3（TLS）を先に確認する。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a>（プロキシ/DLP フロー）</li>
+<li><a href="../04_%E6%A7%8B%E7%AF%89/phase5_dlp/README.html">phase5_dlp 構築スタブ</a></li>
+<li><a href="phase4_%E8%A7%A3%E8%AA%AC.html">phase4_解説</a></li>
+<li><a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果</a></li>
+<li><a href="../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a></li>
+<li><a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-このフェーズで何が実現されるか">1. このフェーズで何が実現されるか</a></li>
+<li class="lvl-2"><a href="#2-なぜこの構成か">2. なぜこの構成か</a></li>
+<li class="lvl-2"><a href="#3-仕組みの核心">3. 仕組みの核心</a></li>
+<li class="lvl-2"><a href="#4-自分で触って確認する手順実装後にこの手順で確認">4. 自分で触って確認する手順（実装後にこの手順で確認）</a></li>
+<li class="lvl-3"><a href="#手順1-dlp-アドオンがロードされているか確認する">手順1: DLP アドオンがロードされているか確認する</a></li>
+<li class="lvl-3"><a href="#手順2-機密キーワードを含むアップロードを試み検知されることを確認するt-5-1-t-5-2学習の核心">手順2: 機密キーワードを含むアップロードを試み、検知されることを確認する（T-5-1, T-5-2、学習の核心）</a></li>
+<li class="lvl-3"><a href="#手順3-キーワードを含まないアップロードは通ることを確認する対照実験">手順3: キーワードを含まないアップロードは通ることを確認する（対照実験）</a></li>
+<li class="lvl-3"><a href="#手順4-検知イベントが-siem-に記録されることを確認するt-5-3">手順4: 検知イベントが SIEM に記録されることを確認する（T-5-3）</a></li>
+<li class="lvl-2"><a href="#5-考えどころ">5. 考えどころ</a></li>
+<li class="lvl-2"><a href="#6-つまずきポイント">6. つまずきポイント</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

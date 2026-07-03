@@ -1,0 +1,50 @@
+name: campus-routed-access
+
+mgmt:
+  network: campus-routed-access-mgmt
+  ipv4-subnet: 172.24.24.0/24
+
+topology:
+  kinds:
+    cisco_iol:
+      image: vrnetlab/cisco_iol:15.7.3M2
+
+  nodes:
+    core1:
+      kind: cisco_iol
+      mgmt-ipv4: 172.24.24.11
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+    core2:
+      kind: cisco_iol
+      mgmt-ipv4: 172.24.24.12
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+    access1:
+      kind: cisco_iol
+      mgmt-ipv4: 172.24.24.21
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+    access2:
+      kind: cisco_iol
+      mgmt-ipv4: 172.24.24.22
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+
+    pc-a:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.24.24.101
+    pc-b:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.24.24.102
+
+  links:
+    - endpoints: ["core1:eth1", "access1:eth1"]
+    - endpoints: ["core2:eth1", "access1:eth2"]
+    - endpoints: ["core1:eth2", "access2:eth1"]
+    - endpoints: ["core2:eth2", "access2:eth2"]
+    - endpoints: ["core1:eth3", "core2:eth3"]
+    - endpoints: ["access1:eth3", "pc-a:eth1"]
+    - endpoints: ["access2:eth3", "pc-b:eth1"]

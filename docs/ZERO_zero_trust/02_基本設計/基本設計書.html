@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜基本設計書</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>02_基本設計</span></nav>
+      <h1 class="doc-title">テーマZERO｜基本設計書</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-03</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">basic-design</span><span class="tag">arm64</span><span class="tag">docker</span><span class="tag">architecture</span></span>
+      </div>
+      
+      <div class="content">
+<h2 id="設計方針" tabindex="-1">設計方針 <a class="header-anchor" href="#設計方針" aria-hidden="true">#</a></h2>
+<p>ゼロトラストの3原則を、本ラボの docker + OSS 構成でどう実現するかを対応づける。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ZT原則</th>
+<th>意味</th>
+<th>本ラボでの対応</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>明示的検証</td>
+<td>すべてのアクセスを毎回検証する</td>
+<td>DMZ の IAP（Pomerium）が全リクエストを IdP（Keycloak）に照会。mTLS（step-ca）で端末も検証</td>
+</tr>
+<tr>
+<td>最小権限</td>
+<td>必要な範囲だけを許可する</td>
+<td>ゾーン分離＋認可ポリシーで <code>app</code> への到達を認証済みかつ posture 合格の主体に限定</td>
+</tr>
+<tr>
+<td>侵害前提</td>
+<td>内部も信頼せず監視する</td>
+<td>全ゾーンのログを可観測ゾーンへ集約（Loki+Grafana）。SWG/IDS/DLP で横方向・外向きを検査</td>
+</tr>
+</tbody>
+</table></div>
+<p>補助方針:</p>
+<ul>
+<li><strong>KISS</strong>: 商用 ZT の全機能を再現しない。各観点が「OSS で代替可能か」を最小構成で示す。</li>
+<li><strong>共通基盤集約</strong>: 1コンポーネントに複数観点を兼務させ、arm64 VM のリソースを節約する（mitmproxy=SWG+DLP、Pomerium=IAP+認可ポリシー）。</li>
+<li><strong>段階投入</strong>: 依存順に Phase 化し、各段でゲート条件を確認してから進む。</li>
+</ul>
+<h2 id="全体構成" tabindex="-1">全体構成 <a class="header-anchor" href="#全体構成" aria-hidden="true">#</a></h2>
+<ul>
+<li>基盤: OrbStack VM <code>clab</code>（Ubuntu 24.04 / arm64）上の Docker。</li>
+<li>分離: docker bridge を4ゾーン分作成し、コンポーネントを所属させる。</li>
+<li>データ面の流れは3本: <strong>認証フロー</strong>（client→IAP→IdP）、<strong>プロキシフロー</strong>（client→SWG→外部）、<strong>ログフロー</strong>（各所→Loki→Grafana）。詳細は <a href="%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a>。</li>
+</ul>
+<pre class="mermaid">graph LR
+    subgraph U[&quot;Untrust&quot;]
+        C[client]
+        E[external]
+    end
+    subgraph D[&quot;DMZ / 認可層&quot;]
+        P[Pomerium/oauth2-proxy]
+        K[Keycloak]
+        M[mitmproxy/Squid+Suricata]
+        S[step-ca]
+    end
+    subgraph T[&quot;Trust / 業務&quot;]
+        A[app]
+    end
+    subgraph O[&quot;可観測&quot;]
+        L[Loki+Promtail]
+        G[Grafana]
+    end
+    C --&gt; P --&gt; A
+    P --&gt; K
+    C -.-&gt; M -.-&gt; E
+    S -.-&gt; P
+    P --&gt; L
+    M --&gt; L
+    K --&gt; L
+    L --&gt; G
+</pre>
+<h2 id="ゾーンネットワーク設計" tabindex="-1">ゾーン・ネットワーク設計 <a class="header-anchor" href="#ゾーンネットワーク設計" aria-hidden="true">#</a></h2>
+<p>docker bridge を4本作る。ゾーン間の通信は設計した経路のみを許容する（Untrust→Trust の直通は禁止）。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ゾーン</th>
+<th>bridge 名（予定）</th>
+<th>サブネット</th>
+<th>GW</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Untrust</td>
+<td><code>zt-untrust</code></td>
+<td>172.30.0.0/24</td>
+<td>172.30.0.1</td>
+<td>端末側。信頼しない</td>
+</tr>
+<tr>
+<td>DMZ（認可層）</td>
+<td><code>zt-dmz</code></td>
+<td>172.30.10.0/24</td>
+<td>172.30.10.1</td>
+<td>認証・認可・検査の関所</td>
+</tr>
+<tr>
+<td>Trust（業務）</td>
+<td><code>zt-trust</code></td>
+<td>172.30.20.0/24</td>
+<td>172.30.20.1</td>
+<td>保護対象サービス</td>
+</tr>
+<tr>
+<td>可観測</td>
+<td><code>zt-obs</code></td>
+<td>172.30.30.0/24</td>
+<td>172.30.30.1</td>
+<td>ログ集約・可視化</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>DMZ の関所ノード（Pomerium 等）は Untrust と Trust の両方に足を持ち、橋渡しする（マルチホーム）。</li>
+<li>可観測ゾーンには全ゾーンから片方向でログが流入する。</li>
+<li>アドレス割当の詳細は <a href="IP%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9%E7%AE%A1%E7%90%86%E8%A1%A8.html">IPアドレス管理表</a>。</li>
+</ul>
+<h2 id="コンポーネント設計" tabindex="-1">コンポーネント設計 <a class="header-anchor" href="#コンポーネント設計" aria-hidden="true">#</a></h2>
+<p>各 OSS の役割と連携。確度・arm64 可用性は <a href="%E5%AE%9F%E8%A3%85%E5%8F%AF%E8%83%BD%E6%80%A7%E3%83%9E%E3%83%88%E3%83%AA%E3%82%AF%E3%82%B9.html">実装可能性マトリクス</a> を参照。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>コンポーネント</th>
+<th>観点</th>
+<th>役割</th>
+<th>主な連携先</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Keycloak</td>
+<td>ID統制</td>
+<td>OIDC IdP。トークン発行・ユーザー/ロール管理</td>
+<td>Pomerium（OIDC 委譲先）</td>
+</tr>
+<tr>
+<td>oauth2-proxy → Pomerium</td>
+<td>NWセキュリティ</td>
+<td>IAP。未認証拒否・認可ポリシー適用</td>
+<td>Keycloak, app, step-ca</td>
+</tr>
+<tr>
+<td>mitmproxy（or Squid+Suricata）</td>
+<td>WEB / DLP</td>
+<td>SWG（TLS 復号・検査）＋ DLP（内容検査・ブロック）</td>
+<td>external, Loki</td>
+</tr>
+<tr>
+<td>step-ca</td>
+<td>デバイス統制</td>
+<td>端末 mTLS 証明書発行・posture claim モック</td>
+<td>Pomerium</td>
+</tr>
+<tr>
+<td>Loki + Promtail</td>
+<td>SIEM</td>
+<td>ログ集約・保存</td>
+<td>全コンポーネント</td>
+</tr>
+<tr>
+<td>Grafana</td>
+<td>SIEM</td>
+<td>ダッシュボード可視化</td>
+<td>Loki</td>
+</tr>
+<tr>
+<td>client / app / external</td>
+<td>土台</td>
+<td>利用者端末 / 保護対象 / 外部端末（multitool 流用）</td>
+<td>各ゾーン</td>
+</tr>
+</tbody>
+</table></div>
+<p>連携の要点:</p>
+<ul>
+<li>IAP は認証を Keycloak に委譲し、端末検証を step-ca（mTLS）に委ねる。判断結果で <code>app</code> への転送可否を決める。</li>
+<li>SWG は client の外向き通信を横取りし、DLP アドオンで内容を検査してから <code>external</code> へ流す。</li>
+<li>すべての判断ログは Loki に集約し、Grafana で「拒否・許可・検知」の件数を可視化する。</li>
+</ul>
+<h2 id="アドレス設計方針" tabindex="-1">アドレス設計方針 <a class="header-anchor" href="#アドレス設計方針" aria-hidden="true">#</a></h2>
+<ul>
+<li>プライベート <code>172.30.0.0/16</code> をラボ専用に確保し、ゾーンごとに <code>/24</code> を切る（10 の位でゾーンを識別）。</li>
+<li>ノードアドレスは末尾で役割を識別する（例: <code>.10</code> 番台=IdP、<code>.20</code> 番台=IAP など）。割当は <a href="IP%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9%E7%AE%A1%E7%90%86%E8%A1%A8.html">IPアドレス管理表</a> に集約。</li>
+<li>名前解決は docker の組み込み DNS（サービス名）を基本とする。</li>
+</ul>
+<h2 id="冗長性拡張性" tabindex="-1">冗長性・拡張性 <a class="header-anchor" href="#冗長性拡張性" aria-hidden="true">#</a></h2>
+<ul>
+<li>本ラボは PoC のため<strong>冗長化しない</strong>（単一インスタンス）。可用性は検証対象外。</li>
+<li>拡張点:
+<ul>
+<li>IdP: Keycloak 内蔵 DB → OpenLDAP へ差し替え可能な構成にする。</li>
+<li>IAP: oauth2-proxy → Pomerium → OpenZiti と段階的に高度化できるよう、認可の入口を1つに固定する。</li>
+<li>SIEM: Loki 先行 → Wazuh へ拡張（統合 SIEM/EDR、4GB 級、要検証）。</li>
+<li>IOL 連携: L2/L3 を絡めた検証は発展課題として別テーマで扱う。</li>
+</ul>
+</li>
+</ul>
+<h2 id="セキュリティ方針" tabindex="-1">セキュリティ方針 <a class="header-anchor" href="#セキュリティ方針" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>関所集中</strong>: 認証・認可・検査を DMZ に集約し、Trust への到達点を1つに絞る。</li>
+<li><strong>復号可視化の範囲限定</strong>: SWG の SSL bump はラボ内通信に限定し、実運用の盗聴と混同しない前提を明記する。</li>
+<li><strong>秘密情報の非埋め込み</strong>: 初期パスワード・鍵は設定ファイルに直書きせず、Phase 実装時に環境変数/シークレットで注入する（設計段階では値を書かない）。</li>
+<li><strong>ログの改ざん耐性</strong>: ログは生成元から可観測ゾーンへ片方向で送り、端末側で消せない構成を志向する。</li>
+</ul>
+<h2 id="設計判断の記録考えどころ" tabindex="-1">設計判断の記録（考えどころ） <a class="header-anchor" href="#設計判断の記録考えどころ" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>判断</th>
+<th>選択</th>
+<th>理由</th>
+<th>却下案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>D-1</td>
+<td>IOL 連携するか</td>
+<td>しない（docker network で完結）</td>
+<td>ZT の主眼は L7 認可。IOL は x86 で重く（1ノード約2分）再現性を下げる</td>
+<td>IOL で L2/L3 込みの完全再現（発展課題へ回す）</td>
+</tr>
+<tr>
+<td>D-2</td>
+<td>SWG/DLP を分けるか</td>
+<td>mitmproxy に集約（兼務）</td>
+<td>arm64 VM のリソース節約。DLP は SWG の通信を検査する同一経路上にある</td>
+<td>Squid+c-icap+ClamAV で分離（arm64 可用性リスクと重量）</td>
+</tr>
+<tr>
+<td>D-3</td>
+<td>SIEM をいつ入れるか</td>
+<td>Phase 3（SWG/DLP より前）</td>
+<td>以降の「効いている証拠」を可視化するため早期投入</td>
+<td>最後に SIEM（効果が観測できないまま構築が進むリスク）</td>
+</tr>
+<tr>
+<td>D-4</td>
+<td>SIEM の実体</td>
+<td>Loki+Grafana 先行、Wazuh は後回し</td>
+<td>Loki は軽量で arm64 確度高。Wazuh は 4GB 級で要検証</td>
+<td>最初から Wazuh（重量・検証未済でブロッカー化リスク）</td>
+</tr>
+<tr>
+<td>D-5</td>
+<td>IAP の起点</td>
+<td>oauth2-proxy から</td>
+<td>最小で「未認証拒否」を示せる。Pomerium は認可ポリシーで段階的に高度化</td>
+<td>いきなり Pomerium/OpenZiti（初手の複雑度が高い）</td>
+</tr>
+<tr>
+<td>D-6</td>
+<td>エンドポイント</td>
+<td>multitool 流用</td>
+<td>既存イメージで ping/curl/dig が揃い、疎通・プロキシ確認に十分</td>
+<td>専用アプリを自作（YAGNI）</td>
+</tr>
+</tbody>
+</table></div>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#設計方針">設計方針</a></li>
+<li class="lvl-2"><a href="#全体構成">全体構成</a></li>
+<li class="lvl-2"><a href="#ゾーンネットワーク設計">ゾーン・ネットワーク設計</a></li>
+<li class="lvl-2"><a href="#コンポーネント設計">コンポーネント設計</a></li>
+<li class="lvl-2"><a href="#アドレス設計方針">アドレス設計方針</a></li>
+<li class="lvl-2"><a href="#冗長性拡張性">冗長性・拡張性</a></li>
+<li class="lvl-2"><a href="#セキュリティ方針">セキュリティ方針</a></li>
+<li class="lvl-2"><a href="#設計判断の記録考えどころ">設計判断の記録（考えどころ）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

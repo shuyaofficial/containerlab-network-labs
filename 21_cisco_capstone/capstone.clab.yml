@@ -1,0 +1,113 @@
+name: capstone
+
+# ==========================
+# 🛠 管理ネットワーク（静的IP固定でドリフト/重複を根絶）
+# ==========================
+mgmt:
+  network: clab
+  ipv4-subnet: 172.20.20.0/24
+  ipv6-subnet: 3fff:172:20:20::/64
+
+topology:
+  nodes:
+    # ==========================
+    # 🌍 インターネット（ISP側）
+    # ==========================
+    isp:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+      mgmt-ipv4: 172.20.20.11
+      memory: 1Gb
+      binds:
+        - launch_custom.exp:/iol/launch.exp:ro
+
+    # ==========================
+    # 🏢 本社 (Headquarters)
+    # ==========================
+    hq-edge1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+      mgmt-ipv4: 172.20.20.12
+      memory: 1Gb
+      binds:
+        - launch_custom.exp:/iol/launch.exp:ro
+
+    hq-edge2:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+      mgmt-ipv4: 172.20.20.13
+      memory: 1Gb
+      binds:
+        - launch_custom.exp:/iol/launch.exp:ro
+
+    hq-core1:
+      kind: cisco_iol
+      type: L2
+      image: vrnetlab/cisco_iol:L2-15.2
+      mgmt-ipv4: 172.20.20.21
+      memory: 1Gb
+      binds:
+        - launch_custom.exp:/iol/launch.exp:ro
+
+    hq-core2:
+      kind: cisco_iol
+      type: L2
+      image: vrnetlab/cisco_iol:L2-15.2
+      mgmt-ipv4: 172.20.20.22
+      memory: 1Gb
+      binds:
+        - launch_custom.exp:/iol/launch.exp:ro
+
+    hq-pc-sales:
+      kind: linux
+      image: wbitt/network-multitool
+      mgmt-ipv4: 172.20.20.101
+      exec:
+        - ip addr add 10.1.10.100/24 dev eth1
+        - ip route del default
+        - ip route add default via 10.1.10.254 dev eth1
+
+    # ==========================
+    # 🏪 支社 (Branch)
+    # ==========================
+    br-edge:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+      mgmt-ipv4: 172.20.20.14
+      memory: 1Gb
+      binds:
+        - launch_custom.exp:/iol/launch.exp:ro
+
+    br-pc:
+      kind: linux
+      image: wbitt/network-multitool
+      mgmt-ipv4: 172.20.20.102
+      exec:
+        - ip addr add 10.2.40.100/24 dev eth1
+        - ip route del default
+        - ip route add default via 10.2.40.254 dev eth1
+
+  # ==========================
+  # 🔗 物理結線 (Links)
+  # ==========================
+  links:
+    # --- 外部インターネット境界 ---
+    - endpoints: ["isp:eth1", "hq-edge1:eth1"] # isp:e0/1, hq-edge1:e0/1
+    - endpoints: ["isp:eth2", "hq-edge2:eth1"] # isp:e0/2, hq-edge2:e0/1
+    - endpoints: ["isp:eth3", "br-edge:eth1"]  # isp:e0/3, br-edge:e0/1
+
+    # --- 本社エッジ ⇔ コア ---
+    - endpoints: ["hq-edge1:eth2", "hq-core1:eth1"] # e0/2 - e0/1
+    - endpoints: ["hq-edge1:eth3", "hq-core2:eth1"] # e0/3 - e0/1
+    - endpoints: ["hq-edge2:eth2", "hq-core1:eth2"] # e0/2 - e0/2
+    - endpoints: ["hq-edge2:eth3", "hq-core2:eth2"] # e0/3 - e0/2
+
+    # --- 本社コア間（トランク/EtherChannel用） ---
+    - endpoints: ["hq-core1:eth5", "hq-core2:eth5"] # e1/1 - e1/1
+    - endpoints: ["hq-core1:eth6", "hq-core2:eth6"] # e1/2 - e1/2
+
+    # --- 本社PC接続 ---
+    - endpoints: ["hq-core1:eth7", "hq-pc-sales:eth1"] # e1/3 - eth1
+
+    # --- 支社PC接続 ---
+    - endpoints: ["br-edge:eth2", "br-pc:eth1"] # e0/2 - eth1

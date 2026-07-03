@@ -1,0 +1,56 @@
+name: campus-multi-site
+
+mgmt:
+  network: campus-multi-site-mgmt
+  ipv4-subnet: 172.25.25.0/24
+
+topology:
+  kinds:
+    cisco_iol:
+      image: vrnetlab/cisco_iol:15.7.3M2
+
+  nodes:
+    main-core:
+      kind: cisco_iol
+      mgmt-ipv4: 172.25.25.11
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+    main-edge:
+      kind: cisco_iol
+      mgmt-ipv4: 172.25.25.12
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+    branch-edge:
+      kind: cisco_iol
+      mgmt-ipv4: 172.25.25.21
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+    branch-core:
+      kind: cisco_iol
+      mgmt-ipv4: 172.25.25.22
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+
+    main-pc:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.25.25.101
+      exec:
+        - ip link set eth1 up
+        - ip address add 10.50.10.10/24 dev eth1
+        - ip route add 10.60.0.0/16 via 10.50.10.1 dev eth1
+    branch-pc:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.25.25.102
+      exec:
+        - ip link set eth1 up
+        - ip address add 10.60.10.10/24 dev eth1
+        - ip route add 10.50.0.0/16 via 10.60.10.1 dev eth1
+
+  links:
+    - endpoints: ["main-core:eth1", "main-edge:eth1"]
+    - endpoints: ["main-edge:eth2", "branch-edge:eth2"]
+    - endpoints: ["branch-edge:eth1", "branch-core:eth1"]
+    - endpoints: ["main-core:eth2", "main-pc:eth1"]
+    - endpoints: ["branch-core:eth2", "branch-pc:eth1"]

@@ -1,0 +1,147 @@
+
+br-edge>enable
+br-edge#terminal length 0
+br-edge#show running-config
+Building configuration...
+
+Current configuration : 2264 bytes
+!
+! Last configuration change at 12:28:00 UTC Wed Jun 24 2026
+!
+version 15.2
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+service compress-config
+!
+hostname br-edge
+!
+boot-start-marker
+boot-end-marker
+!
+!
+vrf definition clab-mgmt
+ description clab-mgmt
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+!
+!
+username admin privilege 15 secret 5 $1$AAdk$L2/5byavtG5eFcyikrjL50
+no aaa new-model
+!
+!
+!
+!
+!
+!
+!
+!
+no ip domain-lookup
+ip domain-name lab
+no ip cef
+ipv6 unicast-routing
+ipv6 cef
+!
+!
+!
+spanning-tree mode pvst
+spanning-tree extend system-id
+!
+vlan internal allocation policy ascending
+!
+! 
+!
+crypto ikev2 proposal IKEV2_PROP 
+ encryption des
+ integrity sha256
+ group 14
+!
+crypto ikev2 policy IKEV2_POL 
+ proposal IKEV2_PROP
+!
+crypto ikev2 keyring IKEV2_KEY
+ peer FGT_HQ
+  address 200.0.1.1
+  pre-shared-key cisco123
+ !
+!
+!
+crypto ikev2 profile IKEV2_PROF
+ match identity remote address 200.0.1.1 255.255.255.255 
+ identity local address 200.0.3.1
+ authentication remote pre-share
+ authentication local pre-share
+ keyring local IKEV2_KEY
+!
+!
+!
+crypto ipsec transform-set IPSEC_TSET esp-des esp-sha256-hmac 
+ mode tunnel
+!
+crypto ipsec profile IPSEC_PROF
+ set transform-set IPSEC_TSET 
+ set pfs group14
+ set ikev2-profile IKEV2_PROF
+!
+!
+!
+!
+!
+!
+!
+interface Tunnel1
+ ip address 172.16.40.2 255.255.255.252
+ tunnel source Ethernet0/1
+ tunnel mode ipsec ipv4
+ tunnel destination 200.0.1.1
+ tunnel protection ipsec profile IPSEC_PROF
+!
+interface Ethernet0/0
+ description clab-mgmt
+ no switchport
+ vrf forwarding clab-mgmt
+ ip address 172.20.20.2 255.255.255.0
+ ipv6 address 3FFF:172:20:20::2/64
+!
+interface Ethernet0/1
+ no switchport
+ ip address 200.0.3.1 255.255.255.0
+!
+interface Ethernet0/2
+ no switchport
+ ip address 10.2.40.254 255.255.255.0
+!
+interface Ethernet0/3
+ shutdown
+!
+ip forward-protocol nd
+!
+!
+no ip http server
+no ip http secure-server
+ip route 0.0.0.0 0.0.0.0 200.0.3.254
+ip route 10.20.30.0 255.255.255.0 Tunnel1
+ip route vrf clab-mgmt 0.0.0.0 0.0.0.0 Ethernet0/0 172.20.20.1
+!
+!
+ipv6 route vrf clab-mgmt ::/0 Ethernet0/0 3FFF:172:20:20::1
+!
+!
+!
+control-plane
+!
+!
+line con 0
+ logging synchronous
+line aux 0
+line vty 0 4
+ login local
+!
+!
+end
+
+br-edge#

@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>第7章: 統合キャプストン — 2拠点 →（最終形）大規模社内LAN（⬜ ゴール）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ロードマップ</span>
+<span class="sep">/</span>
+<span>章別アウトライン</span></nav>
+      <h1 class="doc-title">第7章: 統合キャプストン — 2拠点 →（最終形）大規模社内LAN（⬜ ゴール）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>これまでの全章を1つに束ねる総合演習。<strong>「企業の社内ネットワークを、
+要件定義から設計・構築・試験・ドキュメント化まで自力で一気通貫」</strong> がゴール。
+<strong>2段構え</strong>で進める：まず <strong>基本形＝本社＋支社2拠点</strong> で全機能を統合し、
+次に <strong>最終形＝大規模社内LAN（3階層キャンパス）</strong> へスケールアップする。
+（DC＝VXLAN/EVPNファブリックは目標外。第6章の任意枠で“仕組みを知る”に留める）
+詳細な進め方・記入テンプレは <code>../キャプストン/要件定義_設計_構築テンプレート.md</code>。</p>
+</blockquote>
+<hr>
+<h2 id="-ゴール像題材" tabindex="-1">🎯 ゴール像（題材） <a class="header-anchor" href="#-ゴール像題材" aria-hidden="true">#</a></h2>
+<pre><code>            ┌──────────── インターネット ────────────┐
+         [ISP-A]                                   [ISP-B]
+            │   eBGP(デュアルホーム)                  │
+       ┌──[ R-Edge1 ]══iBGP/OSPF══[ R-Edge2 ]──┐     （第1章: BGP/BFD）
+       │        │  FW/DMZ・NAT・ACL  │            │     （第4章: ACL/NAT）
+       │   ┌─[ CoreSW1 ]══EtherChannel══[ CoreSW2 ]─┐
+本社HQ │   │   HSRP仮想GW / STP Root      （第2章）   │
+       │   │   VLAN10 営業 / VLAN20 開発 / VLAN30 サーバ
+       │   └─ DHCP/DNS/NTP（第3章）, SNMP/Syslog（第5章）
+       │
+       │═══════ 拠点間 IPsec VPN（第4章: rfc4301/4303）═══════
+       │
+   支社BR [ R-Branch ]─[ L3SW ]─ VLAN40 支社LAN（第2章/第3章）
+</code></pre>
+<ul>
+<li><strong>本社(HQ)</strong>: デュアルISP境界・冗長コア・部署別VLAN・GW冗長・DMZ/FW・各種サービス・監視</li>
+<li><strong>支社(BR)</strong>: L3SW + ルータ、支社LAN、本社へIPsec VPN接続</li>
+<li>自動化（第5章 Ansible）で設定投入・取得を効率化、（任意）IPv6デュアルスタック（第6章）</li>
+</ul>
+<hr>
+<h2 id="-各章がどう効くか統合マップ" tabindex="-1">🧩 各章がどう効くか（統合マップ） <a class="header-anchor" href="#-各章がどう効くか統合マップ" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>章</th>
+<th>キャプストンでの役割</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>第1章</td>
+<td>インターネット境界のBGPデュアルホーム＋BFD、社内OSPF</td>
+</tr>
+<tr>
+<td>第2章</td>
+<td>コア冗長（STP/EtherChannel/L3SW）、部署VLAN、HSRP GW冗長、<strong>Track連動</strong></td>
+</tr>
+<tr>
+<td>第3章</td>
+<td>DHCP（リレー）/DNS/NTP の社内サービス基盤</td>
+</tr>
+<tr>
+<td>第4章</td>
+<td>ACL/NAT/DMZ、<strong>本社⇔支社 IPsec VPN</strong>、QoS</td>
+</tr>
+<tr>
+<td>第5章</td>
+<td>SNMP/Syslog 監視、Ansible で構築自動化</td>
+</tr>
+<tr>
+<td>第6章(任意)</td>
+<td>IPv6デュアルスタック化、（発展）L3VPN/VXLAN</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="-最終形大規模社内lanへのスケール" tabindex="-1">🏗️ 最終形：大規模社内LANへのスケール <a class="header-anchor" href="#-最終形大規模社内lanへのスケール" aria-hidden="true">#</a></h2>
+<p>基本形（2拠点）で全機能を一度通したら、**「設計が大規模でも破綻しない」**ことを学ぶために
+本社を <strong>3階層（コア／ディストリビューション／アクセス）のキャンパスLAN</strong> へ拡張する。</p>
+<pre><code>            [ Core SW x2 ]              ← 高速・冗長の中枢（L3、ルーティングのみ）
+           /     |      \
+   [Distri-A] [Distri-B] [Distri-C]     ← 棟/フロア単位の集約（L3境界・経路集約・STP root）
+      / | \      ...        ...
+ [Access SW 群（各フロア）]              ← 末端ポート収容（VLAN・ポートセキュリティ）
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>スケール時の論点</th>
+<th>大規模で効く設計手法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>経路数の爆発</td>
+<td>OSPF <strong>マルチエリア</strong>化＋<strong>経路集約</strong>（エリア境界で束ねる）</td>
+</tr>
+<tr>
+<td>STPの複雑化</td>
+<td><strong>MST</strong>（VLAN群をインスタンスに束ねる）、ディストリでL2/L3境界を切る</td>
+</tr>
+<tr>
+<td>アドレス枯渇/管理</td>
+<td>階層的IP設計（棟→フロア→VLANで集約しやすく）</td>
+</tr>
+<tr>
+<td>単一障害点</td>
+<td>各階層を冗長化（コア/ディストリ二重化、上下リンク冗長）</td>
+</tr>
+<tr>
+<td>拠点増</td>
+<td>支社テンプレを<strong>横展開</strong>（同じ設計を複製できる標準化）</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>仮想環境（arm64/IOL）はノードが重いので、<strong>「縮小モデルで原理を確認 → 設計書では大規模を表現」</strong>
+という二段構えが現実的。ノードは原理確認に必要な最小数（例: コア2＋ディストリ2＋アクセス2）に絞る。</p>
+</blockquote>
+<hr>
+<h2 id="-進め方5フェーズ詳細はテンプレ参照" tabindex="-1">🏁 進め方（5フェーズ・詳細はテンプレ参照） <a class="header-anchor" href="#-進め方5フェーズ詳細はテンプレ参照" aria-hidden="true">#</a></h2>
+<ol>
+<li><strong>要件定義</strong> … 事業/規模/可用性(SLA)/セキュリティ/拠点間要件を文書化</li>
+<li><strong>設計</strong> … 論理（IP/VLAN/ルーティング/冗長/QoS/セキュリティ）＋物理（機器/結線/構成図）</li>
+<li><strong>構築</strong> … containerlab トポロジ化 → 段階投入 → Ansible自動化</li>
+<li><strong>試験</strong> … 疎通／障害(フェイルオーバ)／性能／セキュリティ検証</li>
+<li><strong>ドキュメント</strong> … パラメータシート／試験成績書／運用手順書</li>
+</ol>
+<h2 id="-完了条件これができたらゴール達成" tabindex="-1">✅ 完了条件（これができたら「ゴール達成」） <a class="header-anchor" href="#-完了条件これができたらゴール達成" aria-hidden="true">#</a></h2>
+<ul>
+<li>[ ] 要件定義書・設計書一式（論理/物理構成図、IP設計、VLAN設計、ルーティング設計）が揃う</li>
+<li>[ ] containerlab で全体が起動し、全VLAN/拠点が疎通する</li>
+<li>[ ] <strong>障害試験</strong>: ①ISP-A断 ②コアSW1断 ③拠点間VPN断 のいずれでも自動迂回/復旧する</li>
+<li>[ ] 主要通信のセキュリティ（ACL/NAT/VPN暗号化）が意図通り効いている</li>
+<li>[ ] 試験成績書・運用手順書まで完成し、第三者が再構築できる状態</li>
+<li>[ ] <strong>（最終形）</strong> 3階層・マルチエリアOSPF・経路集約・MST で、大規模化しても破綻しない設計を図示・説明できる</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-ゴール像題材">🎯 ゴール像（題材）</a></li>
+<li class="lvl-2"><a href="#-各章がどう効くか統合マップ">🧩 各章がどう効くか（統合マップ）</a></li>
+<li class="lvl-2"><a href="#-最終形大規模社内lanへのスケール">🏗️ 最終形：大規模社内LANへのスケール</a></li>
+<li class="lvl-2"><a href="#-進め方5フェーズ詳細はテンプレ参照">🏁 進め方（5フェーズ・詳細はテンプレ参照）</a></li>
+<li class="lvl-2"><a href="#-完了条件これができたらゴール達成">✅ 完了条件（これができたら「ゴール達成」）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

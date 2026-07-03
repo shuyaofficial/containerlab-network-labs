@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>基本設計書（High-Level Design）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>21_cisco_capstone</span>
+<span class="sep">/</span>
+<span>02_基本設計</span></nav>
+      <h1 class="doc-title">基本設計書（High-Level Design）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="1-ネットワーク論理構成トポロジ設計" tabindex="-1">1. ネットワーク論理構成（トポロジ設計） <a class="header-anchor" href="#1-ネットワーク論理構成トポロジ設計" aria-hidden="true">#</a></h2>
+<p>要件定義を満たすため、以下の論理トポロジを採用する。</p>
+<pre><code class="language-text">      [ インターネット (ISP) ]
+        /                \
+  [HQ-Edge1(主)]      [HQ-Edge2(副)]    [BR-Edge] (支社)
+        \                /                |
+    [HQ-Core1]======[HQ-Core2]        [支社LAN]
+        |
+  [本社 各VLAN群]
+</code></pre>
+<h2 id="2-アドレス設計方針ipアドレスvlan" tabindex="-1">2. アドレス設計方針（IPアドレス・VLAN） <a class="header-anchor" href="#2-アドレス設計方針ipアドレスvlan" aria-hidden="true">#</a></h2>
+<p>将来的な拡張と経路集約を見据え、プライベートIP空間 <code>10.0.0.0/8</code> を拠点ごとに分割して割り当てる。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>拠点・用途</th>
+<th>ネットワークアドレス</th>
+<th>VLAN ID</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>本社 営業部</td>
+<td>10.1.10.0/24</td>
+<td>VLAN 10</td>
+<td>第2オクテット <code>1</code> は本社を示す</td>
+</tr>
+<tr>
+<td>本社 開発部</td>
+<td>10.1.20.0/24</td>
+<td>VLAN 20</td>
+<td></td>
+</tr>
+<tr>
+<td>本社 サーバ</td>
+<td>10.1.30.0/24</td>
+<td>VLAN 30</td>
+<td></td>
+</tr>
+<tr>
+<td>本社 P2P(ルータ間)</td>
+<td>10.0.0.0/24帯</td>
+<td>なし (L3ポート)</td>
+<td>OSPF等のルーティング用</td>
+</tr>
+<tr>
+<td>支社 LAN</td>
+<td>10.2.40.0/24</td>
+<td>VLAN 40</td>
+<td>第2オクテット <code>2</code> は支社を示す</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="3-ルーティング設計" tabindex="-1">3. ルーティング設計 <a class="header-anchor" href="#3-ルーティング設計" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>内部ルーティング (IGP)</strong>: <code>OSPF</code> を採用。本社内のエッジルーターとコアスイッチ間を Area 0 で接続し、動的に経路情報を同期する。</li>
+<li><strong>外部ルーティング (EGP)</strong>: <code>BGP</code> を採用。本社とISP間でピアを確立し、デュアルホーム環境（2回線）でのインターネット通信を制御する。</li>
+<li><strong>拠点間ルーティング</strong>: 支社と本社の間はインターネット越しの接続となるため、IPsecトンネルインタフェースを構築し、スタティックルートで経路を制御する。</li>
+</ul>
+<h2 id="4-冗長化設計高可用性" tabindex="-1">4. 冗長化設計（高可用性） <a class="header-anchor" href="#4-冗長化設計高可用性" aria-hidden="true">#</a></h2>
+<p>単一障害点（SPOF）を排除するため、各レイヤーで以下の冗長化技術を組み合わせる。</p>
+<ul>
+<li><strong>L2レイヤー (ループ防止・リンク冗長)</strong>: コアスイッチ間を <code>EtherChannel</code>（複数物理リンクの束ね）で接続し、帯域増強と耐障害性を確保する。また <code>STP (RSTP)</code> によりL2ループを未然に防ぐ。</li>
+<li><strong>L3レイヤー (デフォルトゲートウェイ冗長)</strong>: <code>HSRP</code> を導入。HQ-Core1をActive、HQ-Core2をStandbyとし、端末から見たゲートウェイIP（10.1.x.254）を仮想化する。</li>
+<li><strong>WANレイヤー (上流回線連動)</strong>: <code>Track</code> 機能を活用し、メイン回線（HQ-Edge1）のダウンを検知した場合、自動的にHSRPのActive権をHQ-Core2に譲り、サブ回線（HQ-Edge2）へトラフィックを迂回させる。</li>
+</ul>
+<h2 id="5-セキュリティ設計" tabindex="-1">5. セキュリティ設計 <a class="header-anchor" href="#5-セキュリティ設計" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>インターネットアクセス</strong>: 本社および支社のエッジルーターにて <code>NAT (PAT)</code> を設定し、プライベートIPを隠蔽する。</li>
+<li><strong>拠点間通信</strong>: <code>IPsec VPN</code> を用いて、支社〜本社間の通信ペイロードを暗号化（ESP）する。</li>
+<li><strong>アクセス制御</strong>: 将来的に、支社から本社開発部への通信を遮断する <code>ACL (Access Control List)</code> を導入する準備をしておく。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-ネットワーク論理構成トポロジ設計">1. ネットワーク論理構成（トポロジ設計）</a></li>
+<li class="lvl-2"><a href="#2-アドレス設計方針ipアドレスvlan">2. アドレス設計方針（IPアドレス・VLAN）</a></li>
+<li class="lvl-2"><a href="#3-ルーティング設計">3. ルーティング設計</a></li>
+<li class="lvl-2"><a href="#4-冗長化設計高可用性">4. 冗長化設計（高可用性）</a></li>
+<li class="lvl-2"><a href="#5-セキュリティ設計">5. セキュリティ設計</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

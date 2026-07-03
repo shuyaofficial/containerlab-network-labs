@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>パラメータシート① IP・インターフェース編（記入済）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>22_enterprise_campus_lan</span>
+<span class="sep">/</span>
+<span>03_詳細設計</span></nav>
+      <h1 class="doc-title">パラメータシート① IP・インターフェース編（記入済）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p><strong>このシートは基本設計を元に記入済みです。</strong> IPアドレスの正本は <a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/IP%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9%E7%AE%A1%E7%90%86%E8%A1%A8.html">../02_基本設計/IPアドレス管理表.md</a>、
+結線は <a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E3%83%8D%E3%83%83%E3%83%88%E3%83%AF%E3%83%BC%E3%82%AF%E7%89%A9%E7%90%86%E6%A7%8B%E6%88%90%E5%9B%B3_%E3%83%86%E3%82%AD%E3%82%B9%E3%83%88%E7%89%88.html">../02_基本設計/ネットワーク物理構成図_テキスト版.md</a>。
+設定コマンドは自分で考えて実機に投入し、終わったら「投入✅」にチェックを入れてください。</p>
+</blockquote>
+<h2 id="記入の観点" tabindex="-1">記入の観点 <a class="header-anchor" href="#記入の観点" aria-hidden="true">#</a></h2>
+<ul>
+<li>各ポートの<strong>モード</strong>（ルーテッド / トランク / アクセス）を確定させる（L3SWはデフォルトでswitchport。ルーテッド化が必要な箇所はどこか？）</li>
+<li>トランクには<strong>許可VLANリスト</strong>を明記する（全許可にしない）</li>
+<li>未使用ポートの扱い（shutdown）も漏れなく記入する</li>
+</ul>
+<h2 id="core1" tabindex="-1">core1 <a class="header-anchor" href="#core1" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF</th>
+<th>モード</th>
+<th>IP / 所属VLAN</th>
+<th>許可VLAN</th>
+<th>説明</th>
+<th>投入✅</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E0/1 (eth1)</td>
+<td>ルーテッド</td>
+<td>10.0.0.1/30</td>
+<td>—</td>
+<td>core2向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/2 (eth2)</td>
+<td>ルーテッド</td>
+<td>10.0.0.5/30</td>
+<td>—</td>
+<td>dist-a1向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/3 (eth3)</td>
+<td>ルーテッド</td>
+<td>10.0.0.9/30</td>
+<td>—</td>
+<td>dist-a2向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E1/0 (eth4)</td>
+<td>ルーテッド</td>
+<td>10.0.0.21/30</td>
+<td>—</td>
+<td>dist-b1向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E1/1 (eth5)</td>
+<td>ルーテッド</td>
+<td>10.0.1.29/30</td>
+<td>—</td>
+<td>fgt-edge向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>—</td>
+<td>10.255.0.1/32</td>
+<td>—</td>
+<td>ルーターID/管理</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>未使用ポート</td>
+<td>アクセス</td>
+<td>—</td>
+<td>—</td>
+<td>shutdown</td>
+<td><input type="checkbox"></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="core2" tabindex="-1">core2 <a class="header-anchor" href="#core2" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF</th>
+<th>モード</th>
+<th>IP / 所属VLAN</th>
+<th>許可VLAN</th>
+<th>説明</th>
+<th>投入✅</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E0/1 (eth1)</td>
+<td>ルーテッド</td>
+<td>10.0.0.2/30</td>
+<td>—</td>
+<td>core1向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/2 (eth2)</td>
+<td>ルーテッド</td>
+<td>10.0.0.13/30</td>
+<td>—</td>
+<td>dist-a1向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/3 (eth3)</td>
+<td>ルーテッド</td>
+<td>10.0.0.17/30</td>
+<td>—</td>
+<td>dist-a2向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E1/0 (eth4)</td>
+<td>ルーテッド</td>
+<td>10.0.0.25/30</td>
+<td>—</td>
+<td>dist-b1向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E1/1 (eth5)</td>
+<td>ルーテッド</td>
+<td>10.0.1.33/30</td>
+<td>—</td>
+<td>fgt-edge向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>—</td>
+<td>10.255.0.2/32</td>
+<td>—</td>
+<td>ルーターID/管理</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>未使用ポート</td>
+<td>アクセス</td>
+<td>—</td>
+<td>—</td>
+<td>shutdown</td>
+<td><input type="checkbox"></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="dist-a1" tabindex="-1">dist-a1 <a class="header-anchor" href="#dist-a1" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF</th>
+<th>モード</th>
+<th>IP / 所属VLAN</th>
+<th>許可VLAN</th>
+<th>説明</th>
+<th>投入✅</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E0/1 (eth1)</td>
+<td>ルーテッド</td>
+<td>10.0.0.6/30</td>
+<td>—</td>
+<td>core1向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/2 (eth2)</td>
+<td>ルーテッド</td>
+<td>10.0.0.14/30</td>
+<td>—</td>
+<td>core2向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E1/1 (eth5)</td>
+<td>トランク</td>
+<td>Po1メンバー</td>
+<td>10,20,901</td>
+<td>dist-a2向け（Po1）</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E1/2 (eth6)</td>
+<td>トランク</td>
+<td>Po1メンバー</td>
+<td>10,20,901</td>
+<td>dist-a2向け（Po1）</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/3 (eth3)</td>
+<td>トランク</td>
+<td>—</td>
+<td>10,20</td>
+<td>acc-a1向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E1/0 (eth4)</td>
+<td>トランク</td>
+<td>—</td>
+<td>10,20</td>
+<td>acc-a2向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>SVI VLAN10</td>
+<td>—</td>
+<td>10.10.10.1/24</td>
+<td>—</td>
+<td>営業部GW</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>SVI VLAN20</td>
+<td>—</td>
+<td>10.10.20.1/24</td>
+<td>—</td>
+<td>開発部GW</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>SVI VLAN901</td>
+<td>—</td>
+<td>10.10.255.1/30</td>
+<td>—</td>
+<td>OSPF隣接用</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>—</td>
+<td>10.255.0.11/32</td>
+<td>—</td>
+<td>ルーターID/管理</td>
+<td><input type="checkbox"></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="dist-a2" tabindex="-1">dist-a2 <a class="header-anchor" href="#dist-a2" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF</th>
+<th>モード</th>
+<th>IP / 所属VLAN</th>
+<th>許可VLAN</th>
+<th>説明</th>
+<th>投入✅</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E0/1 (eth1)</td>
+<td>ルーテッド</td>
+<td>10.0.0.10/30</td>
+<td>—</td>
+<td>core1向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/2 (eth2)</td>
+<td>ルーテッド</td>
+<td>10.0.0.18/30</td>
+<td>—</td>
+<td>core2向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E1/1 (eth5)</td>
+<td>トランク</td>
+<td>Po1メンバー</td>
+<td>10,20,901</td>
+<td>dist-a1向け（Po1）</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E1/2 (eth6)</td>
+<td>トランク</td>
+<td>Po1メンバー</td>
+<td>10,20,901</td>
+<td>dist-a1向け（Po1）</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/3 (eth3)</td>
+<td>トランク</td>
+<td>—</td>
+<td>10,20</td>
+<td>acc-a1向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E1/0 (eth4)</td>
+<td>トランク</td>
+<td>—</td>
+<td>10,20</td>
+<td>acc-a2向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>SVI VLAN10</td>
+<td>—</td>
+<td>10.10.10.2/24</td>
+<td>—</td>
+<td>営業部GW（Standby）</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>SVI VLAN20</td>
+<td>—</td>
+<td>10.10.20.2/24</td>
+<td>—</td>
+<td>開発部GW（Standby）</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>SVI VLAN901</td>
+<td>—</td>
+<td>10.10.255.2/30</td>
+<td>—</td>
+<td>OSPF隣接用</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>—</td>
+<td>10.255.0.12/32</td>
+<td>—</td>
+<td>ルーターID/管理</td>
+<td><input type="checkbox"></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="dist-b1" tabindex="-1">dist-b1 <a class="header-anchor" href="#dist-b1" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF</th>
+<th>モード</th>
+<th>IP / 所属VLAN</th>
+<th>許可VLAN</th>
+<th>説明</th>
+<th>投入✅</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E0/1 (eth1)</td>
+<td>ルーテッド</td>
+<td>10.0.0.22/30</td>
+<td>—</td>
+<td>core1向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/2 (eth2)</td>
+<td>ルーテッド</td>
+<td>10.0.0.26/30</td>
+<td>—</td>
+<td>core2向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E1/1 (eth5)</td>
+<td>トランク</td>
+<td>Po1メンバー</td>
+<td>30,99</td>
+<td>acc-b1向け（Po1）</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E1/2 (eth6)</td>
+<td>トランク</td>
+<td>Po1メンバー</td>
+<td>30,99</td>
+<td>acc-b1向け（Po1）</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>SVI VLAN30</td>
+<td>—</td>
+<td>10.20.30.254/24</td>
+<td>—</td>
+<td>サーバGW</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>SVI VLAN99</td>
+<td>—</td>
+<td>10.20.99.254/24</td>
+<td>—</td>
+<td>運用管理GW</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>—</td>
+<td>10.255.0.21/32</td>
+<td>—</td>
+<td>ルーターID/管理</td>
+<td><input type="checkbox"></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="acc-a1--acc-a2--acc-b1" tabindex="-1">acc-a1 / acc-a2 / acc-b1 <a class="header-anchor" href="#acc-a1--acc-a2--acc-b1" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>機器</th>
+<th>IF</th>
+<th>モード</th>
+<th>所属VLAN / 許可VLAN</th>
+<th>説明</th>
+<th>投入✅</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>acc-a1</td>
+<td>E0/1 (eth1)</td>
+<td>トランク</td>
+<td>VLAN 10,20</td>
+<td>dist-a1向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>acc-a1</td>
+<td>E0/2 (eth2)</td>
+<td>トランク</td>
+<td>VLAN 10,20</td>
+<td>dist-a2向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>acc-a1</td>
+<td>E0/3 (eth3)</td>
+<td>アクセス</td>
+<td>VLAN 10</td>
+<td>pc-sales収容</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>acc-a2</td>
+<td>E0/1 (eth1)</td>
+<td>トランク</td>
+<td>VLAN 10,20</td>
+<td>dist-a1向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>acc-a2</td>
+<td>E0/2 (eth2)</td>
+<td>トランク</td>
+<td>VLAN 10,20</td>
+<td>dist-a2向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>acc-a2</td>
+<td>E0/3 (eth3)</td>
+<td>アクセス</td>
+<td>VLAN 20</td>
+<td>pc-dev収容</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>acc-b1</td>
+<td>E0/1 (eth1)</td>
+<td>トランク</td>
+<td>Po1メンバー (VLAN 30,99)</td>
+<td>dist-b1向け（Po1）</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>acc-b1</td>
+<td>E0/2 (eth2)</td>
+<td>トランク</td>
+<td>Po1メンバー (VLAN 30,99)</td>
+<td>dist-b1向け（Po1）</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>acc-b1</td>
+<td>E0/3 (eth3)</td>
+<td>アクセス</td>
+<td>VLAN 30</td>
+<td>srv-portal収容</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>acc-b1</td>
+<td>E1/0 (eth4)</td>
+<td>アクセス</td>
+<td>VLAN 30</td>
+<td>srv-file収容</td>
+<td><input type="checkbox"></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="fgt-edgecisco-iol-hq-vpn-edge" tabindex="-1">fgt-edge（Cisco IOL HQ VPN edge） <a class="header-anchor" href="#fgt-edgecisco-iol-hq-vpn-edge" aria-hidden="true">#</a></h2>
+<blockquote>
+<p>2026-06-26時点では、FortiGate VMのinvalid license/転送制限疑いを切り分けるため、<code>fgt-edge</code> の実体を Cisco IOL (<code>L2-advipservices-2017</code>) に置換している。ノード名は既存図・リンク互換のため維持する。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Cisco IF</th>
+<th>clab IF</th>
+<th>IP</th>
+<th>役割</th>
+<th>投入✅</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E0/0</td>
+<td>eth0</td>
+<td>DHCP/自動割当</td>
+<td>clab管理</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/1</td>
+<td>eth1</td>
+<td>200.0.1.1/24</td>
+<td>WAN / ISP向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/2</td>
+<td>eth2</td>
+<td>10.0.1.30/30</td>
+<td>core1向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/3</td>
+<td>eth3</td>
+<td>10.0.1.34/30</td>
+<td>core2向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>Tunnel1</td>
+<td>—</td>
+<td>172.16.40.1/30</td>
+<td>br-edge向けIPsec VTI</td>
+<td><input type="checkbox"></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="isp--br-edge" tabindex="-1">isp / br-edge <a class="header-anchor" href="#isp--br-edge" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>機器</th>
+<th>IF</th>
+<th>IP</th>
+<th>説明</th>
+<th>投入✅</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>isp</td>
+<td>E0/1 (eth1)</td>
+<td>200.0.1.254/24</td>
+<td>fgt-edge向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>isp</td>
+<td>E0/2 (eth2)</td>
+<td>200.0.3.254/24</td>
+<td>br-edge向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>isp</td>
+<td>Loopback0</td>
+<td>8.8.8.8/32</td>
+<td>インターネット模擬宛先</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>br-edge</td>
+<td>E0/1 (eth1)</td>
+<td>200.0.3.1/24</td>
+<td>ISP向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>br-edge</td>
+<td>E0/2 (eth2)</td>
+<td>10.2.40.254/24</td>
+<td>支社LAN GW</td>
+<td><input type="checkbox"></td>
+</tr>
+</tbody>
+</table></div>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#記入の観点">記入の観点</a></li>
+<li class="lvl-2"><a href="#core1">core1</a></li>
+<li class="lvl-2"><a href="#core2">core2</a></li>
+<li class="lvl-2"><a href="#dist-a1">dist-a1</a></li>
+<li class="lvl-2"><a href="#dist-a2">dist-a2</a></li>
+<li class="lvl-2"><a href="#dist-b1">dist-b1</a></li>
+<li class="lvl-2"><a href="#acc-a1--acc-a2--acc-b1">acc-a1 / acc-a2 / acc-b1</a></li>
+<li class="lvl-2"><a href="#fgt-edgecisco-iol-hq-vpn-edge">fgt-edge（Cisco IOL HQ VPN edge）</a></li>
+<li class="lvl-2"><a href="#isp--br-edge">isp / br-edge</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

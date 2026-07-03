@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>構築ログ — テーマZERO Phase 0（土台）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>04_構築</span></nav>
+      <h1 class="doc-title">構築ログ — テーマZERO Phase 0（土台）</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">build-log</span><span class="tag">ZERO_zero_trust</span><span class="tag">phase0</span></span>
+      </div>
+      
+      <div class="content">
+<h2 id="日付-2026-07-04" tabindex="-1">日付: 2026-07-04 <a class="header-anchor" href="#日付-2026-07-04" aria-hidden="true">#</a></h2>
+<h2 id="実施者-claude実行環境-claborb-vm-経由" tabindex="-1">実施者: Claude（実行環境: clab@orb VM 経由） <a class="header-anchor" href="#実施者-claude実行環境-claborb-vm-経由" aria-hidden="true">#</a></h2>
+<h3 id="1-トポロジのデプロイ" tabindex="-1">1. トポロジのデプロイ <a class="header-anchor" href="#1-トポロジのデプロイ" aria-hidden="true">#</a></h3>
+<p><code>ZERO_zero_trust/04_構築/phase0_base/zt-base.clab.yml</code> + <code>deploy.sh</code> を作成し、VM 上でデプロイした。</p>
+<pre><code class="language-bash">ssh clab@orb <span class="hljs-string">&quot;cd &#x27;/Users/shuya/Documents/claude/Mac仮想環境構築/ZERO_zero_trust/04_構築/phase0_base&#x27; &amp;&amp; ./deploy.sh deploy&quot;</span>
+</code></pre>
+<p>結果（抜粋、最終成功時）:</p>
+<pre><code class="language-text">01:47:37 INFO Containerlab started version=0.77.0
+01:47:37 INFO Creating docker network name=zt-base-mgmt IPv4 subnet=172.30.99.0/24
+01:47:37 INFO Creating container name=external
+01:47:37 INFO Creating container name=app
+01:47:37 INFO Creating container name=client
+01:47:37 INFO Created link: client:eth1 ▪┄┄▪ zt-untrust:untrust-eth1
+01:47:37 INFO Created link: app:eth1 ▪┄┄▪ zt-trust:trust-eth1
+01:47:37 INFO Created link: external:eth1 ▪┄┄▪ zt-untrust:untrust-eth2
+...
+│ clab-zt-base-app      │ linux │ running │ 172.30.99.21 │
+│ clab-zt-base-client   │ linux │ running │ 172.30.99.11 │
+│ clab-zt-base-external │ linux │ running │ 172.30.99.12 │
+</code></pre>
+<h3 id="2-t-0-1t-0-4-疎通試験" tabindex="-1">2. T-0-1〜T-0-4 疎通試験 <a class="header-anchor" href="#2-t-0-1t-0-4-疎通試験" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-comment"># T-0-1</span>
+docker ps --format <span class="hljs-string">&#x27;table {{.Names}}\t{{.Status}}&#x27;</span> | grep clab-zt-base
+<span class="hljs-comment"># → 3ノードとも Up</span>
+
+<span class="hljs-comment"># T-0-2</span>
+docker <span class="hljs-built_in">exec</span> clab-zt-base-client ping -c3 172.30.20.21
+<span class="hljs-comment"># → 3 packets transmitted, 3 received, 0% packet loss</span>
+
+<span class="hljs-comment"># T-0-3</span>
+docker <span class="hljs-built_in">exec</span> clab-zt-base-client curl -sS -i http://172.30.20.21/
+<span class="hljs-comment"># → HTTP/1.1 200 OK, body: WBITT Network MultiTool (with NGINX) - app - ...</span>
+
+<span class="hljs-comment"># T-0-4</span>
+docker <span class="hljs-built_in">exec</span> clab-zt-base-client ip -4 addr show eth1
+<span class="hljs-comment"># → inet 172.30.0.11/24 (Untrust)</span>
+docker <span class="hljs-built_in">exec</span> clab-zt-base-app ip -4 addr show eth1
+<span class="hljs-comment"># → inet 172.30.20.21/24 (Trust)</span>
+</code></pre>
+<p>すべて合格。詳細は <a href="../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E7%B5%90%E6%9E%9C_2026-07-04.html">試験結果_2026-07-04</a>。</p>
+<h3 id="3-規約ビルド確認t-0-5" tabindex="-1">3. 規約ビルド確認（T-0-5） <a class="header-anchor" href="#3-規約ビルド確認t-0-5" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">cd</span> <span class="hljs-string">&quot;/Users/shuya/Documents/claude/Mac仮想環境構築&quot;</span> &amp;&amp; node 規約/ビルド/build.mjs --check
+</code></pre>
+<p>結果: 本テーマ (ZERO_zero_trust) 起因のエラーなし。既存の他テーマ由来 NFD ファイル名警告のみ残存（本タスクの対象範囲外、対処せず）。</p>
+<h3 id="n-トラブルシューティングメモ" tabindex="-1">N. トラブルシューティングメモ <a class="header-anchor" href="#n-トラブルシューティングメモ" aria-hidden="true">#</a></h3>
+<ul>
+<li>
+<p><strong>問題1</strong>: <code>zt-base.clab.yml</code> の <code>links</code> で両方の bridge ノードに <code>eth1</code> を使ったところ、containerlab がホストのルートネームスペース上でエンドポイント名の重複を検出しエラー（<code>Root network namespace endpoint &quot;eth1&quot; defined by multiple nodes</code>）。</p>
+<ul>
+<li>原因: <code>kind: bridge</code> ノードの Link エンドポイント名はホスト側インターフェース名として扱われ、ラボ内で一意である必要がある。</li>
+<li>対処: <code>zt-untrust:untrust-eth1</code> / <code>zt-untrust:untrust-eth2</code> / <code>zt-trust:trust-eth1</code> のように bridge ごとに接頭辞を付けて一意化した。</li>
+</ul>
+</li>
+<li>
+<p><strong>問題2（本質的な設計課題）</strong>: <code>client</code> → <code>app</code> の ping が <code>100% packet loss</code> で失敗（T-0-2 初回失敗）。</p>
+<ul>
+<li>原因: 論理構成設計どおり <code>zt-untrust</code>（client/external 所属）と <code>zt-trust</code>（app 所属）を別々の Linux bridge（<code>kind: bridge</code>）として完全分離した。Linux bridge は L2 スイッチに過ぎずルーティング機能を持たないため、別サブネット（172.30.0.0/24 と 172.30.20.0/24）間は経路が存在せず疎通しない。これは設計書の「Untrust→Trust 直通禁止」を意図通り体現した状態だが、Phase 0 のゲート条件（<code>client</code>→<code>app</code> 疎通）と両立しない。</li>
+<li>設計判断: 論理構成設計に「Phase 0 では <code>client</code>→<code>app</code> 疎通はゲート確認のための設計上の許可経路」と明記されているため、Phase 0 限定でホスト L3 中継を追加した。具体的には <code>deploy.sh</code> の <code>create_bridges</code> で各 bridge に IP アドレス管理表の GW IP（<code>zt-untrust</code>=172.30.0.1, <code>zt-trust</code>=172.30.20.1）を付与し、<code>net.ipv4.ip_forward=1</code> を有効化。各ノードの <code>exec</code> に相手ゾーンサブネットへの静的経路（<code>ip route add &lt;相手サブネット&gt; via &lt;自ゾーン GW&gt; dev eth1</code>）を追加した。</li>
+<li>該当箇所: <code>deploy.sh</code> の <code>create_bridges()</code>、<code>zt-base.clab.yml</code> の <code>client</code>/<code>app</code> ノードの <code>exec</code> 末尾。</li>
+<li>Phase 2 以降の扱い: この暫定中継は関所（Pomerium/oauth2-proxy）が入った時点で撤去し、Untrust→Trust は関所経由の転送のみに置き換える前提（試験結果ファイルの「残課題」に記載）。</li>
+</ul>
+</li>
+<li>
+<p><strong>問題3</strong>: <code>deploy.sh destroy</code> 後もホストの <code>zt-untrust</code> / <code>zt-trust</code> ブリッジが残存。</p>
+<ul>
+<li>原因: <code>remove_bridges()</code> が <code>BRIDGES</code> 配列（<code>&quot;zt-untrust:172.30.0.1/24&quot;</code> 形式）をパースせず、そのまま <code>ip link show</code> / <code>ip link del</code> に渡していたため対象が見つからず削除に失敗していた。</li>
+<li>対処: <code>remove_bridges()</code> にも <code>create_bridges()</code> と同じ <code>${entry%%:*}</code> パースを追加し、ブリッジ名のみを抽出するよう修正。修正後の <code>destroy</code> で正常にブリッジが削除されることを確認。</li>
+</ul>
+</li>
+</ul>
+<h3 id="4-撤収" tabindex="-1">4. 撤収 <a class="header-anchor" href="#4-撤収" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">ssh clab@orb <span class="hljs-string">&quot;cd &#x27;/Users/shuya/Documents/claude/Mac仮想環境構築/ZERO_zero_trust/04_構築/phase0_base&#x27; &amp;&amp; ./deploy.sh destroy&quot;</span>
+</code></pre>
+<p>結果: 3コンテナ削除、<code>zt-base-mgmt</code> docker network 削除、<code>zt-untrust</code>/<code>zt-trust</code> ホストブリッジ削除まで確認済み。VM はクリーンな状態。</p>
+<h3 id="5-学習ポイント" tabindex="-1">5. 学習ポイント <a class="header-anchor" href="#5-学習ポイント" aria-hidden="true">#</a></h3>
+<ul>
+<li>containerlab の <code>kind: bridge</code> は「既存の Linux bridge に接続する」だけの機能で、<code>docker network create</code> のようなサブネット管理・IP 自動割当は行わない。ゾーン間の GW/ルーティングは呼び出し側（<code>deploy.sh</code> や host 設定）が明示的に用意する必要がある。</li>
+<li>論理構成設計書が言う「docker bridge によるゾーン分離」を containerlab 上でそのまま再現すると、ブリッジ間は完全に非到達になる。「Untrust→Trust 直通禁止」という本番の目的と、「Phase 0 でゲート確認のため疎通させる」という一時的な要求は、設計時点では両立しないことがあり、実装時に「暫定経路として作り、次 Phase で本来の関所に置き換える」という位置づけを明示する判断が必要だった。</li>
+<li><code>bridge</code> kind のリンクエンドポイント名はホストのネームスペースに直接現れるため、他ラボ・他テーマとの名前衝突を避ける接頭辞規約（<code>&lt;bridge名&gt;-ethN</code> 等）が必要。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#日付-2026-07-04">日付: 2026-07-04</a></li>
+<li class="lvl-2"><a href="#実施者-claude実行環境-claborb-vm-経由">実施者: Claude（実行環境: clab@orb VM 経由）</a></li>
+<li class="lvl-3"><a href="#1-トポロジのデプロイ">1. トポロジのデプロイ</a></li>
+<li class="lvl-3"><a href="#2-t-0-1t-0-4-疎通試験">2. T-0-1〜T-0-4 疎通試験</a></li>
+<li class="lvl-3"><a href="#3-規約ビルド確認t-0-5">3. 規約ビルド確認（T-0-5）</a></li>
+<li class="lvl-3"><a href="#n-トラブルシューティングメモ">N. トラブルシューティングメモ</a></li>
+<li class="lvl-3"><a href="#4-撤収">4. 撤収</a></li>
+<li class="lvl-3"><a href="#5-学習ポイント">5. 学習ポイント</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

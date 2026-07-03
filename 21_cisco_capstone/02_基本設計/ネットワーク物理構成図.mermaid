@@ -1,0 +1,44 @@
+graph TD
+  subgraph 外部ネットワーク
+    ISP[ISP ルーター]
+  end
+
+  subgraph 本社拠点_Headquarters
+    HQE1[HQ-Edge1\nCisco L3ルーター]
+    HQE2[HQ-Edge2\nCisco L3ルーター]
+    HQC1[HQ-Core1\nCisco L3スイッチ]
+    HQC2[HQ-Core2\nCisco L3スイッチ]
+    HQPC[HQ-PC-Sales\n営業部PC]
+  end
+
+  subgraph 支社拠点_Branch
+    BRE[BR-Edge\nCisco L3ルーター]
+    BRPC[BR-PC\n支社PC]
+  end
+
+  %% ISP Connections WAN
+  ISP -- e0/1(eth1) ⇔ e0/1(eth1) --- HQE1
+  ISP -- e0/2(eth2) ⇔ e0/1(eth1) --- HQE2
+  ISP -- e0/3(eth3) ⇔ e0/1(eth1) --- BRE
+
+  %% HQ Edge to Core Connections LAN L3/L2
+  HQE1 -- e0/2(eth2) ⇔ e0/1(eth1) --- HQC1
+  HQE1 -- e0/3(eth3) ⇔ e0/1(eth1) --- HQC2
+  HQE2 -- e0/2(eth2) ⇔ e0/2(eth2) --- HQC1
+  HQE2 -- e0/3(eth3) ⇔ e0/2(eth2) --- HQC2
+
+  %% HQ Core to Core Connections EtherChannel / Trunk
+  HQC1 -- e1/1(eth5) ⇔ e1/1(eth5) --- HQC2
+  HQC1 -- e1/2(eth6) ⇔ e1/2(eth6) --- HQC2
+  
+  %% Access Connections
+  HQC1 -- e1/3(eth7) ⇔ eth1 --- HQPC
+  BRE -- e0/2(eth2) ⇔ eth1 --- BRPC
+
+  classDef external fill:#f9f9f9,stroke:#333,stroke-width:2px,color:#000;
+  classDef hq fill:#e1f5fe,stroke:#0277bd,stroke-width:2px,color:#000;
+  classDef branch fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000;
+  
+  class ISP external;
+  class HQE1,HQE2,HQC1,HQC2,HQPC hq;
+  class BRE,BRPC branch;

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>VPN代替案: 既存imageでの実装優先順位</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ロードマップ</span>
+<span class="sep">/</span>
+<span>tech_notes</span></nav>
+      <h1 class="doc-title">VPN代替案: 既存imageでの実装優先順位</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="2026-06-26-実施結果--完了" tabindex="-1">【2026-06-26 実施結果 — 完了】 <a class="header-anchor" href="#2026-06-26-実施結果--完了" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>fgt-edge を Cisco IOL に置換し、T-105(br-pc→srv-portal) を開通させた</strong>（ping 4/4・HTTP 200・ESP暗号化確認）。詳細: <code>../切り分け/fortigate_cisco_swap_RESOLVED_2026-06-26.md</code>。</li>
+<li><strong>重要な訂正</strong>: 下表ランキング1位の <code>cisco_iol:15.7.3M2</code> は <strong>このARM64ホストでは起動しない</strong>（System Config Dialogハング。<code>../22_enterprise_campus_lan/環境_土台再構築_2026-06-15.md</code> §6）。
+→ <strong>実際に使ったのは <code>cisco_iol:L2-advipservices-2017</code></strong>（唯一の実証済みL3 IOL、br-edge/core/distと同一）。<code>no ip cef</code> でCEF-transit-VTIクセを回避。</li>
+<li><strong>永続性の注意</strong>: イメージの <code>entrypoint.sh</code> が iouyap を起動しないため、再デプロイ/再起動でデータプレーンが死ぬ。恒久対策は entrypoint修正＋イメージ再ビルド（修正版は <code>~/vrnetlab/cisco/iol/docker/entrypoint.sh</code>）。</li>
+</ul>
+<h2 id="結論" tabindex="-1">結論 <a class="header-anchor" href="#結論" aria-hidden="true">#</a></h2>
+<ul>
+<li>最短で成功体験を作るなら <code>vrnetlab/cisco_iol:15.7.3M2</code> でCiscoルーター同士のIPsec VPNを組む。</li>
+<li>今回のFortiGate x Cisco構成は、IKE/IPsec自体は成立するが、FortiGate側で復号済みLAN間パケットがforward policy/session/egressに進まない。</li>
+<li>FortiGateを続ける場合は、先にライセンス有効状態または別FortiOS版で比較する。</li>
+</ul>
+<h2 id="推奨ランキング" tabindex="-1">推奨ランキング <a class="header-anchor" href="#推奨ランキング" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:right">rank</th>
+<th>image</th>
+<th>使い方</th>
+<th>採用理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right">1</td>
+<td><code>vrnetlab/cisco_iol:15.7.3M2</code></td>
+<td>Cisco-Cisco IPsec</td>
+<td>軽い、既存ラボあり、まずT-105相当を通すのに最短</td>
+</tr>
+<tr>
+<td style="text-align:right">2</td>
+<td><code>vrnetlab/cisco_csr1000v:17.03.05</code></td>
+<td>IOS XE IPsec</td>
+<td>実機寄りでIPsec検証に強い</td>
+</tr>
+<tr>
+<td style="text-align:right">3</td>
+<td><code>vrnetlab/cisco_asav:9-18-1</code></td>
+<td>FW型VPN代替</td>
+<td>FortiGateのFW役割をCisco ASAで代替可能</td>
+</tr>
+<tr>
+<td style="text-align:right">4</td>
+<td><code>vrnetlab/cisco_vios:159-3.M6</code></td>
+<td>IOS系比較</td>
+<td>IOL以外のCisco比較候補</td>
+</tr>
+<tr>
+<td style="text-align:right">5</td>
+<td><code>vrnetlab/juniper_vsrx:24.4R1.9</code></td>
+<td>マルチベンダーVPN</td>
+<td>Forti以外のFW/VPN装置として有力</td>
+</tr>
+<tr>
+<td style="text-align:right">6</td>
+<td><code>vrnetlab/mikrotik_routeros:7.5</code></td>
+<td>軽量IPsec</td>
+<td>小さく試せるが学習軸はCisco/Fortiから外れる</td>
+</tr>
+<tr>
+<td style="text-align:right">7</td>
+<td><code>vrnetlab/vr-fortios:7.4.2.F</code></td>
+<td>Forti再検証</td>
+<td>今回の未解決個体。invalid license制限が疑い</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="次の実装候補" tabindex="-1">次の実装候補 <a class="header-anchor" href="#次の実装候補" aria-hidden="true">#</a></h2>
+<ul>
+<li><code>14_cisco_ipsec_vpn</code> をベースに、HQ <code>10.20.30.0/24</code> と支社 <code>10.2.40.0/24</code> のLAN間VPNへ拡張する。</li>
+<li>成功後、テーマ22の <code>fgt-edge</code> を一時的にCisco VPN edgeへ置換する比較トポロジを作る。</li>
+<li>FortiGate再挑戦は、ライセンス有効化または別FortiOS build確認後に行う。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li>詳細な切り分け記録: <code>../切り分け/fortigate_cisco_ipsec_transit_unresolved_2026-06-26.md</code></li>
+<li>Fortinet KB: <a href="https://community.fortinet.com/fortigate-3/troubleshooting-tip-error-no-route-exists-from-source-address-with-policy-matching-194132">https://community.fortinet.com/fortigate-3/troubleshooting-tip-error-no-route-exists-from-source-address-with-policy-matching-194132</a></li>
+<li>Fortinet Docs: <a href="https://docs.fortinet.com/document/fortigate/6.4.0/administration-guide/239039/dynamic-tunnel-interface-creation">https://docs.fortinet.com/document/fortigate/6.4.0/administration-guide/239039/dynamic-tunnel-interface-creation</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#2026-06-26-実施結果--完了">【2026-06-26 実施結果 — 完了】</a></li>
+<li class="lvl-2"><a href="#結論">結論</a></li>
+<li class="lvl-2"><a href="#推奨ランキング">推奨ランキング</a></li>
+<li class="lvl-2"><a href="#次の実装候補">次の実装候補</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

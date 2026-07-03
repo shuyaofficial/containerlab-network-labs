@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜IPアドレス管理表</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>02_基本設計</span></nav>
+      <h1 class="doc-title">テーマZERO｜IPアドレス管理表</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">ip-table</span><span class="tag">docker</span><span class="tag">subnet</span><span class="tag">arm64</span></span>
+      </div>
+      
+      <div class="content">
+<p>Phase 0-6 の全予定ノードのアドレス割当を1点に集約する。<strong>このファイルがアドレスの唯一の正</strong>（他文書は参照する）。
+<a href="%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88%E6%9B%B8.html">基本設計書</a> のゾーン設計と整合させる。今回デプロイするのは Phase 0（<code>client</code> / <code>app</code> / <code>external</code>）のみで、Phase 1-6 は設計値（実装時に確定）。</p>
+<h2 id="管理サブネット" tabindex="-1">管理サブネット <a class="header-anchor" href="#管理サブネット" aria-hidden="true">#</a></h2>
+<p>プライベート <code>172.30.0.0/16</code> をラボ専用に確保し、ゾーンごとに <code>/24</code> を切る。第3オクテット（10 の位）でゾーンを識別する。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ゾーン</th>
+<th>bridge 名</th>
+<th>サブネット</th>
+<th>GW</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Untrust</td>
+<td><code>zt-untrust</code></td>
+<td>172.30.0.0/24</td>
+<td>172.30.0.1</td>
+<td>端末側。信頼しない</td>
+</tr>
+<tr>
+<td>DMZ（認可層）</td>
+<td><code>zt-dmz</code></td>
+<td>172.30.10.0/24</td>
+<td>172.30.10.1</td>
+<td>認証・認可・検査の関所</td>
+</tr>
+<tr>
+<td>Trust（業務）</td>
+<td><code>zt-trust</code></td>
+<td>172.30.20.0/24</td>
+<td>172.30.20.1</td>
+<td>保護対象サービス</td>
+</tr>
+<tr>
+<td>可観測</td>
+<td><code>zt-obs</code></td>
+<td>172.30.30.0/24</td>
+<td>172.30.30.1</td>
+<td>ログ集約・可視化</td>
+</tr>
+</tbody>
+</table></div>
+<p>アドレス採番規則:</p>
+<ul>
+<li>第4オクテットの 10 番台=ID/認可系、20 番台=IAP/アプリ系、30 番台=検査/CA系、40 番台=SIEM系（ゾーン内で役割を識別）。</li>
+<li>名前解決は docker 組み込み DNS（サービス名）を基本とし、IP は補助。</li>
+<li>Phase 1-6 のアドレスは<strong>予定値</strong>。実装時に本表を確定値へ更新する。</li>
+</ul>
+<h2 id="ノード一覧表phase-0-6" tabindex="-1">ノード一覧表（Phase 0-6） <a class="header-anchor" href="#ノード一覧表phase-0-6" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>ノード名</th>
+<th>観点 / 役割</th>
+<th>ゾーン</th>
+<th>サブネット</th>
+<th>予定 IP</th>
+<th>multi-home</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>client</td>
+<td>利用者端末（multitool）</td>
+<td>Untrust</td>
+<td>172.30.0.0/24</td>
+<td>172.30.0.11</td>
+<td>−</td>
+<td>今回デプロイ</td>
+</tr>
+<tr>
+<td>0</td>
+<td>external</td>
+<td>外部/未管理端末（multitool）</td>
+<td>Untrust</td>
+<td>172.30.0.0/24</td>
+<td>172.30.0.12</td>
+<td>−</td>
+<td>今回デプロイ。SWG 検証の外部先</td>
+</tr>
+<tr>
+<td>0</td>
+<td>app</td>
+<td>保護対象サービス（multitool）</td>
+<td>Trust</td>
+<td>172.30.20.0/24</td>
+<td>172.30.20.21</td>
+<td>−</td>
+<td>今回デプロイ</td>
+</tr>
+<tr>
+<td>1</td>
+<td>keycloak</td>
+<td>ID統制（OIDC IdP）</td>
+<td>DMZ</td>
+<td>172.30.10.0/24</td>
+<td>172.30.10.11</td>
+<td>−</td>
+<td>設計値。内蔵 DB</td>
+</tr>
+<tr>
+<td>2</td>
+<td>pomerium</td>
+<td>NWセキュリティ（IAP）</td>
+<td>DMZ</td>
+<td>172.30.10.0/24</td>
+<td>172.30.10.21</td>
+<td>✅ Untrust/Trust</td>
+<td>設計値。関所。oauth2-proxy から起点</td>
+</tr>
+<tr>
+<td>2</td>
+<td>oauth2-proxy</td>
+<td>NWセキュリティ（IAP 起点）</td>
+<td>DMZ</td>
+<td>172.30.10.0/24</td>
+<td>172.30.10.22</td>
+<td>✅ Untrust/Trust</td>
+<td>設計値。最小の未認証拒否で先行</td>
+</tr>
+<tr>
+<td>4</td>
+<td>mitmproxy</td>
+<td>WEB(4)+DLP(5) 兼務（SWG）</td>
+<td>DMZ</td>
+<td>172.30.10.0/24</td>
+<td>172.30.10.31</td>
+<td>✅ Untrust</td>
+<td>設計値。SSL bump。DLP アドオン同居</td>
+</tr>
+<tr>
+<td>4</td>
+<td>squid</td>
+<td>WEB 代替（SSL bump）</td>
+<td>DMZ</td>
+<td>172.30.10.0/24</td>
+<td>172.30.10.32</td>
+<td>✅ Untrust</td>
+<td>設計値。mitmproxy 一本化なら不使用</td>
+</tr>
+<tr>
+<td>4</td>
+<td>suricata</td>
+<td>WEB 代替（IDS）</td>
+<td>DMZ</td>
+<td>172.30.10.0/24</td>
+<td>172.30.10.33</td>
+<td>−</td>
+<td>設計値。arm64 不可なら代替</td>
+</tr>
+<tr>
+<td>6</td>
+<td>step-ca</td>
+<td>デバイス統制（mTLS / posture）</td>
+<td>DMZ</td>
+<td>172.30.10.0/24</td>
+<td>172.30.10.41</td>
+<td>−</td>
+<td>設計値。証明書発行・posture モック</td>
+</tr>
+<tr>
+<td>3</td>
+<td>loki</td>
+<td>SIEM（ログ保存）</td>
+<td>可観測</td>
+<td>172.30.30.0/24</td>
+<td>172.30.30.41</td>
+<td>−</td>
+<td>設計値。軽量先行</td>
+</tr>
+<tr>
+<td>3</td>
+<td>promtail</td>
+<td>SIEM（ログ収集）</td>
+<td>可観測</td>
+<td>172.30.30.0/24</td>
+<td>172.30.30.42</td>
+<td>−</td>
+<td>設計値。各ノードのログを Loki へ</td>
+</tr>
+<tr>
+<td>3</td>
+<td>grafana</td>
+<td>SIEM（可視化）</td>
+<td>可観測</td>
+<td>172.30.30.0/24</td>
+<td>172.30.30.43</td>
+<td>−</td>
+<td>設計値。Loki データソース</td>
+</tr>
+<tr>
+<td>6+</td>
+<td>wazuh-manager</td>
+<td>SIEM 発展（統合 SIEM/EDR）</td>
+<td>可観測</td>
+<td>172.30.30.0/24</td>
+<td>172.30.30.44</td>
+<td>−</td>
+<td>発展。2-4GB 級。要検証（D-4）</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>multi-home の関所（Pomerium / oauth2-proxy）は DMZ を主所属とし、Untrust（受信）と Trust（<code>app</code> への転送）に足を持つ。Trust 側の補助 IP は 172.30.20.x を実装時に採番する。</li>
+<li>mitmproxy / squid は Untrust に足を持ち、<code>client</code> の外向き通信を横取りする。</li>
+</ul>
+<h2 id="ホストポート公開vm-から到達させる予定ポート" tabindex="-1">ホストポート公開（VM から到達させる予定ポート） <a class="header-anchor" href="#ホストポート公開vm-から到達させる予定ポート" aria-hidden="true">#</a></h2>
+<p>VM <code>clab</code> のホストポートにマップして管理 UI 等へ到達させる。<strong>ポート・認証情報は各 Phase 実装時に確定</strong>（<a href="../00_%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3/%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89.html">ログインコマンド.md</a> と同期）。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>ノード</th>
+<th>予定ホストポート</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>keycloak</td>
+<td>8080</td>
+<td>管理画面 / token endpoint</td>
+</tr>
+<tr>
+<td>2</td>
+<td>pomerium / oauth2-proxy</td>
+<td>実装時に確定</td>
+<td>保護対象 app への入口</td>
+</tr>
+<tr>
+<td>3</td>
+<td>grafana</td>
+<td>3000</td>
+<td>ダッシュボード</td>
+</tr>
+<tr>
+<td>4</td>
+<td>mitmproxy</td>
+<td>8081</td>
+<td>mitmweb UI</td>
+</tr>
+<tr>
+<td>6</td>
+<td>step-ca</td>
+<td>9000</td>
+<td>ACME / 証明書発行</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="割当ルール今後の追加ノード向け" tabindex="-1">割当ルール（今後の追加ノード向け） <a class="header-anchor" href="#割当ルール今後の追加ノード向け" aria-hidden="true">#</a></h2>
+<ul>
+<li>新ノードはまず所属ゾーンを決め、その <code>/24</code> 内で役割帯（10/20/30/40 番台）から採番する。</li>
+<li>1ノードが複数ゾーンに足を持つ場合、主所属ゾーンの IP を代表とし、補助 IP は備考に記す。</li>
+<li>予定値から確定値に変わったら、備考の「設計値」を消し、<code>date</code> を更新する。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88%E6%9B%B8.html">基本設計書</a></li>
+<li><a href="%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a></li>
+<li><a href="%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a></li>
+<li><a href="../00_%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3/%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89.html">ログインコマンド</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#管理サブネット">管理サブネット</a></li>
+<li class="lvl-2"><a href="#ノード一覧表phase-0-6">ノード一覧表（Phase 0-6）</a></li>
+<li class="lvl-2"><a href="#ホストポート公開vm-から到達させる予定ポート">ホストポート公開（VM から到達させる予定ポート）</a></li>
+<li class="lvl-2"><a href="#割当ルール今後の追加ノード向け">割当ルール（今後の追加ノード向け）</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

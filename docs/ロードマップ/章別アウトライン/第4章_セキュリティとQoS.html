@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>第4章: セキュリティ / QoS（◐ 実施中：13✅ / 14◐ / 15⬜）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ロードマップ</span>
+<span class="sep">/</span>
+<span>章別アウトライン</span></nav>
+      <h1 class="doc-title">第4章: セキュリティ / QoS（◐ 実施中：13✅ / 14◐ / 15⬜）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>社内LANを「守る」「品質を担保する」層。境界フィルタ・アドレス変換から、
+拠点間VPN（キャプストンの本社⇔支社接続の核）、優先制御までを扱う。</p>
+</blockquote>
+<hr>
+<h2 id="-章の狙い" tabindex="-1">🎯 章の狙い <a class="header-anchor" href="#-章の狙い" aria-hidden="true">#</a></h2>
+<ul>
+<li>ACL で通信を許可/拒否し、NAT(PAT) で内部アドレスを隠して外に出す</li>
+<li>IPsec でサイト間を暗号化接続できる（<strong>キャプストンの拠点間VPNの核</strong>）</li>
+<li>TLS の役割（どこで何を守るか）を概観できる</li>
+<li>QoS/DiffServ で音声・業務トラフィックを優先制御できる</li>
+</ul>
+<h2 id="前提" tabindex="-1">前提 <a class="header-anchor" href="#前提" aria-hidden="true">#</a></h2>
+<ul>
+<li>第1章（境界ルータ/BGP）、第2章（VLAN/L3SW）、第3章（サービス）</li>
+</ul>
+<hr>
+<h2 id="-テーマ一覧" tabindex="-1">📋 テーマ一覧 <a class="header-anchor" href="#-テーマ一覧" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>タイトル</th>
+<th>狙い</th>
+<th>対応RFC</th>
+<th>難易度</th>
+<th>到達条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>13</td>
+<td>ACL / NAT(PAT) / ポートセキュリティ</td>
+<td>標準/拡張ACL、PAT、L2ポート保護</td>
+<td>Cisco（補完）</td>
+<td>初〜中級</td>
+<td>内部→外部のみPATで疎通、不要通信をACL遮断、未許可MACをポートで遮断</td>
+</tr>
+<tr>
+<td>14</td>
+<td>IPsec サイト間VPN ＋ TLS概観</td>
+<td>IKE/ESPでトンネル、暗号化疎通。TLS1.2/1.3の位置づけ</td>
+<td><code>rfc4301</code> <code>rfc4303</code> / <code>rfc5246</code> <code>rfc8446</code></td>
+<td>中級</td>
+<td>2拠点間でIPsecトンネルUP、暗号化された往復疎通を確認</td>
+</tr>
+<tr>
+<td>15</td>
+<td>QoS / DiffServ(DSCP)</td>
+<td>分類・マーキング(DSCP)・優先キューイング</td>
+<td><code>rfc2474</code> <code>rfc2475</code></td>
+<td>中級</td>
+<td>輻輳時に優先クラスが落ちないことを観測</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="-つまずきポイント先回り" tabindex="-1">🔑 つまずきポイント先回り <a class="header-anchor" href="#-つまずきポイント先回り" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>ACL</strong>: 適用方向(in/out)と暗黙のdeny、ワイルドカードマスク</li>
+<li><strong>NAT</strong>: inside/outside の定義、PATのポート枯渇、戻り通信の対応</li>
+<li><strong>IPsec</strong>: フェーズ1/2のパラメータ不一致（暗号/ハッシュ/DH/PFS/proxy-id）が最大の沼。両端で完全一致を</li>
+<li><strong>QoS</strong>: trust境界（どこからDSCPを信じるか）、信頼できないマーキングの再分類</li>
+</ul>
+<h2 id="-キャプストンへの伏線" tabindex="-1">🔗 キャプストンへの伏線 <a class="header-anchor" href="#-キャプストンへの伏線" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>14のIPsec</strong> が、第7章キャプストン「本社⇔支社」接続のそのまま核になる</li>
+<li><strong>13のACL/NAT</strong> が DMZ/FW 設計とインターネット境界の核になる</li>
+</ul>
+<h2 id="-章末チェック" tabindex="-1">✅ 章末チェック <a class="header-anchor" href="#-章末チェック" aria-hidden="true">#</a></h2>
+<ul>
+<li>[x] 拡張ACLを送信元/宛先/ポートで書き、方向を誤らず適用できる</li>
+<li>[x] PATの inside/outside を図で説明し、設定できる</li>
+<li>[x] IPsec フェーズ1/2の不一致を <code>debug</code>/<code>show crypto</code> で切り分けられる</li>
+<li>[x] DSCP の信頼境界を決め、優先キューを設計できる</li>
+<li>[ ] 各テーマの <code>振り返りシート</code> 作成済み</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-章の狙い">🎯 章の狙い</a></li>
+<li class="lvl-2"><a href="#前提">前提</a></li>
+<li class="lvl-2"><a href="#-テーマ一覧">📋 テーマ一覧</a></li>
+<li class="lvl-2"><a href="#-つまずきポイント先回り">🔑 つまずきポイント先回り</a></li>
+<li class="lvl-2"><a href="#-キャプストンへの伏線">🔗 キャプストンへの伏線</a></li>
+<li class="lvl-2"><a href="#-章末チェック">✅ 章末チェック</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

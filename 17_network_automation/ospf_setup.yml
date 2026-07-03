@@ -1,0 +1,27 @@
+---
+- name: 自動化による初期構築とOSPF設定
+  hosts: routers
+  gather_facts: no
+  
+  tasks:
+    - name: 【R1】インターフェース設定
+      cisco.ios.ios_config:
+        lines:
+          - ip address 10.0.0.1 255.255.255.0
+          - no shutdown
+        parents: interface Ethernet0/1
+      when: inventory_hostname == 'r1'
+
+    - name: 【R2】インターフェース設定
+      cisco.ios.ios_config:
+        lines:
+          - ip address 10.0.0.2 255.255.255.0
+          - no shutdown
+        parents: interface Ethernet0/1
+      when: inventory_hostname == 'r2'
+
+    - name: 全ルーター共通のOSPF設定
+      cisco.ios.ios_config:
+        lines:
+          - network 10.0.0.0 0.0.0.255 area 0
+        parents: router ospf 1

@@ -1,0 +1,33 @@
+name: automation
+
+topology:
+  nodes:
+    # -----------------------------
+    # 1. 監視・自動化サーバー (Controller)
+    # -----------------------------
+    controller:
+      kind: linux
+      image: ubuntu:latest
+      # Ansibleが実行できるようにコンテナ起動時に必要なパッケージを自動インストール
+      exec:
+        - apt-get update
+        - apt-get install -y python3-pip python3-paramiko openssh-client iputils-ping sshpass
+        - pip3 install ansible netmiko --break-system-packages
+      # ローカルのディレクトリをコンテナ内の /workspace にマウント
+      binds:
+        - .:/workspace
+
+    # -----------------------------
+    # 2. 自動化のターゲットルーター
+    # -----------------------------
+    r1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+
+    r2:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+
+  # R1とR2を直結させる
+  links:
+    - endpoints: ["r1:eth1", "r2:eth1"]

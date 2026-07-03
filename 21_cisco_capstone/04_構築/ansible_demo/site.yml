@@ -1,0 +1,14 @@
+---
+- name: Deploy Cisco Configurations
+  hosts: all
+  gather_facts: no
+  tasks:
+    - name: Load configuration from file
+      cisco.ios.ios_config:
+        src: "configs/{{ inventory_hostname }}.cfg"
+      register: config_result
+      ignore_errors: yes
+
+    - name: Save running config to startup
+      cisco.ios.ios_config:
+        save_when: changed

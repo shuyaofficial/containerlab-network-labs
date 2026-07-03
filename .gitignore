@@ -1,0 +1,29 @@
+# === Containerlab ランタイム生成物（TLS CA秘密鍵を含む・機微） ===
+clab-*/
+*.clab.yml.bak
+.tls/
+
+# === ライセンス素材・機器イメージバイナリ（再配布不可） ===
+*.bin
+*.qcow2
+*.vmdk
+*.iol
+*.image
+IOURC*
+.iourc
+*iourc*
+*license*.txt
+
+# === HTMLビルド依存・生成物 ===
+規約/ビルド/node_modules/
+node_modules/
+
+# === OS・エディタ ===
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
+
+# === 作業ログ（一時的・機微を含みうる） ===
+# 注: docs/ はGitHub Pages配信のため追跡する（除外しない）

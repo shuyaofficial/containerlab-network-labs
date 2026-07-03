@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>clab運用規約 — 配置・deploy.sh・実行パターン</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>規約</span></nav>
+      <h1 class="doc-title">clab運用規約 — 配置・deploy.sh・実行パターン</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-03</span>
+        <span class="tags"><span class="tag">standard</span><span class="tag">containerlab</span><span class="tag">deploy</span><span class="tag">iol</span></span>
+      </div>
+      
+      <div class="content">
+<p>containerlabトポロジファイル（<code>.clab.yml</code>）と <code>deploy.sh</code> の標準構成、およびVM実行パターンを定義する。
+基準実装は <a href="../26_dynamic_routing_deep_dive/04_%E6%A7%8B%E7%AF%89/deploy.sh">26_dynamic_routing_deep_dive/04_構築/deploy.sh</a>。</p>
+<h2 id="1-clabyml配置" tabindex="-1">1. clab.yml配置 <a class="header-anchor" href="#1-clabyml配置" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>規約</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>配置場所</td>
+<td><code>04_構築/&lt;topo&gt;.clab.yml</code> に統一</td>
+</tr>
+<tr>
+<td>禁止</td>
+<td>テーマルート直置き禁止（<code>NN_theme_name/*.clab.yml</code> は不可）</td>
+</tr>
+<tr>
+<td>ファイル名</td>
+<td><code>&lt;topo&gt;</code> はテーマの主題を表す短い英語スラッグ（例: <code>campus.clab.yml</code>）</td>
+</tr>
+<tr>
+<td>mgmtネットワーク名</td>
+<td><code>topology.mgmt.network</code> は <code>&lt;lab-name&gt;-mgmt</code> 形式</td>
+</tr>
+</tbody>
+</table></div>
+<pre><code class="language-yaml"><span class="hljs-attr">name:</span> <span class="hljs-string">dynamic-routing-lab</span>
+
+<span class="hljs-attr">mgmt:</span>
+  <span class="hljs-attr">network:</span> <span class="hljs-string">dynamic-routing-mgmt</span>
+  <span class="hljs-attr">ipv4-subnet:</span> <span class="hljs-number">172.26</span><span class="hljs-number">.26</span><span class="hljs-number">.0</span><span class="hljs-string">/24</span>
+</code></pre>
+<h2 id="2-deploysh標準" tabindex="-1">2. deploy.sh標準 <a class="header-anchor" href="#2-deploysh標準" aria-hidden="true">#</a></h2>
+<p>テーマ26を基準実装とする4サブコマンド構成 <code>{deploy|iouyap|inspect|destroy}</code> を必須とする。</p>
+<h3 id="21-必須要素" tabindex="-1">2.1 必須要素 <a class="header-anchor" href="#21-必須要素" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>要素</th>
+<th>規約</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>シェバン</td>
+<td><code>#!/usr/bin/env bash</code></td>
+</tr>
+<tr>
+<td>安全設定</td>
+<td><code>set -euo pipefail</code> を先頭付近に必須</td>
+</tr>
+<tr>
+<td>実行位置固定</td>
+<td><code>cd &quot;$(dirname &quot;$0&quot;)&quot;</code> でスクリプト自身の位置に移動してから処理</td>
+</tr>
+<tr>
+<td>ノード特定</td>
+<td><code>NAME_PREFIX=&quot;clab-&lt;lab-name&gt;-&quot;</code> を定義し、<code>docker ps</code> の絞り込みに使う</td>
+</tr>
+<tr>
+<td>サブコマンド分岐</td>
+<td>`case &quot;${1:-deploy}&quot; in deploy</td>
+</tr>
+<tr>
+<td>usage表示</td>
+<td>不明な引数は `usage: $0 {deploy</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="22-サブコマンドの役割" tabindex="-1">2.2 サブコマンドの役割 <a class="header-anchor" href="#22-サブコマンドの役割" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>サブコマンド</th>
+<th>処理内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>deploy</code></td>
+<td><code>sudo containerlab deploy -t &quot;$TOPO&quot;</code> → IOL使用時は続けて <code>start_iouyap</code> を呼ぶ</td>
+</tr>
+<tr>
+<td><code>iouyap</code></td>
+<td>IOLコンテナへ <code>iouyap</code> を後付けで起動し直す（deploy後の再適用・障害復旧用）</td>
+</tr>
+<tr>
+<td><code>inspect</code></td>
+<td><code>sudo containerlab inspect -t &quot;$TOPO&quot;</code> でノード一覧・状態を表示</td>
+</tr>
+<tr>
+<td><code>destroy</code></td>
+<td><code>sudo containerlab destroy -t &quot;$TOPO&quot; --cleanup</code> で完全破棄</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="23-iouyapiol使用テーマのみ" tabindex="-1">2.3 iouyap（IOL使用テーマのみ） <a class="header-anchor" href="#23-iouyapiol使用テーマのみ" aria-hidden="true">#</a></h3>
+<ul>
+<li><code>start_iouyap</code> 関数は <code>sleep 5</code> 等で起動待機後、<code>docker ps</code> を <code>NAME_PREFIX</code> でフィルタし、
+エンドポイント系ノード（<code>pc$</code> / <code>srv$</code> 等の命名サフィックス）を <code>grep -v -E</code> で除外してIOLノードのみへ実行する。</li>
+<li>各コンテナに対し <code>sudo docker exec -d -w /iol &quot;$container&quot; /usr/bin/iouyap 513 2&gt;/dev/null || true</code> を実行する。</li>
+<li>IOLを使わないテーマ（FRR/cRPD/vEOS等arm64ネイティブのみで構成）は <code>iouyap</code> サブコマンドを省略してよい。</li>
+</ul>
+<h3 id="24-サンプル基準実装" tabindex="-1">2.4 サンプル（基準実装） <a class="header-anchor" href="#24-サンプル基準実装" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-meta">#!/usr/bin/env bash</span>
+<span class="hljs-built_in">set</span> -euo pipefail
+
+<span class="hljs-built_in">cd</span> <span class="hljs-string">&quot;<span class="hljs-subst">$(dirname <span class="hljs-string">&quot;<span class="hljs-variable">$0</span>&quot;</span>)</span>&quot;</span>
+TOPO=<span class="hljs-string">&quot;campus.clab.yml&quot;</span>
+NAME_PREFIX=<span class="hljs-string">&quot;clab-dynamic-routing-lab-&quot;</span>
+
+<span class="hljs-function"><span class="hljs-title">start_iouyap</span></span>() {
+  <span class="hljs-built_in">sleep</span> 5
+  <span class="hljs-keyword">for</span> container <span class="hljs-keyword">in</span> $(<span class="hljs-built_in">sudo</span> docker ps --format <span class="hljs-string">&#x27;{{.Names}}&#x27;</span> \
+      | grep <span class="hljs-string">&quot;^<span class="hljs-variable">${NAME_PREFIX}</span>&quot;</span> | grep -v -E <span class="hljs-string">&#x27;pc$|srv$&#x27;</span>); <span class="hljs-keyword">do</span>
+    <span class="hljs-built_in">sudo</span> docker <span class="hljs-built_in">exec</span> -d -w /iol <span class="hljs-string">&quot;<span class="hljs-variable">$container</span>&quot;</span> /usr/bin/iouyap 513 2&gt;/dev/null || <span class="hljs-literal">true</span>
+  <span class="hljs-keyword">done</span>
+}
+
+<span class="hljs-keyword">case</span> <span class="hljs-string">&quot;<span class="hljs-variable">${1:-deploy}</span>&quot;</span> <span class="hljs-keyword">in</span>
+  deploy)
+    <span class="hljs-built_in">sudo</span> containerlab deploy -t <span class="hljs-string">&quot;<span class="hljs-variable">$TOPO</span>&quot;</span>
+    start_iouyap
+    ;;
+  iouyap)
+    start_iouyap
+    ;;
+  inspect)
+    <span class="hljs-built_in">sudo</span> containerlab inspect -t <span class="hljs-string">&quot;<span class="hljs-variable">$TOPO</span>&quot;</span>
+    ;;
+  destroy)
+    <span class="hljs-built_in">sudo</span> containerlab destroy -t <span class="hljs-string">&quot;<span class="hljs-variable">$TOPO</span>&quot;</span> --cleanup
+    ;;
+  *)
+    <span class="hljs-built_in">echo</span> <span class="hljs-string">&quot;usage: <span class="hljs-variable">$0</span> {deploy|iouyap|inspect|destroy}&quot;</span> &gt;&amp;2
+    <span class="hljs-built_in">exit</span> 1
+    ;;
+<span class="hljs-keyword">esac</span>
+</code></pre>
+<h2 id="3-vm実行パターン必須" tabindex="-1">3. VM実行パターン（必須） <a class="header-anchor" href="#3-vm実行パターン必須" aria-hidden="true">#</a></h2>
+<ul>
+<li>Macホスト上で <code>containerlab</code> や <code>deploy.sh</code> を直接実行しない（sudoパスワード要求・Dockerソケット不一致で失敗する）。</li>
+<li><strong>必ず OrbStack の Linux VM に対して SSH 経由で実行する</strong>（<code>containerlab-setup</code> スキル準拠）。</li>
+</ul>
+<pre><code class="language-bash">ssh clab@orb <span class="hljs-string">&quot;cd /Users/shuya/Documents/claude/Mac仮想環境構築/&lt;テーマ名&gt;/04_構築 &amp;&amp; ./deploy.sh deploy&quot;</span>
+ssh clab@orb <span class="hljs-string">&quot;cd /Users/shuya/Documents/claude/Mac仮想環境構築/&lt;テーマ名&gt;/04_構築 &amp;&amp; ./deploy.sh inspect&quot;</span>
+ssh clab@orb <span class="hljs-string">&quot;cd /Users/shuya/Documents/claude/Mac仮想環境構築/&lt;テーマ名&gt;/04_構築 &amp;&amp; ./deploy.sh destroy&quot;</span>
+</code></pre>
+<ul>
+<li>Macファイルのパス（<code>/Users/shuya/...</code>）はOrbStack VM内に同一パスでマウントされているため、絶対パスをそのまま使える。</li>
+<li>コンソール接続は <code>sudo docker attach --sig-proxy=false clab-&lt;lab-name&gt;-&lt;node&gt;</code> を用いる（<code>--sig-proxy=false</code> 必須。付けないとCtrl-Cがコンテナごと終了させてしまう）。抜けるのは <code>Ctrl-P → Ctrl-Q</code>。</li>
+</ul>
+<h2 id="4-mgmt-ipv4-静的固定規約" tabindex="-1">4. mgmt-ipv4 静的固定規約 <a class="header-anchor" href="#4-mgmt-ipv4-静的固定規約" aria-hidden="true">#</a></h2>
+<p>既存慣行（テーマ26等）を正式ルールとして明文化する。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>系統</th>
+<th>アドレス範囲</th>
+<th>対象</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>router系（本拠地・拠点内の階層ノード）</td>
+<td><code>.11</code>〜<code>.14</code></td>
+<td>例: hq-core / hq-dist / hq-edge / hq-dmz</td>
+</tr>
+<tr>
+<td>core系（拠点間・中継ノード）</td>
+<td><code>.21</code>〜<code>.22</code></td>
+<td>例: br-core / br-edge</td>
+</tr>
+<tr>
+<td>ISP・外部中継</td>
+<td><code>.100</code> 台前半</td>
+<td>例: isp</td>
+</tr>
+<tr>
+<td>エンドポイント（PC・サーバ）</td>
+<td><code>.101</code> 以降</td>
+<td>例: hq-pc / br-pc / dmz-srv</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>全ノードに <code>mgmt-ipv4</code> を静的固定する（DHCP任せにしない。<code>docker attach</code> 前提のコンソール接続でIPが不定だと運用しづらいため）。</li>
+<li>mgmtサブネットは <code>172.26.26.0/24</code> のように各テーマで独立したレンジを使う（テーマ間の衝突を避ける）。</li>
+</ul>
+<h2 id="5-ノード命名name_prefix規約" tabindex="-1">5. ノード命名・NAME_PREFIX規約 <a class="header-anchor" href="#5-ノード命名name_prefix規約" aria-hidden="true">#</a></h2>
+<ul>
+<li>ノード名は <code>&lt;拠点略称&gt;-&lt;役割&gt;</code> 形式（例: <code>hq-core</code>, <code>hq-dist</code>, <code>br-edge</code>）。役割名は <code>core</code> / <code>dist</code> / <code>edge</code> / <code>dmz</code> 等、階層構造がわかる語を使う。</li>
+<li><code>deploy.sh</code> の <code>NAME_PREFIX</code> は <code>clab-&lt;lab-name&gt;-</code>（<code>lab-name</code> は <code>clab.yml</code> の <code>name:</code> と一致させる）。</li>
+<li>エンドポイント（PC/サーバ）は <code>pc</code> / <code>srv</code> 等の識別しやすいサフィックスを付け、<code>iouyap</code> 起動対象から除外できるようにする。</li>
+</ul>
+<h2 id="6-iol注意事項" tabindex="-1">6. IOL注意事項 <a class="header-anchor" href="#6-iol注意事項" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>起動時間</td>
+<td>x86イメージのarm64エミュレーションのため、1ノードあたり起動に<strong>約2分</strong>かかる（回避不可・仕様として受け入れる）</td>
+</tr>
+<tr>
+<td>entrypoint起動方式</td>
+<td><code>exec /iol/iol.bin ...</code> のように <strong><code>exec</code> で直接起動</strong>する。バックグラウンド化（末尾<code>&amp;</code>）は禁止</td>
+</tr>
+<tr>
+<td>バックグラウンド禁止の理由</td>
+<td><code>&amp;</code> で起動するとIOLプロセスがPID1にならず、<code>docker attach</code> でコンソールに接続できなくなる（標準入出力がIOSに直結しない）</td>
+</tr>
+<tr>
+<td>コンソール接続</td>
+<td><code>sudo docker attach --sig-proxy=false &lt;container&gt;</code> を使う</td>
+</tr>
+<tr>
+<td>ライセンス</td>
+<td><code>IOURC</code>（<code>gns3-iouvm</code> 用ライセンス）をentrypoint内に埋め込み、hostname <code>gns3-iouvm</code> を固定する</td>
+</tr>
+<tr>
+<td>起動順序</td>
+<td>IOL起動 → iouyap起動の順（逆順だと <code>sock lock</code> エラーが発生する）</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="7-禁止事項" tabindex="-1">7. 禁止事項 <a class="header-anchor" href="#7-禁止事項" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>禁止事項</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>clab.yml</code> への設定コマンドの答え直書き</td>
+<td>学習テーマは<code>mentor_guidelines.md</code>準拠でユーザー自身が設定を考える機会を奪わない（<a href="../mentor_guidelines.html">../mentor_guidelines.md</a>）</td>
+</tr>
+<tr>
+<td>per-themeイメージの直ビルド</td>
+<td>廃止済みの方式。イメージは共通の <code>~/vrnetlab</code> ビルド済みイメージ群を使い回す（<a href="../%E7%92%B0%E5%A2%83/%E7%92%B0%E5%A2%83%E8%AA%AC%E6%98%8E.html">../環境/環境説明.md</a> §4-6参照）</td>
+</tr>
+<tr>
+<td><code>clab-*</code> ランタイムディレクトリのgit管理</td>
+<td><code>containerlab deploy</code> が生成する <code>clab-&lt;lab-name&gt;/</code> はランタイム生成物（topology-data.json・証明書等）であり、ソースではない。<code>.gitignore</code> 対象とする</td>
+</tr>
+</tbody>
+</table></div>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-clabyml配置">1. clab.yml配置</a></li>
+<li class="lvl-2"><a href="#2-deploysh標準">2. deploy.sh標準</a></li>
+<li class="lvl-3"><a href="#21-必須要素">2.1 必須要素</a></li>
+<li class="lvl-3"><a href="#22-サブコマンドの役割">2.2 サブコマンドの役割</a></li>
+<li class="lvl-3"><a href="#23-iouyapiol使用テーマのみ">2.3 iouyap（IOL使用テーマのみ）</a></li>
+<li class="lvl-3"><a href="#24-サンプル基準実装">2.4 サンプル（基準実装）</a></li>
+<li class="lvl-2"><a href="#3-vm実行パターン必須">3. VM実行パターン（必須）</a></li>
+<li class="lvl-2"><a href="#4-mgmt-ipv4-静的固定規約">4. mgmt-ipv4 静的固定規約</a></li>
+<li class="lvl-2"><a href="#5-ノード命名name_prefix規約">5. ノード命名・NAME_PREFIX規約</a></li>
+<li class="lvl-2"><a href="#6-iol注意事項">6. IOL注意事項</a></li>
+<li class="lvl-2"><a href="#7-禁止事項">7. 禁止事項</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

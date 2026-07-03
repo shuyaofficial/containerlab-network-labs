@@ -1,0 +1,17 @@
+enable
+configure terminal
+hostname br-edge
+ip routing
+no ip domain-lookup
+interface Ethernet0/1
+no switchport
+ip address 200.0.3.1 255.255.255.0
+no shutdown
+interface Ethernet0/2
+no switchport
+ip address 10.2.40.254 255.255.255.0
+no shutdown
+interface Ethernet0/3
+shutdown
+end
+write memory

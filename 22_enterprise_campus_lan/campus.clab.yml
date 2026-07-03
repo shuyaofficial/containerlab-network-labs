@@ -1,0 +1,212 @@
+name: campus
+topology:
+  nodes:
+    # ------------------
+    # L3 コア
+    # ------------------
+    core1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      type: l2
+      group: "Area 0 (Backbone)"
+      labels:
+        graph-level: 4
+        graph-icon: switch
+    core2:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      type: l2
+      group: "Area 0 (Backbone)"
+      labels:
+        graph-level: 4
+        graph-icon: switch
+
+    # ------------------
+    # L3 ディストリビューション
+    # ------------------
+    dist-a1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      type: l2
+      group: "Area 1 (A-Building)"
+      labels:
+        graph-level: 3
+        graph-icon: switch
+    dist-a2:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      type: l2
+      group: "Area 1 (A-Building)"
+      labels:
+        graph-level: 3
+        graph-icon: switch
+    dist-b1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      type: l2
+      group: "Area 2 (B-Building)"
+      labels:
+        graph-level: 3
+        graph-icon: switch
+
+    # ------------------
+    # L2 アクセス
+    # ------------------
+    acc-a1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-15.2
+      type: l2
+      group: "Area 1 (A-Building)"
+      labels:
+        graph-level: 2
+        graph-icon: switch
+    acc-a2:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-15.2
+      type: l2
+      group: "Area 1 (A-Building)"
+      labels:
+        graph-level: 2
+        graph-icon: switch
+    acc-b1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-15.2
+      type: l2
+      group: "Area 2 (B-Building)"
+      labels:
+        graph-level: 2
+        graph-icon: switch
+
+    # ------------------
+    # 境界FW
+    # ------------------
+    fgt-edge:                      # 実体はCiscoルーター(HQ VPN edge)。FortiGate(invalid license)から置換 2026-06-26
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      type: l2
+      group: "Area 0 (Backbone)"
+      labels:
+        graph-level: 5
+        graph-icon: router
+
+    # ------------------
+    # ISP・支社（※フェーズ0〜2の段階ではコメントアウト推奨だが、今回はそのまま記載）
+    # ------------------
+    isp:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      type: l2
+      group: "Internet"
+      labels:
+        graph-level: 6
+        graph-icon: router
+    br-edge:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      type: l2
+      group: "Branch"
+      labels:
+        graph-level: 5
+        graph-icon: router
+
+    # ------------------
+    # エンドポイント（PC・サーバ）
+    # ------------------
+    pc-sales:
+      kind: linux
+      image: wbitt/network-multitool
+      group: "Area 1 (A-Building)"
+      labels:
+        graph-level: 1
+        graph-icon: host
+      exec:
+        - ip addr add 10.10.10.100/24 dev eth1
+        - ip route del default
+        - ip route add default via 10.10.10.254 dev eth1
+
+    pc-dev:
+      kind: linux
+      image: wbitt/network-multitool
+      group: "Area 1 (A-Building)"
+      labels:
+        graph-level: 1
+        graph-icon: host
+      exec:
+        - ip addr add 10.10.20.100/24 dev eth1
+        - ip route del default
+        - ip route add default via 10.10.20.254 dev eth1
+
+    srv-file:
+      kind: linux
+      image: wbitt/network-multitool
+      group: "Area 2 (B-Building)"
+      labels:
+        graph-level: 1
+        graph-icon: host
+      binds:
+        - parts_endpoints/shared_files:/usr/share/nginx/html:ro
+      exec:
+        - ip addr add 10.20.30.10/24 dev eth1
+        - ip route del default
+        - ip route add default via 10.20.30.254 dev eth1
+
+    srv-portal:
+      kind: linux
+      image: wbitt/network-multitool
+      group: "Area 2 (B-Building)"
+      labels:
+        graph-level: 1
+        graph-icon: host
+      binds:
+        - parts_endpoints/portal_html:/usr/share/nginx/html:ro
+      exec:
+        - ip addr add 10.20.30.20/24 dev eth1
+        - ip route del default
+        - ip route add default via 10.20.30.254 dev eth1
+
+    br-pc:
+      kind: linux
+      image: wbitt/network-multitool
+      group: "Branch"
+      labels:
+        graph-level: 4
+        graph-icon: host
+      exec:
+        - ip addr add 10.2.40.100/24 dev eth1
+        - ip route del default
+        - ip route add default via 10.2.40.254 dev eth1
+
+  links:
+    # --- バックボーン L3 P2P ---
+    - endpoints: ["core1:eth1", "core2:eth1"]
+    - endpoints: ["core1:eth2", "dist-a1:eth1"]
+    - endpoints: ["core1:eth3", "dist-a2:eth1"]
+    - endpoints: ["core2:eth2", "dist-a1:eth2"]
+    - endpoints: ["core2:eth3", "dist-a2:eth2"]
+    - endpoints: ["core1:eth4", "dist-b1:eth1"]
+    - endpoints: ["core2:eth4", "dist-b1:eth2"]
+    - endpoints: ["core1:eth5", "fgt-edge:eth2"]
+    - endpoints: ["core2:eth5", "fgt-edge:eth3"]
+
+    # --- トランクリンク (A棟) ---
+    - endpoints: ["dist-a1:eth5", "dist-a2:eth5"] # Po1 (Et1/1)
+    - endpoints: ["dist-a1:eth6", "dist-a2:eth6"] # Po1 (Et1/2)
+    - endpoints: ["dist-a1:eth3", "acc-a1:eth1"]
+    - endpoints: ["dist-a2:eth3", "acc-a1:eth2"]
+    - endpoints: ["dist-a1:eth4", "acc-a2:eth1"]
+    - endpoints: ["dist-a2:eth4", "acc-a2:eth2"]
+
+    # --- トランクリンク (B棟) ---
+    - endpoints: ["dist-b1:eth5", "acc-b1:eth1"]  # Po1
+    - endpoints: ["dist-b1:eth6", "acc-b1:eth2"]  # Po1
+
+    # --- アクセスリンク ---
+    - endpoints: ["acc-a1:eth3", "pc-sales:eth1"]
+    - endpoints: ["acc-a2:eth3", "pc-dev:eth1"]
+    - endpoints: ["acc-b1:eth3", "srv-portal:eth1"]
+    - endpoints: ["acc-b1:eth4", "srv-file:eth1"]
+
+    # --- インターネット境界 / WAN / 支社 ---
+    - endpoints: ["fgt-edge:eth1", "isp:eth1"]
+    - endpoints: ["isp:eth2", "br-edge:eth1"]
+    - endpoints: ["br-edge:eth2", "br-pc:eth1"]

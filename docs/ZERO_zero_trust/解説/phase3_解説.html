@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Phase 3 解説 — SIEM（Loki + Grafana）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>解説</span></nav>
+      <h1 class="doc-title">Phase 3 解説 — SIEM（Loki + Grafana）</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">explainer</span><span class="tag">siem</span><span class="tag">loki</span><span class="tag">grafana</span><span class="tag">promtail</span></span>
+      </div>
+      
+      <div class="content">
+<h2 id="1-このフェーズで何が実現されるか" tabindex="-1">1. このフェーズで何が実現されるか <a class="header-anchor" href="#1-このフェーズで何が実現されるか" aria-hidden="true">#</a></h2>
+<p>Phase 3 では各観点のログを集約・可視化する基盤（Loki + Promtail + Grafana）を立てる。Phase 1（認証ログ）・Phase 2（認可ログ）の記録を Grafana のダッシュボードで見えるようにする。このフェーズをあえて SWG/DLP（Phase 4/5）より前に置くのは、以降の Phase で「セキュリティ機構が本当に効いているか」を証拠つきで示すため（D-3）。</p>
+<ul>
+<li><strong>ビフォー</strong>: Phase 1/2 の各コンポーネントは docker のコンテナログとしてログを吐いているが、生ログを都度 <code>docker logs</code> で追うしかない。件数の傾向や横断的な相関が見えない。</li>
+<li><strong>アフター</strong>: Promtail が各ノードのログを収集し、Loki に保存され、Grafana でクエリ・ダッシュボード表示ができる。「未認証拒否は何件あったか」「認証成功は何件か」が一目でわかる。</li>
+</ul>
+<h2 id="2-なぜこの構成か" tabindex="-1">2. なぜこの構成か <a class="header-anchor" href="#2-なぜこの構成か" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>観点</th>
+<th>商用製品</th>
+<th>本ラボの OSS 選定</th>
+<th>選定理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SIEM</td>
+<td>Splunk, Microsoft Sentinel</td>
+<td><strong>Grafana + Loki + Promtail</strong>（軽量先行）。発展: Wazuh（統合 SIEM/EDR）</td>
+<td><a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果</a> で grafana/loki/promtail は全て arm64 ネイティブ対応（High）。wazuh-manager も arm64 対応だが <code>latest</code> タグが存在せずバージョンタグ明示が必須という運用上の注意点あり</td>
+</tr>
+</tbody>
+</table></div>
+<p>なぜ Loki 先行か（D-4）:</p>
+<ul>
+<li>Wazuh は統合 SIEM/EDR として強力だが、リソース見積が 2-4GB 級と重い。VM 全体のメモリ制約（NFR-2）を考えると、まず軽量な Loki+Grafana（512MB 級）で「ログを集めて見る」という SIEM の本質的な価値を確保し、Wazuh は発展課題に回す判断が合理的。</li>
+<li><strong>なぜ SIEM を早期投入するか（D-3）</strong>: Phase 4（SWG）・Phase 5（DLP）は「検知・ブロックが機能しているか」を示す必要がある。SIEM が無い状態でこれらを実装すると、効果が見えないまま構築が進むリスクがある。先に「見る仕組み」を用意しておくことで、以降の Phase の実装がそのまま検証可能になる。</li>
+</ul>
+<p><strong>実務でこの知識がどこで効くか</strong>: Splunk や Sentinel の SPL/KQL クエリを書いたことがなくても、Grafana の LogQL（Loki のクエリ言語）は考え方が近い。「ラベルで絞り込み、正規表現でフィルタし、集計する」という SIEM クエリの基本パターンは共通しており、ここで学んだクエリ感覚は商用 SIEM に触れたときにも転用できる。またログの片方向集約という設計思想は、監査ログの改ざん耐性（ログ生成元がログを消せない）という監査・コンプライアンス要件の基礎になる。</p>
+<h2 id="3-仕組みの核心" tabindex="-1">3. 仕組みの核心 <a class="header-anchor" href="#3-仕組みの核心" aria-hidden="true">#</a></h2>
+<p><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a> のフロー3（ログフロー）が Phase 3 の核心。</p>
+<pre class="mermaid">graph LR
+    K[keycloak&lt;br/&gt;認証ログ] --&gt; PT[promtail]
+    P[pomerium&lt;br/&gt;認可ログ] --&gt; PT
+    M[mitmproxy&lt;br/&gt;検査/DLPログ] --&gt; PT
+    S[step-ca&lt;br/&gt;証明書ログ] --&gt; PT
+    PT --&gt; L[loki&lt;br/&gt;保存]
+    L --&gt; G[grafana&lt;br/&gt;可視化]
+</pre>
+<p>ポイント:</p>
+<ul>
+<li><strong>Promtail はエージェント、Loki はストレージ、Grafana はビューア</strong>という3層分担。Loki は Elasticsearch のような全文検索インデックスを持たず、ラベル（メタデータ）でログストリームを絞り込んでから中身を検索する設計（&quot;like Prometheus, but for logs&quot;）。これが軽量な理由の一つ。</li>
+<li><strong>片方向のログフロー</strong>。各コンポーネント（生成元）から Loki への送信のみで、Loki から生成元への書き込みは発生しない。これにより「攻撃者がログを改ざん・削除できない」という監査ログの基本要件を、設計レベルで満たそうとしている（基本設計書のセキュリティ方針）。</li>
+<li><strong>可観測ゾーンは他ゾーンから片方向でのみ受信</strong>し、Grafana の閲覧アクセス以外の戻り通信は無い設計。ゾーン分離の原則がここでも適用されている。</li>
+</ul>
+<h2 id="4-自分で触って確認する手順実装後にこの手順で確認" tabindex="-1">4. 自分で触って確認する手順（実装後にこの手順で確認） <a class="header-anchor" href="#4-自分で触って確認する手順実装後にこの手順で確認" aria-hidden="true">#</a></h2>
+<p>Phase 3 は今回スコープでは未デプロイ（設計値）。実装後、<a href="../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a> T-3-* に沿って以下を確認する想定。</p>
+<h3 id="手順1-loki-の準備状態を確認する" tabindex="-1">手順1: Loki の準備状態を確認する <a class="header-anchor" href="#手順1-loki-の準備状態を確認する" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">docker <span class="hljs-built_in">exec</span> clab-zero-grafana wget -qO- http://loki:3100/ready
+</code></pre>
+<p>期待結果: <code>ready</code> が返る。</p>
+<h3 id="手順2-promtail-がログを収集しているか確認するt-3-1" tabindex="-1">手順2: Promtail がログを収集しているか確認する（T-3-1） <a class="header-anchor" href="#手順2-promtail-がログを収集しているか確認するt-3-1" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">docker logs --<span class="hljs-built_in">tail</span> 50 clab-zero-promtail
+</code></pre>
+<p>期待結果: 各ターゲット（keycloak, pomerium 等）のログをスクレイプしているログ行が出力されている。</p>
+<h3 id="手順3-grafana-に-loki-データソースを登録しphase-12-のログをクエリするt-3-2学習の核心" tabindex="-1">手順3: Grafana に Loki データソースを登録し、Phase 1/2 のログをクエリする（T-3-2、学習の核心） <a class="header-anchor" href="#手順3-grafana-に-loki-データソースを登録しphase-12-のログをクエリするt-3-2学習の核心" aria-hidden="true">#</a></h3>
+<p>Grafana の Explore 画面で LogQL クエリを実行する。</p>
+<pre><code class="language-logql">{container=&quot;clab-zero-keycloak&quot;} |= &quot;LOGIN&quot;
+</code></pre>
+<pre><code class="language-logql">{container=&quot;clab-zero-pomerium&quot;} |= &quot;deny&quot;
+</code></pre>
+<p>期待結果: それぞれ Keycloak のログイン試行行、Pomerium の拒否判定行がタイムライン付きで表示される。<strong>「ログとは何か」を生の文字列としてではなく、ラベルとタイムスタンプ付きの構造化データとして扱える</strong>ことを体験するのがこの手順のねらい。</p>
+<h3 id="手順4-未認証拒否認証成功の件数を可視化するダッシュボードを作るt-3-3" tabindex="-1">手順4: 未認証拒否・認証成功の件数を可視化するダッシュボードを作る（T-3-3） <a class="header-anchor" href="#手順4-未認証拒否認証成功の件数を可視化するダッシュボードを作るt-3-3" aria-hidden="true">#</a></h3>
+<pre><code class="language-logql">sum(count_over_time({container=&quot;clab-zero-pomerium&quot;} |= &quot;deny&quot; [5m]))
+</code></pre>
+<p>このようなクエリをパネル化し、時系列グラフとして「拒否件数の推移」を表示する。ここまでできると、Phase 2 で作った IAP が実際にリクエストを弾いていることの<strong>証拠</strong>になる。</p>
+<h2 id="5-考えどころ" tabindex="-1">5. 考えどころ <a class="header-anchor" href="#5-考えどころ" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>本番設計ならどうするか</strong>: 本番の SIEM はログの長期保存（コンプライアンス要件で数年単位）、相関分析（複数ソースをまたいだ異常検知）、SOAR 連携（自動対応）まで含む。本ラボの Loki+Grafana は「ログを集めて見る」の一歩目に留まる。</li>
+<li><strong>このラボの簡略化ポイント</strong>:
+<ul>
+<li><strong>保持期間・容量制限は未設計</strong>。本番は保持ポリシー（retention）とストレージ容量管理が必須。</li>
+<li><strong>相関ルール・アラートは手動クエリの域</strong>。本番の SIEM は自動アラート・エスカレーションフローを持つ。</li>
+<li><strong>Wazuh は後回し</strong>。EDR 機能（エンドポイントでの異常検知）は本ラボのスコープ外で、SIEM（ログ集約・可視化）のみに絞っている。</li>
+</ul>
+</li>
+</ul>
+<h2 id="6-つまずきポイント" tabindex="-1">6. つまずきポイント <a class="header-anchor" href="#6-つまずきポイント" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>Grafana でログが見えない</strong>: <a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a> にある通り「ログ層は独立して壊れる」。他の Phase が正常でも、Promtail のラベル設定や対象コンテナのログ出力先（stdout/stderr か、ファイルか）だけが原因で L6 が単独 NG になりうる。</li>
+<li><strong>ラベルの粒度が粗すぎて絞り込めない</strong>: Promtail の scrape config でコンテナ名以外のラベル（サービス種別など）を付けていないと、大量ログの中から目的の行を探しにくい。ラベル設計は Phase 3 実装時に見直す価値がある。</li>
+<li><strong>Loki が起動直後は ready を返さない</strong>: 起動直後は数秒〜数十秒の初期化時間がかかることがある。即座に <code>/ready</code> を叩いてエラーになっても、少し待って再試行する。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a>（ログフロー）</li>
+<li><a href="../04_%E6%A7%8B%E7%AF%89/phase3_siem/README.html">phase3_siem 構築スタブ</a></li>
+<li><a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果</a></li>
+<li><a href="../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a></li>
+<li><a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-このフェーズで何が実現されるか">1. このフェーズで何が実現されるか</a></li>
+<li class="lvl-2"><a href="#2-なぜこの構成か">2. なぜこの構成か</a></li>
+<li class="lvl-2"><a href="#3-仕組みの核心">3. 仕組みの核心</a></li>
+<li class="lvl-2"><a href="#4-自分で触って確認する手順実装後にこの手順で確認">4. 自分で触って確認する手順（実装後にこの手順で確認）</a></li>
+<li class="lvl-3"><a href="#手順1-loki-の準備状態を確認する">手順1: Loki の準備状態を確認する</a></li>
+<li class="lvl-3"><a href="#手順2-promtail-がログを収集しているか確認するt-3-1">手順2: Promtail がログを収集しているか確認する（T-3-1）</a></li>
+<li class="lvl-3"><a href="#手順3-grafana-に-loki-データソースを登録しphase-12-のログをクエリするt-3-2学習の核心">手順3: Grafana に Loki データソースを登録し、Phase 1/2 のログをクエリする（T-3-2、学習の核心）</a></li>
+<li class="lvl-3"><a href="#手順4-未認証拒否認証成功の件数を可視化するダッシュボードを作るt-3-3">手順4: 未認証拒否・認証成功の件数を可視化するダッシュボードを作る（T-3-3）</a></li>
+<li class="lvl-2"><a href="#5-考えどころ">5. 考えどころ</a></li>
+<li class="lvl-2"><a href="#6-つまずきポイント">6. つまずきポイント</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

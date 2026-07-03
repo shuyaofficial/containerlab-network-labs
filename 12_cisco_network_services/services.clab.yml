@@ -1,0 +1,27 @@
+name: network-services
+
+topology:
+  nodes:
+    # インフラサーバー用（純粋なルーター）
+    srv1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+      
+    # L3スイッチ（DHCPリレーエージェント）
+    sw1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      type: l2
+
+    # クライアントPC
+    pc1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-15.2
+      type: l2
+
+  links:
+    # サーバーとL3スイッチ間のルーテッドリンク
+    - endpoints: ["srv1:eth1", "sw1:eth1"]
+    
+    # L3スイッチとPC間のアクセスリンク
+    - endpoints: ["sw1:eth2", "pc1:eth1"]

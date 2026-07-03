@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Theme 25: Campus Pattern C — Multi-Campus</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>25_campus_multi_site</span></nav>
+      <h1 class="doc-title">Theme 25: Campus Pattern C — Multi-Campus</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="1-このラボで学ぶこと" tabindex="-1">1. このラボで学ぶこと <a class="header-anchor" href="#1-このラボで学ぶこと" aria-hidden="true">#</a></h2>
+<p>Multi-Campusは、キャンパス内部のIGPと、拠点間のBGPを役割分担させて複数拠点を接続する設計です。このラボでは、Main CampusとBranch Campusを別々のOSPFドメインとして構築し、境界ルーター間をeBGPで接続します。</p>
+<p>主眼は「すべての細かい経路を相手へ漏らさない集約」と、「経路ループを作らない制御付き再配信」です。IPsecは既存Theme 14で学習済みのため、まず単純なL3 WANでルーティング設計を完成させ、追加Missionとして重ねます。</p>
+<blockquote>
+<p><strong>初期状態</strong>: containerlabは機器、配線、attach可能な起動方式、PC側のIP/経路だけを用意します。Cisco IOLのインフラリンクIP、Loopback、OSPF、BGP、prefix-list、route-map、集約・再配信は一切自動設定しません。設定はすべて自分で考えて投入してください。</p>
+</blockquote>
+<h2 id="2-トポロジ" tabindex="-1">2. トポロジ <a class="header-anchor" href="#2-トポロジ" aria-hidden="true">#</a></h2>
+<pre class="mermaid">flowchart LR
+    MPC[&quot;main-pc\n10.50.10.10&quot;]
+    MC[&quot;main-core\nOSPF 10&quot;]
+    ME[&quot;main-edge\nAS 65050&quot;]
+    BE[&quot;branch-edge\nAS 65060&quot;]
+    BC[&quot;branch-core\nOSPF 20&quot;]
+    BPC[&quot;branch-pc\n10.60.10.10&quot;]
+
+    MPC --- MC
+    MC ---|&quot;OSPF area 0&quot;| ME
+    ME ---|&quot;eBGP / WAN&quot;| BE
+    BE ---|&quot;OSPF area 0&quot;| BC
+    BC --- BPC
+</pre>
+<blockquote>
+<p>両キャンパスのOSPFは別プロセス・別ドメインです。両方でarea 0を使っても、BGP境界を越えて同じOSPFドメインになるわけではありません。</p>
+</blockquote>
+<h2 id="3-ノードとアドレス設計" tabindex="-1">3. ノードとアドレス設計 <a class="header-anchor" href="#3-ノードとアドレス設計" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>役割</th>
+<th style="text-align:right">Router ID / Loopback</th>
+<th style="text-align:right">管理IP</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>main-core</td>
+<td>Main内部ルーター</td>
+<td style="text-align:right">10.50.255.1/32</td>
+<td style="text-align:right">172.25.25.11</td>
+</tr>
+<tr>
+<td>main-edge</td>
+<td>Main境界、AS 65050</td>
+<td style="text-align:right">10.50.255.254/32</td>
+<td style="text-align:right">172.25.25.12</td>
+</tr>
+<tr>
+<td>branch-edge</td>
+<td>Branch境界、AS 65060</td>
+<td style="text-align:right">10.60.255.254/32</td>
+<td style="text-align:right">172.25.25.21</td>
+</tr>
+<tr>
+<td>branch-core</td>
+<td>Branch内部ルーター</td>
+<td style="text-align:right">10.60.255.1/32</td>
+<td style="text-align:right">172.25.25.22</td>
+</tr>
+<tr>
+<td>main-pc</td>
+<td>Main端末</td>
+<td style="text-align:right">10.50.10.10/24</td>
+<td style="text-align:right">172.25.25.101</td>
+</tr>
+<tr>
+<td>branch-pc</td>
+<td>Branch端末</td>
+<td style="text-align:right">10.60.10.10/24</td>
+<td style="text-align:right">172.25.25.102</td>
+</tr>
+</tbody>
+</table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>接続</th>
+<th>サブネット</th>
+<th style="text-align:right">左側</th>
+<th style="text-align:right">右側</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>main-core—main-edge</td>
+<td>10.255.50.0/30</td>
+<td style="text-align:right">.1</td>
+<td style="text-align:right">.2</td>
+</tr>
+<tr>
+<td>main-edge—branch-edge</td>
+<td>198.51.100.0/30</td>
+<td style="text-align:right">.1</td>
+<td style="text-align:right">.2</td>
+</tr>
+<tr>
+<td>branch-edge—branch-core</td>
+<td>10.255.60.0/30</td>
+<td style="text-align:right">.1</td>
+<td style="text-align:right">.2</td>
+</tr>
+<tr>
+<td>main-core—main-pc</td>
+<td>10.50.10.0/24</td>
+<td style="text-align:right">.1</td>
+<td style="text-align:right">.10</td>
+</tr>
+<tr>
+<td>branch-core—branch-pc</td>
+<td>10.60.10.0/24</td>
+<td style="text-align:right">.1</td>
+<td style="text-align:right">.10</td>
+</tr>
+</tbody>
+</table></div>
+<p>広告する集約経路:</p>
+<ul>
+<li>Main Campus: <code>10.50.0.0/16</code></li>
+<li>Branch Campus: <code>10.60.0.0/16</code></li>
+</ul>
+<h2 id="4-mission" tabindex="-1">4. Mission <a class="header-anchor" href="#4-mission" aria-hidden="true">#</a></h2>
+<h3 id="mission-1-各キャンパスのospfを独立構築する" tabindex="-1">Mission 1: 各キャンパスのOSPFを独立構築する <a class="header-anchor" href="#mission-1-各キャンパスのospfを独立構築する" aria-hidden="true">#</a></h3>
+<ul>
+<li>MainはOSPF process 10、Branchはprocess 20を使用する。</li>
+<li>内部リンク、ユーザーサブネット、Loopbackをarea 0で広告する。</li>
+<li>境界ルーター間のWANリンクはOSPFへ参加させない。</li>
+</ul>
+<h3 id="mission-2-ebgpで境界を接続する" tabindex="-1">Mission 2: eBGPで境界を接続する <a class="header-anchor" href="#mission-2-ebgpで境界を接続する" aria-hidden="true">#</a></h3>
+<ul>
+<li>main-edgeをAS 65050、branch-edgeをAS 65060とする。</li>
+<li>WANリンク上でeBGPネイバーを確立する。</li>
+<li>BGP Router IDをLoopbackの値へ固定する。</li>
+</ul>
+<h3 id="mission-3-集約と再配信を制御する" tabindex="-1">Mission 3: 集約と再配信を制御する <a class="header-anchor" href="#mission-3-集約と再配信を制御する" aria-hidden="true">#</a></h3>
+<ul>
+<li>OSPFからBGPへ渡す経路をprefix-listとroute-mapで自拠点プレフィックスだけに制限する。</li>
+<li>BGPでは<code>/16</code>集約だけを相手拠点へ見せ、配下の<code>/24</code>を抑止する。</li>
+<li>BGPからOSPFへは相手拠点の<code>/16</code>だけを再配信する。</li>
+<li>再配信経路へtagを付け、再注入や経路ループを判別できるようにする。</li>
+</ul>
+<h3 id="mission-4-通信と経路障害を試験する" tabindex="-1">Mission 4: 通信と経路障害を試験する <a class="header-anchor" href="#mission-4-通信と経路障害を試験する" aria-hidden="true">#</a></h3>
+<ul>
+<li>main-pcとbranch-pcの相互疎通を確認する。</li>
+<li>各キャンパス内部では、相手拠点の<code>/16</code>だけが見えることを確認する。</li>
+<li>BGPセッション停止時に相手拠点経路が消え、復旧後に戻ることを確認する。</li>
+</ul>
+<h3 id="追加mission-ipsecを重ねる" tabindex="-1">追加Mission: IPsecを重ねる <a class="header-anchor" href="#追加mission-ipsecを重ねる" aria-hidden="true">#</a></h3>
+<ul>
+<li>基礎Mission合格後にのみ、Theme 14を参照してEdge間へroute-based IPsecを追加する。</li>
+<li>BGPのネイバー到達性、MTU、暗号化前後の経路を別々に確認する。</li>
+<li>IPsec失敗と経路制御失敗を同時に切り分けない。</li>
+</ul>
+<h2 id="5-起動方法" tabindex="-1">5. 起動方法 <a class="header-anchor" href="#5-起動方法" aria-hidden="true">#</a></h2>
+<h3 id="実行場所-orbstack-linux-vmssh-claborb" tabindex="-1">実行場所: OrbStack Linux VM（<code>ssh clab@orb</code>） <a class="header-anchor" href="#実行場所-orbstack-linux-vmssh-claborb" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">cd</span> /Users/shuya/Documents/claude/Mac仮想環境構築/25_campus_multi_site/04_構築
+./deploy.sh deploy
+</code></pre>
+<p>Cisco IOLへのログイン例:</p>
+<pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker attach --sig-proxy=<span class="hljs-literal">false</span> clab-campus-multi-site-main-edge
+</code></pre>
+<p>画面が表示されない場合はEnterを1〜2回押します。機器ごとのコマンド、離脱方法、切り分けは<a href="00_%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3/%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89.html">00_ログイン/ログインコマンド.md</a>を参照してください。</p>
+<p>停止・削除:</p>
+<pre><code class="language-bash">./deploy.sh destroy
+</code></pre>
+<h2 id="6-達成条件" tabindex="-1">6. 達成条件 <a class="header-anchor" href="#6-達成条件" aria-hidden="true">#</a></h2>
+<ul>
+<li>Main側とBranch側でOSPF隣接がそれぞれ<code>FULL</code>。</li>
+<li>Edge間eBGPが<code>Established</code>。</li>
+<li>Main側には<code>10.60.0.0/16</code>、Branch側には<code>10.50.0.0/16</code>だけが拠点間経路として存在。</li>
+<li>相手側の個別<code>/24</code>がBGPテーブルへ漏れていない。</li>
+<li>main-pcとbranch-pcが相互疎通。</li>
+<li>BGP停止・復旧に追従して経路が消失・再学習。</li>
+</ul>
+<h2 id="7-設計上の禁止事項" tabindex="-1">7. 設計上の禁止事項 <a class="header-anchor" href="#7-設計上の禁止事項" aria-hidden="true">#</a></h2>
+<ul>
+<li>prefix-listなしの相互<code>redistribute</code>。</li>
+<li><code>10.0.0.0/8</code>のような実際の拠点範囲より広すぎる集約。</li>
+<li>基礎ルーティングが未完成のままIPsecを追加すること。</li>
+<li>BGP表、OSPF表、RIBを区別せず「pingが通るから完成」と判定すること。</li>
+</ul>
+<h2 id="8-ローカル環境上の注意" tabindex="-1">8. ローカル環境上の注意 <a class="header-anchor" href="#8-ローカル環境上の注意" aria-hidden="true">#</a></h2>
+<ul>
+<li>使用イメージは<code>vrnetlab/cisco_iol:15.7.3M2</code>。</li>
+<li>containerlabのリンク名は<code>eth1</code>形式で記述し、IOS内では<code>Ethernet0/1</code>等に対応します。</li>
+<li>IOLをPID1にするentrypointを使用して<code>docker attach</code>でIOSへ直接接続します。</li>
+<li>Linux端末とのリンクでエミュレータ固有のduplex問題が出た場合、まずEdge間Loopback pingでL3ファブリックを切り分け、その後端末リンクを確認します。</li>
+<li>既存テーマとは異なるラボ名と管理ネットワーク<code>172.25.25.0/24</code>を使用します。</li>
+</ul>
+<h2 id="9-設計文書の読み順" tabindex="-1">9. 設計文書の読み順 <a class="header-anchor" href="#9-設計文書の読み順" aria-hidden="true">#</a></h2>
+<ol>
+<li><a href="00_%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3/%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89.html">機器別ログインコマンド</a></li>
+<li><a href="01_%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9/%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9%E6%9B%B8.html">要件定義書</a></li>
+<li><a href="02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88%E6%9B%B8.html">基本設計書</a></li>
+<li><a href="02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/IP%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9%E7%AE%A1%E7%90%86%E8%A1%A8.html">IPアドレス管理表</a></li>
+<li><a href="02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E3%83%8D%E3%83%83%E3%83%88%E3%83%AF%E3%83%BC%E3%82%AF%E7%89%A9%E7%90%86%E6%A7%8B%E6%88%90%E5%9B%B3.mermaid">ネットワーク物理構成図</a></li>
+<li><a href="03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E3%83%91%E3%83%A9%E3%83%A1%E3%83%BC%E3%82%BF%E3%82%B7%E3%83%BC%E3%83%88.html">パラメータシート</a></li>
+<li><a href="04_%E6%A7%8B%E7%AF%89/%E6%A7%8B%E7%AF%89%E3%83%AD%E3%82%B0_%E3%83%86%E3%83%B3%E3%83%97%E3%83%AC%E3%83%BC%E3%83%88.html">構築ログテンプレート</a></li>
+<li><a href="05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a></li>
+</ol>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-このラボで学ぶこと">1. このラボで学ぶこと</a></li>
+<li class="lvl-2"><a href="#2-トポロジ">2. トポロジ</a></li>
+<li class="lvl-2"><a href="#3-ノードとアドレス設計">3. ノードとアドレス設計</a></li>
+<li class="lvl-2"><a href="#4-mission">4. Mission</a></li>
+<li class="lvl-3"><a href="#mission-1-各キャンパスのospfを独立構築する">Mission 1: 各キャンパスのOSPFを独立構築する</a></li>
+<li class="lvl-3"><a href="#mission-2-ebgpで境界を接続する">Mission 2: eBGPで境界を接続する</a></li>
+<li class="lvl-3"><a href="#mission-3-集約と再配信を制御する">Mission 3: 集約と再配信を制御する</a></li>
+<li class="lvl-3"><a href="#mission-4-通信と経路障害を試験する">Mission 4: 通信と経路障害を試験する</a></li>
+<li class="lvl-3"><a href="#追加mission-ipsecを重ねる">追加Mission: IPsecを重ねる</a></li>
+<li class="lvl-2"><a href="#5-起動方法">5. 起動方法</a></li>
+<li class="lvl-3"><a href="#実行場所-orbstack-linux-vmssh-claborb">実行場所: OrbStack Linux VM（ssh clab@orb）</a></li>
+<li class="lvl-2"><a href="#6-達成条件">6. 達成条件</a></li>
+<li class="lvl-2"><a href="#7-設計上の禁止事項">7. 設計上の禁止事項</a></li>
+<li class="lvl-2"><a href="#8-ローカル環境上の注意">8. ローカル環境上の注意</a></li>
+<li class="lvl-2"><a href="#9-設計文書の読み順">9. 設計文書の読み順</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

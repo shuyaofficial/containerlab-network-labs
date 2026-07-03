@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>ビルドシステム — MD→HTML 静的生成</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>規約</span>
+<span class="sep">/</span>
+<span>ビルド</span></nav>
+      <h1 class="doc-title">ビルドシステム — MD→HTML 静的生成</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">standard</span><span class="tag">build</span><span class="tag">html</span><span class="tag">tooling</span></span>
+      </div>
+      
+      <div class="content">
+<p><code>Mac仮想環境構築/</code> 配下の Markdown 設計書を、<strong>印刷にも耐える閲覧HTML</strong>へ変換する静的ビルダ。
+Markdown がソース・オブ・トゥルース。HTML は生成ビューであり手編集禁止（<a href="../%E3%83%89%E3%82%AD%E3%83%A5%E3%83%A1%E3%83%B3%E3%83%88%E6%A8%99%E6%BA%96.html">ドキュメント標準.md</a> §5）。</p>
+<h2 id="使い方" tabindex="-1">使い方 <a class="header-anchor" href="#使い方" aria-hidden="true">#</a></h2>
+<pre><code class="language-bash"><span class="hljs-built_in">cd</span> 規約/ビルド
+npm install                  <span class="hljs-comment"># 初回のみ</span>
+
+node build.mjs              <span class="hljs-comment"># 全 .md → docs/ をビルド + ポータル index.html</span>
+node build.mjs --file &lt;p&gt;   <span class="hljs-comment"># 単一ファイル（ROOT配下のみ）</span>
+node build.mjs --watch      <span class="hljs-comment"># chokidar でファイル監視・自動再ビルド</span>
+node build.mjs --check      <span class="hljs-comment"># 検証のみ（違反あれば終了コード非0）</span>
+</code></pre>
+<p><code>npm run build</code> / <code>npm run watch</code> / <code>npm run check</code> でも同じ。</p>
+<h2 id="出力" tabindex="-1">出力 <a class="header-anchor" href="#出力" aria-hidden="true">#</a></h2>
+<ul>
+<li><code>docs/</code> にソースと同じディレクトリ構造で <code>.html</code> を生成する（GitHub Pages 公開単位）。</li>
+<li><code>docs/assets/</code> に共通アセットを配置する:
+<ul>
+<li><code>doc.css</code> — 紙系デザイントークンの閲覧スタイル</li>
+<li><code>mermaid.min.js</code> — 図描画（node_modules から同梱コピー。<strong>外部CDN不使用</strong>）</li>
+<li><code>highlight.css</code> — highlight.js の淡色テーマ（github light）</li>
+</ul>
+</li>
+<li><code>docs/index.html</code> — テーマカード一覧のポータル。</li>
+</ul>
+<h2 id="対象と除外" tabindex="-1">対象と除外 <a class="header-anchor" href="#対象と除外" aria-hidden="true">#</a></h2>
+<ul>
+<li>対象: ROOT 配下の全 <code>*.md</code>。</li>
+<li>除外ディレクトリ: <code>node_modules/</code> <code>docs/</code> <code>.git/</code> <code>log/</code> <code>rfc/</code> <code>切り分け/</code> <code>インターロップ/</code> <code>規約/雛形/</code>、および <code>clab-*</code> プレフィックスのディレクトリ。</li>
+<li>ルートは <code>path.resolve(スクリプト位置, '../..')</code> で解決する。<strong>絶対パスはハードコードしない</strong>（GitHub 移植性）。</li>
+</ul>
+<h2 id="frontmatter-とレガシー互換" tabindex="-1">frontmatter とレガシー互換 <a class="header-anchor" href="#frontmatter-とレガシー互換" aria-hidden="true">#</a></h2>
+<ul>
+<li>frontmatter は <a href="https://www.npmjs.com/package/gray-matter">gray-matter</a> で分離し、<code>template.html</code> の
+<code>{{title}} {{breadcrumb}} {{tags}} {{status}} {{date}} {{toc}} {{content}} {{notice}} {{assets}}</code> を置換する。</li>
+<li><strong>strict パス</strong>（<code>規約/</code> と <code>ZERO_zero_trust/</code>）は frontmatter 必須。</li>
+<li><strong>レガシー文書</strong>（テーマ 02〜27 等）は frontmatter が無くてもビルドする。<code>title</code> は先頭 H1 を採用する（無ければファイル名）。</li>
+<li>本文先頭の H1 はマストヘッドの <code>.doc-title</code> と重複するため、生成時に1つだけ除去する。</li>
+</ul>
+<h2 id="markdown-処理" tabindex="-1">Markdown 処理 <a class="header-anchor" href="#markdown-処理" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="https://github.com/markdown-it/markdown-it">markdown-it</a>（<code>html:true, linkify:true</code>）+ <code>markdown-it-anchor</code>（H2/H3 に id とアンカー）+ <code>markdown-it-attrs</code>。</li>
+<li>コードは highlight.js（<code>bash</code> / <code>yaml</code> / <code>text</code> / <code>python</code> ほか。<code>sh</code>→bash、<code>yml</code>→yaml も正規化）。</li>
+<li><code>```mermaid</code> フェンス → <code>&lt;pre class=&quot;mermaid&quot;&gt;</code>。テンプレ側の同梱 <code>mermaid.min.js</code> が <code>startOnLoad</code> で描画する。</li>
+<li>内部リンク: 相対 <code>.md</code> → <code>.html</code> に書き換える（アンカー・クエリ保持）。外部URL・<code>#</code>アンカーはそのまま。</li>
+<li>表は <code>.table-wrap</code> で囲み、横スクロールと印刷崩れを防ぐ。</li>
+</ul>
+<h2 id="デザイン" tabindex="-1">デザイン <a class="header-anchor" href="#デザイン" aria-hidden="true">#</a></h2>
+<ul>
+<li>紙系トークン（<code>--paper</code> <code>--canvas</code> <code>--ink</code> <code>--cisco</code>、ゾーン色、<code>--radius:16px</code>）を構成図HTMLから継承。</li>
+<li>本文最大幅 ~76ch ＋ 右サイドに <code>position:sticky</code> の TOC（H2/H3から生成、スクロール連動でアクティブ表示）。</li>
+<li>日本語タイポ（Hiragino Sans / Noto Sans JP、<code>line-height:1.65</code>、<code>tabular-nums</code>）。</li>
+<li><code>--cisco</code> を見出し・リンク・アクティブTOCに意味的に使用。</li>
+<li>表はヘッダ薄グレー・行ホバー・<code>@media print</code> で罫線明瞭＋<code>break-inside:avoid</code>＋TOC非表示。</li>
+<li>モーションは最小限（<code>cubic-bezier(.22,1,.36,1)</code>、<code>prefers-reduced-motion</code> 対応）。</li>
+</ul>
+<h2 id="--check-検証" tabindex="-1">--check 検証 <a class="header-anchor" href="#--check-検証" aria-hidden="true">#</a></h2>
+<p>strict 対象（<code>規約/</code> <code>ZERO_zero_trust/</code>）は<strong>エラー</strong>、レガシーは<strong>警告</strong>。出力形式は <code>file:line 種別 詳細</code>。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>種別</th>
+<th>内容</th>
+<th>適用範囲</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NFD-FILENAME</code></td>
+<td>ファイル名が NFC 正規化されていない</td>
+<td>全域（エラー）</td>
+</tr>
+<tr>
+<td><code>FM-MISSING</code></td>
+<td>frontmatter が無い</td>
+<td>strict</td>
+</tr>
+<tr>
+<td><code>FM-FIELD</code></td>
+<td>必須フィールド欠落（type/theme/status/date/tags/title）</td>
+<td>strict</td>
+</tr>
+<tr>
+<td><code>H1-COUNT</code></td>
+<td>H1 が 0 個 or 複数</td>
+<td>strict</td>
+</tr>
+<tr>
+<td><code>LINK-BROKEN</code></td>
+<td>相対 <code>.md</code> リンクの参照先が存在しない</td>
+<td>strict</td>
+</tr>
+<tr>
+<td><code>ABS-PATH</code></td>
+<td>絶対パス（<code>/Users/…</code>）リンクの埋め込み</td>
+<td>strict</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="ポータル-indexhtml" tabindex="-1">ポータル index.html <a class="header-anchor" href="#ポータル-indexhtml" aria-hidden="true">#</a></h2>
+<ul>
+<li>テーマ（トップレベルディレクトリ）ごとにカード表示。<code>ZERO_</code> を先頭、以降は番号順。</li>
+<li>各カードにテーマ名・文書数・文書リンク一覧。</li>
+<li><code>ロードマップ/進捗管理.md</code> が読めれば進捗状態の絵文字を各カードに表示する（読めなくても壊れない）。</li>
+</ul>
+<h2 id="既知の制限" tabindex="-1">既知の制限 <a class="header-anchor" href="#既知の制限" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>レガシー NFD ファイル名</strong>: テーマ 02〜27・<code>ロードマップ/</code>・<code>環境/</code> に NFC 未正規化のファイル名が残っており、<code>--check</code> が <code>NFD-FILENAME</code> エラーを出す（仕様上 NFD は全域エラー）。これらは本標準の遡及対象外（<a href="../README.html">規約/README.md</a> 適用範囲）のため未修正。strict 対象（<code>規約/</code> <code>ZERO_zero_trust/</code>）には NFD 違反は無い。コミットゲートとして使う場合、当面はレガシー由来のエラーを許容するか、対象を strict に絞る運用が必要。</li>
+<li><code>--check</code> はコードフェンス内の見出し・リンクを除外するが、インライン <code>&lt;code&gt;</code> 内の疑似リンクまでは判定しない（実害は軽微）。</li>
+<li><code>mermaid.min.js</code> は約 3.4MB。図を含む文書でのみロードされ、含まない文書でも <code>&lt;script&gt;</code> タグ自体は残る（描画は <code>startOnLoad</code> が図の有無を判定）。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#使い方">使い方</a></li>
+<li class="lvl-2"><a href="#出力">出力</a></li>
+<li class="lvl-2"><a href="#対象と除外">対象と除外</a></li>
+<li class="lvl-2"><a href="#frontmatter-とレガシー互換">frontmatter とレガシー互換</a></li>
+<li class="lvl-2"><a href="#markdown-処理">Markdown 処理</a></li>
+<li class="lvl-2"><a href="#デザイン">デザイン</a></li>
+<li class="lvl-2"><a href="#--check-検証">--check 検証</a></li>
+<li class="lvl-2"><a href="#ポータル-indexhtml">ポータル index.html</a></li>
+<li class="lvl-2"><a href="#既知の制限">既知の制限</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

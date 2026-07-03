@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>参考資料 — ネットワーク技術の書籍はこちら → `/Users/shuya/Documents/本/ネットワーク技術/`</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>参考資料</span></nav>
+      <h1 class="doc-title">参考資料 — ネットワーク技術の書籍はこちら → `/Users/shuya/Documents/本/ネットワーク技術/`</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>ネットワーク学習用の参考書籍（PDF＋AI向けOCR検索索引）は、蔵書整理のため
+<strong><code>/Users/shuya/Documents/本/ネットワーク技術/</code></strong> に移動しました。</p>
+<h2 id="-aiへの指示ネットワークの書籍を参照したいとき" tabindex="-1">🤖 AIへの指示：ネットワークの書籍を参照したいとき <a class="header-anchor" href="#-aiへの指示ネットワークの書籍を参照したいとき" aria-hidden="true">#</a></h2>
+<p>ラボ検証・設計・トラブルシュート等で書籍を参照したくなったら、上記フォルダの検索システムを使う。
+<strong>元PDF（数百MB・画像のみ）は直接読まないこと。</strong></p>
+<pre><code class="language-bash"><span class="hljs-built_in">cd</span> <span class="hljs-string">&quot;/Users/shuya/Documents/本/ネットワーク技術&quot;</span>
+
+<span class="hljs-comment"># 全5冊を横断検索（どの本にあるか不明なとき）</span>
+python3 search_all.py <span class="hljs-string">&quot;OSPF ネイバーが上がらない 確認&quot;</span>
+
+<span class="hljs-comment"># 特定の本だけ検索</span>
+python3 <span class="hljs-string">&quot;ネットワーク「動作試験」入門/_index/search.py&quot;</span> <span class="hljs-string">&quot;show ip ospf neighbor&quot;</span>
+</code></pre>
+<p>→ ヒットした本の <code>_index/text/pNNN.md</code>（数KB）だけを Read する。
+→ 図・トポロジ・コマンド出力が必要なときだけ <code>_index/pages/pNNN.jpg</code>（各&lt;1MB）を Read する。</p>
+<h2 id="収録書籍5冊" tabindex="-1">収録書籍（5冊） <a class="header-anchor" href="#収録書籍5冊" aria-hidden="true">#</a></h2>
+<ul>
+<li>ネットワーク「動作試験」入門 …… 動作試験・疎通確認・トラブルシュート</li>
+<li>ネットワーク・デザインパターン …… 設計パターン・冗長化・負荷分散</li>
+<li>ネットワーク技術＆設計入門 …… 技術と設計の基礎</li>
+<li>マスタリングTCP/IP 入門編 …… TCP/IPプロトコル全般</li>
+<li>マスタリングTCP/IP 情報セキュリティ編 …… 暗号・認証・FW</li>
+</ul>
+<p>詳細は移動先の <code>README.md</code> と各本の <code>_index/INDEX.md</code>（目次・タグ索引）を参照。</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-aiへの指示ネットワークの書籍を参照したいとき">🤖 AIへの指示：ネットワークの書籍を参照したいとき</a></li>
+<li class="lvl-2"><a href="#収録書籍5冊">収録書籍（5冊）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

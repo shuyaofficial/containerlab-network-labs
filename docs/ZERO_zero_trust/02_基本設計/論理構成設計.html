@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜論理構成設計</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>02_基本設計</span></nav>
+      <h1 class="doc-title">テーマZERO｜論理構成設計</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">logical-design</span><span class="tag">docker</span><span class="tag">network</span><span class="tag">flow</span></span>
+      </div>
+      
+      <div class="content">
+<p><a href="%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88%E6%9B%B8.html">基本設計書</a> のゾーン方針を、ノード・ネットワーク・ポート・通信フローのレベルに落とす。
+アドレスの正は <a href="IP%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9%E7%AE%A1%E7%90%86%E8%A1%A8.html">IPアドレス管理表</a>。ここでは「何が何とどう通信するか」を確定する。</p>
+<h2 id="ノード一覧論理" tabindex="-1">ノード一覧（論理） <a class="header-anchor" href="#ノード一覧論理" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>観点</th>
+<th>ゾーン</th>
+<th>役割</th>
+<th>Phase</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>client</td>
+<td>土台</td>
+<td>Untrust</td>
+<td>利用者端末（認証してアプリを使う）</td>
+<td>0</td>
+</tr>
+<tr>
+<td>external</td>
+<td>土台</td>
+<td>Untrust</td>
+<td>外部/未管理端末（SWG 検査の外部先）</td>
+<td>0</td>
+</tr>
+<tr>
+<td>app</td>
+<td>土台</td>
+<td>Trust</td>
+<td>保護対象サービス</td>
+<td>0</td>
+</tr>
+<tr>
+<td>keycloak</td>
+<td>ID統制</td>
+<td>DMZ</td>
+<td>OIDC IdP。トークン発行</td>
+<td>1</td>
+</tr>
+<tr>
+<td>oauth2-proxy → pomerium</td>
+<td>NWセキュリティ</td>
+<td>DMZ</td>
+<td>IAP。未認証拒否・認可</td>
+<td>2</td>
+</tr>
+<tr>
+<td>mitmproxy</td>
+<td>WEB+DLP</td>
+<td>DMZ</td>
+<td>SWG（SSL bump）＋ DLP アドオン</td>
+<td>4/5</td>
+</tr>
+<tr>
+<td>squid + suricata</td>
+<td>WEB 代替</td>
+<td>DMZ</td>
+<td>SSL bump ＋ IDS（arm64 次第）</td>
+<td>4</td>
+</tr>
+<tr>
+<td>step-ca</td>
+<td>デバイス統制</td>
+<td>DMZ</td>
+<td>mTLS 発行・posture claim モック</td>
+<td>6</td>
+</tr>
+<tr>
+<td>loki + promtail</td>
+<td>SIEM</td>
+<td>可観測</td>
+<td>ログ集約・保存・収集</td>
+<td>3</td>
+</tr>
+<tr>
+<td>grafana</td>
+<td>SIEM</td>
+<td>可観測</td>
+<td>可視化</td>
+<td>3</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="docker-bridge--サブネット設計" tabindex="-1">docker bridge / サブネット設計 <a class="header-anchor" href="#docker-bridge--サブネット設計" aria-hidden="true">#</a></h2>
+<p>4本の docker bridge でゾーンを分離する。ゾーン間の通信は<strong>設計した経路のみ</strong>を許容し、Untrust→Trust の直通は禁止する。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>bridge 名</th>
+<th>サブネット</th>
+<th>GW</th>
+<th>所属ノード</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>zt-untrust</code></td>
+<td>172.30.0.0/24</td>
+<td>172.30.0.1</td>
+<td>client, external ／（足）pomerium, oauth2-proxy, mitmproxy, squid</td>
+</tr>
+<tr>
+<td><code>zt-dmz</code></td>
+<td>172.30.10.0/24</td>
+<td>172.30.10.1</td>
+<td>keycloak, pomerium, oauth2-proxy, mitmproxy, squid, suricata, step-ca</td>
+</tr>
+<tr>
+<td><code>zt-trust</code></td>
+<td>172.30.20.0/24</td>
+<td>172.30.20.1</td>
+<td>app ／（足）pomerium, oauth2-proxy</td>
+</tr>
+<tr>
+<td><code>zt-obs</code></td>
+<td>172.30.30.0/24</td>
+<td>172.30.30.1</td>
+<td>loki, promtail, grafana</td>
+</tr>
+</tbody>
+</table></div>
+<p>分離の要点:</p>
+<ul>
+<li><strong>関所のマルチホーム</strong>: Pomerium / oauth2-proxy は Untrust（受信）・DMZ（IdP 照会）・Trust（<code>app</code> 転送）に足を持つ。これにより Untrust から Trust へ「関所経由でしか」到達できない。</li>
+<li><strong>SWG のマルチホーム</strong>: mitmproxy / squid は Untrust に足を持ち、<code>client</code> の外向き通信を横取りして <code>external</code> へ流す。</li>
+<li><strong>可観測の片方向</strong>: 全ゾーンから <code>zt-obs</code> へログが片方向で流入する。<code>zt-obs</code> からの戻り通信は Grafana 参照のみ。</li>
+<li><strong>Phase 0 の最小構成</strong>: Phase 0 では <code>client</code>/<code>external</code>（Untrust）と <code>app</code>（Trust）のみ。関所が無いため、Untrust→Trust の直通禁止を確認する土台として使う（<code>client</code>→<code>app</code> 疎通はゲート確認のための設計上の許可経路）。</li>
+</ul>
+<h2 id="ポート設計" tabindex="-1">ポート設計 <a class="header-anchor" href="#ポート設計" aria-hidden="true">#</a></h2>
+<p>コンテナ間はサービス名 + 標準ポートで通信する。VM ホストへの公開は <a href="IP%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9%E7%AE%A1%E7%90%86%E8%A1%A8.html">IPアドレス管理表</a> のホストポート表に集約。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>待受ポート（コンテナ内）</th>
+<th>プロトコル</th>
+<th>呼び出し元</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>app</td>
+<td>80</td>
+<td>HTTP</td>
+<td>pomerium（認可後）, client（Phase 0 疎通）</td>
+<td>保護対象サービス</td>
+</tr>
+<tr>
+<td>keycloak</td>
+<td>8080</td>
+<td>HTTP</td>
+<td>pomerium/oauth2-proxy, ホスト（管理）</td>
+<td>OIDC / 管理画面</td>
+</tr>
+<tr>
+<td>pomerium</td>
+<td>443 / 80</td>
+<td>HTTPS/HTTP</td>
+<td>client</td>
+<td>IAP 入口</td>
+</tr>
+<tr>
+<td>oauth2-proxy</td>
+<td>4180</td>
+<td>HTTP</td>
+<td>client</td>
+<td>IAP 入口（先行）</td>
+</tr>
+<tr>
+<td>mitmproxy</td>
+<td>8080（proxy）/ 8081（web UI）</td>
+<td>HTTP proxy</td>
+<td>client（外向き）</td>
+<td>SWG / DLP</td>
+</tr>
+<tr>
+<td>squid</td>
+<td>3128</td>
+<td>HTTP proxy</td>
+<td>client（外向き）</td>
+<td>SWG 代替</td>
+</tr>
+<tr>
+<td>step-ca</td>
+<td>9000</td>
+<td>HTTPS</td>
+<td>pomerium, client（証明書取得）</td>
+<td>ACME / mTLS 発行</td>
+</tr>
+<tr>
+<td>loki</td>
+<td>3100</td>
+<td>HTTP</td>
+<td>promtail, grafana</td>
+<td>ログ受信 / クエリ</td>
+</tr>
+<tr>
+<td>promtail</td>
+<td>−（送信のみ）</td>
+<td>HTTP</td>
+<td>−</td>
+<td>各ノードのログを Loki へ push</td>
+</tr>
+<tr>
+<td>grafana</td>
+<td>3000</td>
+<td>HTTP</td>
+<td>ホスト（閲覧）</td>
+<td>ダッシュボード</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>ポート番号は各 OSS の既定値に基づく設計値。Phase 実装時に確定・調整する。</p>
+</blockquote>
+<h2 id="通信フロー" tabindex="-1">通信フロー <a class="header-anchor" href="#通信フロー" aria-hidden="true">#</a></h2>
+<p>データ面の流れは3本。基本設計書の全体構成を、経路とプロトコル付きで詳細化する。</p>
+<h3 id="フロー1-認証フローclient--iap--idp--app" tabindex="-1">フロー1: 認証フロー（client → IAP → IdP → app） <a class="header-anchor" href="#フロー1-認証フローclient--iap--idp--app" aria-hidden="true">#</a></h3>
+<p>未認証アクセスは関所で止め、認証済みのみ Trust へ転送する。</p>
+<pre class="mermaid">sequenceDiagram
+    participant C as client (Untrust)
+    participant P as pomerium/oauth2-proxy (DMZ:IAP)
+    participant K as keycloak (DMZ:IdP)
+    participant A as app (Trust)
+    C-&gt;&gt;P: (1) app へアクセス要求
+    P--&gt;&gt;C: (2) 未認証 → Keycloak へリダイレクト
+    C-&gt;&gt;K: (3) OIDC ログイン（認可コードフロー）
+    K--&gt;&gt;C: (4) 認可コード
+    C-&gt;&gt;P: (5) コードを提示
+    P-&gt;&gt;K: (6) トークン検証
+    K--&gt;&gt;P: (7) ID/アクセストークン
+    P-&gt;&gt;A: (8) 認可済のみ転送
+    A--&gt;&gt;C: (9) 応答（IAP 経由）
+</pre>
+<ul>
+<li>ゲート: Phase 1 は (3)(4) のトークン取得まで。Phase 2 は (2) の未認証拒否と (8) の認可済転送。</li>
+</ul>
+<h3 id="フロー2-プロキシフローclient--swg--external" tabindex="-1">フロー2: プロキシフロー（client → SWG → external） <a class="header-anchor" href="#フロー2-プロキシフローclient--swg--external" aria-hidden="true">#</a></h3>
+<p>外向き Web 通信は SWG を強制経由し、SSL bump で可視化・DLP 検査してから外部へ流す。</p>
+<pre class="mermaid">sequenceDiagram
+    participant C as client (Untrust)
+    participant M as mitmproxy (DMZ:SWG+DLP)
+    participant E as external (Untrust)
+    C-&gt;&gt;M: (1) 外向き HTTP(S)（proxy 強制経由）
+    M-&gt;&gt;M: (2) SSL bump で復号・検査 / DLP アドオンで内容判定
+    alt キーワード検出（DLP）
+        M--&gt;&gt;C: (3a) ブロック応答
+        M-&gt;&gt;M: (3b) 検知イベントをログ出力
+    else 問題なし
+        M-&gt;&gt;E: (4) 検査後に転送
+        E--&gt;&gt;C: (5) 応答（SWG 経由）
+    end
+</pre>
+<ul>
+<li>ゲート: Phase 4 は (1)(2)(4) の強制経由と SSL bump 可視化。Phase 5 は (2)(3a)(3b) の検知・ブロック・記録。</li>
+</ul>
+<h3 id="フロー3-ログフロー各ノード--promtail--loki--grafana" tabindex="-1">フロー3: ログフロー（各ノード → Promtail → Loki → Grafana） <a class="header-anchor" href="#フロー3-ログフロー各ノード--promtail--loki--grafana" aria-hidden="true">#</a></h3>
+<p>全ゾーンのログを可観測ゾーンへ片方向で集約し、Grafana で可視化する。</p>
+<pre class="mermaid">graph LR
+    K[keycloak&lt;br/&gt;認証ログ] --&gt; PT[promtail]
+    P[pomerium&lt;br/&gt;認可ログ] --&gt; PT
+    M[mitmproxy&lt;br/&gt;検査/DLPログ] --&gt; PT
+    S[step-ca&lt;br/&gt;証明書ログ] --&gt; PT
+    PT --&gt; L[loki&lt;br/&gt;保存]
+    L --&gt; G[grafana&lt;br/&gt;可視化]
+</pre>
+<ul>
+<li>片方向: 生成元 → 可観測ゾーンへのみ流入し、端末側から消せない構成を志向する（改ざん耐性、基本設計書 セキュリティ方針）。</li>
+<li>ゲート: Phase 3 は Phase 1/2 のログが Grafana で表示できること。以降の Phase では「拒否・許可・検知」の件数を可視化する。</li>
+</ul>
+<h2 id="名前解決経路の前提" tabindex="-1">名前解決・経路の前提 <a class="header-anchor" href="#名前解決経路の前提" aria-hidden="true">#</a></h2>
+<ul>
+<li>コンテナ間は docker 組み込み DNS（サービス名）で解決する。IP は補助。</li>
+<li>ゾーン間は各ノードの multi-home（足の有無）で経路を制御する。ルーティングの作り込みは行わない（docker network で完結、D-1）。</li>
+<li>Phase 0 では関所・SWG が未配置のため、Untrust↔Trust の疎通は <code>client</code>→<code>app</code> の土台確認に限定する。Phase 2 以降は関所経由に置き換える。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88%E6%9B%B8.html">基本設計書</a></li>
+<li><a href="IP%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9%E7%AE%A1%E7%90%86%E8%A1%A8.html">IPアドレス管理表</a></li>
+<li><a href="%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a></li>
+<li><a href="%E3%83%8D%E3%83%83%E3%83%88%E3%83%AF%E3%83%BC%E3%82%AF%E7%89%A9%E7%90%86%E6%A7%8B%E6%88%90%E5%9B%B3.mermaid">ネットワーク物理構成図（Mermaid）</a></li>
+<li><a href="%E3%83%8D%E3%83%83%E3%83%88%E3%83%AF%E3%83%BC%E3%82%AF%E6%A7%8B%E6%88%90%E5%9B%B3.html">ネットワーク構成図（HTML）</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#ノード一覧論理">ノード一覧（論理）</a></li>
+<li class="lvl-2"><a href="#docker-bridge--サブネット設計">docker bridge / サブネット設計</a></li>
+<li class="lvl-2"><a href="#ポート設計">ポート設計</a></li>
+<li class="lvl-2"><a href="#通信フロー">通信フロー</a></li>
+<li class="lvl-3"><a href="#フロー1-認証フローclient--iap--idp--app">フロー1: 認証フロー（client → IAP → IdP → app）</a></li>
+<li class="lvl-3"><a href="#フロー2-プロキシフローclient--swg--external">フロー2: プロキシフロー（client → SWG → external）</a></li>
+<li class="lvl-3"><a href="#フロー3-ログフロー各ノード--promtail--loki--grafana">フロー3: ログフロー（各ノード → Promtail → Loki → Grafana）</a></li>
+<li class="lvl-2"><a href="#名前解決経路の前提">名前解決・経路の前提</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

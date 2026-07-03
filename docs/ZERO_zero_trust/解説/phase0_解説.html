@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Phase 0 解説 — 土台（ゾーン分離とゲート試験）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>解説</span></nav>
+      <h1 class="doc-title">Phase 0 解説 — 土台（ゾーン分離とゲート試験）</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">explainer</span><span class="tag">docker</span><span class="tag">network</span><span class="tag">foundation</span></span>
+      </div>
+      
+      <div class="content">
+<h2 id="1-このフェーズで何が実現されるか" tabindex="-1">1. このフェーズで何が実現されるか <a class="header-anchor" href="#1-このフェーズで何が実現されるか" aria-hidden="true">#</a></h2>
+<p>Phase 0 は、Zero Trust の6観点すべてが乗る「土台」を作る。具体的には docker bridge で4ゾーン（Untrust / DMZ / Trust / 可観測）を分離し、<code>wbitt/network-multitool</code> を流用した3ノード（<code>client</code> / <code>app</code> / <code>external</code>）で最小の疎通経路を確認する。あわせて frontmatter・HTML ビルド・git といった本ラボの運用規約が正しく回ることも確認する。</p>
+<ul>
+<li><strong>ビフォー</strong>: ネットワークもドキュメント規約も存在しない、まっさらな状態。</li>
+<li><strong>アフター</strong>: <code>client</code>（Untrust）→ <code>app</code>（Trust）に ping/curl が通り、<code>external</code>（Untrust）は別ノードとして独立している。ゾーンは切られているが、Phase 1 以降で導入する関所（IAP）はまだ無いため、この段階での <code>client</code>→<code>app</code> 疎通は「関所を後から挿入するための土台確認」であり、最終形の通信経路ではない。</li>
+</ul>
+<p>この段階では認証も認可も検査も行われない。あくまで「ゾーンを分けられること」「ノードが意図通りに配置できること」「規約が壊れずに回ること」を確認するフェーズである。</p>
+<h2 id="2-なぜこの構成か" tabindex="-1">2. なぜこの構成か <a class="header-anchor" href="#2-なぜこの構成か" aria-hidden="true">#</a></h2>
+<p>Phase 0 自体に対応する商用製品は無い（土台・下ごしらえの位置づけ）。ただし、ここで採用した考え方は商用 ZT 製品のアーキテクチャそのものと対応する。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>本ラボでの要素</th>
+<th>商用 ZT 製品での対応概念</th>
+<th>対応の意味</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>docker bridge によるゾーン分離（Untrust/DMZ/Trust/可観測）</td>
+<td>Zscaler・Cisco Secure Access 等の「セグメント」「マイクロセグメンテーション」</td>
+<td>ネットワークを役割ごとに区切り、境界を明示する発想は商用 ZT でも共通</td>
+</tr>
+<tr>
+<td>Untrust→Trust の直通禁止</td>
+<td>ZTNA の「暗黙の信頼をなくす」原則そのもの</td>
+<td>VPN のようにネットワークに乗れば内部が見える、という設計を最初から排除する</td>
+</tr>
+<tr>
+<td><code>wbitt/network-multitool</code> の使い回し</td>
+<td>商用製品の PoC 環境で使う疎通確認端末</td>
+<td>本質はエンドポイントではなく「疎通経路の検証」なので、専用アプリを自作しない（D-6, YAGNI）</td>
+</tr>
+</tbody>
+</table></div>
+<p>なぜ Phase 0 から始めるか: いきなり Keycloak や Pomerium を入れると、ネットワーク設計のミスなのか OSS 設定のミスなのか切り分けが難しくなる。先にゾーンと疎通だけを確定させておくことで、Phase 1 以降の問題切り分けが「土台は健全」という前提の上で進められる。</p>
+<p><strong>実務でこの知識がどこで効くか</strong>: Cisco 系の実務経験がある読者にとって、VLAN/ゾーンベースファイアウォールの設計思想と直結する。ASA/FTD のゾーン（inside/outside/dmz）や ACL の「デフォルト拒否」と同じ発想が、docker bridge + コンテナ配置というソフトウェア的な手段で再現されている、と読み替えると理解が早い。</p>
+<h2 id="3-仕組みの核心" tabindex="-1">3. 仕組みの核心 <a class="header-anchor" href="#3-仕組みの核心" aria-hidden="true">#</a></h2>
+<p>Phase 0 のネットワーク構造は次の通り（<a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88%E6%9B%B8.html">基本設計書</a>・<a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a> より）。</p>
+<pre class="mermaid">graph LR
+    subgraph U[&quot;Untrust (172.30.0.0/24)&quot;]
+        C[client&lt;br/&gt;172.30.0.11]
+        E[external&lt;br/&gt;172.30.0.12]
+    end
+    subgraph T[&quot;Trust (172.30.20.0/24)&quot;]
+        A[app&lt;br/&gt;172.30.20.21]
+    end
+    C --&gt;|ping/curl&lt;br/&gt;ゲート確認用| A
+    C -.-&gt;|同一ゾーン内&lt;br/&gt;疎通は自由| E
+</pre>
+<p>ポイントは3つ。</p>
+<ol>
+<li><strong>ゾーンは docker bridge（サブネット）の単位で切る</strong>。<code>zt-untrust</code>（172.30.0.0/24）、<code>zt-trust</code>（172.30.20.0/24）はそれぞれ別の bridge であり、L3 的に隔離されている。</li>
+<li><strong>Phase 0 では関所が無い</strong>ため、<code>client</code>→<code>app</code> の疎通は「本来はここに IAP が挟まる」という前提の仮経路である。Phase 2 で Pomerium/oauth2-proxy が入ると、この直通経路は無くなり、関所経由に置き換わる。</li>
+<li><strong>名前解決は docker 組み込み DNS</strong>（サービス名）を使う。IP アドレスは補助情報であり、コンテナ間通信は <code>app</code> のようなサービス名で行う。</li>
+</ol>
+<h2 id="4-自分で触って確認する手順" tabindex="-1">4. 自分で触って確認する手順 <a class="header-anchor" href="#4-自分で触って確認する手順" aria-hidden="true">#</a></h2>
+<p>Phase 0 はこのタスクと並行してデプロイ実施中のため、以下は<strong>現行の手順</strong>として記載する（<a href="../00_%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3/%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89.html">ログインコマンド</a>・<a href="../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a> T-0-* 準拠）。</p>
+<h3 id="手順1-vm-へ接続する" tabindex="-1">手順1: VM へ接続する <a class="header-anchor" href="#手順1-vm-へ接続する" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">ssh clab@orb
+docker --version
+containerlab version
+</code></pre>
+<h3 id="手順2-ノードが3台とも-up-か確認するt-0-1" tabindex="-1">手順2: ノードが3台とも Up か確認する（T-0-1） <a class="header-anchor" href="#手順2-ノードが3台とも-up-か確認するt-0-1" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">docker ps --format <span class="hljs-string">&#x27;table {{.Names}}\t{{.Image}}\t{{.Status}}&#x27;</span>
+</code></pre>
+<p>期待結果: <code>clab-zero-client</code> / <code>clab-zero-app</code> / <code>clab-zero-external</code> の3コンテナが <code>Up</code> 状態で表示される。コンテナ名の <code>clab-&lt;lab名&gt;-&lt;node名&gt;</code> はcontainerlab の命名規約。</p>
+<h3 id="手順3-client--app-の疎通を確認するt-0-2-t-0-3" tabindex="-1">手順3: client → app の疎通を確認する（T-0-2, T-0-3） <a class="header-anchor" href="#手順3-client--app-の疎通を確認するt-0-2-t-0-3" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">docker <span class="hljs-built_in">exec</span> clab-zero-client ping -c 3 app
+docker <span class="hljs-built_in">exec</span> clab-zero-client curl -sS http://app/
+</code></pre>
+<p>期待結果: ping は 3/3 応答。curl は <code>app</code>（multitool のデフォルトページ）の応答本文が返る。ここで<strong>なぜ <code>app</code> という名前で届くのか</strong>を意識する — IP を直接指定せず、docker の組み込み DNS がサービス名を解決している。</p>
+<h3 id="手順4-client-がどのゾーンに属しているか確認するt-0-4" tabindex="-1">手順4: client がどのゾーンに属しているか確認する（T-0-4） <a class="header-anchor" href="#手順4-client-がどのゾーンに属しているか確認するt-0-4" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">docker <span class="hljs-built_in">exec</span> clab-zero-client ip -4 addr show
+</code></pre>
+<p>期待結果: <code>172.30.0.0/24</code>（Untrust）のアドレスが割り当てられている。<code>app</code> 側で同様に確認すると <code>172.30.20.0/24</code>（Trust）になっているはずで、<strong>別サブネットのノード同士が疎通できている</strong>ことが Phase 0 の土台部分の確認ポイントになる。</p>
+<h3 id="手順5-external-が-client-と隔離されていないことを確認する同一ゾーン内は自由疎通の設計" tabindex="-1">手順5: external が client と隔離されていないことを確認する（同一ゾーン内は自由疎通の設計） <a class="header-anchor" href="#手順5-external-が-client-と隔離されていないことを確認する同一ゾーン内は自由疎通の設計" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">docker <span class="hljs-built_in">exec</span> clab-zero-client ping -c 3 external
+</code></pre>
+<p>期待結果: 同じ Untrust ゾーン内なので疎通できる。Phase 4 でこの経路が SWG 強制経由に置き換わる前段階として、「今は素通し」であることを確認しておく。</p>
+<h3 id="手順6-規約ビルドが通ることを確認するt-0-5" tabindex="-1">手順6: 規約ビルドが通ることを確認する（T-0-5） <a class="header-anchor" href="#手順6-規約ビルドが通ることを確認するt-0-5" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">node 規約/ビルド/build.mjs --check
+</code></pre>
+<p>期待結果: pass。frontmatter の必須項目・NFC ファイル名・相対リンク切れが検出されない。</p>
+<h2 id="5-考えどころ" tabindex="-1">5. 考えどころ <a class="header-anchor" href="#5-考えどころ" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>本番設計ならどうするか</strong>: 実際の ZT 導入では、ゾーン分離だけでなく VPC/VLAN のルーティングテーブル、セキュリティグループ、ファイアウォールルールの多重防御を組み合わせる。本ラボは docker bridge 1層のみで、L2/L3 の作り込み（ルーティング・NAT・ACL の詳細）は行わない（D-1）。</li>
+<li><strong>このラボの簡略化ポイント</strong>:
+<ul>
+<li>冗長化なし（単一 VM・単一コンテナ）。可用性は検証対象外。</li>
+<li><code>client</code>→<code>app</code> の直通経路は Phase 0 限定の暫定経路。本番相当の ZT では最初から関所必須で、こうした「関所なし疎通」は許容されない。</li>
+<li>IOL（実機/仮想ルータの L2/L3 検証）とは連携しない。ZT の主眼は L7 の認可であり、L2/L3 の作り込みは目的が異なる（D-1）。</li>
+</ul>
+</li>
+</ul>
+<h2 id="6-つまずきポイント" tabindex="-1">6. つまずきポイント <a class="header-anchor" href="#6-つまずきポイント" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>コンテナ名が想定と違う</strong>: containerlab の命名規約 <code>clab-&lt;lab名&gt;-&lt;node名&gt;</code> を前提にコマンドを打つと、lab 名が違って <code>No such container</code> になることがある。まず <code>docker ps</code> で実際の名前を確認する。</li>
+<li><strong>ping は通るが curl が失敗する</strong>: L2 到達（ping）と L7 到達（HTTP）は別の層。ping OK なのに curl NG なら、<code>app</code> 側のサービスプロセスが起きているか（<code>docker logs clab-zero-app</code>）を先に見る。<a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a> の「L1 コンテナ起動→L2 ネットワーク到達」の順で下から確認する。</li>
+<li><strong>frontmatter ビルドが落ちる</strong>: <code>date</code> の形式（YYYY-MM-DD）や <code>tags</code> の配列表記の崩れが典型的な原因。<a href="../../%E8%A6%8F%E7%B4%84/frontmatter%E3%82%B9%E3%82%AD%E3%83%BC%E3%83%9E.html">frontmatterスキーマ</a> と diff を取ると早い。</li>
+<li><strong>DNS 解決に失敗する</strong>: docker bridge のカスタムネットワーク作成順序によっては組み込み DNS が効かないことがある。<code>docker network inspect zt-untrust</code> でノードが正しく参加しているか確認する。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88%E6%9B%B8.html">基本設計書</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/IP%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9%E7%AE%A1%E7%90%86%E8%A1%A8.html">IPアドレス管理表</a></li>
+<li><a href="../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a></li>
+<li><a href="../00_%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3/%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89.html">ログインコマンド</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-このフェーズで何が実現されるか">1. このフェーズで何が実現されるか</a></li>
+<li class="lvl-2"><a href="#2-なぜこの構成か">2. なぜこの構成か</a></li>
+<li class="lvl-2"><a href="#3-仕組みの核心">3. 仕組みの核心</a></li>
+<li class="lvl-2"><a href="#4-自分で触って確認する手順">4. 自分で触って確認する手順</a></li>
+<li class="lvl-3"><a href="#手順1-vm-へ接続する">手順1: VM へ接続する</a></li>
+<li class="lvl-3"><a href="#手順2-ノードが3台とも-up-か確認するt-0-1">手順2: ノードが3台とも Up か確認する（T-0-1）</a></li>
+<li class="lvl-3"><a href="#手順3-client--app-の疎通を確認するt-0-2-t-0-3">手順3: client → app の疎通を確認する（T-0-2, T-0-3）</a></li>
+<li class="lvl-3"><a href="#手順4-client-がどのゾーンに属しているか確認するt-0-4">手順4: client がどのゾーンに属しているか確認する（T-0-4）</a></li>
+<li class="lvl-3"><a href="#手順5-external-が-client-と隔離されていないことを確認する同一ゾーン内は自由疎通の設計">手順5: external が client と隔離されていないことを確認する（同一ゾーン内は自由疎通の設計）</a></li>
+<li class="lvl-3"><a href="#手順6-規約ビルドが通ることを確認するt-0-5">手順6: 規約ビルドが通ることを確認する（T-0-5）</a></li>
+<li class="lvl-2"><a href="#5-考えどころ">5. 考えどころ</a></li>
+<li class="lvl-2"><a href="#6-つまずきポイント">6. つまずきポイント</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

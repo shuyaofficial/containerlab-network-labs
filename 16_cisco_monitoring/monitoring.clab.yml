@@ -1,0 +1,19 @@
+name: monitoring
+
+topology:
+  nodes:
+    pc1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+    
+    r1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+
+    nms:
+      kind: linux
+      image: wbitt/network-multitool
+
+  links:
+    - endpoints: ["pc1:eth1", "r1:eth1"]
+    - endpoints: ["r1:eth2", "nms:eth1"]

@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>基本設計書: QoS/ACL/route-map応用</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>27_qos_acl_policy_control</span>
+<span class="sep">/</span>
+<span>02_基本設計</span></nav>
+      <h1 class="doc-title">基本設計書: QoS/ACL/route-map応用</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="1-ネットワークゾーンと論理構成" tabindex="-1">1. ネットワークゾーンと論理構成 <a class="header-anchor" href="#1-ネットワークゾーンと論理構成" aria-hidden="true">#</a></h2>
+<p>本システムは『ネットワーク・デザインパターン』のコンセプトに基づき、4つのゾーンを構成する。各ゾーンの境界（エッジルータやディストリビューションスイッチ）で適切なセキュリティ・QoSポリシーを適用する。</p>
+<ul>
+<li><strong>Trustゾーン</strong>: 本社・支社の社内LAN (10.27.10.0/24, 10.27.20.0/24, 10.27.50.0/24)</li>
+<li><strong>DMZゾーン</strong>: 本社公開サーバ (10.27.30.0/24)</li>
+<li><strong>Untrustゾーン</strong>: ISP/インターネット (198.51.100.0/24)</li>
+<li><strong>WANゾーン</strong>: 拠点間接続網</li>
+</ul>
+<h2 id="2-アクセス制御acl設計" tabindex="-1">2. アクセス制御（ACL）設計 <a class="header-anchor" href="#2-アクセス制御acl設計" aria-hidden="true">#</a></h2>
+<p>ACLは各インターフェースのできるだけ「送信元に近い場所（インバウンド）」または「境界ルータのアウトバウンド」に適用する。</p>
+<ul>
+<li><strong>hq-edge (Untrust境界)</strong>:
+<ul>
+<li>外部インターフェース（ISP側）のインバウンドにACLを適用。</li>
+<li>DMZのパブリックIP宛てHTTP/HTTPSを許可。</li>
+<li>内部からの戻り通信（TCP established等）を許可し、他はDeny。</li>
+</ul>
+</li>
+<li><strong>hq-core / hq-dmz (DMZ境界)</strong>:
+<ul>
+<li>DMZインターフェースのインバウンドで、DMZからTrust宛てのパケットをDeny。</li>
+</ul>
+</li>
+</ul>
+<h2 id="3-ポリシーベースルーティングpbr設計" tabindex="-1">3. ポリシーベースルーティング（PBR）設計 <a class="header-anchor" href="#3-ポリシーベースルーティングpbr設計" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>実装箇所</strong>: hq-dist</li>
+<li><strong>設計内容</strong>: <code>hq-voip</code> (10.27.50.0/24) からのパケットをACLでキャッチし、<code>route-map</code> で <code>set ip next-hop</code> を用いて、通常のOSPF/EIGRPで計算された経路とは別の特定のネクストホップへ転送する。</li>
+</ul>
+<h2 id="4-qos-quality-of-service-設計" tabindex="-1">4. QoS (Quality of Service) 設計 <a class="header-anchor" href="#4-qos-quality-of-service-設計" aria-hidden="true">#</a></h2>
+<p>シスコの <strong>MQC (Modular QoS CLI)</strong> フレームワークを使用して設計する。</p>
+<h3 id="41-トラフィック分類とマーキングclass-map--policy-map" tabindex="-1">4.1 トラフィック分類とマーキング（class-map / policy-map） <a class="header-anchor" href="#41-トラフィック分類とマーキングclass-map--policy-map" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>実装箇所</strong>: hq-dist (LAN側エッジ) または hq-edge (WAN側エッジ)</li>
+<li><strong>分類</strong>:
+<ul>
+<li><code>class-map match-all VOICE</code>: ACLで送信元 10.27.50.0/24 をマッチ。</li>
+</ul>
+</li>
+<li><strong>マーキング</strong>:
+<ul>
+<li><code>policy-map MARKING</code> にて、VOICEクラスに対して <code>set dscp ef</code> を設定。</li>
+</ul>
+</li>
+</ul>
+<h3 id="42-キューイングとスケジューリングpolicy-map" tabindex="-1">4.2 キューイングとスケジューリング（policy-map） <a class="header-anchor" href="#42-キューイングとスケジューリングpolicy-map" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>実装箇所</strong>: hq-edge のWANインターフェース (アウトバウンド)</li>
+<li><strong>設計</strong>:
+<ul>
+<li><code>policy-map QUEUING</code> を作成。</li>
+<li><code>class VOICE</code> に対して <code>priority</code> コマンドを使用（LLQ）し、帯域幅（例: 2000 kbps）を保証。</li>
+<li>他のトラフィックに対しては <code>bandwidth</code> や <code>fair-queue</code> を設定。</li>
+</ul>
+</li>
+</ul>
+<h2 id="5-bgp経路フィルタリング設計" tabindex="-1">5. BGP経路フィルタリング設計 <a class="header-anchor" href="#5-bgp経路フィルタリング設計" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>実装箇所</strong>: hq-edge, br-edge</li>
+<li><strong>設計内容</strong>:
+<ul>
+<li><code>ip prefix-list</code> を定義し、自拠点のサブネットのみを <code>permit</code> する。</li>
+<li>BGPの <code>neighbor &lt;IP&gt; prefix-list &lt;NAME&gt; out</code> コマンドで適用し、意図しない経路漏洩を防ぐ。</li>
+</ul>
+</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-ネットワークゾーンと論理構成">1. ネットワークゾーンと論理構成</a></li>
+<li class="lvl-2"><a href="#2-アクセス制御acl設計">2. アクセス制御（ACL）設計</a></li>
+<li class="lvl-2"><a href="#3-ポリシーベースルーティングpbr設計">3. ポリシーベースルーティング（PBR）設計</a></li>
+<li class="lvl-2"><a href="#4-qos-quality-of-service-設計">4. QoS (Quality of Service) 設計</a></li>
+<li class="lvl-3"><a href="#41-トラフィック分類とマーキングclass-map--policy-map">4.1 トラフィック分類とマーキング（class-map / policy-map）</a></li>
+<li class="lvl-3"><a href="#42-キューイングとスケジューリングpolicy-map">4.2 キューイングとスケジューリング（policy-map）</a></li>
+<li class="lvl-2"><a href="#5-bgp経路フィルタリング設計">5. BGP経路フィルタリング設計</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

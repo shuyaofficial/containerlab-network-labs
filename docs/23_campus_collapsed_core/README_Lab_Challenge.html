@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>🏆 Theme 23: Collapsed Core Campus LAN</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>23_campus_collapsed_core</span></nav>
+      <h1 class="doc-title">🏆 Theme 23: Collapsed Core Campus LAN</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="-ミッション" tabindex="-1">📝 ミッション <a class="header-anchor" href="#-ミッション" aria-hidden="true">#</a></h2>
+<p>実務で最も採用されることの多い**「Collapsed Core（2階層モデル）」**のキャンパスLANを設計・構築・試験せよ。</p>
+<p>伝統的な3階層モデルから「コア層」と「ディストリビューション層」を1組の強力なL3スイッチに統合し、ルーティング、HSRP（デフォルトGW冗長化）、そしてSTPルートブリッジの機能をすべて集約させること。</p>
+<h2 id="-トポロジ図-collapsed-core" tabindex="-1">🗺️ トポロジ図 (Collapsed Core) <a class="header-anchor" href="#-トポロジ図-collapsed-core" aria-hidden="true">#</a></h2>
+<pre class="mermaid">graph TD
+    subgraph &quot;Core &amp; Distribution Layer (L3/L2)&quot;
+        CD1(CoreDist-1&lt;br&gt;L3 Switch) ---|Trunk / OSPF| CD2(CoreDist-2&lt;br&gt;L3 Switch)
+    \end
+    
+    subgraph &quot;Access Layer (L2)&quot;
+        Acc1(Access-1&lt;br&gt;L2 Switch)
+        Acc2(Access-2&lt;br&gt;L2 Switch)
+    \end
+    
+    subgraph &quot;Endpoints&quot;
+        PC1(PC-1&lt;br&gt;VLAN 10)
+        PC2(PC-2&lt;br&gt;VLAN 20)
+        PC3(PC-3&lt;br&gt;VLAN 10)
+    \end
+    
+    %% Trunks
+    CD1 ---|Trunk| Acc1
+    CD1 ---|Trunk| Acc2
+    CD2 ---|Trunk| Acc1
+    CD2 ---|Trunk| Acc2
+    
+    %% Access Ports
+    Acc1 ---|VLAN 10| PC1
+    Acc1 ---|VLAN 20| PC2
+    Acc2 ---|VLAN 10| PC3
+</pre>
+<h2 id="-推奨コンテナイメージapple-silicon--m4対応" tabindex="-1">⚙️ 推奨コンテナイメージ（Apple Silicon / M4対応） <a class="header-anchor" href="#-推奨コンテナイメージapple-silicon--m4対応" aria-hidden="true">#</a></h2>
+<p>本環境では、コンテナベースの軽量かつ完全なCiscoルーター/スイッチ環境を使用する。</p>
+<ul>
+<li><strong>CoreDist (L3スイッチ役)</strong>
+<ul>
+<li><code>vrnetlab/cisco_iol:L3-adventerprisek9</code></li>
+<li>理由: デフォルトで <code>ip routing</code> が有効であり、OSPFやHSRPの動作に完全対応しているため。</li>
+</ul>
+</li>
+<li><strong>Access (L2スイッチ役)</strong>
+<ul>
+<li><code>vrnetlab/cisco_iol:L2-advipservices-2017</code> (または同等のL2イメージ)</li>
+<li>理由: VLAN, Trunk, STPの動作に最適化されており、L3ルーティングのオーバーヘッドがないため。</li>
+</ul>
+</li>
+<li><strong>Endpoints (PC役)</strong>
+<ul>
+<li><code>parts_endpoints/</code> フォルダ内のスクリプトを利用（実体は <code>alpine</code> コンテナ等）。</li>
+</ul>
+</li>
+</ul>
+<h2 id="-達成条件-acceptance-criteria" tabindex="-1">🎯 達成条件 (Acceptance Criteria) <a class="header-anchor" href="#-達成条件-acceptance-criteria" aria-hidden="true">#</a></h2>
+<ol>
+<li><strong>L2設計</strong>: CoreDist1がVLAN10のSTPルートブリッジ、CoreDist2がVLAN20のSTPルートブリッジとして機能し、負荷分散されていること。</li>
+<li><strong>デフォルトGW冗長化</strong>: VLANごとにHSRPを設定し、アクティブ側のHSRPルーターがSTPルートブリッジと一致していること。</li>
+<li><strong>L3設計</strong>: CoreDist-1とCoreDist-2の間はL3ルーティング（OSPF等）で経路交換を行い、障害時に迂回できること。</li>
+<li><strong>疎通確認</strong>: PC-1(VLAN10)からPC-2(VLAN20)への通信が成功すること。</li>
+<li><strong>障害試験</strong>: CoreDist-1へのリンクを全て切断（shutdown）した際に、通信断が数秒以内に収束し、CoreDist-2経由で通信が継続すること。</li>
+</ol>
+<hr>
+<h2 id="-進め方" tabindex="-1">👣 進め方 <a class="header-anchor" href="#-進め方" aria-hidden="true">#</a></h2>
+<ol>
+<li><code>01_要件定義/</code> : ネットワーク要件、VLAN/IPアドレス体系の定義</li>
+<li><code>02_基本設計/</code> : 論理構成図、STP/HSRPの設計</li>
+<li><code>03_詳細設計/</code> : ポートアサイン、パラメータシートの作成</li>
+<li><code>04_構築/</code> : <code>campus.clab.yml</code> を作成し、Ciscoコンテナを起動・設定投入</li>
+<li><code>05_試験/</code> : テストケースの作成と、リンク切断時のフェイルオーバー挙動の確認</li>
+</ol>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-ミッション">📝 ミッション</a></li>
+<li class="lvl-2"><a href="#-トポロジ図-collapsed-core">🗺️ トポロジ図 (Collapsed Core)</a></li>
+<li class="lvl-2"><a href="#-推奨コンテナイメージapple-silicon--m4対応">⚙️ 推奨コンテナイメージ（Apple Silicon / M4対応）</a></li>
+<li class="lvl-2"><a href="#-達成条件-acceptance-criteria">🎯 達成条件 (Acceptance Criteria)</a></li>
+<li class="lvl-2"><a href="#-進め方">👣 進め方</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

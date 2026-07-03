@@ -1,0 +1,199 @@
+{
+  "freeTextAnnotations": [],
+  "freeShapeAnnotations": [],
+  "trafficRateAnnotations": [],
+  "groupStyleAnnotations": [],
+  "networkNodeAnnotations": [],
+  "nodeAnnotations": [
+    {
+      "id": "core1",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 140,
+        "y": 200
+      },
+      "geoCoordinates": {
+        "lat": 48.775846,
+        "lng": 9.182932
+      }
+    },
+    {
+      "id": "core2",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": -60,
+        "y": 200
+      },
+      "geoCoordinates": {
+        "lat": 50.110924,
+        "lng": 8.682127
+      }
+    },
+    {
+      "id": "dist-a1",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 220,
+        "y": 360
+      },
+      "geoCoordinates": {
+        "lat": 48.856613,
+        "lng": 2.352222
+      }
+    },
+    {
+      "id": "dist-a2",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 40,
+        "y": 360
+      },
+      "geoCoordinates": {
+        "lat": 51.507351,
+        "lng": -0.127758
+      }
+    },
+    {
+      "id": "dist-b1",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": -140,
+        "y": 360
+      },
+      "geoCoordinates": {
+        "lat": 48.775846,
+        "lng": 11.982932
+      }
+    },
+    {
+      "id": "acc-a1",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 220,
+        "y": 480
+      },
+      "geoCoordinates": {
+        "lat": 50.110924,
+        "lng": 11.482127
+      }
+    },
+    {
+      "id": "acc-a2",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 40,
+        "y": 480
+      },
+      "geoCoordinates": {
+        "lat": 48.856613,
+        "lng": 5.152222
+      }
+    },
+    {
+      "id": "acc-b1",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": -140,
+        "y": 480
+      },
+      "geoCoordinates": {
+        "lat": 51.507351,
+        "lng": 2.672242
+      }
+    },
+    {
+      "id": "isp",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 220,
+        "y": 40
+      },
+      "geoCoordinates": {
+        "lat": 52.090823,
+        "lng": 10.662026
+      }
+    },
+    {
+      "id": "br-edge",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 480,
+        "y": 100
+      },
+      "geoCoordinates": {
+        "lat": 50.836512,
+        "lng": 4.332121
+      }
+    },
+    {
+      "id": "fgt-edge",
+      "position": {
+        "x": 40,
+        "y": 100
+      },
+      "geoCoordinates": {
+        "lat": 50.755745,
+        "lng": 11.162831
+      },
+      "interfacePattern": "e0/{n}"
+    },
+    {
+      "id": "pc-sales",
+      "position": {
+        "x": 220,
+        "y": 600
+      },
+      "geoCoordinates": {
+        "lat": 53.48725,
+        "lng": 1.852141
+      }
+    },
+    {
+      "id": "pc-dev",
+      "position": {
+        "x": 40,
+        "y": 600
+      },
+      "geoCoordinates": {
+        "lat": 51.575846,
+        "lng": 9.182932
+      }
+    },
+    {
+      "id": "srv-file",
+      "position": {
+        "x": -40,
+        "y": 600
+      },
+      "geoCoordinates": {
+        "lat": 52.910924,
+        "lng": 8.682127
+      }
+    },
+    {
+      "id": "srv-portal",
+      "position": {
+        "x": -240,
+        "y": 600
+      },
+      "geoCoordinates": {
+        "lat": 51.656613,
+        "lng": 2.352222
+      }
+    },
+    {
+      "id": "br-pc",
+      "position": {
+        "x": 480,
+        "y": 240
+      },
+      "geoCoordinates": {
+        "lat": 54.307351,
+        "lng": -0.127758
+      }
+    }
+  ],
+  "edgeAnnotations": [],
+  "aliasEndpointAnnotations": [],
+  "viewerSettings": {}
+}

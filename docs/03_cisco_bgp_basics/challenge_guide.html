@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>📖 Cisco IOL BGP基礎 手動構築ガイド</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>03_cisco_bgp_basics</span></nav>
+      <h1 class="doc-title">📖 Cisco IOL BGP基礎 手動構築ガイド</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>本ファイルは、メンターである私（AI）との対話を通じて、完全に真っ白なCisco IOLルータ2台を手動でBGP（eBGP）接続していくステップバイステップの進行記録ガイドです。</p>
+<hr>
+<h2 id="-トポロジーと設計要件" tabindex="-1">🗺️ トポロジーと設計要件 <a class="header-anchor" href="#-トポロジーと設計要件" aria-hidden="true">#</a></h2>
+<p>ルータ2台を直結したシンプルなeBGP接続ネットワークを設計します。</p>
+<pre><code class="language-text">           [ AS 65001 ]                     [ AS 65002 ]
+         +--------------+                 +--------------+
+         |      R1      |                 |      R2      |
+         |  Loopback0:  |                 |  Loopback0:  |
+         |   1.1.1.1    |                 |   2.2.2.2    |
+         +------+-------+                 +------+-------+
+                | Ethernet0/1                    | Ethernet0/1
+                | .1                             | .2
+                +--------------------------------+
+                        192.168.12.0/24
+</code></pre>
+<h3 id="インターフェースbgp設計" tabindex="-1">インターフェース＆BGP設計 <a class="header-anchor" href="#インターフェースbgp設計" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>デバイス</th>
+<th>インターフェース</th>
+<th>IPアドレス / サブネット</th>
+<th>BGP AS番号</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.12.1/24</code></td>
+<td><strong>AS 65001</strong></td>
+</tr>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>1.1.1.1/32</code></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.12.2/24</code></td>
+<td><strong>AS 65002</strong></td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>2.2.2.2/32</code></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="-step-1-物理トポロジーの起動とログイン" tabindex="-1">🏁 STEP 1: 物理トポロジーの起動とログイン <a class="header-anchor" href="#-step-1-物理トポロジーの起動とログイン" aria-hidden="true">#</a></h2>
+<h3 id="1-機器の-cli-へのログイン方法" tabindex="-1">1. 機器の CLI へのログイン方法 <a class="header-anchor" href="#1-機器の-cli-へのログイン方法" aria-hidden="true">#</a></h3>
+<p>Cisco IOLイメージには初期IPやSSH設定が入っていないため、**コンソール接続（docker attach）**でログインします。</p>
+<ul>
+<li><strong>R1 に接続:</strong><pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker attach clab-cisco-bgp-basics-r1
+</code></pre>
+</li>
+<li><strong>R2 に接続:</strong><pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker attach clab-cisco-bgp-basics-r2
+</code></pre>
+</li>
+</ul>
+<blockquote>
+<p>[!CAUTION]
+<strong>コンソールからの切断方法:</strong>
+アタッチしたコンソールから抜ける（ホストに戻る）ときは、<strong><code>Ctrl + P</code> の後に <code>Ctrl + Q</code></strong> を順番に押してください。</p>
+</blockquote>
+<hr>
+<h2 id="-ミッション一覧" tabindex="-1">🛠️ ミッション一覧 <a class="header-anchor" href="#-ミッション一覧" aria-hidden="true">#</a></h2>
+<h3 id="-mission-1-ipアドレス設定と生存確認-step-1" tabindex="-1">💻 Mission 1: IPアドレス設定と生存確認 (STEP 1) <a class="header-anchor" href="#-mission-1-ipアドレス設定と生存確認-step-1" aria-hidden="true">#</a></h3>
+<p>R1、R2にお互いIPアドレスを設定し、物理的な隣人同士でPingが通るようにします。</p>
+<ul>
+<li><strong>R1設定目標:</strong>
+<ul>
+<li>Loopback0: <code>1.1.1.1 255.255.255.255</code></li>
+<li>Ethernet0/1: <code>192.168.12.1 255.255.255.0</code> (インターフェースの有効化 <code>no shutdown</code> を忘れずに！)</li>
+</ul>
+</li>
+<li><strong>R2設定目標:</strong>
+<ul>
+<li>Loopback0: <code>2.2.2.2 255.255.255.255</code></li>
+<li>Ethernet0/1: <code>192.168.12.2 255.255.255.0</code> (有効化も忘れずに！)</li>
+</ul>
+</li>
+<li><strong>検証:</strong>
+<ul>
+<li>R1から <code>ping 192.168.12.2</code> が成功することを確認。</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h3 id="-mission-2-bgpネイバーの構築とtcp-179の観測-step-2" tabindex="-1">💻 Mission 2: BGPネイバーの構築とTCP 179の観測 (STEP 2) <a class="header-anchor" href="#-mission-2-bgpネイバーの構築とtcp-179の観測-step-2" aria-hidden="true">#</a></h3>
+<p>異なるASのルータ同士でBGPネイバー（ピア）を確立します。
+BGPはOSPFのように自動で相手を探さないため、<strong>「相手のIPアドレス」と「相手のAS番号」を明示的に指定する</strong>必要があります。</p>
+<ul>
+<li><strong>BGPの基本設定コマンド（R1の例）:</strong><pre><code class="language-ios">router bgp 65001
+ neighbor 192.168.12.2 remote-as 65002
+</code></pre>
+</li>
+<li><strong>検証コマンド:</strong>
+<ul>
+<li>BGP全体の要約を確認： <code>show ip bgp summary</code></li>
+<li>ネイバーの状態が <strong><code>Active</code></strong>（相手を探している）や <strong><code>OpenSent</code></strong> などの遷移を経て、最終的に <strong>数字（受信した経路数。現状は0）</strong> または <strong><code>Established</code></strong> になることを確認します。</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h3 id="-mission-3-ospfと決定的に異なるnetwork広告の検証-step-3" tabindex="-1">💻 Mission 3: OSPFと決定的に異なる「network」広告の検証 (STEP 3) <a class="header-anchor" href="#-mission-3-ospfと決定的に異なるnetwork広告の検証-step-3" aria-hidden="true">#</a></h3>
+<p>BGPの <code>network</code> コマンドは、OSPFの「この範囲のインターフェースでプロトコルを起動する」という意味とは全く異なり、**「このIPアドレスのルートを、他のルータに広告（注入）する」**という意味を持ちます。</p>
+<p>さらに、BGPには**「自分のルーティングテーブル（show ip route）に載っていない経路は、絶対に広告してはならない」**という厳しいルールがあります。</p>
+<h4>1. 破壊実験（無効な広告）</h4>
+<ul>
+<li>R1で、まだ自分が持っていない架空のIP <code>9.9.9.9</code> を広報するように設定します。<pre><code class="language-ios">router bgp 65001
+ network 9.9.9.9 mask 255.255.255.255
+</code></pre>
+</li>
+<li>対向のR2で <code>show ip bgp</code> や <code>show ip route</code> を実行し、<strong>何も届いていないこと</strong>を観測します。</li>
+</ul>
+<h4>2. 正しい広告</h4>
+<ul>
+<li>R1で、すでにルーティングテーブル（直接接続 <code>C</code>）に載っている Loopback0（<code>1.1.1.1</code>）を広報するように設定します。<pre><code class="language-ios">router bgp 65001
+ network 1.1.1.1 mask 255.255.255.255
+</code></pre>
+</li>
+<li>対向のR2で <code>show ip bgp</code> を実行し、<code>1.1.1.1</code> が届いていることを確認します。</li>
+<li>その際、経路情報の横に <strong><code>65001 i</code></strong> （AS 65001 を経由してきたことを示すAS-Path）がくっついているのを観察します！</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-トポロジーと設計要件">🗺️ トポロジーと設計要件</a></li>
+<li class="lvl-3"><a href="#インターフェースbgp設計">インターフェース＆BGP設計</a></li>
+<li class="lvl-2"><a href="#-step-1-物理トポロジーの起動とログイン">🏁 STEP 1: 物理トポロジーの起動とログイン</a></li>
+<li class="lvl-3"><a href="#1-機器の-cli-へのログイン方法">1. 機器の CLI へのログイン方法</a></li>
+<li class="lvl-2"><a href="#-ミッション一覧">🛠️ ミッション一覧</a></li>
+<li class="lvl-3"><a href="#-mission-1-ipアドレス設定と生存確認-step-1">💻 Mission 1: IPアドレス設定と生存確認 (STEP 1)</a></li>
+<li class="lvl-3"><a href="#-mission-2-bgpネイバーの構築とtcp-179の観測-step-2">💻 Mission 2: BGPネイバーの構築とTCP 179の観測 (STEP 2)</a></li>
+<li class="lvl-3"><a href="#-mission-3-ospfと決定的に異なるnetwork広告の検証-step-3">💻 Mission 3: OSPFと決定的に異なる「network」広告の検証 (STEP 3)</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

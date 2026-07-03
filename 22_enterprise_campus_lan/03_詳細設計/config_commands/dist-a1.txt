@@ -1,0 +1,55 @@
+enable
+configure terminal
+hostname dist-a1
+ip routing
+no ip domain-lookup
+vlan 10
+name A_Sales
+vlan 20
+name A_Dev
+vlan 901
+name A_Dist_Interconnect
+exit
+interface Loopback0
+ip address 10.255.0.11 255.255.255.255
+interface Ethernet0/1
+no switchport
+ip address 10.0.0.6 255.255.255.252
+no shutdown
+interface Ethernet0/2
+no switchport
+ip address 10.0.0.14 255.255.255.252
+no shutdown
+interface range Ethernet1/1-2
+switchport trunk encapsulation dot1q
+switchport mode trunk
+channel-group 1 mode active
+no shutdown
+interface Port-channel1
+switchport trunk encapsulation dot1q
+switchport mode trunk
+switchport trunk allowed vlan 10,20,901
+no shutdown
+interface Ethernet0/3
+switchport trunk encapsulation dot1q
+switchport mode trunk
+switchport trunk allowed vlan 10,20
+no shutdown
+interface Ethernet1/0
+switchport trunk encapsulation dot1q
+switchport mode trunk
+switchport trunk allowed vlan 10,20
+no shutdown
+interface Vlan10
+ip address 10.10.10.1 255.255.255.0
+no shutdown
+interface Vlan20
+ip address 10.10.20.1 255.255.255.0
+no shutdown
+interface Vlan901
+ip address 10.10.255.1 255.255.255.252
+no shutdown
+interface Ethernet1/3
+shutdown
+end
+write memory

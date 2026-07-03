@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマ22 環境 再構築ログ＆手順（2026-06-15）</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>22_enterprise_campus_lan</span></nav>
+      <h1 class="doc-title">テーマ22 環境 再構築ログ＆手順（2026-06-15）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>旧VM「clab」が消失していたため、<strong>旧方式（OrbStack Linux VM + containerlab + IOL）で土台を作り直した</strong>記録と、
+残りの再構築手順をまとめる。6/15更新テーマ23の「テーマフォルダ内に vrnetlab を抱える新方式」は採らない方針。</p>
+</blockquote>
+<hr>
+<h2 id="1-今日やったこと土台素材が要らない部分は完了" tabindex="-1">1. 今日やったこと（土台＝素材が要らない部分は完了） <a class="header-anchor" href="#1-今日やったこと土台素材が要らない部分は完了" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>項目</th>
+<th>状態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>OrbStack Linux VM <code>clab</code>（Ubuntu 24.04 / arm64）を<strong>新規作成</strong></td>
+<td>✅ <code>ssh clab@orb</code> で接続可</td>
+</tr>
+<tr>
+<td>2</td>
+<td>docker 29.1.3 / <strong>containerlab 0.76.1</strong> / make / qemu-system-x86 / expect / git を導入</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>3</td>
+<td>x86エミュ（Rosetta + qemu binfmt）が登録済みであることを確認</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>~/vrnetlab</code>（v0.21.0）をVM内に用意し<strong>ARM64パッチ適用</strong>（<code>cpu=host→qemu64</code>・kvm無効化）</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>5</td>
+<td>IOL Dockerfile に<strong>i386対応</strong>（<code>dpkg --add-architecture i386</code> + <code>libc6:i386 libgcc-s1:i386</code>）を注入＝旧環境の壁#2対策</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>6</td>
+<td>FortiGate Dockerfile に <code>qemu-system-x86</code> 追加＝旧環境の壁§5F-2対策</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>7</td>
+<td>エンドポイント用 <code>wbitt/network-multitool</code> を取得</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>campus.clab.yml</code> を現行clabで<strong>構文検証</strong>（parse成功・graph生成OK）</td>
+<td>✅ デプロイ可能</td>
+</tr>
+</tbody>
+</table></div>
+<p>MacのファイルはVM内に<strong>同一パス</strong>で見える（<code>/Users/shuya/.../22_enterprise_campus_lan/</code> がそのまま）。
+→ <code>binds</code>（shared_files / portal_html）もそのまま効くので、テーマフォルダから直接 deploy できる。</p>
+<hr>
+<h2 id="2-残っている壁あなたの判断素材が必要" tabindex="-1">2. 残っている壁（あなたの判断・素材が必要） <a class="header-anchor" href="#2-残っている壁あなたの判断素材が必要" aria-hidden="true">#</a></h2>
+<p><code>campus.clab.yml</code> が要求するイメージのうち、<strong>ライセンス4種が消失</strong>している（このMac全体・Drive・ゴミ箱を探索済みだが無し）。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>イメージ（タグはclab.ymlと一致が必須）</th>
+<th>役割</th>
+<th>台数</th>
+<th>素材</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vrnetlab/cisco_iol:L2-advipservices-2017</code></td>
+<td>L3SW（core1/2・dist-a1/a2/b1）</td>
+<td>5</td>
+<td>IOL <code>.bin</code>（L3スイッチ用）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_iol:L2-15.2</code></td>
+<td>L2SW（acc-a1/a2/b1）</td>
+<td>3</td>
+<td>IOL <code>.bin</code>（L2スイッチ用）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_iol:15.7.3M2</code></td>
+<td>Router（isp・br-edge）</td>
+<td>2</td>
+<td>IOL <code>.bin</code>（ルータ用）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/vr-fortios:7.2.4</code></td>
+<td>境界FW（fgt-edge）</td>
+<td>1</td>
+<td>FortiGate <code>qcow2</code>（要ログインDL）</td>
+</tr>
+<tr>
+<td><code>wbitt/network-multitool</code></td>
+<td>PC/サーバ ×5</td>
+<td>5</td>
+<td>✅ 取得済み</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="-旧世代iolのライセンス問題重要" tabindex="-1">⚠ 旧世代IOLのライセンス問題（重要） <a class="header-anchor" href="#-旧世代iolのライセンス問題重要" aria-hidden="true">#</a></h3>
+<p>modern vrnetlab(v0.21.0)のIOLビルダーは <strong>iourcライセンス生成を持っていない</strong>（iol.binを直接起動するだけ）。
+旧環境の15.x世代IOLは <strong>iourc必須</strong>で、消えた旧VMでは自作entrypoint（キー自動生成 + expectで初期ダイアログ自動応答）で解決していた。
+→ <strong>同世代の.binを使う場合、このカスタムentrypointの復元が必要</strong>。<code>.bin</code>を1つ用意してくれれば、実バイナリのhostid出力に合わせて復元・検証する（盲目で当てずに、実物で確実に通す）。</p>
+<p>代替案（より入手容易・堅牢）: iourc不要の**新しめIOL（例: 17.12.x のL2/L3）**を入手 → modern定義のままビルド可。
+その場合は <code>campus.clab.yml</code> の <code>image:</code> タグを入手版に合わせて差し替える（タグは単なるラベルなので問題なし）。</p>
+<hr>
+<h2 id="3-素材が揃ったあとの再構築手順コマンド" tabindex="-1">3. 素材が揃ったあとの再構築手順（コマンド） <a class="header-anchor" href="#3-素材が揃ったあとの再構築手順コマンド" aria-hidden="true">#</a></h2>
+<pre><code class="language-bash"><span class="hljs-comment"># 1) 素材を所定の名前で配置（clab VM 内）</span>
+<span class="hljs-comment">#    例:</span>
+ssh clab@orb
+<span class="hljs-built_in">cp</span> /path/to/iol_l3sw.bin  ~/vrnetlab/cisco/iol/cisco_iol-L2-advipservices-2017.bin
+<span class="hljs-built_in">cp</span> /path/to/iol_l2sw.bin  ~/vrnetlab/cisco/iol/cisco_iol-L2-15.2.bin
+<span class="hljs-built_in">cp</span> /path/to/iol_router.bin ~/vrnetlab/cisco/iol/cisco_iol-15.7.3M2.bin
+<span class="hljs-built_in">cp</span> /path/to/fortios.qcow2 ~/vrnetlab/fortigate/fortios-v7.2.4.qcow2
+
+<span class="hljs-comment"># 2) ビルド→状況確認→デプロイ（ヘルパー一発）</span>
+<span class="hljs-built_in">cd</span> <span class="hljs-string">&quot;/Users/shuya/Documents/claude/Mac仮想環境構築/22_enterprise_campus_lan&quot;</span>
+./build_and_deploy.sh all
+
+<span class="hljs-comment"># 個別に:</span>
+./build_and_deploy.sh status     <span class="hljs-comment"># 充足状況だけ確認</span>
+./build_and_deploy.sh build      <span class="hljs-comment"># イメージビルドのみ</span>
+./build_and_deploy.sh deploy     <span class="hljs-comment"># デプロイのみ</span>
+./build_and_deploy.sh destroy    <span class="hljs-comment"># 撤去</span>
+</code></pre>
+<p>デプロイ後の確認:</p>
+<pre><code class="language-bash"><span class="hljs-built_in">sudo</span> containerlab inspect -t campus.clab.yml      <span class="hljs-comment"># 全ノードの起動状態</span>
+<span class="hljs-built_in">sudo</span> docker <span class="hljs-built_in">exec</span> -it clab-campus-pc-sales bash    <span class="hljs-comment"># 営業PCに入る</span>
+curl http://10.20.30.20/                          <span class="hljs-comment"># 社内ポータル疎通（L3+HTTP）</span>
+</code></pre>
+<blockquote>
+<p>機器のCLI設定（OSPF/VLAN/MST/HSRP/FortiGateポリシー等）は<strong>あなたの学習範囲</strong>。ここでは投入しない。</p>
+</blockquote>
+<hr>
+<h2 id="4-段階デプロイ推奨リソース約13gb対策" tabindex="-1">4. 段階デプロイ（推奨・リソース約13GB対策） <a class="header-anchor" href="#4-段階デプロイ推奨リソース約13gb対策" aria-hidden="true">#</a></h2>
+<p>IOLは1ノード約2分。一気に全部は重いので、フェーズに合わせて:</p>
+<pre><code class="language-bash"><span class="hljs-comment"># 例) キャンパス内部(IOL 8台)だけ先に起動</span>
+<span class="hljs-built_in">sudo</span> containerlab deploy -t campus.clab.yml --node-filter core1,core2,dist-a1,dist-a2,dist-b1,acc-a1,acc-a2,acc-b1,pc-sales,pc-dev,srv-file,srv-portal
+<span class="hljs-comment"># FGT/ISP/支社はフェーズ3以降で追加</span>
+</code></pre>
+<hr>
+<h2 id="5-メモ" tabindex="-1">5. メモ <a class="header-anchor" href="#5-メモ" aria-hidden="true">#</a></h2>
+<ul>
+<li>VMの撤去/作り直し: <code>orb delete clab</code> → 本手順を再実行。</li>
+<li>vrnetlabのパッチ backup: <code>~/vrnetlab/common/vrnetlab.py.bak</code>, <code>~/vrnetlab/cisco/iol/docker/Dockerfile.bak</code>, <code>~/vrnetlab/fortigate/docker/Dockerfile.bak</code>。</li>
+<li>旧環境の経緯・壁の詳細は <code>../log/作業ログ.md</code>、環境全体像は <code>../環境/環境説明.md</code> を参照。</li>
+</ul>
+<hr>
+<h2 id="6-2026-06-17-デプロイ完了" tabindex="-1">6. 2026-06-17 デプロイ完了 <a class="header-anchor" href="#6-2026-06-17-デプロイ完了" aria-hidden="true">#</a></h2>
+<h3 id="解決した問題" tabindex="-1">解決した問題 <a class="header-anchor" href="#解決した問題" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>問題</th>
+<th>原因</th>
+<th>解決策</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IOLルータ(15.7.3M2) ARM64でSystem Config Dialogハング</td>
+<td>IOLルータバイナリがARM64 QEMU上でダイアログ表示時にCPU 96%で無限ループ</td>
+<td><code>L2-advipservices-2017</code>イメージに切替（L3ルーティング完備・ダイアログ非表示）</td>
+</tr>
+<tr>
+<td>docker attachでコンソール接続不可（全IOLノード）</td>
+<td>entrypoint.shで<code>&amp;</code>バックグラウンド起動→IOLのfd 0が<code>/dev/null</code>に</td>
+<td><code>exec</code>でIOLを直接起動（PID 1=iol.bin、fd 0=/dev/pts/0）</td>
+</tr>
+<tr>
+<td>FortiGate QEMU crash</td>
+<td>ARM64でcpu=host不可</td>
+<td><code>env: QEMU_CPU: qemu64</code> をclab.ymlに設定</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="最終構成" tabindex="-1">最終構成 <a class="header-anchor" href="#最終構成" aria-hidden="true">#</a></h3>
+<ul>
+<li>IOL Core/Dist/ISP/BR-edge（7台）: <code>vrnetlab/cisco_iol:L2-advipservices-2017</code>（type: l2）</li>
+<li>IOL Access（3台）: <code>vrnetlab/cisco_iol:L2-15.2</code>（type: l2）</li>
+<li>FortiGate: <code>vrnetlab/vr-fortios:7.4.2.F</code>（QEMU_CPU: qemu64）</li>
+<li>エンドポイント（5台）: <code>wbitt/network-multitool</code></li>
+</ul>
+<h3 id="コンソールアクセス方法" tabindex="-1">コンソールアクセス方法 <a class="header-anchor" href="#コンソールアクセス方法" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-comment"># IOLノード</span>
+docker attach --sig-proxy=<span class="hljs-literal">false</span> clab-campus-&lt;node&gt;
+<span class="hljs-comment"># 切断: Ctrl+P → Ctrl+Q</span>
+
+<span class="hljs-comment"># FortiGate</span>
+ssh admin@&lt;mgmt-ip&gt;  <span class="hljs-comment"># 初回パスワード未設定</span>
+</code></pre>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-今日やったこと土台素材が要らない部分は完了">1. 今日やったこと（土台＝素材が要らない部分は完了）</a></li>
+<li class="lvl-2"><a href="#2-残っている壁あなたの判断素材が必要">2. 残っている壁（あなたの判断・素材が必要）</a></li>
+<li class="lvl-3"><a href="#-旧世代iolのライセンス問題重要">⚠ 旧世代IOLのライセンス問題（重要）</a></li>
+<li class="lvl-2"><a href="#3-素材が揃ったあとの再構築手順コマンド">3. 素材が揃ったあとの再構築手順（コマンド）</a></li>
+<li class="lvl-2"><a href="#4-段階デプロイ推奨リソース約13gb対策">4. 段階デプロイ（推奨・リソース約13GB対策）</a></li>
+<li class="lvl-2"><a href="#5-メモ">5. メモ</a></li>
+<li class="lvl-2"><a href="#6-2026-06-17-デプロイ完了">6. 2026-06-17 デプロイ完了</a></li>
+<li class="lvl-3"><a href="#解決した問題">解決した問題</a></li>
+<li class="lvl-3"><a href="#最終構成">最終構成</a></li>
+<li class="lvl-3"><a href="#コンソールアクセス方法">コンソールアクセス方法</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

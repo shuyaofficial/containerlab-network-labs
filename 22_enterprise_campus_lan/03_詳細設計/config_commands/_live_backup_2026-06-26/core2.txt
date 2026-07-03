@@ -1,0 +1,142 @@
+
+core2>enable
+core2#terminal length 0
+core2#show running-config
+Building configuration...
+
+Current configuration : 1979 bytes
+!
+! Last configuration change at 07:16:11 UTC Fri Jun 19 2026
+!
+version 15.2
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+service compress-config
+!
+hostname core2
+!
+boot-start-marker
+boot-end-marker
+!
+!
+vrf definition clab-mgmt
+ description clab-mgmt
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+!
+!
+username admin privilege 15 secret 5 $1$mP7x$5f47o4G9MxeRIVFajo5al.
+no aaa new-model
+!
+!
+!
+!
+!
+!
+!
+!
+no ip domain-lookup
+ip domain-name lab
+ip cef
+ipv6 unicast-routing
+ipv6 cef
+!
+!
+!
+spanning-tree mode pvst
+spanning-tree extend system-id
+!
+vlan internal allocation policy ascending
+!
+! 
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+interface Loopback0
+ ip address 10.255.0.2 255.255.255.255
+!
+interface Ethernet0/0
+ description clab-mgmt
+ no switchport
+ vrf forwarding clab-mgmt
+ ip address 172.20.20.6 255.255.255.0
+ ipv6 address 3FFF:172:20:20::6/64
+!
+interface Ethernet0/1
+ no switchport
+ ip address 10.0.0.2 255.255.255.252
+ ip ospf network point-to-point
+ ip ospf 1 area 0
+!
+interface Ethernet0/2
+ no switchport
+ ip address 10.0.0.13 255.255.255.252
+ ip ospf network point-to-point
+ ip ospf 1 area 0
+!
+interface Ethernet0/3
+ no switchport
+ ip address 10.0.0.17 255.255.255.252
+ ip ospf network point-to-point
+ ip ospf 1 area 0
+!
+interface Ethernet1/0
+ no switchport
+ ip address 10.0.0.25 255.255.255.252
+ ip ospf network point-to-point
+ ip ospf 1 area 0
+!
+interface Ethernet1/1
+ no switchport
+ ip address 10.0.1.33 255.255.255.252
+ ip ospf network point-to-point
+ ip ospf 1 area 0
+!
+interface Ethernet1/2
+ shutdown
+!
+interface Ethernet1/3
+ shutdown
+!
+router ospf 1
+ router-id 10.255.0.2
+!
+ip forward-protocol nd
+!
+!
+no ip http server
+no ip http secure-server
+ip route vrf clab-mgmt 0.0.0.0 0.0.0.0 Ethernet0/0 172.20.20.1
+!
+!
+ipv6 route vrf clab-mgmt ::/0 Ethernet0/0 3FFF:172:20:20::1
+!
+!
+!
+control-plane
+!
+!
+line con 0
+ logging synchronous
+line aux 0
+line vty 0 4
+ login local
+!
+!
+end
+
+core2#

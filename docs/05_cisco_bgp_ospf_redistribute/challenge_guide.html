@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>🚀 Challenge 05: OSPF ＆ BGP のルート再配送（Mutual Redistribution）</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>05_cisco_bgp_ospf_redistribute</span></nav>
+      <h1 class="doc-title">🚀 Challenge 05: OSPF ＆ BGP のルート再配送（Mutual Redistribution）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>本ラボは、物理結線のみが完了した「まっさらなルータ3台」を使い、社内ネットワーク（OSPF）と外部ネットワーク（BGP）をAS境界ルータで接続し、双方向でルート情報をやり取りする「ルート再配送」を体験するハンズオン課題です。</p>
+<p>異なるルーティングプロトコル間でルートを翻訳して受け渡す仕組みの本質を学びましょう！</p>
+<hr>
+<h2 id="-トポロジーと設計要件" tabindex="-1">🗺️ トポロジーと設計要件 <a class="header-anchor" href="#-トポロジーと設計要件" aria-hidden="true">#</a></h2>
+<pre class="mermaid">graph LR
+    subgraph AS_Internal [社内AS / OSPFエリア0]
+        R1[R1] &lt;--&gt; |192.168.12.0/24| R2_OSPF[R2 OSPF]
+    end
+
+    subgraph AS_External [外部AS / eBGP]
+        R2_BGP[R2 BGP AS:65002] &lt;--&gt; |192.168.23.0/24| R3[R3 BGP AS:65003]
+    end
+
+    style R1 fill:#dff,stroke:#333,stroke-width:2px
+    style R2_OSPF fill:#fdf,stroke:#333,stroke-width:2px
+    style R2_BGP fill:#fdf,stroke:#333,stroke-width:2px
+    style R3 fill:#ffd,stroke:#333,stroke-width:2px
+</pre>
+<h3 id="1-インターフェースip設計" tabindex="-1">1. インターフェースIP設計 <a class="header-anchor" href="#1-インターフェースip設計" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>デバイス</th>
+<th>インターフェース</th>
+<th>IPアドレス / サブネット</th>
+<th>役割・プロトコル</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.12.1/24</code></td>
+<td>対向R2接続用（OSPF）</td>
+</tr>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>1.1.1.1/32</code></td>
+<td>社内ローカル拠点（OSPF広報）</td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.12.2/24</code></td>
+<td>対向R1接続用（OSPF）</td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Ethernet0/2</code></td>
+<td><code>192.168.23.2/24</code></td>
+<td>対向R3接続用（eBGP）</td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>2.2.2.2/32</code></td>
+<td>ルータID用</td>
+</tr>
+<tr>
+<td><strong>R3</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.23.3/24</code></td>
+<td>対向R2接続用（eBGP）</td>
+</tr>
+<tr>
+<td><strong>R3</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>3.3.3.3/32</code></td>
+<td>外部インターネット拠点（BGP広報）</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="2-プロトコル設定要件" tabindex="-1">2. プロトコル設定要件 <a class="header-anchor" href="#2-プロトコル設定要件" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>OSPF (R1-R2間):</strong>
+<ul>
+<li>プロセスID: <code>1</code></li>
+<li>エリア: <code>0</code></li>
+<li>R1 の <code>1.1.1.1/32</code> は OSPF にアドバタイズする。</li>
+</ul>
+</li>
+<li><strong>BGP (R2-R3間):</strong>
+<ul>
+<li>R2 AS番号: <code>65002</code></li>
+<li>R3 AS番号: <code>65003</code> (eBGPピア)</li>
+<li>R3 の <code>3.3.3.3/32</code> は BGP に <code>network</code> コマンドで広告する。</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2 id="-4つのミッション" tabindex="-1">🎯 4つのミッション <a class="header-anchor" href="#-4つのミッション" aria-hidden="true">#</a></h2>
+<h3 id="mission-1-ospf-と-bgp-の個別開通" tabindex="-1">Mission 1: OSPF と BGP の個別開通 <a class="header-anchor" href="#mission-1-ospf-と-bgp-の個別開通" aria-hidden="true">#</a></h3>
+<p>各ルータにIPアドレスとルーティング設定を投入し、それぞれの境界で正しくネイバーを確立します。
+この段階では、**「R1には外部ルート（3.3.3.3）が届かず、R3には社内ルート（1.1.1.1）が届かない」**という状態を確認します。</p>
+<h3 id="mission-2-ospfルート--bgpへの再配送" tabindex="-1">Mission 2: OSPFルート ➔ BGPへの再配送 <a class="header-anchor" href="#mission-2-ospfルート--bgpへの再配送" aria-hidden="true">#</a></h3>
+<p>R2（境界ルータ）において、OSPFで学習した社内ルートを、BGPの外部ネットワークへ流し込みます。
+R3のBGPテーブル（<code>show ip bgp</code>）に、<code>1.1.1.1/32</code> が届く様子を観測します。</p>
+<h3 id="mission-3-bgpルート--ospfへの再配送" tabindex="-1">Mission 3: BGPルート ➔ OSPFへの再配送 <a class="header-anchor" href="#mission-3-bgpルート--ospfへの再配送" aria-hidden="true">#</a></h3>
+<p>R2（境界ルータ）において、BGPで学習した外部ルートを、社内OSPFネットワークへ流し込みます。
+R1のルーティングテーブルに <code>3.3.3.3/32</code> が <strong>「O E2（OSPF外部ルート）」</strong> として載ってくることを確認します。</p>
+<h3 id="mission-4-完全疎通確認" tabindex="-1">Mission 4: 完全疎通確認 <a class="header-anchor" href="#mission-4-完全疎通確認" aria-hidden="true">#</a></h3>
+<p>R1からR3の外部拠点への双方向Pingが完璧に通ることを確認します！
+<code>ping 3.3.3.3 source loopback 0</code></p>
+<hr>
+<h2 id="-コマンドリファレンス設定のヒント" tabindex="-1">🛠️ コマンドリファレンス（設定のヒント） <a class="header-anchor" href="#-コマンドリファレンス設定のヒント" aria-hidden="true">#</a></h2>
+<p>再配送（Redistribute）の設定は、AS境界ルータ <strong>R2</strong> でのみ行います。</p>
+<h4>OSPFからBGPへの再配送 (R2にて)</h4>
+<pre><code class="language-ios">router bgp 65002
+ redistribute ospf 1
+</code></pre>
+<h4>BGPからOSPFへの再配送 (R2にて)</h4>
+<pre><code class="language-ios">router ospf 1
+ redistribute bgp 65002 subnets
+</code></pre>
+<blockquote>
+<p>[!IMPORTANT]
+Cisco IOS の OSPF へ再配送する際は、必ず末尾に <strong><code>subnets</code></strong> キーワードをつけてください。これを忘れると、クラスフル（/8, /16, /24等）ではないサブネット化されたネットワーク（/32のLoopback等）がOSPFへ配送されず、ルーティングテーブルに載らない原因になります！</p>
+</blockquote>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-トポロジーと設計要件">🗺️ トポロジーと設計要件</a></li>
+<li class="lvl-3"><a href="#1-インターフェースip設計">1. インターフェースIP設計</a></li>
+<li class="lvl-3"><a href="#2-プロトコル設定要件">2. プロトコル設定要件</a></li>
+<li class="lvl-2"><a href="#-4つのミッション">🎯 4つのミッション</a></li>
+<li class="lvl-3"><a href="#mission-1-ospf-と-bgp-の個別開通">Mission 1: OSPF と BGP の個別開通</a></li>
+<li class="lvl-3"><a href="#mission-2-ospfルート--bgpへの再配送">Mission 2: OSPFルート ➔ BGPへの再配送</a></li>
+<li class="lvl-3"><a href="#mission-3-bgpルート--ospfへの再配送">Mission 3: BGPルート ➔ OSPFへの再配送</a></li>
+<li class="lvl-3"><a href="#mission-4-完全疎通確認">Mission 4: 完全疎通確認</a></li>
+<li class="lvl-2"><a href="#-コマンドリファレンス設定のヒント">🛠️ コマンドリファレンス（設定のヒント）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

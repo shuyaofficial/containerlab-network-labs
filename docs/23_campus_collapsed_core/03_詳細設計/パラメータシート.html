@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>パラメータシート（詳細設計） — テーマ23: Collapsed Core Campus LAN</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>23_campus_collapsed_core</span>
+<span class="sep">/</span>
+<span>03_詳細設計</span></nav>
+      <h1 class="doc-title">パラメータシート（詳細設計） — テーマ23: Collapsed Core Campus LAN</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>このシートは基本設計を元に記入済みです。設定コマンドは自分で考えて実機に投入し、終わったら「投入✅」にチェックを入れてください。
+結線（インターフェース）は <code>campus.clab.yml</code> に定義された内容に準拠しています。</p>
+</blockquote>
+<h2 id="記入の観点" tabindex="-1">記入の観点 <a class="header-anchor" href="#記入の観点" aria-hidden="true">#</a></h2>
+<ul>
+<li>各ポートの<strong>モード</strong>（ルーテッド / トランク / アクセス）を確定させる。</li>
+<li>STPのプライオリティ、HSRPのプライオリティの対応を間違えないように設定する。</li>
+</ul>
+<hr>
+<h2 id="coredist-1-l3-switch" tabindex="-1">CoreDist-1 (L3 Switch) <a class="header-anchor" href="#coredist-1-l3-switch" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF</th>
+<th>モード</th>
+<th>IP / 所属VLAN</th>
+<th>説明 / パラメータ</th>
+<th>投入✅</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E0/1 (eth1)</td>
+<td>ルーテッド</td>
+<td>10.0.0.1/30</td>
+<td>CoreDist-2向け (<code>no switchport</code> 化必須)</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/2 (eth2)</td>
+<td>トランク</td>
+<td>許可VLAN: 10, 20</td>
+<td>Access-1向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/3 (eth3)</td>
+<td>トランク</td>
+<td>許可VLAN: 10, 20</td>
+<td>Access-2向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>SVI VLAN10</td>
+<td>—</td>
+<td>10.10.10.251/24</td>
+<td>営業部GW <br><strong>HSRP</strong>: VIP 10.10.10.254, Priority 110, Preempt</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>SVI VLAN20</td>
+<td>—</td>
+<td>10.10.20.251/24</td>
+<td>開発部GW <br><strong>HSRP</strong>: VIP 10.10.20.254, Priority 100</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>—</td>
+<td>10.255.0.11/32</td>
+<td>OSPFルーターID / 管理</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td><strong>STP</strong></td>
+<td>—</td>
+<td>—</td>
+<td>VLAN 10: Root Primary (Priority 4096)<br>VLAN 20: Root Secondary (Priority 8192)</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td><strong>OSPF</strong></td>
+<td>—</td>
+<td>—</td>
+<td>Area 0 に全て参加。SVIは <code>passive-interface</code> とする</td>
+<td><input type="checkbox"></td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="coredist-2-l3-switch" tabindex="-1">CoreDist-2 (L3 Switch) <a class="header-anchor" href="#coredist-2-l3-switch" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF</th>
+<th>モード</th>
+<th>IP / 所属VLAN</th>
+<th>説明 / パラメータ</th>
+<th>投入✅</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E0/1 (eth1)</td>
+<td>ルーテッド</td>
+<td>10.0.0.2/30</td>
+<td>CoreDist-1向け (<code>no switchport</code> 化必須)</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/2 (eth2)</td>
+<td>トランク</td>
+<td>許可VLAN: 10, 20</td>
+<td>Access-1向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/3 (eth3)</td>
+<td>トランク</td>
+<td>許可VLAN: 10, 20</td>
+<td>Access-2向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>SVI VLAN10</td>
+<td>—</td>
+<td>10.10.10.252/24</td>
+<td>営業部GW <br><strong>HSRP</strong>: VIP 10.10.10.254, Priority 100</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>SVI VLAN20</td>
+<td>—</td>
+<td>10.10.20.252/24</td>
+<td>開発部GW <br><strong>HSRP</strong>: VIP 10.10.20.254, Priority 110, Preempt</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>—</td>
+<td>10.255.0.12/32</td>
+<td>OSPFルーターID / 管理</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td><strong>STP</strong></td>
+<td>—</td>
+<td>—</td>
+<td>VLAN 10: Root Secondary (Priority 8192)<br>VLAN 20: Root Primary (Priority 4096)</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td><strong>OSPF</strong></td>
+<td>—</td>
+<td>—</td>
+<td>Area 0 に全て参加。SVIは <code>passive-interface</code> とする</td>
+<td><input type="checkbox"></td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="access-1-l2-switch" tabindex="-1">Access-1 (L2 Switch) <a class="header-anchor" href="#access-1-l2-switch" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF</th>
+<th>モード</th>
+<th>IP / 所属VLAN</th>
+<th>説明 / パラメータ</th>
+<th>投入✅</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E0/1 (eth1)</td>
+<td>トランク</td>
+<td>許可VLAN: 10, 20</td>
+<td>CoreDist-1向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/2 (eth2)</td>
+<td>トランク</td>
+<td>許可VLAN: 10, 20</td>
+<td>CoreDist-2向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/3 (eth3)</td>
+<td>アクセス</td>
+<td>VLAN 10</td>
+<td>PC-1 (10.10.10.1) 収容</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E1/0 (eth4)</td>
+<td>アクセス</td>
+<td>VLAN 20</td>
+<td>PC-2 (10.10.20.2) 収容</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td><strong>STP</strong></td>
+<td>—</td>
+<td>—</td>
+<td>STP（PVST+）を有効化（デフォルト設定でOK）</td>
+<td><input type="checkbox"></td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="access-2-l2-switch" tabindex="-1">Access-2 (L2 Switch) <a class="header-anchor" href="#access-2-l2-switch" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF</th>
+<th>モード</th>
+<th>IP / 所属VLAN</th>
+<th>説明 / パラメータ</th>
+<th>投入✅</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E0/1 (eth1)</td>
+<td>トランク</td>
+<td>許可VLAN: 10, 20</td>
+<td>CoreDist-1向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/2 (eth2)</td>
+<td>トランク</td>
+<td>許可VLAN: 10, 20</td>
+<td>CoreDist-2向け</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>E0/3 (eth3)</td>
+<td>アクセス</td>
+<td>VLAN 10</td>
+<td>PC-3 (10.10.10.3) 収容</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td><strong>STP</strong></td>
+<td>—</td>
+<td>—</td>
+<td>STP（PVST+）を有効化（デフォルト設定でOK）</td>
+<td><input type="checkbox"></td>
+</tr>
+</tbody>
+</table></div>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#記入の観点">記入の観点</a></li>
+<li class="lvl-2"><a href="#coredist-1-l3-switch">CoreDist-1 (L3 Switch)</a></li>
+<li class="lvl-2"><a href="#coredist-2-l3-switch">CoreDist-2 (L3 Switch)</a></li>
+<li class="lvl-2"><a href="#access-1-l2-switch">Access-1 (L2 Switch)</a></li>
+<li class="lvl-2"><a href="#access-2-l2-switch">Access-2 (L2 Switch)</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+set timeout -1
+set pid $env(IOL_PID)
+set slots $env(NUM_SLOTS)
+spawn -noecho /iol/iol.bin $pid -m 512 -e $slots -s 0 -c config.txt -n 1024
+expect {
+  -re {configuration dialog.*: ?$} { send "no\r"; exp_continue }
+  -re {terminate autoinstall.*: ?$} { send "yes\r"; exp_continue }
+  -re {Press RETURN to get started} { send "\r" }
+  timeout { }
+}
+interact

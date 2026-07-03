@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>🏢 テーマ22: 大規模キャンパス社内LAN（3階層・マルチエリアOSPF・MST・FortiGate境界）</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>22_enterprise_campus_lan</span></nav>
+      <h1 class="doc-title">🏢 テーマ22: 大規模キャンパス社内LAN（3階層・マルチエリアOSPF・MST・FortiGate境界）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p><strong>終了済み（2026-06-29、部分達成）</strong>
+FortiGate版は復号後転送が成立せず、<code>fgt-edge</code>の実体をCisco IOLへ置換して支社から本社サーバへのVPN疎通とHTTP 200を確認した。A棟LAN、FW/NAT、全試験は未完。
+終了時点と再開方法は <a href="06_%E7%B5%82%E4%BA%86%E3%83%BB%E5%BC%95%E7%B6%99%E3%81%8E/README.html"><code>06_終了・引継ぎ/README.md</code></a>、試験成績は <a href="05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E7%B5%90%E6%9E%9C_2026-06-29.html"><code>05_試験/試験結果_2026-06-29.md</code></a> を参照する。</p>
+</blockquote>
+<p>テーマ21（卒業制作）合格おめでとうございます！🎓
+ここからは<strong>ポスト・キャプストン編</strong>。ロードマップの「STEP2 最終形」＝<strong>規模が大きくなっても破綻しない社内LAN</strong>に挑みます。</p>
+<p>あなたは株式会社XXX（社員約400名）のインフラエンジニアです。
+本社が<strong>キャンパス（A棟・B棟の2棟構成）<strong>へ移転することになり、ネットワークの全面刷新を任されました。
+今回は境界に</strong>専用ファイアウォール（FortiGate）<strong>を導入し、支社のCiscoルーターとの</strong>マルチベンダーVPN</strong>にも挑戦します。</p>
+<hr>
+<h2 id="-このテーマで新しく学ぶこと" tabindex="-1">🆕 このテーマで新しく学ぶこと <a class="header-anchor" href="#-このテーマで新しく学ぶこと" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>技術</th>
+<th>なぜ必要か（21との差分）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>3階層設計（コア/ディストリ/アクセス）</td>
+<td>機器が増えても「どこに何の役割を置くか」が破綻しないため</td>
+</tr>
+<tr>
+<td>OSPFマルチエリア＋経路集約</td>
+<td>棟・フロアが増えてもコアの経路テーブルが肥大化しないため</td>
+</tr>
+<tr>
+<td>discard route（集約の罠対策）</td>
+<td>ABRが2台ある集約構成の古典的ブラックホール問題への対処</td>
+</tr>
+<tr>
+<td>MST</td>
+<td>VLANが増えてもSTPの計算・運用負荷を増やさないため</td>
+</tr>
+<tr>
+<td>FortiGate（専用FW）</td>
+<td>ルーターACLからの卒業。ステートフルポリシー・ゾーン管理</td>
+</tr>
+<tr>
+<td>FortiGate⇔Cisco IPsec interop</td>
+<td>実務で頻出する「ベンダーが違う機器同士のVPN」のデバッグ経験</td>
+</tr>
+</tbody>
+</table></div>
+<p>これまでの積み上げ（VLAN/トランク/EtherChannel/STP/HSRP/OSPF/ACL/NAT/IPsec）は<strong>全部使います</strong>。</p>
+<hr>
+<h2 id="-ドキュメントマップ分担" tabindex="-1">📋 ドキュメントマップ（分担） <a class="header-anchor" href="#-ドキュメントマップ分担" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ドキュメント</th>
+<th>担当</th>
+<th>状態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="01_%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9/%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9%E6%9B%B8.html">01_要件定義/要件定義書.md</a></td>
+<td>Claude（発注側を演じる）</td>
+<td>✅ 完成</td>
+</tr>
+<tr>
+<td><a href="02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88%E6%9B%B8.html">02_基本設計/基本設計書.md</a></td>
+<td>Claude</td>
+<td>✅ 完成</td>
+</tr>
+<tr>
+<td><a href="02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/IP%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9%E7%AE%A1%E7%90%86%E8%A1%A8.html">02_基本設計/IPアドレス管理表.md</a></td>
+<td>Claude</td>
+<td>✅ 完成（<strong>IPの正本</strong>）</td>
+</tr>
+<tr>
+<td><a href="02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E3%83%8D%E3%83%83%E3%83%88%E3%83%AF%E3%83%BC%E3%82%AF%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E5%9B%B3_%E3%83%86%E3%82%AD%E3%82%B9%E3%83%88%E7%89%88.html">02_基本設計/ネットワーク論理構成図_テキスト版.md</a> ほか構成図</td>
+<td>Claude</td>
+<td>✅ 完成</td>
+</tr>
+<tr>
+<td><a href="02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E3%83%8D%E3%83%83%E3%83%88%E3%83%AF%E3%83%BC%E3%82%AF%E7%89%A9%E7%90%86%E6%A7%8B%E6%88%90%E5%9B%B3_%E3%83%86%E3%82%AD%E3%82%B9%E3%83%88%E7%89%88.html">02_基本設計/ネットワーク物理構成図_テキスト版.md</a>（結線表）</td>
+<td>Claude</td>
+<td>✅ 完成（<strong>clab.ymlの元ネタ</strong>）</td>
+</tr>
+<tr>
+<td><a href="03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/">03_詳細設計/</a> パラメータシート4枚</td>
+<td><strong>あなた</strong>（テンプレは用意済み）</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><code>campus.clab.yml</code>（トポロジ定義）</td>
+<td><strong>あなた</strong></td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><a href="04_%E6%A7%8B%E7%AF%89/">04_構築/</a> 構築＋構築ログ</td>
+<td><strong>あなた</strong>（テンプレあり）</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><a href="05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">05_試験/試験計画書.md</a></td>
+<td>Claude（項目定義）／<strong>実施はあなた</strong></td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><a href="parts_endpoints/README_%E9%83%A8%E6%9D%90%E8%AA%AC%E6%98%8E.html">parts_endpoints/</a> PC・サーバ部材</td>
+<td>Claude</td>
+<td>✅ 完成（組み込むだけ）</td>
+</tr>
+<tr>
+<td>振り返りシート</td>
+<td><strong>あなた</strong></td>
+<td>⬜</td>
+</tr>
+<tr>
+<td><a href="05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E7%B5%90%E6%9E%9C_2026-06-29.html">05_試験/試験結果_2026-06-29.md</a></td>
+<td>Codex</td>
+<td>✅ 部分達成の終了成績</td>
+</tr>
+<tr>
+<td><a href="06_%E7%B5%82%E4%BA%86%E3%83%BB%E5%BC%95%E7%B6%99%E3%81%8E/README.html">06_終了・引継ぎ/README.md</a></td>
+<td>Codex</td>
+<td>✅ 終了状態・再開手順</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>🧭 メンター方針はこれまで通り: <strong>設定コマンドの答えは渡しません</strong>。「達成すべき要件」と「設計の意図」だけ提示します。
+詰まったら過去テーマのREADME・構築ログ・コマンド履歴を見返すこと。それでも詰まったら質問をくれれば段階的にヒントを出します。</p>
+</blockquote>
+<hr>
+<h2 id="-構築フェーズ推奨順序" tabindex="-1">🚀 構築フェーズ（推奨順序） <a class="header-anchor" href="#-構築フェーズ推奨順序" aria-hidden="true">#</a></h2>
+<h3 id="フェーズ0-詳細設計とトポロジ定義" tabindex="-1">フェーズ0: 詳細設計とトポロジ定義 <a class="header-anchor" href="#フェーズ0-詳細設計とトポロジ定義" aria-hidden="true">#</a></h3>
+<ol>
+<li><code>03_詳細設計/</code> のパラメータシート4枚を埋める（基本設計を「投入できる粒度」へ翻訳する工程）</li>
+<li>結線表から <code>campus.clab.yml</code> を自作し、<code>parts_endpoints/endpoints.partial.clab.yml</code> の5ノードを組み込む</li>
+<li>デプロイして全ノードの起動を確認</li>
+</ol>
+<p><strong>完了条件</strong>: 全ノード起動・各機器のコンソールに入れる</p>
+<h3 id="フェーズ1-l2構築a棟b棟" tabindex="-1">フェーズ1: L2構築（A棟・B棟） <a class="header-anchor" href="#フェーズ1-l2構築a棟b棟" aria-hidden="true">#</a></h3>
+<ul>
+<li>VLAN作成・トランク（許可VLAN明示）・<strong>LACP</strong> EtherChannel（Po1×2箇所）</li>
+<li><strong>MST</strong>（Region/Revision/マッピングを棟内で完全一致させる）・Root配置</li>
+<li>ポートセキュリティ・未使用ポートshutdown</li>
+</ul>
+<p><strong>完了条件（ゲート）</strong>: 試験計画 T-201, T-202, T-301, T-302</p>
+<h3 id="フェーズ2-l3構築本テーマの山場" tabindex="-1">フェーズ2: L3構築（本テーマの山場） <a class="header-anchor" href="#フェーズ2-l3構築本テーマの山場" aria-hidden="true">#</a></h3>
+<ul>
+<li>ルーテッドリンク化・SVI・Loopback</li>
+<li><strong>HSRP</strong>（VIP .254・preempt・上位リンクトラッキング）</li>
+<li><strong>OSPFマルチエリア</strong>（Area 0/1/2・P2Pタイプ・passive設計）</li>
+<li><strong>経路集約</strong>（ABRで/16集約＋discard route）</li>
+</ul>
+<p><strong>完了条件（ゲート)</strong>: T-203, T-401, <strong>T-402（コアの経路が集約されている）</strong>, T-403 ＋ pc-sales→srv-portal疎通（T-101）</p>
+<h3 id="フェーズ3-インターネット境界fortigate" tabindex="-1">フェーズ3: インターネット境界（FortiGate） <a class="header-anchor" href="#フェーズ3-インターネット境界fortigate" aria-hidden="true">#</a></h3>
+<ul>
+<li>FortiGate初期設定（GUIまたはCLI）・インターフェース/ゾーン設定</li>
+<li><strong>OSPF Area 0参加</strong>（ネットワークタイプに注意）・<strong>デフォルトルート広報</strong></li>
+<li>SNAT＋ファイアウォールポリシー・ISP設定</li>
+</ul>
+<p><strong>完了条件（ゲート）</strong>: T-204, T-205, T-103（pc-salesから8.8.8.8へping）, T-601</p>
+<h3 id="フェーズ4-支社マルチベンダーvpn" tabindex="-1">フェーズ4: 支社＋マルチベンダーVPN <a class="header-anchor" href="#フェーズ4-支社マルチベンダーvpn" aria-hidden="true">#</a></h3>
+<ul>
+<li>br-edge（PAT・ISP向けデフォルト）</li>
+<li><strong>FortiGate⇔Cisco IOSのIPsec VPN（route-based/IKEv2）</strong>——プロポーザルは両端で明示的に一致させること</li>
+<li>VPNポリシーで「支社→サーバVLANのみ許可」</li>
+</ul>
+<p><strong>完了条件（ゲート）</strong>: T-104, T-105, <strong>T-602（ISP上で暗号化を確認）</strong>, T-604</p>
+<h3 id="フェーズ5-セキュリティ仕上げ総合試験" tabindex="-1">フェーズ5: セキュリティ仕上げ＋総合試験 <a class="header-anchor" href="#フェーズ5-セキュリティ仕上げ総合試験" aria-hidden="true">#</a></h3>
+<ul>
+<li>営業⇔開発の制限ACL（<strong>dist-a1/a2両方に</strong>）</li>
+<li>試験計画書の全項目を実施 → <code>05_試験/試験結果_YYYY-MM-DD.md</code> に成績まとめ</li>
+<li><strong>障害試験</strong>（T-404〜T-409）と<strong>意図的破壊演習</strong>（T-603）まで完走</li>
+<li>振り返りシート作成 → <code>ロードマップ/進捗管理.md</code> 更新</li>
+</ul>
+<hr>
+<h2 id="-環境メモ" tabindex="-1">🖥️ 環境メモ <a class="header-anchor" href="#-環境メモ" aria-hidden="true">#</a></h2>
+<h3 id="リソースと段階デプロイ" tabindex="-1">リソースと段階デプロイ <a class="header-anchor" href="#リソースと段階デプロイ" aria-hidden="true">#</a></h3>
+<ul>
+<li>ネットワーク機器11台（IOL×10＝約10GB、FortiGate＝2GB）＋エンドポイント5台。<strong>合計約13GB</strong>。</li>
+<li>IOLは1ノード約2分起動。<strong>一気に全部起動せず、フェーズに合わせた段階デプロイを推奨</strong>:
+<ul>
+<li>方法A: clab.ymlのノードを段階的にコメントアウト解除して <code>deploy</code> し直す</li>
+<li>方法B: <code>containerlab deploy --node-filter &lt;ノード名,...&gt;</code> で部分起動</li>
+<li>フェーズ1〜2はキャンパス内部（IOL 8台）だけで進められる。FGT/ISP/支社はフェーズ3以降でOK</li>
+</ul>
+</li>
+</ul>
+<h3 id="fortigateの扱い初登場" tabindex="-1">FortiGateの扱い（初登場！） <a class="header-anchor" href="#fortigateの扱い初登場" aria-hidden="true">#</a></h3>
+<ul>
+<li>導入手順・イメージタグは <a href="../%E7%92%B0%E5%A2%83/%E4%BB%96%E3%83%99%E3%83%B3%E3%83%80%E3%83%BC%E8%BF%BD%E5%8A%A0%E6%89%8B%E9%A0%86.html"><code>../環境/他ベンダー追加手順.md</code></a> を参照（起動検証済み・約2分）</li>
+<li>管理: 起動後、管理IPへ <strong>HTTPSでGUI</strong>、またはSSHでCLI（<code>get system interface physical</code> で物理IF一覧）</li>
+<li>⚠️ <strong>clab.ymlの <code>ethN</code> とFortiOSの <code>portN</code> はズレる</strong>（eth0=管理）。結線表の「想定」を実機で必ず確認してから設定すること</li>
+<li>FortiGateのログはトラブルシュートの宝庫。VPNが上がらない時は<strong>FGT側とCisco側の両方のログを突き合わせる</strong>のが定石</li>
+</ul>
+<h3 id="いつもの鉄則" tabindex="-1">いつもの鉄則 <a class="header-anchor" href="#いつもの鉄則" aria-hidden="true">#</a></h3>
+<ol>
+<li><strong>復路（帰り道）を必ず確認</strong>（06の教訓）</li>
+<li>新環境はまず <strong>no shutdown</strong></li>
+<li><strong>障害試験までやって初めて「できた」</strong></li>
+<li>EtherChannelは<strong>LACP必須</strong>・エンドポイントは<strong>multitool</strong>・linksは<strong>ethN表記</strong>（<a href="../%E5%88%87%E3%82%8A%E5%88%86%E3%81%91/containerlab_iol_quirks.html"><code>../切り分け/containerlab_iol_quirks.md</code></a>）</li>
+</ol>
+<hr>
+<h2 id="-仕上げの問いテーマ21から続く一人前の基準" tabindex="-1">🌟 仕上げの問い（テーマ21から続く一人前の基準） <a class="header-anchor" href="#-仕上げの問いテーマ21から続く一人前の基準" aria-hidden="true">#</a></h2>
+<ul>
+<li>「<strong>なぜ集約するのか</strong>」を、経路数・収束範囲・障害の影響範囲の観点で説明できるか？</li>
+<li>A棟に3つ目のフロア（VLAN）を追加するとき、<strong>どの機器に何を足せばよいか</strong>を即答できるか？（コアは触らなくてよい設計になっているか）</li>
+<li>FortiGateとCiscoのVPNが上がらないとき、<strong>どちらのログから何を読むか</strong>の手順を説明できるか？</li>
+</ul>
+<p>健闘を祈ります！🔥</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-このテーマで新しく学ぶこと">🆕 このテーマで新しく学ぶこと</a></li>
+<li class="lvl-2"><a href="#-ドキュメントマップ分担">📋 ドキュメントマップ（分担）</a></li>
+<li class="lvl-2"><a href="#-構築フェーズ推奨順序">🚀 構築フェーズ（推奨順序）</a></li>
+<li class="lvl-3"><a href="#フェーズ0-詳細設計とトポロジ定義">フェーズ0: 詳細設計とトポロジ定義</a></li>
+<li class="lvl-3"><a href="#フェーズ1-l2構築a棟b棟">フェーズ1: L2構築（A棟・B棟）</a></li>
+<li class="lvl-3"><a href="#フェーズ2-l3構築本テーマの山場">フェーズ2: L3構築（本テーマの山場）</a></li>
+<li class="lvl-3"><a href="#フェーズ3-インターネット境界fortigate">フェーズ3: インターネット境界（FortiGate）</a></li>
+<li class="lvl-3"><a href="#フェーズ4-支社マルチベンダーvpn">フェーズ4: 支社＋マルチベンダーVPN</a></li>
+<li class="lvl-3"><a href="#フェーズ5-セキュリティ仕上げ総合試験">フェーズ5: セキュリティ仕上げ＋総合試験</a></li>
+<li class="lvl-2"><a href="#-環境メモ">🖥️ 環境メモ</a></li>
+<li class="lvl-3"><a href="#リソースと段階デプロイ">リソースと段階デプロイ</a></li>
+<li class="lvl-3"><a href="#fortigateの扱い初登場">FortiGateの扱い（初登場！）</a></li>
+<li class="lvl-3"><a href="#いつもの鉄則">いつもの鉄則</a></li>
+<li class="lvl-2"><a href="#-仕上げの問いテーマ21から続く一人前の基準">🌟 仕上げの問い（テーマ21から続く一人前の基準）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

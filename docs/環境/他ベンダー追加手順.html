@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>他ベンダー機器を Containerlab Docker 化する手順（汎用プレイブック）</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>環境</span></nav>
+      <h1 class="doc-title">他ベンダー機器を Containerlab Docker 化する手順（汎用プレイブック）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>IOL以外の機種・他ベンダーを <code>~/vrnetlab/&lt;vendor&gt;/&lt;platform&gt;/</code> でビルドし、Containerlabで使う手順。
+前提と全体像は <code>環境説明.md</code>、経緯は <code>log/作業ログ.md</code> §5 を参照。最終更新: 2026-06-02。</p>
+</blockquote>
+<hr>
+<h2 id="0-大前提arm64の現実" tabindex="-1">0. 大前提（arm64の現実） <a class="header-anchor" href="#0-大前提arm64の現実" aria-hidden="true">#</a></h2>
+<ul>
+<li>この環境は <strong>arm64 + /dev/kvm 無し</strong>。x86のフルVM(qcow2/vmdk)は <strong>QEMU TCG完全エミュ</strong>で動く＝<strong>遅い</strong>。</li>
+<li>目安: <strong>RAM ≤2GB / 1-2 vCPU = 現実的</strong>。4GB以上や dual-VM や「ビルドにKVM必須」は <strong>非現実的</strong>。</li>
+<li><code>common/vrnetlab.py</code> 改造済み（<code>-cpu host</code>→<code>qemu64</code>）により x86 VMが起動可能。新規機種でも自動で効く。</li>
+</ul>
+<h2 id="1-共通4ステップ" tabindex="-1">1. 共通4ステップ <a class="header-anchor" href="#1-共通4ステップ" aria-hidden="true">#</a></h2>
+<pre><code class="language-bash">ssh clab@orb
+<span class="hljs-built_in">cd</span> ~/vrnetlab/&lt;vendor&gt;/&lt;platform&gt;          <span class="hljs-comment"># 例: mikrotik/routeros, extreme/exos, cisco/vios</span>
+<span class="hljs-built_in">cat</span> README.md                               <span class="hljs-comment"># ★ファイル名規則を毎回確認（重要）</span>
+
+<span class="hljs-comment"># (a) イメージを配置。形式により：</span>
+<span class="hljs-comment">#   .qcow2      → そのまま規則名でコピー</span>
+<span class="hljs-comment">#   .vmdk       → そのまま置ける builder もあれば、qemu-img convert が要る builder もある</span>
+<span class="hljs-comment">#   .vmdk→qcow2 → qemu-img convert -f vmdk -O qcow2 in.vmdk &lt;規則名&gt;.qcow2</span>
+<span class="hljs-comment">#   .tgz/.zip   → tar xzf / unzip して中の qcow2/vmdk/img を取り出す</span>
+<span class="hljs-comment">#   .img(gz)    → gunzip</span>
+
+<span class="hljs-comment"># (b) ビルド（生成物は vrnetlab/&lt;kind&gt;:&lt;ver&gt;）</span>
+make docker-image                           <span class="hljs-comment"># ※同dirに余分な *.qcow2 を残さない（globで拾う）</span>
+docker images | grep -i &lt;platform&gt;          <span class="hljs-comment"># 出来たタグ確認</span>
+
+<span class="hljs-comment"># (c) clab.yml に書く（下記テンプレ）</span>
+<span class="hljs-comment"># (d) sudo containerlab deploy -t &lt;lab&gt;.clab.yml</span>
+</code></pre>
+<blockquote>
+<p>⚠ ツール: <code>qemu-utils</code>(qemu-img) / <code>unzip</code> / <code>gdown</code> / <code>sshpass</code> は導入済み。
+無ければ <code>sudo apt-get install -y qemu-utils unzip</code> 等。</p>
+</blockquote>
+<h2 id="2-ダウンロード手段" tabindex="-1">2. ダウンロード手段 <a class="header-anchor" href="#2-ダウンロード手段" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>元</th>
+<th>方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Google Drive (hegdepavankumarリポ)</td>
+<td><code>python3 -m gdown &quot;https://drive.google.com/uc?id=&lt;ID&gt;&quot; -O out.tgz</code>。<strong>quotaで失敗する事あり</strong>→別バージョン/ミラー、またはユーザーが手動DL</td>
+</tr>
+<tr>
+<td>ベンダー直(無料)</td>
+<td><code>curl -fsSL -o file URL</code>（MikroTik/OpenWrt/Extremeは無料・無認証）</td>
+</tr>
+<tr>
+<td>ベンダー(要ログイン)</td>
+<td>ユーザーがブラウザでDL → Mac <code>~/Downloads/</code> に置く（OrbStackで <code>clab</code> VM内も同じパスで見える）→ こちらでビルド</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="3-実証済みレシピコピペ可" tabindex="-1">3. 実証済みレシピ（コピペ可） <a class="header-anchor" href="#3-実証済みレシピコピペ可" aria-hidden="true">#</a></h2>
+<h3 id="mikrotik-chr最軽量無料healthy実証済" tabindex="-1">MikroTik CHR（最軽量・無料・✅healthy実証済） <a class="header-anchor" href="#mikrotik-chr最軽量無料healthy実証済" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">cd</span> ~/vrnetlab/mikrotik/routeros
+curl -fsSL -o chr.zip https://download.mikrotik.com/routeros/7.21.4/chr-7.21.4.vmdk.zip
+unzip -o chr.zip &amp;&amp; <span class="hljs-built_in">rm</span> chr.zip
+make docker-image            <span class="hljs-comment"># → vrnetlab/mikrotik_routeros:7.21.4-amd64</span>
+</code></pre>
+<h3 id="openwrt最軽量128mb無料" tabindex="-1">OpenWrt（最軽量128MB・無料） <a class="header-anchor" href="#openwrt最軽量128mb無料" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">cd</span> ~/vrnetlab/openwrt
+curl -fsSL -o owrt.img.gz https://downloads.openwrt.org/releases/25.12.4/targets/x86/64/openwrt-25.12.4-x86-64-generic-ext4-combined.img.gz
+gunzip -f owrt.img.gz &amp;&amp; <span class="hljs-built_in">mv</span> owrt.img openwrt-25.12.4-x86-64-generic-ext4-combined.img
+make docker-image            <span class="hljs-comment"># → vrnetlab/openwrt_openwrt:25.12.4</span>
+<span class="hljs-comment"># ※ `make build` は全バージョンを落とすので使わない（手動DLが安全）</span>
+</code></pre>
+<h3 id="extreme-exos無料" tabindex="-1">Extreme EXOS（無料） <a class="header-anchor" href="#extreme-exos無料" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">cd</span> ~/vrnetlab/extreme/exos
+curl -fsSL -o EXOS-VM_32.7.2.19.qcow2 \
+  https://akamai-ep.extremenetworks.com/Extreme_P/github-en/Virtual_EXOS/EXOS-VM_32.7.2.19.qcow2
+make docker-image            <span class="hljs-comment"># → vrnetlab/extreme_exos:32.7.2.19</span>
+</code></pre>
+<h3 id="cisco-vios--viosl2repoのdriveから" tabindex="-1">Cisco vIOS / vIOSL2（repoのDriveから） <a class="header-anchor" href="#cisco-vios--viosl2repoのdriveから" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">cd</span> ~/vrnetlab/cisco/vios
+python3 -m gdown <span class="hljs-string">&quot;https://drive.google.com/uc?id=&lt;ID&gt;&quot;</span> -O dl.tgz
+tar xzf dl.tgz                                 <span class="hljs-comment"># 中に virtioa.qcow2</span>
+<span class="hljs-built_in">cp</span> &lt;<span class="hljs-built_in">dir</span>&gt;/virtioa.qcow2 cisco_vios-&lt;ver&gt;.qcow2  <span class="hljs-comment"># L2は cisco_viosl2-&lt;YYYYMMDD&gt;.qcow2</span>
+make docker-image            <span class="hljs-comment"># → vrnetlab/cisco_vios:&lt;ver&gt;  (L2は :L2-&lt;date&gt;)</span>
+</code></pre>
+<h3 id="fortigate要ログインdlhealthy実証済" tabindex="-1">FortiGate（要ログインDL・✅healthy実証済） <a class="header-anchor" href="#fortigate要ログインdlhealthy実証済" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">cd</span> ~/vrnetlab/fortinet/fortigate
+<span class="hljs-built_in">rm</span> -rf /tmp/fgt &amp;&amp; <span class="hljs-built_in">mkdir</span> -p /tmp/fgt
+tar xzf <span class="hljs-string">&quot;/Users/shuya/Downloads/fortinet-FGT-vX.Y.Z-buildNNNN.tgz&quot;</span> -C /tmp/fgt   <span class="hljs-comment"># 中に virtioa.qcow2</span>
+<span class="hljs-built_in">cp</span> /tmp/fgt/*/virtioa.qcow2 ./fortios-vX.Y.Z.qcow2        <span class="hljs-comment"># ★この命名が必須(fortios-v…)</span>
+<span class="hljs-comment"># 初回のみ: docker/Dockerfile の apt一覧に `qemu-system-x86` を追加（arm64でx86 qemu必須）</span>
+make                         <span class="hljs-comment"># ※ &quot;make docker-image&quot; ではなく &quot;make&quot;（→ vrnetlab/vr-fortios:X.Y.Z）</span>
+</code></pre>
+<h2 id="4-clabyml-テンプレ" tabindex="-1">4. clab.yml テンプレ <a class="header-anchor" href="#4-clabyml-テンプレ" aria-hidden="true">#</a></h2>
+<pre><code class="language-yaml"><span class="hljs-attr">name:</span> <span class="hljs-string">demo</span>
+<span class="hljs-attr">topology:</span>
+  <span class="hljs-attr">nodes:</span>
+    <span class="hljs-attr">r1:</span> { <span class="hljs-attr">kind:</span> <span class="hljs-string">&lt;KIND&gt;</span>, <span class="hljs-attr">image:</span> <span class="hljs-string">&lt;IMAGE&gt;</span> }
+    <span class="hljs-attr">r2:</span> { <span class="hljs-attr">kind:</span> <span class="hljs-string">&lt;KIND&gt;</span>, <span class="hljs-attr">image:</span> <span class="hljs-string">&lt;IMAGE&gt;</span> }
+  <span class="hljs-attr">links:</span>
+    <span class="hljs-bullet">-</span> <span class="hljs-attr">endpoints:</span> [<span class="hljs-string">&quot;r1:eth1&quot;</span>, <span class="hljs-string">&quot;r2:eth1&quot;</span>]
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>機種</th>
+<th>KIND</th>
+<th>IMAGE 例</th>
+<th>データIF</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cisco IOSv</td>
+<td><code>cisco_vios</code></td>
+<td><code>vrnetlab/cisco_vios:159-3.M3</code></td>
+<td>eth1=Gi0/1</td>
+</tr>
+<tr>
+<td>MikroTik CHR</td>
+<td><code>mikrotik_ros</code></td>
+<td><code>vrnetlab/mikrotik_routeros:7.21.4-amd64</code></td>
+<td>eth1=ether2</td>
+</tr>
+<tr>
+<td>Extreme EXOS</td>
+<td><code>extreme_exos</code></td>
+<td><code>vrnetlab/extreme_exos:32.7.2.19</code></td>
+<td>eth1=port1</td>
+</tr>
+<tr>
+<td>OpenWrt</td>
+<td><code>openwrt</code></td>
+<td><code>vrnetlab/openwrt_openwrt:25.12.4</code></td>
+<td>eth1</td>
+</tr>
+<tr>
+<td>FortiGate</td>
+<td><code>fortinet_fortigate</code></td>
+<td><code>vrnetlab/vr-fortios:7.2.0</code></td>
+<td>eth1=port2</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>kind名はclab公式（containerlab.dev/manual/kinds）準拠。起動が遅いノードは
+deployがhealth待ちで時間がかかる（vIOSで約2分/ノード）。<code>docker logs &lt;node&gt;</code> で進捗確認。</p>
+</blockquote>
+<h2 id="5-ベンダー別-実現性早見表" tabindex="-1">5. ベンダー別 実現性早見表 <a class="header-anchor" href="#5-ベンダー別-実現性早見表" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>区分</th>
+<th>ベンダー/機種</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>✅ 無料DL・自動化可（推奨）</td>
+<td>MikroTik CHR, OpenWrt, Extreme EXOS, Cisco IOL/vIOS</td>
+</tr>
+<tr>
+<td>✅ 要ログインDLだが実証済</td>
+<td><strong>FortiGate 7.2.x(2GB)</strong>（ユーザー提供qcow2→<code>make</code>でビルド・healthy確認）</td>
+</tr>
+<tr>
+<td>△ 要ログインDL（未実証だが可能）</td>
+<td>Arista vEOS(2GB), Juniper vSRX(4GB・遅), FortiFirewall(同FortiOS)</td>
+</tr>
+<tr>
+<td>✖ arm64非現実的／Containerlab非対応</td>
+<td>Palo Alto(4-6GB), <strong>FortiManager(clab kind無)</strong>, Nokia SR OS, Juniper vMX/vJunos/vQFX, Aruba(8GB), Huawei, Dell FTOSv, SONiC</td>
+</tr>
+<tr>
+<td>⚡ ネイティブarm64の速い代替（VMより推奨）</td>
+<td>Nokia <strong>SR Linux</strong>, Arista <strong>cEOS</strong>, Juniper <strong>cRPD</strong>, FRR</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>「重い機種が欲しい」場合は、まず⚡のネイティブarm64コンテナを検討する方が快適。</p>
+</blockquote>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#0-大前提arm64の現実">0. 大前提（arm64の現実）</a></li>
+<li class="lvl-2"><a href="#1-共通4ステップ">1. 共通4ステップ</a></li>
+<li class="lvl-2"><a href="#2-ダウンロード手段">2. ダウンロード手段</a></li>
+<li class="lvl-2"><a href="#3-実証済みレシピコピペ可">3. 実証済みレシピ（コピペ可）</a></li>
+<li class="lvl-3"><a href="#mikrotik-chr最軽量無料healthy実証済">MikroTik CHR（最軽量・無料・✅healthy実証済）</a></li>
+<li class="lvl-3"><a href="#openwrt最軽量128mb無料">OpenWrt（最軽量128MB・無料）</a></li>
+<li class="lvl-3"><a href="#extreme-exos無料">Extreme EXOS（無料）</a></li>
+<li class="lvl-3"><a href="#cisco-vios--viosl2repoのdriveから">Cisco vIOS / vIOSL2（repoのDriveから）</a></li>
+<li class="lvl-3"><a href="#fortigate要ログインdlhealthy実証済">FortiGate（要ログインDL・✅healthy実証済）</a></li>
+<li class="lvl-2"><a href="#4-clabyml-テンプレ">4. clab.yml テンプレ</a></li>
+<li class="lvl-2"><a href="#5-ベンダー別-実現性早見表">5. ベンダー別 実現性早見表</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

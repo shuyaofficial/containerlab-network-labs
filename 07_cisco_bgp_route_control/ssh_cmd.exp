@@ -1,0 +1,35 @@
+#!/usr/bin/expect -f
+# SSH to IOL router and run a command
+# Usage: ssh_cmd.exp <hostname> <command>
+
+set hostname [lindex $argv 0]
+set cmd [lindex $argv 1]
+set timeout 15
+
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null admin@${hostname}
+
+expect {
+    "Password:" { send "admin\r" }
+    "password:" { send "admin\r" }
+    timeout { puts "TIMEOUT waiting for password"; exit 1 }
+}
+
+expect {
+    -re {[A-Za-z0-9_-]+[>#]} { }
+    timeout { puts "TIMEOUT waiting for prompt"; exit 1 }
+}
+
+send "terminal length 0\r"
+expect {
+    -re {[A-Za-z0-9_-]+[>#]} { }
+    timeout { }
+}
+
+send "${cmd}\r"
+expect {
+    -re {[A-Za-z0-9_-]+[>#]} { }
+    timeout { puts "TIMEOUT waiting for output"; exit 1 }
+}
+
+send "exit\r"
+expect eof

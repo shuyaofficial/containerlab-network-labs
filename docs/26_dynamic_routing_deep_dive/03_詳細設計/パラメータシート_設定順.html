@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>パラメータシート（設定順ビュー）— Theme 26: Dynamic Routing Deep Dive</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>26_dynamic_routing_deep_dive</span>
+<span class="sep">/</span>
+<span>03_詳細設計</span></nav>
+      <h1 class="doc-title">パラメータシート（設定順ビュー）— Theme 26: Dynamic Routing Deep Dive</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p><strong>本書は「設定する順番」で並べた作業ビューです。</strong> 値の正本は <a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/IP%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9%E7%AE%A1%E7%90%86%E8%A1%A8.html">IPアドレス管理表</a>、
+ノード別の一覧は <a href="%E3%83%91%E3%83%A9%E3%83%A1%E3%83%BC%E3%82%BF%E3%82%B7%E3%83%BC%E3%83%88.html">パラメータシート.md</a> を参照。両者と数値は一致させています。</p>
+<p><strong>本書に IOS コンフィグコマンド／startup-config は記載しません。</strong> 設計値・投入順序・順序の根拠・確認観点までを示し、
+IOSコマンドへの変換は学習者が行います。</p>
+</blockquote>
+<h2 id="なぜ順番で並べ替えたか" tabindex="-1">なぜ「順番」で並べ替えたか <a class="header-anchor" href="#なぜ順番で並べ替えたか" aria-hidden="true">#</a></h2>
+<p>ノード別に値だけ並んでいると、投入順が見えず次の事故が起きやすい：</p>
+<ul>
+<li><strong>Router ID 事故</strong>: Loopback を作る前に OSPF/BGP/EIGRP を有効化すると、意図しない Router ID が選ばれ、直すのに手戻りが発生する。</li>
+<li><strong>再配信のトラブル</strong>: 再配信を設定する前にルートマップなどのポリシーオブジェクト（ACL、prefix-list等）を作っておかないと、不要な経路がルーティングドメインに流れ込んでしまい、ルーティングループやメモリ枯渇の原因になる。</li>
+</ul>
+<p>これを避けるため、次の3原則で並べています：</p>
+<ol>
+<li><strong>Router ID はプロセス有効化の前に確定</strong> — Loopback を先に作る。</li>
+<li><strong>ルーティングプロセスと隣接の確立</strong> — 物理IFのIPを設定し、OSPF/EIGRP/BGPの隣接関係を成立させる。</li>
+<li><strong>ポリシーの作成 → 適用</strong> — route-mapやprefix-listを作成してから再配信（redistribute）やNATを適用する。</li>
+</ol>
+<hr>
+<h2 id="phase-0-事前確認環境側が用意済み" tabindex="-1">Phase 0. 事前確認（環境側が用意済み） <a class="header-anchor" href="#phase-0-事前確認環境側が用意済み" aria-hidden="true">#</a></h2>
+<p>投入対象は Cisco IOL 7台：<strong>hq-core / hq-dist / hq-edge / hq-dmz / br-edge / br-core / isp</strong>。
+次は <code>campus.clab.yml</code> が自動設定済みなので触らない。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>内容</th>
+<th>状態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>管理IP（7台＋PC/Srv3台）</td>
+<td><code>172.26.26.0/24</code> から固定</td>
+<td>✅ 自動</td>
+</tr>
+<tr>
+<td>PC側データプレーンIP・静的経路</td>
+<td>hq-pc、dmz-srv、br-pc ほか</td>
+<td>✅ 自動</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="phase-1-loopback0-を最初に作る全7台" tabindex="-1">Phase 1. Loopback0 を最初に作る（全7台） <a class="header-anchor" href="#phase-1-loopback0-を最初に作る全7台" aria-hidden="true">#</a></h2>
+<p><strong>先に作る理由</strong>: Loopback0 は Router ID の供給源。OSPF/EIGRP/BGP起動前にupさせておけば意図どおりのRouter IDが自動的に選ばれる。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>インターフェース</th>
+<th style="text-align:right">IP設計値</th>
+<th>用途</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>hq-core</td>
+<td>Loopback0</td>
+<td style="text-align:right">10.26.255.1/32</td>
+<td>OSPF/EIGRP Router ID</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>hq-dist</td>
+<td>Loopback0</td>
+<td style="text-align:right">10.26.255.2/32</td>
+<td>EIGRP Router ID</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>hq-edge</td>
+<td>Loopback0</td>
+<td style="text-align:right">10.26.255.254/32</td>
+<td>OSPF/BGP Router ID</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>hq-dmz</td>
+<td>Loopback0</td>
+<td style="text-align:right">10.26.255.3/32</td>
+<td>OSPF Router ID</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>isp</td>
+<td>Loopback0</td>
+<td style="text-align:right">10.26.255.100/32</td>
+<td>BGP Router ID</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>br-edge</td>
+<td>Loopback0</td>
+<td style="text-align:right">10.26.255.12/32</td>
+<td>OSPF/BGP Router ID</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>br-core</td>
+<td>Loopback0</td>
+<td style="text-align:right">10.26.255.11/32</td>
+<td>OSPF Router ID</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="phase-2-物理ifのipを設定全7台" tabindex="-1">Phase 2. 物理IFのIPを設定（全7台） <a class="header-anchor" href="#phase-2-物理ifのipを設定全7台" aria-hidden="true">#</a></h2>
+<p><strong>この順の理由</strong>: ルーティング有効化の前にリンクを up（connected）にする。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>IF</th>
+<th>対向</th>
+<th style="text-align:right">IP設計値</th>
+<th>ルーティング</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>hq-core</td>
+<td>E0/1</td>
+<td>hq-dist E0/1</td>
+<td style="text-align:right">10.26.1.1/30</td>
+<td>EIGRP 100</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>hq-core</td>
+<td>E0/2</td>
+<td>hq-edge E0/1</td>
+<td style="text-align:right">10.26.1.5/30</td>
+<td>OSPF 10 (Area 0)</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>hq-core</td>
+<td>E0/3</td>
+<td>hq-dmz E0/1</td>
+<td style="text-align:right">10.26.1.9/30</td>
+<td>OSPF 10 (Area 0)</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>hq-dist</td>
+<td>E0/1</td>
+<td>hq-core E0/1</td>
+<td style="text-align:right">10.26.1.2/30</td>
+<td>EIGRP 100</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>hq-dist</td>
+<td>E0/2</td>
+<td>hq-pc eth1</td>
+<td style="text-align:right">10.26.10.1/24</td>
+<td>EIGRP 100 (Passive)</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>hq-edge</td>
+<td>E0/1</td>
+<td>hq-core E0/2</td>
+<td style="text-align:right">10.26.1.6/30</td>
+<td>OSPF 10 (Area 0)</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>hq-edge</td>
+<td>E0/2</td>
+<td>isp E0/1</td>
+<td style="text-align:right">198.51.100.1/30</td>
+<td>BGP 65000</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>hq-dmz</td>
+<td>E0/1</td>
+<td>hq-core E0/3</td>
+<td style="text-align:right">10.26.1.10/30</td>
+<td>OSPF 10 (Area 0)</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>hq-dmz</td>
+<td>E0/2</td>
+<td>dmz-srv eth1</td>
+<td style="text-align:right">10.26.30.1/24</td>
+<td>OSPF 10 (Area 0, Passive)</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>isp</td>
+<td>E0/1</td>
+<td>hq-edge E0/2</td>
+<td style="text-align:right">198.51.100.2/30</td>
+<td>BGP 65100</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>isp</td>
+<td>E0/2</td>
+<td>br-edge E0/1</td>
+<td style="text-align:right">198.51.100.5/30</td>
+<td>BGP 65100</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>br-edge</td>
+<td>E0/1</td>
+<td>isp E0/2</td>
+<td style="text-align:right">198.51.100.6/30</td>
+<td>BGP 65001</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>br-edge</td>
+<td>E0/2</td>
+<td>br-core E0/1</td>
+<td style="text-align:right">10.26.2.1/30</td>
+<td>OSPF 10 (Area 1)</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>br-core</td>
+<td>E0/1</td>
+<td>br-edge E0/2</td>
+<td style="text-align:right">10.26.2.2/30</td>
+<td>OSPF 10 (Area 1)</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>br-core</td>
+<td>E0/2</td>
+<td>br-pc eth1</td>
+<td style="text-align:right">10.26.20.1/24</td>
+<td>OSPF 10 (Area 1, Passive)</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="phase-3-igp-有効化ospf--eigrp" tabindex="-1">Phase 3. IGP 有効化（OSPF &amp; EIGRP） <a class="header-anchor" href="#phase-3-igp-有効化ospf--eigrp" aria-hidden="true">#</a></h2>
+<p><strong>この順の理由</strong>: 社内ネットワーク（HQ・Branch）の基本ルーティングを確立する。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>プロトコル</th>
+<th>プロセス等</th>
+<th>対象ネットワーク/IF</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>hq-core</td>
+<td>EIGRP</td>
+<td>AS 100</td>
+<td>E0/1</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>hq-core</td>
+<td>OSPF</td>
+<td>10 (Area 0)</td>
+<td>E0/2, E0/3, Loopback0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>hq-dist</td>
+<td>EIGRP</td>
+<td>AS 100</td>
+<td>E0/1, E0/2 (Passive)</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>hq-edge</td>
+<td>OSPF</td>
+<td>10 (Area 0)</td>
+<td>E0/1, Loopback0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>hq-dmz</td>
+<td>OSPF</td>
+<td>10 (Area 0)</td>
+<td>E0/1, E0/2 (Passive), Loopback0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>br-edge</td>
+<td>OSPF</td>
+<td>10 (Area 1)</td>
+<td>E0/2, Loopback0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>br-core</td>
+<td>OSPF</td>
+<td>10 (Area 1)</td>
+<td>E0/1, E0/2 (Passive), Loopback0</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="phase-4--チェックポイントigp-隣接" tabindex="-1">Phase 4. ✔ チェックポイント：IGP 隣接 <a class="header-anchor" href="#phase-4--チェックポイントigp-隣接" aria-hidden="true">#</a></h2>
+<p>先に進む前に、キャンパス内のIGP隣接が確立していることを確認する。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>確認</th>
+<th>対象</th>
+<th>期待</th>
+<th>確認</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HQ EIGRP 隣接</td>
+<td>hq-core ⇔ hq-dist</td>
+<td>UP</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>HQ OSPF 隣接</td>
+<td>hq-core ⇔ hq-edge / hq-dmz</td>
+<td>FULL</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>Branch OSPF 隣接</td>
+<td>br-edge ⇔ br-core</td>
+<td>FULL</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="phase-5-ebgp-基本と経路制御" tabindex="-1">Phase 5. eBGP 基本と経路制御 <a class="header-anchor" href="#phase-5-ebgp-基本と経路制御" aria-hidden="true">#</a></h2>
+<p><strong>この順の理由</strong>: IGPが整った後、拠点間を結ぶBGPセッションを確立し、デフォルトルートやプレフィックスを広告する。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>BGP</th>
+<th>ネイバー</th>
+<th>ネットワーク広告 / 制御</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>hq-edge</td>
+<td>AS 65000</td>
+<td>isp (198.51.100.2)</td>
+<td>10.26.0.0/16 (aggregate等)</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>br-edge</td>
+<td>AS 65001</td>
+<td>isp (198.51.100.5)</td>
+<td>prefix-listを使用し 10.26.20.0/24 などの自拠点経路のみを送信</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>isp</td>
+<td>AS 65100</td>
+<td>hq-edge, br-edge</td>
+<td>各ピアへ Default route (<code>0.0.0.0/0</code>) を広告</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="phase-6--チェックポイントebgp-established" tabindex="-1">Phase 6. ✔ チェックポイント：eBGP Established <a class="header-anchor" href="#phase-6--チェックポイントebgp-established" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>確認</th>
+<th>対象</th>
+<th>期待</th>
+<th>確認</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>eBGP セッション</td>
+<td>hq-edge ⇔ isp ⇔ br-edge</td>
+<td>Established</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="phase-7-ポリシー作成と再配信hq-core--br-edge" tabindex="-1">Phase 7. ポリシー作成と再配信（hq-core / br-edge） <a class="header-anchor" href="#phase-7-ポリシー作成と再配信hq-core--br-edge" aria-hidden="true">#</a></h2>
+<p><strong>この順の理由</strong>: redistribute（再配信）によるルーティングループを防ぐため、事前にroute-mapを作る。</p>
+<h3 id="hq-core-ospf--eigrp" tabindex="-1">hq-core (OSPF ↔ EIGRP) <a class="header-anchor" href="#hq-core-ospf--eigrp" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>内容</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>route-map作成</td>
+<td>EIGRPからOSPFへの再配信時、<code>10.26.0.0/16</code> のみ許可</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>OSPF→EIGRP再配信</td>
+<td><code>redistribute ospf 10 metric 1000000 10 255 1 1500</code></td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>EIGRP→OSPF再配信</td>
+<td><code>redistribute eigrp 100 subnets route-map &lt;MAP名&gt;</code></td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="br-edge--hq-edge-ospf--bgp--default-route" tabindex="-1">br-edge / hq-edge (OSPF ↔ BGP / Default Route) <a class="header-anchor" href="#br-edge--hq-edge-ospf--bgp--default-route" aria-hidden="true">#</a></h3>
+<p>ISPから受け取ったデフォルトルートなどを、必要に応じて社内OSPFに広告（<code>default-information originate</code> 等を利用）。</p>
+<hr>
+<h2 id="phase-8-natpatの設定hq-edge" tabindex="-1">Phase 8. NAT/PATの設定（hq-edge） <a class="header-anchor" href="#phase-8-natpatの設定hq-edge" aria-hidden="true">#</a></h2>
+<p><strong>この順の理由</strong>: ルーティング設定が完了し、ISPへの経路が見えた状態でNATを設定し、HQ-PCからのインターネット(Branch)通信を可能にする。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>対象</th>
+<th>設定内容</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>hq-edge</td>
+<td>Inside</td>
+<td>E0/1 を <code>ip nat inside</code> に設定</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>hq-edge</td>
+<td>Outside</td>
+<td>E0/2 を <code>ip nat outside</code> に設定</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>hq-edge</td>
+<td>ACL作成</td>
+<td>内部ネットワーク（10.26.0.0/16）を許可する ACL 1 を作成</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>hq-edge</td>
+<td>NATルールの適用</td>
+<td><code>ip nat inside source list 1 interface Ethernet0/2 overload</code></td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="phase-9--チェックポイント最終経路確認と疎通" tabindex="-1">Phase 9. ✔ チェックポイント：最終経路確認と疎通 <a class="header-anchor" href="#phase-9--チェックポイント最終経路確認と疎通" aria-hidden="true">#</a></h2>
+<h3 id="e2e-疎通確認" tabindex="-1">E2E 疎通確認 <a class="header-anchor" href="#e2e-疎通確認" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>確認元</th>
+<th>宛先</th>
+<th>期待</th>
+<th>通信の仕組み</th>
+<th>確認</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>hq-pc</td>
+<td>dmz-srv</td>
+<td>疎通OK</td>
+<td>EIGRP ↔ OSPFの再配信による社内ルーティング</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>hq-pc</td>
+<td>br-pc</td>
+<td>疎通OK</td>
+<td>HQを出る際にNAT(NAPT)され、ISP経由でBranchに到達</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>isp</td>
+<td>dmz-srv</td>
+<td>疎通NG</td>
+<td>ISP側にはプライベートIPが広告されておらず、NATで守られているため到達不可</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="nat変換の確認" tabindex="-1">NAT変換の確認 <a class="header-anchor" href="#nat変換の確認" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>確認コマンド</th>
+<th>期待</th>
+<th>確認</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>show ip nat translations</code> (hq-edge)</td>
+<td>hq-pcからbr-pc宛のping実行後、変換テーブルにエントリーが作成されていること</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="phase-10-保存" tabindex="-1">Phase 10. 保存 <a class="header-anchor" href="#phase-10-保存" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>内容</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>設定保存</td>
+<td>7台の running-config を保存</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>障害試験 / AAR</td>
+<td><a href="../05_%E8%A9%A6%E9%A8%93/">試験計画書</a> 側で実施（リンクダウン時の経路収束など）</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#なぜ順番で並べ替えたか">なぜ「順番」で並べ替えたか</a></li>
+<li class="lvl-2"><a href="#phase-0-事前確認環境側が用意済み">Phase 0. 事前確認（環境側が用意済み）</a></li>
+<li class="lvl-2"><a href="#phase-1-loopback0-を最初に作る全7台">Phase 1. Loopback0 を最初に作る（全7台）</a></li>
+<li class="lvl-2"><a href="#phase-2-物理ifのipを設定全7台">Phase 2. 物理IFのIPを設定（全7台）</a></li>
+<li class="lvl-2"><a href="#phase-3-igp-有効化ospf--eigrp">Phase 3. IGP 有効化（OSPF &amp; EIGRP）</a></li>
+<li class="lvl-2"><a href="#phase-4--チェックポイントigp-隣接">Phase 4. ✔ チェックポイント：IGP 隣接</a></li>
+<li class="lvl-2"><a href="#phase-5-ebgp-基本と経路制御">Phase 5. eBGP 基本と経路制御</a></li>
+<li class="lvl-2"><a href="#phase-6--チェックポイントebgp-established">Phase 6. ✔ チェックポイント：eBGP Established</a></li>
+<li class="lvl-2"><a href="#phase-7-ポリシー作成と再配信hq-core--br-edge">Phase 7. ポリシー作成と再配信（hq-core / br-edge）</a></li>
+<li class="lvl-3"><a href="#hq-core-ospf--eigrp">hq-core (OSPF ↔ EIGRP)</a></li>
+<li class="lvl-3"><a href="#br-edge--hq-edge-ospf--bgp--default-route">br-edge / hq-edge (OSPF ↔ BGP / Default Route)</a></li>
+<li class="lvl-2"><a href="#phase-8-natpatの設定hq-edge">Phase 8. NAT/PATの設定（hq-edge）</a></li>
+<li class="lvl-2"><a href="#phase-9--チェックポイント最終経路確認と疎通">Phase 9. ✔ チェックポイント：最終経路確認と疎通</a></li>
+<li class="lvl-3"><a href="#e2e-疎通確認">E2E 疎通確認</a></li>
+<li class="lvl-3"><a href="#nat変換の確認">NAT変換の確認</a></li>
+<li class="lvl-2"><a href="#phase-10-保存">Phase 10. 保存</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

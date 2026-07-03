@@ -1,0 +1,34 @@
+name: ipsec-vpn
+
+topology:
+  nodes:
+    # 東京本社のクライアントPC（ルーターイメージで代用）
+    tokyo-pc:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+    
+    # 東京本社のVPNエッジルーター
+    tokyo-r1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+
+    # インターネットプロバイダ（ダミールーター）
+    isp:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+
+    # 大阪支社のVPNエッジルーター
+    osaka-r1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+
+    # 大阪支社のクライアントPC（ルーターイメージで代用）
+    osaka-pc:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+
+  links:
+    - endpoints: ["tokyo-pc:eth1", "tokyo-r1:eth2"]
+    - endpoints: ["tokyo-r1:eth1", "isp:eth1"]
+    - endpoints: ["isp:eth2", "osaka-r1:eth1"]
+    - endpoints: ["osaka-r1:eth2", "osaka-pc:eth1"]

@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>🚀 Challenge 05: ルートフィルタリング（Route-map / Prefix-list）＆ ルートリフレクタ（RR）ハンズオン</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>05_cisco_bgp_route_map_rr</span></nav>
+      <h1 class="doc-title">🚀 Challenge 05: ルートフィルタリング（Route-map / Prefix-list）＆ ルートリフレクタ（RR）ハンズオン</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>本ラボは、物理結線のみが完了した「まっさらなルータ4台」を使い、ルートリフレクタ（RR）によるiBGPスプリットホライズンの解決と、Route-map ＆ Prefix-listを用いた高度なルート制御（フィルタリング）を体験する、極上ハンズオン課題です。</p>
+<hr>
+<h2 id="-トポロジーと設計要件" tabindex="-1">🗺️ トポロジーと設計要件 <a class="header-anchor" href="#-トポロジーと設計要件" aria-hidden="true">#</a></h2>
+<pre class="mermaid">graph LR
+    subgraph AS_External [外部AS 65001]
+        R1[R1 / eBGP]
+    end
+
+    subgraph AS_Internal [社内AS 65002 / OSPF Area 0]
+        R2[R2 /境界 iBGP] &lt;--&gt; |192.168.23.0/24| R3[R3 /親 RR]
+        R3 &lt;--&gt; |192.168.34.0/24| R4[R4 /子 iBGP]
+    end
+
+    R1 &lt;--&gt; |192.168.12.0/24| R2
+
+    style R1 fill:#dff,stroke:#333,stroke-width:2px
+    style R2 fill:#fdf,stroke:#333,stroke-width:2px
+    style R3 fill:#ffd,stroke:#333,stroke-width:2px
+    style R4 fill:#fdf,stroke:#333,stroke-width:2px
+</pre>
+<h3 id="1-インターフェースip設計" tabindex="-1">1. インターフェースIP設計 <a class="header-anchor" href="#1-インターフェースip設計" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>デバイス</th>
+<th>インターフェース</th>
+<th>IPアドレス / サブネット</th>
+<th>役割・プロトコル</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.12.1/24</code></td>
+<td>対向R2接続用（eBGP）</td>
+</tr>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>1.1.1.1/32</code></td>
+<td>外部インターネット拠点</td>
+</tr>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Loopback10</code></td>
+<td><code>10.1.1.1/24</code></td>
+<td>テスト用セグメント1 (社内通過許可ルート)</td>
+</tr>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Loopback20</code></td>
+<td><code>10.2.2.2/24</code></td>
+<td>テスト用セグメント2 (境界R2で遮断するルート)</td>
+</tr>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Loopback30</code></td>
+<td><code>10.3.3.3/24</code></td>
+<td>テスト用セグメント3 (境界R2で遮断するルート)</td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.12.2/24</code></td>
+<td>対向R1接続用（eBGP）</td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Ethernet0/2</code></td>
+<td><code>192.168.23.2/24</code></td>
+<td>対向R3接続用（OSPF &amp; iBGP）</td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>2.2.2.2/32</code></td>
+<td>OSPF広報 ＆ iBGPピア用</td>
+</tr>
+<tr>
+<td><strong>R3</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.23.3/24</code></td>
+<td>対向R2接続用（OSPF &amp; iBGP）</td>
+</tr>
+<tr>
+<td><strong>R3</strong></td>
+<td><code>Ethernet0/2</code></td>
+<td><code>192.168.34.3/24</code></td>
+<td>対向R4接続用（OSPF &amp; iBGP）</td>
+</tr>
+<tr>
+<td><strong>R3</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>3.3.3.3/32</code></td>
+<td>OSPF広報 ＆ ルートリフレクタ(RR)親機</td>
+</tr>
+<tr>
+<td><strong>R4</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.34.4/24</code></td>
+<td>対向R3接続用（OSPF &amp; iBGP）</td>
+</tr>
+<tr>
+<td><strong>R4</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>4.4.4.4/32</code></td>
+<td>OSPF広報 ＆ iBGPピア用（RRクライアント）</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="2-プロトコル設計" tabindex="-1">2. プロトコル設計 <a class="header-anchor" href="#2-プロトコル設計" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>OSPF (社内AS 65002内: R2, R3, R4):</strong>
+<ul>
+<li>プロセスID: <code>1</code></li>
+<li>エリア: <code>0</code></li>
+<li>各ルータの <code>Loopback0</code> および物理接続リンク（<code>192.168.23.0/24</code>, <code>192.168.34.0/24</code>）は OSPF にアドバタイズします。</li>
+<li><strong>重要:</strong> eBGP接続用の物理リンク <code>192.168.12.0/24</code> を OSPF で広報することにより、<code>next-hop-self</code> を使わなくても R3 や R4 が R1（<code>192.168.12.1</code>）へ到達できるようにし、ネクストホップの自動解決を試します！</li>
+</ul>
+</li>
+<li><strong>BGP (R1-R2-R3-R4間):</strong>
+<ul>
+<li><strong>R1:</strong> AS <code>65001</code> (eBGPピア: R2 の <code>192.168.12.2</code> と接続)</li>
+<li><strong>R2, R3, R4:</strong> AS <code>65002</code> (iBGPピア)</li>
+<li>iBGPピアは、OSPFで疎通を確保した <code>Loopback0</code>（<code>2.2.2.2</code>, <code>3.3.3.3</code>, <code>4.4.4.4</code>）の間で確立します。</li>
+<li><strong>重要:</strong> <strong>R2 と R4 の間には直接BGPピアを張りません！</strong>
+<ul>
+<li>R2 ➔ R3 間でピアを張る</li>
+<li>R3 ➔ R4 間でピアを張る</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2 id="-3つのミッション" tabindex="-1">🎯 3つのミッション <a class="header-anchor" href="#-3つのミッション" aria-hidden="true">#</a></h2>
+<h3 id="mission-1-ospf-と-ibgpスプリットホライズントラップの観測" tabindex="-1">Mission 1: OSPF と iBGP（スプリットホライズントラップ）の観測 <a class="header-anchor" href="#mission-1-ospf-と-ibgpスプリットホライズントラップの観測" aria-hidden="true">#</a></h3>
+<ol>
+<li>AS65002内部（R2, R3, R4）で OSPF を有効化し、<code>Loopback0</code> 同士で双方向 Ping が通ることを確認します。</li>
+<li>R1 と R2 の間で eBGP を確立し、R1 から <code>1.1.1.1/32</code>, <code>10.1.1.0/24</code>, <code>10.2.2.0/24</code>, <code>10.3.3.0/24</code> を広報します。</li>
+<li>R2 ➔ R3 間、R3 ➔ R4 間で Loopback0 を使った iBGP ピアを確立します。</li>
+<li><strong>観測ポイント:</strong>
+<ul>
+<li>R3 の BGPテーブルには R1 のルートが届きますが、<strong>R4 の BGPテーブルにはルートが一切届かない</strong>ことを確認します。</li>
+<li>なぜ届かないのか？これが iBGP の大原則である <strong>「スプリットホライズン（iBGPから学習したルートは他のiBGPネイバーに転送しない）」</strong> の挙動です！</li>
+</ul>
+</li>
+</ol>
+<h3 id="mission-2-ルートリフレクタrrの有効化--next-hop-self-無しでの自動解決" tabindex="-1">Mission 2: ルートリフレクタ（RR）の有効化 ＆ next-hop-self 無しでの自動解決 <a class="header-anchor" href="#mission-2-ルートリフレクタrrの有効化--next-hop-self-無しでの自動解決" aria-hidden="true">#</a></h3>
+<ol>
+<li>R3（親ルータ）において、R2 と R4 を <strong>クライアント（<code>route-reflector-client</code>）</strong> に指定します。</li>
+<li><strong>観測ポイント:</strong>
+<ul>
+<li>設定後、R4 の BGPテーブルに R1 のルートが反射されて現れる様子を観測します！</li>
+<li>さらに、R2で <code>next-hop-self</code> を設定しなくても、OSPFで eBGP 境界セグメント（<code>192.168.12.0/24</code>）が広報されているため、R4がネクストホップ <code>192.168.12.1</code> を自動で解決し、ベストルート（<code>*&gt;</code>）として認識されることを確認します。</li>
+</ul>
+</li>
+</ol>
+<h3 id="mission-3-route-map-と-prefix-list-によるフィルタリング" tabindex="-1">Mission 3: Route-map と Prefix-list によるフィルタリング <a class="header-anchor" href="#mission-3-route-map-と-prefix-list-によるフィルタリング" aria-hidden="true">#</a></h3>
+<ol>
+<li>社内ポリシーに基づき、R2（境界ルータ）で以下のフィルタリングを実装します。
+<ul>
+<li><strong>要件:</strong> <code>10.1.1.0/24</code> だけを受信許可し、<code>10.2.2.0/24</code> と <code>10.3.3.0/24</code> をブロックします。</li>
+</ul>
+</li>
+<li><code>ip prefix-list</code> を作成し、<code>10.1.1.0/24</code> を許可します。</li>
+<li><code>route-map</code> を作成し、prefix-list をマッチさせます。</li>
+<li>R2 の BGP ネイバー（R1対向）に <code>route-map</code> を <code>in</code> で適用します。</li>
+<li><strong>観測ポイント:</strong>
+<ul>
+<li>フィルタリング適用後、BGPソフトクリアを行い、R2, R3, R4 の BGPテーブルから不要なルートが完全に消え去り、<code>10.1.1.0/24</code> だけが美しくフィルタされて残っていることを確認します。</li>
+</ul>
+</li>
+</ol>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-トポロジーと設計要件">🗺️ トポロジーと設計要件</a></li>
+<li class="lvl-3"><a href="#1-インターフェースip設計">1. インターフェースIP設計</a></li>
+<li class="lvl-3"><a href="#2-プロトコル設計">2. プロトコル設計</a></li>
+<li class="lvl-2"><a href="#-3つのミッション">🎯 3つのミッション</a></li>
+<li class="lvl-3"><a href="#mission-1-ospf-と-ibgpスプリットホライズントラップの観測">Mission 1: OSPF と iBGP（スプリットホライズントラップ）の観測</a></li>
+<li class="lvl-3"><a href="#mission-2-ルートリフレクタrrの有効化--next-hop-self-無しでの自動解決">Mission 2: ルートリフレクタ（RR）の有効化 ＆ next-hop-self 無しでの自動解決</a></li>
+<li class="lvl-3"><a href="#mission-3-route-map-と-prefix-list-によるフィルタリング">Mission 3: Route-map と Prefix-list によるフィルタリング</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "name": "netlab-docbuild",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Markdown→HTML 静的ビルド。ネットワークラボ設計書を印刷にも耐える閲覧HTMLへ変換する。",
+  "bin": {
+    "netlab-docbuild": "./build.mjs"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "check": "node build.mjs --check"
+  },
+  "dependencies": {
+    "chokidar": "^3.6.0",
+    "gray-matter": "^4.0.3",
+    "highlight.js": "^11.10.0",
+    "markdown-it": "^14.1.0",
+    "markdown-it-anchor": "^9.2.0",
+    "markdown-it-attrs": "^4.2.0",
+    "mermaid": "^11.4.1"
+  }
+}

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜Phase 0 土台</title>
+  <link rel="stylesheet" href="../../../assets/doc.css">
+  <link rel="stylesheet" href="../../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>04_構築</span>
+<span class="sep">/</span>
+<span>phase0_base</span></nav>
+      <h1 class="doc-title">テーマZERO｜Phase 0 土台</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">phase</span><span class="tag">base</span><span class="tag">containerlab</span></span>
+      </div>
+      
+      <div class="content">
+<p>docker bridge 4ゾーンのうち Phase 0 で使う <code>zt-untrust</code> / <code>zt-trust</code> の2ゾーンと、エンドポイント3台（<code>client</code> / <code>external</code> / <code>app</code>）で疎通の骨格を作る。以降の全 Phase の土台。詳細は <a href="../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a> Phase 0、<a href="../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a>。</p>
+<h2 id="目的" tabindex="-1">目的 <a class="header-anchor" href="#目的" aria-hidden="true">#</a></h2>
+<ul>
+<li>docker bridge によるゾーン分離（Untrust / Trust）を containerlab 上に構築する。</li>
+<li>関所（Phase 2 以降）が無い状態で、Untrust→Trust の直通が「設計上許可した経路のみ」であることを確認する土台とする。</li>
+<li>規約一式（frontmatter / HTML ビルド / git）が回ることを確認する。</li>
+</ul>
+<h2 id="ノード表" tabindex="-1">ノード表 <a class="header-anchor" href="#ノード表" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>役割</th>
+<th>ゾーン</th>
+<th>bridge</th>
+<th>IP（データ面）</th>
+<th>mgmt-ipv4</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>client</td>
+<td>利用者端末（multitool）</td>
+<td>Untrust</td>
+<td>zt-untrust</td>
+<td>172.30.0.11/24</td>
+<td>172.30.99.11</td>
+</tr>
+<tr>
+<td>external</td>
+<td>外部/未管理端末（multitool）</td>
+<td>Untrust</td>
+<td>zt-untrust</td>
+<td>172.30.0.12/24</td>
+<td>172.30.99.12</td>
+</tr>
+<tr>
+<td>app</td>
+<td>保護対象サービス（multitool）</td>
+<td>Trust</td>
+<td>zt-trust</td>
+<td>172.30.20.21/24</td>
+<td>172.30.99.21</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>イメージ: <code>wbitt/network-multitool:latest</code>（内蔵 nginx で 80/tcp 応答）。</li>
+<li><code>zt-untrust</code> / <code>zt-trust</code> は containerlab の <code>bridge</code> kind（ホスト側 Linux bridge）で表現。<code>deploy.sh</code> がデプロイ前に作成し、撤収時に削除する。</li>
+<li>mgmt ネットワークは <code>zt-base-mgmt</code>（172.30.99.0/24、他テーマと非衝突のレンジ）。データ面のゾーンサブネットは <a href="../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/IP%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9%E7%AE%A1%E7%90%86%E8%A1%A8.html">IPアドレス管理表</a> に準拠。</li>
+</ul>
+<h2 id="デプロイ確認撤収コマンド" tabindex="-1">デプロイ・確認・撤収コマンド <a class="header-anchor" href="#デプロイ確認撤収コマンド" aria-hidden="true">#</a></h2>
+<p>VM (<code>clab@orb</code>) 経由で実行する（<a href="../../../%E8%A6%8F%E7%B4%84/clab%E9%81%8B%E7%94%A8%E8%A6%8F%E7%B4%84.html">clab運用規約</a> 準拠）。</p>
+<pre><code class="language-bash"><span class="hljs-comment"># デプロイ（zt-untrust/zt-trust bridge 作成 → containerlab deploy）</span>
+ssh clab@orb <span class="hljs-string">&quot;cd /Users/shuya/Documents/claude/Mac仮想環境構築/ZERO_zero_trust/04_構築/phase0_base &amp;&amp; ./deploy.sh deploy&quot;</span>
+
+<span class="hljs-comment"># ノード状態確認</span>
+ssh clab@orb <span class="hljs-string">&quot;cd /Users/shuya/Documents/claude/Mac仮想環境構築/ZERO_zero_trust/04_構築/phase0_base &amp;&amp; ./deploy.sh inspect&quot;</span>
+
+<span class="hljs-comment"># 疎通確認（client → app）</span>
+ssh clab@orb <span class="hljs-string">&quot;docker exec clab-zt-base-client ping -c3 172.30.20.21&quot;</span>
+ssh clab@orb <span class="hljs-string">&quot;docker exec clab-zt-base-client curl -sS http://172.30.20.21/&quot;</span>
+
+<span class="hljs-comment"># 撤収（containerlab destroy → bridge 削除）</span>
+ssh clab@orb <span class="hljs-string">&quot;cd /Users/shuya/Documents/claude/Mac仮想環境構築/ZERO_zero_trust/04_構築/phase0_base &amp;&amp; ./deploy.sh destroy&quot;</span>
+</code></pre>
+<ul>
+<li><code>iouyap</code> サブコマンドは IOL 不使用のため「本テーマでは不要」のメッセージのみ表示する。</li>
+</ul>
+<h2 id="ゲート条件次へ進む条件" tabindex="-1">ゲート条件（次へ進む条件） <a class="header-anchor" href="#ゲート条件次へ進む条件" aria-hidden="true">#</a></h2>
+<p><code>client</code> → <code>app</code> の ping / curl が通り、<code>node 規約/ビルド/build.mjs --check</code> が pass すること（<a href="../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a> Phase 0）。試験結果は <a href="../../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E7%B5%90%E6%9E%9C_2026-07-04.html">試験結果_2026-07-04</a>、試験項目は <a href="../../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a> T-0-*。</p>
+<h2 id="学べること" tabindex="-1">学べること <a class="header-anchor" href="#学べること" aria-hidden="true">#</a></h2>
+<p>docker bridge によるゾーン分離、containerlab のノード命名規約、Untrust→Trust 直通禁止の効き方。</p>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a></li>
+<li><a href="../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a></li>
+<li><a href="../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/IP%E3%82%A2%E3%83%89%E3%83%AC%E3%82%B9%E7%AE%A1%E7%90%86%E8%A1%A8.html">IPアドレス管理表</a></li>
+<li><a href="../../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a></li>
+<li><a href="../../../%E8%A6%8F%E7%B4%84/clab%E9%81%8B%E7%94%A8%E8%A6%8F%E7%B4%84.html">clab運用規約</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#目的">目的</a></li>
+<li class="lvl-2"><a href="#ノード表">ノード表</a></li>
+<li class="lvl-2"><a href="#デプロイ確認撤収コマンド">デプロイ・確認・撤収コマンド</a></li>
+<li class="lvl-2"><a href="#ゲート条件次へ進む条件">ゲート条件（次へ進む条件）</a></li>
+<li class="lvl-2"><a href="#学べること">学べること</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

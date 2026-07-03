@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>📑 Theme D: BGPデュアルホーム冗長化ハンズオン 振り返りシート</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>06_cisco_bgp_dual_homed</span>
+<span class="sep">/</span>
+<span>振り返りシート</span></nav>
+      <h1 class="doc-title">📑 Theme D: BGPデュアルホーム冗長化ハンズオン 振り返りシート</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>本シートは、BGPデュアルホーム冗長化（アクティブ/スタンバイ構成）の手動構築およびトラブルシューティングを通じて得られた、重要なネットワーク設計の教訓と動作原理をまとめたものです。</p>
+<hr>
+<h2 id="-今回の学習で得た最強の教訓4点" tabindex="-1">🎯 今回の学習で得た「最強の教訓」4点 <a class="header-anchor" href="#-今回の学習で得た最強の教訓4点" aria-hidden="true">#</a></h2>
+<h3 id="①-ネットワークの鉄則帰り道復路がなければパケットは疎通しない" tabindex="-1">① ネットワークの鉄則：「帰り道（復路）」がなければパケットは疎通しない <a class="header-anchor" href="#①-ネットワークの鉄則帰り道復路がなければパケットは疎通しない" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>事象</strong>: R3にデフォルトルートがあり、R1もBGPで外のルート（8.8.8.8）を正常に学習しているのに、R3からPingが通らなかった。</li>
+<li><strong>原因</strong>: R1およびR2のBGP設定で、自組織のネットワーク（R3のLoopback0である <code>3.3.3.3/32</code> や、R1/R2のLoopback）を <code>network</code> コマンドで上流ISPへ広報し忘れていたため、対向ISP側に戻りルートが存在していなかった。</li>
+<li><strong>教訓</strong>: ルーティング設計では、パケットの「行き（往路）」のルートだけでなく、<strong>「帰り（復路）」のルートが対向機器にあるか</strong>を必ずセットで確認する！</li>
+</ul>
+<h3 id="②-物理の基本新しい環境を起動したらまずポートを起こすno-shutdown" tabindex="-1">② 物理の基本：新しい環境を起動したら「まずポートを起こす（no shutdown）」 <a class="header-anchor" href="#②-物理の基本新しい環境を起動したらまずポートを起こすno-shutdown" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>事象</strong>: R1のIP SLAが起動せず（Timeout）、OSPF設定から <code>always</code> を外した途端にR3からのPingが完全に不通になってしまった。</li>
+<li><strong>原因</strong>: 一から環境を再デプロイした際、R1の <code>interface Ethernet0/1</code>（ISP-A接続用）で <code>no shutdown</code> を実行し忘れていたため、物理ポートが閉じたまま（Down）だった。</li>
+<li><strong>教訓</strong>: Ciscoルータのポートは初期状態では眠っています（Shutdown）。プロトコルやIP SLAを設定する前に、**「すべてのインターフェースが物理的に Up になっているか（<code>show ip int brief</code>）」**を確認するクセをつける！</li>
+</ul>
+<h3 id="③-ospf広報の基本always-なしはルータ自身のデフォルトルートが広報トリガー" tabindex="-1">③ OSPF広報の基本：<code>always</code> なしはルータ自身のデフォルトルートが広報トリガー <a class="header-anchor" href="#③-ospf広報の基本always-なしはルータ自身のデフォルトルートが広報トリガー" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>事象</strong>: R1の物理ポートを落とした障害時に、R3からの通信がR2へ自動迂回（フェイルオーバー）しなかった。</li>
+<li><strong>原因</strong>: R2に <code>ip route 0.0.0.0 0.0.0.0 ...</code>（スタティックデフォルトルート）を入れていなかったため、OSPF（alwaysなし）の広報トリガーが引かれず、R2自身もデフォルトルートを広報していなかった。</li>
+<li><strong>教訓</strong>: OSPFで <code>default-information originate</code>（alwaysなし）を使用する場合は、<strong>そのルータ自身がルーティングテーブル（RIB）にデフォルトルートを何らかの形で持っている必要がある</strong>！</li>
+</ul>
+<h3 id="④-役割分担の基本bgp-lp-と-ospf-コストの美しい棲み分け" tabindex="-1">④ 役割分担の基本：BGP LP と OSPF コストの美しい棲み分け <a class="header-anchor" href="#④-役割分担の基本bgp-lp-と-ospf-コストの美しい棲み分け" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>学んだこと</strong>:
+<ul>
+<li><strong>OSPFコスト（10 vs 100）</strong>: **R3（社内PC）**に対して「通常時はR1へ行きなさい（社内での不要な遠回り・ヘアピン防止）」と指示する。</li>
+<li><strong>BGP LP（100 vs 50）</strong>: **R2（境界ルータ）**に対して「パケットが来ても勝手にISP-Bに投げず、R1に横送りしなさい」と指示し、企業ポリシーを統一する。</li>
+<li><strong>Local Preference</strong>は、あくまで「出ていくパケット（往路）」専用であり、<strong>「帰りのパケット（復路）」には一切影響しない</strong>（帰りルートの制御には AS Path Prepend などが必要）。</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2 id="-トラブルシューティングの記録" tabindex="-1">🛠️ トラブルシューティングの記録 <a class="header-anchor" href="#-トラブルシューティングの記録" aria-hidden="true">#</a></h2>
+<h3 id="1-alwaysありなしによる挙動の違い" tabindex="-1">1. alwaysあり・なしによる挙動の違い <a class="header-anchor" href="#1-alwaysありなしによる挙動の違い" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong><code>always</code> ありの場合</strong>：上流（E0/1）が死んでいてTrackがDownしているのにもかかわらず、OSPFが「俺はデフォルトルート持ってるよ！」と嘘の広報をし続けた。結果、R3はR1にパケットを送り、受け取ったR1がR2にパケットを横送りし、R2 ➔ ISP-Bへと抜けていた（「遠回りだけど疎通はする」の正体）。</li>
+<li><strong><code>always</code> なしの場合</strong>：TrackがDown（上流回線不通）を検知すると、R1はデフォルトルートの広報を<strong>正しく停止</strong>する。R2が正しくデフォルトルートを持っていれば、R3のデフォルトルートがR2経由に綺麗に切り替わる（真の冗長化動作）。</li>
+</ul>
+<hr>
+<p>本シートにまとめられた動作原理は、BGPデュアルホームを設計・構築・運用する上での強固な基礎となります。次のチャレンジでも、この教訓を胸に手動構築を楽しんでいきましょう！</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-今回の学習で得た最強の教訓4点">🎯 今回の学習で得た「最強の教訓」4点</a></li>
+<li class="lvl-3"><a href="#①-ネットワークの鉄則帰り道復路がなければパケットは疎通しない">① ネットワークの鉄則：「帰り道（復路）」がなければパケットは疎通しない</a></li>
+<li class="lvl-3"><a href="#②-物理の基本新しい環境を起動したらまずポートを起こすno-shutdown">② 物理の基本：新しい環境を起動したら「まずポートを起こす（no shutdown）」</a></li>
+<li class="lvl-3"><a href="#③-ospf広報の基本always-なしはルータ自身のデフォルトルートが広報トリガー">③ OSPF広報の基本：always なしはルータ自身のデフォルトルートが広報トリガー</a></li>
+<li class="lvl-3"><a href="#④-役割分担の基本bgp-lp-と-ospf-コストの美しい棲み分け">④ 役割分担の基本：BGP LP と OSPF コストの美しい棲み分け</a></li>
+<li class="lvl-2"><a href="#-トラブルシューティングの記録">🛠️ トラブルシューティングの記録</a></li>
+<li class="lvl-3"><a href="#1-alwaysありなしによる挙動の違い">1. alwaysあり・なしによる挙動の違い</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

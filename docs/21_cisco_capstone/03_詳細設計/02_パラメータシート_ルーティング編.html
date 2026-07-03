@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>パラメータシート（ルーティング・HSRP編）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>21_cisco_capstone</span>
+<span class="sep">/</span>
+<span>03_詳細設計</span></nav>
+      <h1 class="doc-title">パラメータシート（ルーティング・HSRP編）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>本ドキュメントは、本社内を連携させる「OSPF」、インターネットと経路交換する「BGP」、そしてデフォルトゲートウェイの冗長化を行う「HSRP」のパラメータを定義します。</p>
+<h2 id="1-ospf-設計-本社内ルーティング" tabindex="-1">1. OSPF 設計 (本社内ルーティング) <a class="header-anchor" href="#1-ospf-設計-本社内ルーティング" aria-hidden="true">#</a></h2>
+<p>本社内の全ルーター・L3スイッチで OSPF プロセスを起動し、Area 0 (バックボーンエリア) として社内網の経路情報を動的に交換します。</p>
+<h3 id="ospf-基本パラメータ" tabindex="-1">OSPF 基本パラメータ <a class="header-anchor" href="#ospf-基本パラメータ" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:left">機器名</th>
+<th style="text-align:left">プロセスID</th>
+<th style="text-align:left">ルータID (Loopback0)</th>
+<th style="text-align:left">エリア</th>
+<th style="text-align:left">参加するネットワーク (Network コマンド)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">HQ-Edge1</td>
+<td style="text-align:left">1</td>
+<td style="text-align:left">1.1.1.1</td>
+<td style="text-align:left">0</td>
+<td style="text-align:left"><code>10.0.0.0 0.0.0.3</code> (Core1向)<br><code>10.0.0.4 0.0.0.3</code> (Core2向)</td>
+</tr>
+<tr>
+<td style="text-align:left">HQ-Edge2</td>
+<td style="text-align:left">1</td>
+<td style="text-align:left">2.2.2.2</td>
+<td style="text-align:left">0</td>
+<td style="text-align:left"><code>10.0.0.8 0.0.0.3</code> (Core1向)<br><code>10.0.0.12 0.0.0.3</code> (Core2向)</td>
+</tr>
+<tr>
+<td style="text-align:left">HQ-Core1</td>
+<td style="text-align:left">1</td>
+<td style="text-align:left">3.3.3.3</td>
+<td style="text-align:left">0</td>
+<td style="text-align:left"><code>10.0.0.0 0.0.0.3</code> (Edge1向)<br><code>10.0.0.8 0.0.0.3</code> (Edge2向)<br><code>10.1.10.0 0.0.0.255</code> (VLAN10)</td>
+</tr>
+<tr>
+<td style="text-align:left">HQ-Core2</td>
+<td style="text-align:left">1</td>
+<td style="text-align:left">4.4.4.4</td>
+<td style="text-align:left">0</td>
+<td style="text-align:left"><code>10.0.0.4 0.0.0.3</code> (Edge1向)<br><code>10.0.0.12 0.0.0.3</code> (Edge2向)<br><code>10.1.10.0 0.0.0.255</code> (VLAN10)</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="デフォルトルートの再配送-default-information-originate" tabindex="-1">デフォルトルートの再配送 (Default Information Originate) <a class="header-anchor" href="#デフォルトルートの再配送-default-information-originate" aria-hidden="true">#</a></h3>
+<p>HQ-Edge1 および HQ-Edge2 はインターネットへの出口であるため、BGPや静的経路で得た「デフォルトルート(<code>0.0.0.0/0</code>)」を、OSPFを通じてCoreスイッチ側に注入（再配送）します。</p>
+<ul>
+<li><strong>HQ-Edge1</strong>: <code>default-information originate</code> (デフォルトメトリック1) を設定し、メインのデフォルトルートとする。</li>
+<li><strong>HQ-Edge2</strong>: <code>default-information originate metric 20</code> を設定し、バックアップのデフォルトルートとする。これにより、平時はHQ-Edge1にトラフィックが集中し、明示的なActive/Standbyフェイルオーバー構成となる。</li>
+</ul>
+<hr>
+<h2 id="2-bgp-設計-インターネット接続" tabindex="-1">2. BGP 設計 (インターネット接続) <a class="header-anchor" href="#2-bgp-設計-インターネット接続" aria-hidden="true">#</a></h2>
+<p>本社エッジルーターとISPルーター間で、eBGP (External BGP) ピアリングを確立します。</p>
+<h3 id="bgp-基本パラメータ" tabindex="-1">BGP 基本パラメータ <a class="header-anchor" href="#bgp-基本パラメータ" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:left">機器名</th>
+<th style="text-align:left">自AS番号</th>
+<th style="text-align:left">ピア(隣接)先IP</th>
+<th style="text-align:left">ピア先AS番号</th>
+<th style="text-align:left">備考 / 役割</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">ISP (疑似)</td>
+<td style="text-align:left">65000</td>
+<td style="text-align:left">200.0.1.1 (Edge1)<br>200.0.2.1 (Edge2)</td>
+<td style="text-align:left">65001</td>
+<td style="text-align:left">デフォルトルートを本社へ広報</td>
+</tr>
+<tr>
+<td style="text-align:left">HQ-Edge1</td>
+<td style="text-align:left">65001</td>
+<td style="text-align:left">200.0.1.254 (ISP)</td>
+<td style="text-align:left">65000</td>
+<td style="text-align:left">メイン回線ピア</td>
+</tr>
+<tr>
+<td style="text-align:left">HQ-Edge2</td>
+<td style="text-align:left">65001</td>
+<td style="text-align:left">200.0.2.254 (ISP)</td>
+<td style="text-align:left">65000</td>
+<td style="text-align:left">サブ回線ピア</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="経路制御-local-preference" tabindex="-1">経路制御 (Local Preference) <a class="header-anchor" href="#経路制御-local-preference" aria-hidden="true">#</a></h3>
+<p>本社のインターネット通信を「常に HQ-Edge1（メイン回線）を優先」させるため、BGP属性（Local Preference）を操作します。</p>
+<ul>
+<li><strong>HQ-Edge1</strong>: Local Preference = <code>200</code> (優先度高)</li>
+<li><strong>HQ-Edge2</strong>: Local Preference = <code>100</code> (デフォルト値・優先度低)</li>
+</ul>
+<hr>
+<h2 id="3-冗長化プロトコル-hsrp" tabindex="-1">3. 冗長化プロトコル (HSRP) <a class="header-anchor" href="#3-冗長化プロトコル-hsrp" aria-hidden="true">#</a></h2>
+<p>HQ-Core1 と HQ-Core2 は、営業部PC (VLAN 10) に対して冗長化されたデフォルトゲートウェイを提供します。</p>
+<h3 id="hsrp-パラメータ-vlan-10-向け" tabindex="-1">HSRP パラメータ (VLAN 10 向け) <a class="header-anchor" href="#hsrp-パラメータ-vlan-10-向け" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:left">項目</th>
+<th style="text-align:left">設定値</th>
+<th style="text-align:left">備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">対象インターフェース</td>
+<td style="text-align:left">Vlan 10</td>
+<td style="text-align:left">SVIに対して設定</td>
+</tr>
+<tr>
+<td style="text-align:left">HSRP グループ番号</td>
+<td style="text-align:left">10</td>
+<td style="text-align:left">VLAN IDと合わせる</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>仮想IPアドレス (VIP)</strong></td>
+<td style="text-align:left"><strong>10.1.10.254</strong></td>
+<td style="text-align:left">PCに設定するデフォルトゲートウェイ</td>
+</tr>
+<tr>
+<td style="text-align:left">HQ-Core1 プライオリティ</td>
+<td style="text-align:left">150</td>
+<td style="text-align:left"><code>Active</code> (メイン) として動作させるため高く設定</td>
+</tr>
+<tr>
+<td style="text-align:left">HQ-Core2 プライオリティ</td>
+<td style="text-align:left">100</td>
+<td style="text-align:left"><code>Standby</code> (サブ) として動作 (デフォルト値)</td>
+</tr>
+<tr>
+<td style="text-align:left">Preempt機能</td>
+<td style="text-align:left">常に有効</td>
+<td style="text-align:left">障害復旧時に自動的にActiveを奪い返す設定</td>
+</tr>
+</tbody>
+</table></div>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-ospf-設計-本社内ルーティング">1. OSPF 設計 (本社内ルーティング)</a></li>
+<li class="lvl-3"><a href="#ospf-基本パラメータ">OSPF 基本パラメータ</a></li>
+<li class="lvl-3"><a href="#デフォルトルートの再配送-default-information-originate">デフォルトルートの再配送 (Default Information Originate)</a></li>
+<li class="lvl-2"><a href="#2-bgp-設計-インターネット接続">2. BGP 設計 (インターネット接続)</a></li>
+<li class="lvl-3"><a href="#bgp-基本パラメータ">BGP 基本パラメータ</a></li>
+<li class="lvl-3"><a href="#経路制御-local-preference">経路制御 (Local Preference)</a></li>
+<li class="lvl-2"><a href="#3-冗長化プロトコル-hsrp">3. 冗長化プロトコル (HSRP)</a></li>
+<li class="lvl-3"><a href="#hsrp-パラメータ-vlan-10-向け">HSRP パラメータ (VLAN 10 向け)</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

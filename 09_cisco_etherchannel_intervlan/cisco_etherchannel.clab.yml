@@ -1,0 +1,29 @@
+name: cisco-etherchannel
+
+topology:
+  kinds:
+    cisco_iol:
+      image: vrnetlab/cisco_iol:L2-15.2
+      type: l2
+
+  nodes:
+    sw1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+    sw2:
+      kind: cisco_iol
+    pc1:
+      kind: cisco_iol
+    pc2:
+      kind: cisco_iol
+
+  links:
+    # EtherChannel links between SW1 and SW2
+    # eth1 = Ethernet0/1, eth2 = Ethernet0/2
+    - endpoints: ["sw1:eth1", "sw2:eth1"]
+    - endpoints: ["sw1:eth2", "sw2:eth2"]
+    
+    # Access links
+    # eth3 = Ethernet0/3, eth4 = Ethernet1/0
+    - endpoints: ["sw2:eth3", "pc1:eth1"]
+    - endpoints: ["sw2:eth4", "pc2:eth1"]

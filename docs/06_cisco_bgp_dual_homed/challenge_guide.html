@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>🚀 Challenge 06: BGPデュアルホーム（マルチホーム）冗長化ハンズオン</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>06_cisco_bgp_dual_homed</span></nav>
+      <h1 class="doc-title">🚀 Challenge 06: BGPデュアルホーム（マルチホーム）冗長化ハンズオン</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>本ラボは、物理結線のみが完了した「まっさらなルータ5台」を使い、複数のプロバイダ（ISP-A, ISP-B）と接続した企業のインターネット接続冗長化（デュアルホーム）を構築する、超実践的なハンズオン課題です。</p>
+<p>BGPのアトリビュート <strong><code>Local Preference</code>（ローカルプリファレンス）</strong> を駆使して、社内から出ていくトラフィックを思い通りにコントロールする術を体験しましょう！</p>
+<hr>
+<h2 id="-トポロジーと設計要件" tabindex="-1">🗺️ トポロジーと設計要件 <a class="header-anchor" href="#-トポロジーと設計要件" aria-hidden="true">#</a></h2>
+<pre><code>     [ ISP-A (AS 65001) ]            [ ISP-B (AS 65003) ]
+     (Loopback: 8.8.8.8/32)          (Loopback: 8.8.8.8/32)
+       |                               |
+       | eBGP (192.168.11.0/24)        | eBGP (192.168.22.0/24)
+       |                               |
+     [ R1 (AS 65002) ] ============== [ R2 (AS 65002) ]
+     社内境界ルータ1  (iBGP / OSPF)   社内境界ルータ2
+       \                               /
+        \ OSPF (192.168.13.0/24)      / OSPF (192.168.23.0/24)
+         \                           /
+          \                         /
+                    [ R3 ] AS 65002
+                    社内PC/コアスイッチ
+</code></pre>
+<h3 id="1-インターフェースip設計" tabindex="-1">1. インターフェースIP設計 <a class="header-anchor" href="#1-インターフェースip設計" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>デバイス</th>
+<th>インターフェース</th>
+<th>IPアドレス / サブネット</th>
+<th>役割・プロトコル</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ISP-A</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.11.100/24</code></td>
+<td>R1接続用（eBGP）</td>
+</tr>
+<tr>
+<td><strong>ISP-A</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>8.8.8.8/32</code></td>
+<td>仮想DNSサーバ（BGPで広報）</td>
+</tr>
+<tr>
+<td><strong>ISP-B</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.22.100/24</code></td>
+<td>R2接続用（eBGP）</td>
+</tr>
+<tr>
+<td><strong>ISP-B</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>8.8.8.8/32</code></td>
+<td>仮想DNSサーバ（BGPで広報）</td>
+</tr>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.11.1/24</code></td>
+<td>ISP-A接続用（eBGP）</td>
+</tr>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Ethernet0/2</code></td>
+<td><code>192.168.12.1/24</code></td>
+<td>R2接続用（OSPF &amp; iBGP）</td>
+</tr>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Ethernet0/3</code></td>
+<td><code>192.168.13.1/24</code></td>
+<td>R3接続用（OSPF）</td>
+</tr>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>1.1.1.1/32</code></td>
+<td>iBGPピア用</td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.22.2/24</code></td>
+<td>ISP-B接続用（eBGP）</td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Ethernet0/2</code></td>
+<td><code>192.168.12.2/24</code></td>
+<td>R1接続用（OSPF &amp; iBGP）</td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Ethernet0/3</code></td>
+<td><code>192.168.23.2/24</code></td>
+<td>R3接続用（OSPF）</td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>2.2.2.2/32</code></td>
+<td>iBGPピア用</td>
+</tr>
+<tr>
+<td><strong>R3</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.13.3/24</code></td>
+<td>R1接続用（OSPF）</td>
+</tr>
+<tr>
+<td><strong>R3</strong></td>
+<td><code>Ethernet0/2</code></td>
+<td><code>192.168.23.3/24</code></td>
+<td>R2接続用（OSPF）</td>
+</tr>
+<tr>
+<td><strong>R3</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>3.3.3.3/32</code></td>
+<td>テスト用PC</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="2-プロトコル設計" tabindex="-1">2. プロトコル設計 <a class="header-anchor" href="#2-プロトコル設計" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>OSPF (社内AS 65002内: R1, R2, R3):</strong>
+<ul>
+<li>プロセスID: <code>1</code></li>
+<li>エリア: <code>0</code></li>
+<li>社内のすべての Loopback と社内物理リンク（<code>12.0/24</code>, <code>13.0/24</code>, <code>23.0/24</code>）を広報します。</li>
+<li><strong>重要:</strong> <code>192.168.11.0/24</code> や <code>192.168.22.0/24</code> などの eBGP 物理リンクは、OSPF に含めないでください！</li>
+</ul>
+</li>
+<li><strong>BGP 設定:</strong>
+<ul>
+<li><strong>ISP-A:</strong> AS <code>65001</code> (R1とeBGPを張る。<code>8.8.8.8</code> を <code>network</code> 広報)</li>
+<li><strong>ISP-B:</strong> AS <code>65003</code> (R2とeBGPを張る。<code>8.8.8.8</code> を <code>network</code> 広報)</li>
+<li><strong>社内 (R1, R2):</strong> AS <code>65002</code> (Loopback0同士で iBGP を張る。<code>next-hop-self</code> を設定すること！)</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2 id="-4つのミッション" tabindex="-1">🎯 4つのミッション <a class="header-anchor" href="#-4つのミッション" aria-hidden="true">#</a></h2>
+<h3 id="mission-1-基本インフラの構築負荷分散の観測" tabindex="-1">Mission 1: 基本インフラの構築（負荷分散の観測） <a class="header-anchor" href="#mission-1-基本インフラの構築負荷分散の観測" aria-hidden="true">#</a></h3>
+<ol>
+<li>各ルータに基本IPを設定します。</li>
+<li>社内（R1, R2, R3）で OSPF エリア0を開通させ、Loopback0同士で Ping が通ることを確認します。</li>
+<li>R1-ISP-A間、R2-ISP-B間で eBGP を確立します。</li>
+<li>R1-R2間で iBGP（Loopbackピア、<code>next-hop-self</code>）を確立します。</li>
+<li><strong>デフォルトルートの広報（重要）:</strong>
+<ul>
+<li>R3（社内PC）は <code>8.8.8.8</code> へのルートを直接BGPで学習しません（R3ではBGPを動かさないため）。</li>
+<li>そのため、社内境界の <strong>R1 と R2 の両方</strong> から、OSPF 内に向けてデフォルトルートを広報します。
+<ul>
+<li><strong>ヒント:</strong> <code>router ospf 1</code> の中で <code>default-information originate</code> コマンドを設定します。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>観測ポイント:</strong>
+<ul>
+<li>R3 から <code>8.8.8.8</code> へ traceroute（またはPing）を実行した際、R1経由とR2経由の2方向（等コストマルチパス）に負荷分散されてパケットが流れる様子を確認します！</li>
+</ul>
+</li>
+</ol>
+<h3 id="mission-2-local-preference-によるアクティブ--スタンバイ経路制御" tabindex="-1">Mission 2: Local Preference による「アクティブ / スタンバイ」経路制御 <a class="header-anchor" href="#mission-2-local-preference-によるアクティブ--スタンバイ経路制御" aria-hidden="true">#</a></h3>
+<p>企業ポリシー <strong>「通常時はすべて ISP-A（R1）をメインにし、ISP-B（R2）は完全なバックアップ（スタンバイ）にする」</strong> を満たす制御を実装します。</p>
+<ol>
+<li>ルートが社内（AS65002）に入ってきた後の優先度を決定する <strong>Local Preference（初期値100）</strong> を変更します。</li>
+<li><strong>R2（境界2）</strong> において、ISP-B（<code>192.168.22.100</code>）から受け取るルートの Local Preference を <strong><code>50</code>（デフォルトより低い値）</strong> に下げて受信します。
+<ul>
+<li><strong>やり方のヒント:</strong>
+<ul>
+<li>R2で <code>route-map SET_LP permit 10</code> を作成し、その中で <code>set local-preference 50</code> を設定します。</li>
+<li>BGP設定で、対向ISP-Bのneighborに対し、このroute-mapを <strong><code>in</code>（受信方向）</strong> で適用します。</li>
+<li>設定後、ソフトクリア（<code>clear ip bgp * soft</code>）を実行します。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>観測ポイント:</strong>
+<ul>
+<li>設定後、R3 から <code>8.8.8.8</code> へのすべてのトラフィックが、狙い通り <strong>R1 経由（ISP-A）に一本化</strong> されることを <code>traceroute</code> で目撃します！</li>
+</ul>
+</li>
+</ol>
+<h3 id="mission-3-自動フェイルオーバーの観測" tabindex="-1">Mission 3: 自動フェイルオーバーの観測 <a class="header-anchor" href="#mission-3-自動フェイルオーバーの観測" aria-hidden="true">#</a></h3>
+<ol>
+<li>R3 から <code>8.8.8.8</code> に向けて、継続的な Ping（<code>ping 8.8.8.8 repeat 100</code> など）を実行します。</li>
+<li>その状態で、<strong>R1 の <code>Ethernet0/1</code>（ISP-A接続ポート）を <code>shutdown</code></strong> し、メイン回線をわざと断線させます。</li>
+<li><strong>観測ポイント:</strong>
+<ul>
+<li>メイン回線が切れた瞬間、BGPがそれを検知して自動的にバックアップである R2（ISP-B経由）に切り替わり、Ping がほとんど途切れずに通信が継続するダイナミックなフェイルオーバーの瞬間を観測します！</li>
+</ul>
+</li>
+</ol>
+<h3 id="mission-4-プロフェッショナル編ospfコスト制御とip-slatrackによる完全冗長化" tabindex="-1">Mission 4: 【プロフェッショナル編】OSPFコスト制御とIP SLA/Trackによる完全冗長化 <a class="header-anchor" href="#mission-4-プロフェッショナル編ospfコスト制御とip-slatrackによる完全冗長化" aria-hidden="true">#</a></h3>
+<p>Mission 3までの状態では、通常時にR3から見たデフォルトルートがR1とR2で等コスト（負荷分散）になっているため、R2へ送られたパケットがR1へ戻されるという「不要な遠回り（ヘアピン）」が発生してしまいます。また、ISP-Aが落ちた際もR1は無駄にデフォルトルートを社内に広報し続けてしまいます。
+これを解決する実務レベルの「完全なアクティブ・スタンバイ設計」を実装しましょう。</p>
+<ol>
+<li><strong>OSPFデフォルトルートのメトリック（コスト）制御:</strong>
+<ul>
+<li>通常時はR3からのすべてのパケットがR1へダイレクトに流れるよう、OSPFのデフォルトルートにメトリックを設定します。
+<ul>
+<li><strong>R1（メイン）</strong>: メトリック <code>10</code></li>
+<li><strong>R2（バックアップ）</strong>: メトリック <code>100</code></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>IP SLA ＋ Track ＋ スタティックデフォルトルートによる自動停止制御:</strong>
+<ul>
+<li>メイン回線（R1-ISP-A間）が落ちた際、R1がデフォルトルートの広報を自動的に止める（R2へ切り替えさせる）仕組みを作ります。</li>
+<li><strong>R1</strong>において：
+<ul>
+<li><strong>IP SLA</strong>を作成し、ISP-A（<code>192.168.11.100</code>）へ定期的にPingを打つ監視センサーを仕込みます。</li>
+<li>そのIP SLAを監視する <strong>Track</strong> を作成します。</li>
+<li>ISP-A（<code>192.168.11.100</code>）向きのスタティックデフォルトルート（<code>0.0.0.0/0</code>）に、この <strong>Track</strong> を紐付けます。</li>
+<li>OSPFのデフォルトルート広報設定を、<strong>素の <code>default-information originate metric 10</code></strong> にします（これでR1自身のテーブルからスタティックデフォルトルートが消えると、OSPFも自動的に広報を止めます）。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>検証とクリア条件:</strong>
+<ul>
+<li><strong>通常時</strong>: R3 からの <code>traceroute 8.8.8.8</code> が R1（<code>192.168.13.1</code>）経由で<strong>最短2ホップ</strong>で進むこと。</li>
+<li><strong>障害時</strong>: R1の <code>Ethernet0/1</code> を <code>shutdown</code> した際、R1からのデフォルトルート広報が自動的に消え、R3からの <code>traceroute</code> が R2（<code>192.168.23.2</code>）→ ISP-B（<code>192.168.22.100</code>）経由へ<strong>最短2ホップで自動切り替え</strong>されること！</li>
+</ul>
+</li>
+</ol>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-トポロジーと設計要件">🗺️ トポロジーと設計要件</a></li>
+<li class="lvl-3"><a href="#1-インターフェースip設計">1. インターフェースIP設計</a></li>
+<li class="lvl-3"><a href="#2-プロトコル設計">2. プロトコル設計</a></li>
+<li class="lvl-2"><a href="#-4つのミッション">🎯 4つのミッション</a></li>
+<li class="lvl-3"><a href="#mission-1-基本インフラの構築負荷分散の観測">Mission 1: 基本インフラの構築（負荷分散の観測）</a></li>
+<li class="lvl-3"><a href="#mission-2-local-preference-によるアクティブ--スタンバイ経路制御">Mission 2: Local Preference による「アクティブ / スタンバイ」経路制御</a></li>
+<li class="lvl-3"><a href="#mission-3-自動フェイルオーバーの観測">Mission 3: 自動フェイルオーバーの観測</a></li>
+<li class="lvl-3"><a href="#mission-4-プロフェッショナル編ospfコスト制御とip-slatrackによる完全冗長化">Mission 4: 【プロフェッショナル編】OSPFコスト制御とIP SLA/Trackによる完全冗長化</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

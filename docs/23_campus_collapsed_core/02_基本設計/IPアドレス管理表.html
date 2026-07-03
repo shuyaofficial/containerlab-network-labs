@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>IPアドレス管理表 — テーマ23: Collapsed Core Campus LAN</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>23_campus_collapsed_core</span>
+<span class="sep">/</span>
+<span>02_基本設計</span></nav>
+      <h1 class="doc-title">IPアドレス管理表 — テーマ23: Collapsed Core Campus LAN</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="1-ネットワークセグメント一覧" tabindex="-1">1. ネットワークセグメント一覧 <a class="header-anchor" href="#1-ネットワークセグメント一覧" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>用途</th>
+<th>VLAN ID</th>
+<th>サブネット</th>
+<th>デフォルトゲートウェイ (VIP)</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>営業部</td>
+<td>10</td>
+<td>10.10.10.0/24</td>
+<td>10.10.10.254</td>
+<td>HSRP (CoreDist1: Active)</td>
+</tr>
+<tr>
+<td>開発部</td>
+<td>20</td>
+<td>10.10.20.0/24</td>
+<td>10.10.20.254</td>
+<td>HSRP (CoreDist2: Active)</td>
+</tr>
+<tr>
+<td>CoreDist間リンク</td>
+<td>—</td>
+<td>10.0.0.0/30</td>
+<td>—</td>
+<td>Routed Port (e0/1) で OSPF ネイバー確立用</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="2-機器別-ipアドレス割当表" tabindex="-1">2. 機器別 IPアドレス割当表 <a class="header-anchor" href="#2-機器別-ipアドレス割当表" aria-hidden="true">#</a></h2>
+<h3 id="21-ネットワーク機器-l3l2スイッチ" tabindex="-1">2.1 ネットワーク機器 (L3/L2スイッチ) <a class="header-anchor" href="#21-ネットワーク機器-l3l2スイッチ" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>機器名</th>
+<th>インターフェース</th>
+<th>役割</th>
+<th>IPアドレス / サブネットマスク</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>CoreDist-1</strong></td>
+<td>Loopback0</td>
+<td>ルーターID / 管理</td>
+<td>10.255.0.11 / 32</td>
+</tr>
+<tr>
+<td></td>
+<td>Ethernet0/1</td>
+<td>CoreDist-2向け L3リンク</td>
+<td>10.0.0.1 / 30</td>
+</tr>
+<tr>
+<td></td>
+<td>Vlan 10</td>
+<td>営業部 SVI</td>
+<td>10.10.10.251 / 24</td>
+</tr>
+<tr>
+<td></td>
+<td>Vlan 20</td>
+<td>開発部 SVI</td>
+<td>10.10.20.251 / 24</td>
+</tr>
+<tr>
+<td><strong>CoreDist-2</strong></td>
+<td>Loopback0</td>
+<td>ルーターID / 管理</td>
+<td>10.255.0.12 / 32</td>
+</tr>
+<tr>
+<td></td>
+<td>Ethernet0/1</td>
+<td>CoreDist-1向け L3リンク</td>
+<td>10.0.0.2 / 30</td>
+</tr>
+<tr>
+<td></td>
+<td>Vlan 10</td>
+<td>営業部 SVI</td>
+<td>10.10.10.252 / 24</td>
+</tr>
+<tr>
+<td></td>
+<td>Vlan 20</td>
+<td>開発部 SVI</td>
+<td>10.10.20.252 / 24</td>
+</tr>
+<tr>
+<td><strong>Access-1</strong></td>
+<td>Vlan 10</td>
+<td>管理用（オプション）</td>
+<td>10.10.10.21 / 24</td>
+</tr>
+<tr>
+<td><strong>Access-2</strong></td>
+<td>Vlan 10</td>
+<td>管理用（オプション）</td>
+<td>10.10.10.22 / 24</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>※ アクセススイッチの管理用IPは必須ではないが、実務ではTelnet/SSH用に設定されることが多い。</p>
+</blockquote>
+<h3 id="22-エンドポイント-pc" tabindex="-1">2.2 エンドポイント (PC) <a class="header-anchor" href="#22-エンドポイント-pc" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>機器名</th>
+<th>接続先 (VLAN)</th>
+<th>IPアドレス / サブネットマスク</th>
+<th>デフォルトゲートウェイ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>PC-1</strong></td>
+<td>Access-1 (VLAN 10)</td>
+<td>10.10.10.1 / 24</td>
+<td>10.10.10.254</td>
+</tr>
+<tr>
+<td><strong>PC-2</strong></td>
+<td>Access-1 (VLAN 20)</td>
+<td>10.10.20.2 / 24</td>
+<td>10.10.20.254</td>
+</tr>
+<tr>
+<td><strong>PC-3</strong></td>
+<td>Access-2 (VLAN 10)</td>
+<td>10.10.10.3 / 24</td>
+<td>10.10.10.254</td>
+</tr>
+</tbody>
+</table></div>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-ネットワークセグメント一覧">1. ネットワークセグメント一覧</a></li>
+<li class="lvl-2"><a href="#2-機器別-ipアドレス割当表">2. 機器別 IPアドレス割当表</a></li>
+<li class="lvl-3"><a href="#21-ネットワーク機器-l3l2スイッチ">2.1 ネットワーク機器 (L3/L2スイッチ)</a></li>
+<li class="lvl-3"><a href="#22-エンドポイント-pc">2.2 エンドポイント (PC)</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

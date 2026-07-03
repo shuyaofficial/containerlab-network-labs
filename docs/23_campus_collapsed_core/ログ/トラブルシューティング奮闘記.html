@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>トラブルシューティング奮闘記：Collapsed Core Campus LAN</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>23_campus_collapsed_core</span>
+<span class="sep">/</span>
+<span>ログ</span></nav>
+      <h1 class="doc-title">トラブルシューティング奮闘記：Collapsed Core Campus LAN</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>テーマ23「Collapsed Core Campus LAN」の構築と検証において、L2通信（STP/HSRP）が一切通らないという深刻なトラブルに直面しました。このドキュメントでは、その原因究明から解決、そして感動的なフェイルオーバー試験の成功までの軌跡をまとめます。</p>
+<hr>
+<h2 id="1-遭遇したトラブル事象" tabindex="-1">1. 遭遇したトラブル（事象） <a class="header-anchor" href="#1-遭遇したトラブル事象" aria-hidden="true">#</a></h2>
+<p>機器に完璧なコンフィグ（VLAN、Trunk、STP、HSRP）を流し込んだにも関わらず、以下の異常な状態が続きました。</p>
+<ul>
+<li><strong>HSRPがActive/Unknownになる</strong>: CoreDist間でHelloパケットが届かず、Standbyルーターを認識できない。</li>
+<li><strong>STPのSplit Brain（分裂）</strong>: CoreDist1とCoreDist2の双方が <code>This bridge is the root</code> を主張し、ネットワークが分断されている。</li>
+<li><strong>物理層のステータス</strong>: Ciscoのコンソール上では <code>Line protocol is up</code> と表示され、一見すると正常に見える。</li>
+</ul>
+<h2 id="2-原因究明のプロセス" tabindex="-1">2. 原因究明のプロセス <a class="header-anchor" href="#2-原因究明のプロセス" aria-hidden="true">#</a></h2>
+<h3 id="①-l3イメージからl2イメージへの変更" tabindex="-1">① L3イメージからL2イメージへの変更 <a class="header-anchor" href="#①-l3イメージからl2イメージへの変更" aria-hidden="true">#</a></h3>
+<p>当初、CoreDistにL3ルーターのイメージ（<code>15.7.3M2</code>）を使用していましたが、これでは <code>switchport mode trunk</code> 等のL2機能が使えないことが判明しました。そこで、アクセススイッチと同じ <strong>L2マルチレイヤスイッチ（<code>L2-advipservices-2017</code>）</strong> のイメージに変更しました。</p>
+<h3 id="②-コンソールのバグ対応が招いた悲劇" tabindex="-1">② コンソールのバグ対応が招いた悲劇 <a class="header-anchor" href="#②-コンソールのバグ対応が招いた悲劇" aria-hidden="true">#</a></h3>
+<p>元のイメージのままでは <code>docker attach</code> でコンソールに入ると画面がフリーズする（入力不能になる）問題がありました。
+これを解決するため、コンテナの起動スクリプト（<code>entrypoint.sh</code>）を書き換え、「IOLプロセスをバックグラウンドからフォアグラウンドに引きずり出す（<code>exec</code>を外す）」というハックを行いました。これによりコンソールの問題は解決しました。</p>
+<h3 id="③-真の犯人iouyap-のクラッシュとロックファイル" tabindex="-1">③ 真の犯人：<code>iouyap</code> のクラッシュとロックファイル <a class="header-anchor" href="#③-真の犯人iouyap-のクラッシュとロックファイル" aria-hidden="true">#</a></h3>
+<p>しかし、このハックが <strong>最悪の副作用</strong> を引き起こしました。
+Linuxコンテナの仮想NIC（veth）と、IOL内部のインターフェースをブリッジする中継プログラムである <strong><code>iouyap</code></strong> が死んでいたのです。</p>
+<ul>
+<li>通常、<code>iol.bin</code> が起動すると、<code>/tmp/netio0/3.lck</code> のようなロックファイルを作成します。</li>
+<li>私が <code>iol.bin</code> をフォアグラウンド（PID 38等）で起動させたため、後から起動した <code>iouyap</code> がこのロックファイルを見て <strong>「すでに別プロセス（PID 38）が使っているから起動できない！」と勘違いし、自爆（クラッシュ）</strong> していました。</li>
+<li>結果として、Cisco上では「UP」に見えていても、<strong>裏側のシステムレベルでは物理ケーブルがすべて抜かれているのと同じ状態（パケットがブラックホールに消える状態）</strong> になっていました。</li>
+</ul>
+<h2 id="3-解決策ハッキング" tabindex="-1">3. 解決策（ハッキング） <a class="header-anchor" href="#3-解決策ハッキング" aria-hidden="true">#</a></h2>
+<p>原因が判明したため、稼働中のコンテナにバックグラウンドで入り込み、以下の荒療治を行いました。</p>
+<ol>
+<li>邪魔をしているロックファイルを強制削除する（<code>rm -f /tmp/netio0/*.lck</code>）</li>
+<li>即座に <code>iouyap</code> をバックグラウンドで強制起動する（<code>/usr/bin/iouyap 3 &amp;</code>）</li>
+</ol>
+<p>これを全4台のスイッチで実行した瞬間、ブラックホールが解消され、仮想ケーブルにパケットが流れ始めました！</p>
+<h2 id="4-感動のフェイルオーバー試験t-401--t-403" tabindex="-1">4. 感動のフェイルオーバー試験（T-401 &amp; T-403） <a class="header-anchor" href="#4-感動のフェイルオーバー試験t-401--t-403" aria-hidden="true">#</a></h2>
+<p>ケーブルが繋がった直後、STPの再計算が走り、HSRPの <code>unknown</code> が相手のIPアドレスに切り替わるという劇的な復旧を遂げました。
+その後実施した障害試験では、設計の正しさと冗長化プロトコルの美しさを完全に証明できました。</p>
+<h3 id="coredist1-障害時の動作t-401" tabindex="-1">CoreDist1 障害時の動作（T-401） <a class="header-anchor" href="#coredist1-障害時の動作t-401" aria-hidden="true">#</a></h3>
+<ul>
+<li><code>e0/2</code> と <code>e0/3</code> を手動でダウンさせたところ、<strong>約10秒でCoreDist2がHSRPのActiveに昇格</strong>。</li>
+<li>同時にSTPの再計算が走り、今までブロックしていた <code>Et0/3</code> を開放（<code>LIS</code> → <code>LRN</code> → <code>FWD</code>）し、見事に通信の迂回路を作り出しました。</li>
+</ul>
+<h3 id="アップリンク単一障害の-l2-迂回t-403" tabindex="-1">アップリンク単一障害の L2 迂回（T-403） <a class="header-anchor" href="#アップリンク単一障害の-l2-迂回t-403" aria-hidden="true">#</a></h3>
+<ul>
+<li>Access1 の CoreDist1 向けリンク（<code>e0/1</code>）のみを切断した場合、Access1は即座にCoreDist2向けのポートをRootポートに変更。</li>
+<li>CoreDist2も自身のブロックポート（Access2向け）を開放し、「Access1 → CoreDist2 → Access2 → CoreDist1」という見事なL2の迂回ルートを形成し、通信を維持しました。</li>
+</ul>
+<hr>
+<h2 id="5-総括" tabindex="-1">5. 総括 <a class="header-anchor" href="#5-総括" aria-hidden="true">#</a></h2>
+<p>今回は「Containerlab × Cisco IOL」という特殊な仮想環境ゆえの深いシステムバグに悩まされましたが、このトラブルを乗り越えたことで、<strong>「STPがどのようにループを防ぎ、どのようにフェイルオーバーするのか」をパケットレベルで観察できる最高の学習環境</strong> となりました。</p>
+<p>一時は他のAIに助けを求める寸前までいきましたが、最後まで諦めずにログを追いかけた結果、最高の「生きたネットワーク」を完成させることができました。本当にお疲れ様でした！</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-遭遇したトラブル事象">1. 遭遇したトラブル（事象）</a></li>
+<li class="lvl-2"><a href="#2-原因究明のプロセス">2. 原因究明のプロセス</a></li>
+<li class="lvl-3"><a href="#①-l3イメージからl2イメージへの変更">① L3イメージからL2イメージへの変更</a></li>
+<li class="lvl-3"><a href="#②-コンソールのバグ対応が招いた悲劇">② コンソールのバグ対応が招いた悲劇</a></li>
+<li class="lvl-3"><a href="#③-真の犯人iouyap-のクラッシュとロックファイル">③ 真の犯人：iouyap のクラッシュとロックファイル</a></li>
+<li class="lvl-2"><a href="#3-解決策ハッキング">3. 解決策（ハッキング）</a></li>
+<li class="lvl-2"><a href="#4-感動のフェイルオーバー試験t-401--t-403">4. 感動のフェイルオーバー試験（T-401 &amp; T-403）</a></li>
+<li class="lvl-3"><a href="#coredist1-障害時の動作t-401">CoreDist1 障害時の動作（T-401）</a></li>
+<li class="lvl-3"><a href="#アップリンク単一障害の-l2-迂回t-403">アップリンク単一障害の L2 迂回（T-403）</a></li>
+<li class="lvl-2"><a href="#5-総括">5. 総括</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

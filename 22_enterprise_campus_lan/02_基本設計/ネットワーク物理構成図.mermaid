@@ -1,0 +1,42 @@
+graph TB
+    ISP["isp<br/>cisco_iol (Router)"]
+    FGT["fgt-edge<br/>fortinet_fortigate 7.2"]
+    CORE1["core1<br/>cisco_iol L2-adv (L3SW)"]
+    CORE2["core2<br/>cisco_iol L2-adv (L3SW)"]
+    DISTA1["dist-a1<br/>cisco_iol L2-adv (L3SW)"]
+    DISTA2["dist-a2<br/>cisco_iol L2-adv (L3SW)"]
+    DISTB1["dist-b1<br/>cisco_iol L2-adv (L3SW)"]
+    ACCA1["acc-a1<br/>cisco_iol L2 (L2SW)"]
+    ACCA2["acc-a2<br/>cisco_iol L2 (L2SW)"]
+    ACCB1["acc-b1<br/>cisco_iol L2 (L2SW)"]
+    BREDGE["br-edge<br/>cisco_iol (Router)"]
+    PCSALES["pc-sales<br/>network-multitool"]
+    PCDEV["pc-dev<br/>network-multitool"]
+    SRVFILE["srv-file<br/>network-multitool"]
+    SRVPORTAL["srv-portal<br/>network-multitool"]
+    BRPC["br-pc<br/>network-multitool"]
+
+    FGT ---|"fgt:eth1 - isp:eth1"| ISP
+    ISP ---|"isp:eth2 - br-edge:eth1"| BREDGE
+    FGT ---|"fgt:eth2 - core1:eth5"| CORE1
+    FGT ---|"fgt:eth3 - core2:eth5"| CORE2
+    CORE1 ---|"core1:eth1 - core2:eth1"| CORE2
+    CORE1 ---|"core1:eth2 - dist-a1:eth1"| DISTA1
+    CORE1 ---|"core1:eth3 - dist-a2:eth1"| DISTA2
+    CORE2 ---|"core2:eth2 - dist-a1:eth2"| DISTA1
+    CORE2 ---|"core2:eth3 - dist-a2:eth2"| DISTA2
+    CORE1 ---|"core1:eth4 - dist-b1:eth1"| DISTB1
+    CORE2 ---|"core2:eth4 - dist-b1:eth2"| DISTB1
+    DISTA1 ---|"eth3-eth3 (Po1)"| DISTA2
+    DISTA1 ---|"eth4-eth4 (Po1)"| DISTA2
+    DISTA1 ---|"dist-a1:eth5 - acc-a1:eth1"| ACCA1
+    DISTA2 ---|"dist-a2:eth5 - acc-a1:eth2"| ACCA1
+    DISTA1 ---|"dist-a1:eth6 - acc-a2:eth1"| ACCA2
+    DISTA2 ---|"dist-a2:eth6 - acc-a2:eth2"| ACCA2
+    DISTB1 ---|"dist-b1:eth3 - acc-b1:eth1 (Po1)"| ACCB1
+    DISTB1 ---|"dist-b1:eth4 - acc-b1:eth2 (Po1)"| ACCB1
+    ACCA1 ---|"acc-a1:eth3 - pc-sales:eth1"| PCSALES
+    ACCA2 ---|"acc-a2:eth3 - pc-dev:eth1"| PCDEV
+    ACCB1 ---|"acc-b1:eth3 - srv-portal:eth1"| SRVPORTAL
+    ACCB1 ---|"acc-b1:eth4 - srv-file:eth1"| SRVFILE
+    BREDGE ---|"br-edge:eth2 - br-pc:eth1"| BRPC

@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>構築ログ — L2スイッチ管理アクセス解決 ～ 全機器設定投入</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>21_cisco_capstone</span>
+<span class="sep">/</span>
+<span>04_構築</span></nav>
+      <h1 class="doc-title">構築ログ — L2スイッチ管理アクセス解決 ～ 全機器設定投入</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<ul>
+<li><strong>日付</strong>: 2026-06-08</li>
+<li><strong>対象ラボ</strong>: capstone（Cisco IOL 6台 + PC 2台 / Containerlab on OrbStack）</li>
+<li><strong>作業ディレクトリ</strong>: <code>/Users/shuya/Documents/claude/Mac仮想環境構築/21_cisco_capstone/</code></li>
+<li><strong>結論</strong>: L2スイッチ(hq-core1/2)の管理アクセス不能を<strong>根本解決</strong>し、全6台へ設計どおり設定投入。本社PC・支社PCの両方から NAT 経由でインターネット(8.8.8.8)へ到達、ルーティング/HSRP/BGP の正常性を確認。<strong>完了</strong>。</li>
+</ul>
+<hr>
+<h2 id="1-環境" tabindex="-1">1. 環境 <a class="header-anchor" href="#1-環境" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:left">項目</th>
+<th style="text-align:left">内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">ホスト</td>
+<td style="text-align:left">macOS + OrbStack</td>
+</tr>
+<tr>
+<td style="text-align:left">実行VM</td>
+<td style="text-align:left">OrbStack Linux マシン <code>clab</code>（Ubuntu noble arm64）</td>
+</tr>
+<tr>
+<td style="text-align:left">実行方法</td>
+<td style="text-align:left"><code>orb -m clab bash -c &quot;cd '&lt;dir&gt;' &amp;&amp; sudo containerlab ...&quot;</code></td>
+</tr>
+<tr>
+<td style="text-align:left">Containerlab</td>
+<td style="text-align:left">v0.75.0</td>
+</tr>
+<tr>
+<td style="text-align:left">ルーターIMG</td>
+<td style="text-align:left"><code>vrnetlab/cisco_iol:15.7.3M2</code>（isp, hq-edge1, hq-edge2, br-edge）</td>
+</tr>
+<tr>
+<td style="text-align:left">スイッチIMG</td>
+<td style="text-align:left"><code>vrnetlab/cisco_iol:L2-15.2</code>（hq-core1, hq-core2）</td>
+</tr>
+<tr>
+<td style="text-align:left">PC IMG</td>
+<td style="text-align:left"><code>wbitt/network-multitool</code>（hq-pc-sales, br-pc）</td>
+</tr>
+<tr>
+<td style="text-align:left">メモリ対策</td>
+<td style="text-align:left"><code>launch_custom.exp</code>（IOL を <code>-m 512</code> で起動）を全Ciscoノードに bind 済み（NAT時の <code>%MALLOCFAIL</code> 回避）</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="2-直面した問題とできなかった原因根本原因" tabindex="-1">2. 直面した問題と「できなかった原因」（根本原因） <a class="header-anchor" href="#2-直面した問題とできなかった原因根本原因" aria-hidden="true">#</a></h2>
+<h3 id="主因l2スイッチに管理ipが付かず-ssh-不可" tabindex="-1">【主因】L2スイッチに管理IPが付かず SSH 不可 <a class="header-anchor" href="#主因l2スイッチに管理ipが付かず-ssh-不可" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>原因</strong>: トポロジで hq-core1/hq-core2 に <strong><code>type: L2</code> を指定していなかった</strong>。</li>
+<li><strong>メカニズム</strong>: containerlab の day0 設定テンプレート <code>nodes/iol/iol.cfg.tmpl</code> は、管理ポート <code>Ethernet0/0</code> に対し<pre><code>interface Ethernet0/0
+{{ if .IsL2Node }}
+ no switchport
+{{ end }}
+ vrf forwarding clab-mgmt
+ ip address &lt;mgmt-ip&gt; ...
+</code></pre>
+となっており、<strong><code>no switchport</code> は <code>type: L2</code>（=<code>.IsL2Node</code>）のときだけ</strong>出力される。
+未指定だと L2 イメージの <code>Ethernet0/0</code> は <strong>switchport（L2モード）のまま</strong>で、<code>ip address</code> / <code>vrf forwarding</code> が無効化され、管理IPが付与されず SSH 不能。</li>
+<li><strong>証跡</strong>: 修正前の生成config <code>clab-capstone/hq-core1/boot_config.txt</code> は router 形式（<code>no switchport</code> 無し）。SSHは <code>Connection timed out</code>。</li>
+</ul>
+<h3 id="併発バグ①-管理ipのドリフト--誤指定" tabindex="-1">併発バグ① 管理IPのドリフト + 誤指定 <a class="header-anchor" href="#併発バグ①-管理ipのドリフト--誤指定" aria-hidden="true">#</a></h3>
+<ul>
+<li>containerlab は管理IPを毎回自動採番するため、deploy/destroy のたびに各機器のIPが変動。</li>
+<li>旧 <code>configure_cores.sh</code> は hq-core2 の宛先に <strong><code>172.20.20.8</code></strong> を指定していたが、これは実際には <strong>hq-edge1</strong> の管理IP。SSHが通っても <strong>edge1 を誤設定</strong>する状態だった。</li>
+<li>destroy/deploy の短時間反復で <code>%IP-4-DUPADDR</code>（アドレス重複）も誘発。</li>
+</ul>
+<h3 id="併発バグ②-ssh-host-key-の残留再デプロイで弾かれる" tabindex="-1">併発バグ② SSH host key の残留（再デプロイで弾かれる） <a class="header-anchor" href="#併発バグ②-ssh-host-key-の残留再デプロイで弾かれる" aria-hidden="true">#</a></h3>
+<ul>
+<li>旧スクリプトのSSHオプションに <code>UserKnownHostsFile=/dev/null</code> が無く、<code>StrictHostKeyChecking=no</code> だけでは
+再デプロイで鍵が変わったとき <strong><code>REMOTE HOST IDENTIFICATION HAS CHANGED!</code></strong> で接続拒否。これが「不安定」の一因。</li>
+</ul>
+<h3 id="設計ギャップ疎通ゴールに必要だが未実装だった点" tabindex="-1">設計ギャップ（疎通ゴールに必要だが未実装だった点） <a class="header-anchor" href="#設計ギャップ疎通ゴールに必要だが未実装だった点" aria-hidden="true">#</a></h3>
+<ul>
+<li>旧 <code>configure_all.sh</code> の <strong>br-edge に NAT とデフォルトルートが無く</strong>、支社PCがインターネット到達不可だった。</li>
+<li>疎通確認用の「インターネット」ターゲットが存在しなかった。</li>
+</ul>
+<hr>
+<h2 id="3-実施した解決策" tabindex="-1">3. 実施した解決策 <a class="header-anchor" href="#3-実施した解決策" aria-hidden="true">#</a></h2>
+<h3 id="step-1--完全クリーンアップ" tabindex="-1">Step 1 — 完全クリーンアップ <a class="header-anchor" href="#step-1--完全クリーンアップ" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">sudo</span> containerlab destroy -t capstone.clab.yml --cleanup
+<span class="hljs-built_in">sudo</span> docker network prune -f
+</code></pre>
+<p>→ コンテナ・管理ネットワーク(<code>clab</code>)・生成dir(<code>clab-capstone/</code>)を一掃。IP重複と host key churn を解消。</p>
+<h3 id="step-2--トポロジ修正-capstoneclabyml" tabindex="-1">Step 2 — トポロジ修正 <code>capstone.clab.yml</code> <a class="header-anchor" href="#step-2--トポロジ修正-capstoneclabyml" aria-hidden="true">#</a></h3>
+<ul>
+<li>hq-core1 / hq-core2 に <strong><code>type: L2</code></strong> を追加（本丸の修正）。</li>
+<li><strong>管理IPを静的固定</strong>（ドリフト根絶）。<code>mgmt:</code> ブロック + 各ノード <code>mgmt-ipv4:</code>。</li>
+</ul>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:left">node</th>
+<th style="text-align:left">mgmt-ipv4</th>
+<th style="text-align:left"></th>
+<th style="text-align:left">node</th>
+<th style="text-align:left">mgmt-ipv4</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">isp</td>
+<td style="text-align:left">172.20.20.11</td>
+<td style="text-align:left"></td>
+<td style="text-align:left">hq-core1</td>
+<td style="text-align:left">172.20.20.21</td>
+</tr>
+<tr>
+<td style="text-align:left">hq-edge1</td>
+<td style="text-align:left">172.20.20.12</td>
+<td style="text-align:left"></td>
+<td style="text-align:left">hq-core2</td>
+<td style="text-align:left">172.20.20.22</td>
+</tr>
+<tr>
+<td style="text-align:left">hq-edge2</td>
+<td style="text-align:left">172.20.20.13</td>
+<td style="text-align:left"></td>
+<td style="text-align:left">hq-pc-sales</td>
+<td style="text-align:left">172.20.20.101</td>
+</tr>
+<tr>
+<td style="text-align:left">br-edge</td>
+<td style="text-align:left">172.20.20.14</td>
+<td style="text-align:left"></td>
+<td style="text-align:left">br-pc</td>
+<td style="text-align:left">172.20.20.102</td>
+</tr>
+</tbody>
+</table></div>
+<pre><code class="language-yaml"><span class="hljs-attr">mgmt:</span>
+  <span class="hljs-attr">network:</span> <span class="hljs-string">clab</span>
+  <span class="hljs-attr">ipv4-subnet:</span> <span class="hljs-number">172.20</span><span class="hljs-number">.20</span><span class="hljs-number">.0</span><span class="hljs-string">/24</span>
+  <span class="hljs-attr">ipv6-subnet:</span> <span class="hljs-string">3fff:172:20:20::/64</span>
+</code></pre>
+<h3 id="step-3--再デプロイ--検証" tabindex="-1">Step 3 — 再デプロイ + 検証 <a class="header-anchor" href="#step-3--再デプロイ--検証" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">sudo</span> containerlab deploy -t capstone.clab.yml
+</code></pre>
+<p>→ 生成された <code>clab-capstone/hq-core1/boot_config.txt</code> の <code>Ethernet0/0</code> に <strong><code>no switchport</code> が入った</strong>ことを確認（修正が効いた証拠）。</p>
+<h3 id="step-4--全6台の管理ssh疎通確認" tabindex="-1">Step 4 — 全6台の管理SSH疎通確認 <a class="header-anchor" href="#step-4--全6台の管理ssh疎通確認" aria-hidden="true">#</a></h3>
+<ul>
+<li>堅牢なSSHオプション（次ステップと共通）で6台すべて（特に core1=.21 / core2=.22）にSSH成功。</li>
+</ul>
+<h3 id="step-5--設定投入configure_allsh-を1本に統合堅牢化" tabindex="-1">Step 5 — 設定投入（<code>configure_all.sh</code> を1本に統合・堅牢化） <a class="header-anchor" href="#step-5--設定投入configure_allsh-を1本に統合堅牢化" aria-hidden="true">#</a></h3>
+<ul>
+<li>ルーター4台 + コア2台のスクリプトを<strong>統合</strong>。主な堅牢化:
+<ul>
+<li><strong>管理IPはコンテナ名から動的解決</strong>（<code>docker inspect</code>）→ ドリフト無効化。</li>
+<li><strong>SSHオプションに <code>UserKnownHostsFile=/dev/null</code> を追加</strong> → host key churn 対策。</li>
+<li><strong>br-edge に NAT overload + デフォルトルート追加</strong>:
+<code>access-list 1 permit 10.2.40.0 0.0.0.255</code> / <code>ip nat inside source list 1 interface Ethernet0/1 overload</code> / <code>ip route 0.0.0.0 0.0.0.0 200.0.3.254</code></li>
+<li><strong>ISP に Loopback 8.8.8.8/32 を追加</strong>（疎通確認用の「インターネット」役）。</li>
+</ul>
+</li>
+<li>設定本文は <code>03_詳細設計</code> のパラメータシート（IP / ルーティング / NAT）に準拠。</li>
+</ul>
+<h3 id="step-6--疎通正常性確認" tabindex="-1">Step 6 — 疎通・正常性確認 <a class="header-anchor" href="#step-6--疎通正常性確認" aria-hidden="true">#</a></h3>
+<p>→ 結果は <code>05_試験/試験結果_2026-06-08.md</code> を参照。すべて GREEN。</p>
+<h4>使用した堅牢なSSHオプション（再掲）</h4>
+<pre><code>-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 \
+-o KexAlgorithms=+diffie-hellman-group14-sha1 -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa
+</code></pre>
+<hr>
+<h2 id="4-ファイル変更削除一覧" tabindex="-1">4. ファイル変更・削除一覧 <a class="header-anchor" href="#4-ファイル変更削除一覧" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:left">種別</th>
+<th style="text-align:left">ファイル</th>
+<th style="text-align:left">内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">変更</td>
+<td style="text-align:left"><code>capstone.clab.yml</code></td>
+<td style="text-align:left"><code>type: L2</code>×2、<code>mgmt:</code> ブロック + 各ノード <code>mgmt-ipv4:</code></td>
+</tr>
+<tr>
+<td style="text-align:left">全面書き換え</td>
+<td style="text-align:left"><code>configure_all.sh</code></td>
+<td style="text-align:left">全6台を1本に統合 / 動的IP解決 / SSH堅牢化 / br-edge NAT+default / ISP Loopback</td>
+</tr>
+<tr>
+<td style="text-align:left">温存</td>
+<td style="text-align:left"><code>launch_custom.exp</code></td>
+<td style="text-align:left">IOL <code>-m 512</code> メモリ対策（トポロジに bind 済み・現役）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>削除</strong></td>
+<td style="text-align:left"><code>configure_cores.sh</code></td>
+<td style="text-align:left">旧コア用（誤IP指定あり）→ 統合により不要</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>削除</strong></td>
+<td style="text-align:left"><code>configure.py</code></td>
+<td style="text-align:left">telnet経由コンソール投入の試作 → 不要</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>削除</strong></td>
+<td style="text-align:left"><code>configure_console.exp</code></td>
+<td style="text-align:left">コンソール expect 試作（不安定）→ 不要</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>削除</strong></td>
+<td style="text-align:left"><code>configure_attach.exp</code></td>
+<td style="text-align:left"><code>docker attach</code> expect 試作（不安定）→ 不要</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>削除</strong></td>
+<td style="text-align:left"><code>hq-core1_mgmt.txt</code> / <code>hq-core2_mgmt.txt</code></td>
+<td style="text-align:left">手動 mgmt config 案 → <code>type: L2</code> で自動化され不要</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>備考: <code>launch.exp</code> / <code>launch_512m.exp</code> は <code>launch_custom.exp</code> 以前の試作。現在は未使用（掃除候補）。</p>
+</blockquote>
+<hr>
+<h2 id="5-残課題--対象外" tabindex="-1">5. 残課題 / 対象外 <a class="header-anchor" href="#5-残課題--対象外" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>IPsec / GRE VPN（Tunnel0, IKEv2, HQ-Edge1 ↔ BR-Edge）</strong>: パラメータシート03編に定義があるが、<strong>ユーザー本人が後で実施</strong>するため本作業では未着手。
+<ul>
+<li>HQエッジの NAT 除外ACL（<code>access-list 100 deny ip 10.0.0.0 0.255.255.255 10.2.40.0 0.0.0.255</code>）は <strong>VPN前提のため温存</strong>。VPN追加時にそのまま機能する（インターネット通信には無害）。</li>
+<li>注意: IOL イメージは crypto(IPsec) 非対応のことが多く、その場合は GRE-only へのフォールバックを検討。</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h2 id="6-クリーン再構築の手順再現用" tabindex="-1">6. クリーン再構築の手順（再現用） <a class="header-anchor" href="#6-クリーン再構築の手順再現用" aria-hidden="true">#</a></h2>
+<pre><code class="language-bash"><span class="hljs-built_in">cd</span> <span class="hljs-string">&quot;/Users/shuya/Documents/claude/Mac仮想環境構築/21_cisco_capstone&quot;</span>
+<span class="hljs-comment"># 1) 破棄</span>
+orb -m clab bash -c <span class="hljs-string">&#x27;cd &quot;$PWD&quot;; sudo containerlab destroy -t capstone.clab.yml --cleanup; sudo docker network prune -f&#x27;</span>
+<span class="hljs-comment"># 2) 構築</span>
+orb -m clab bash -c <span class="hljs-string">&#x27;cd &quot;$PWD&quot;; sudo containerlab deploy -t capstone.clab.yml&#x27;</span>
+<span class="hljs-comment"># 3) 設定投入（全6台がSSH可になるまで自動で待機する）</span>
+orb -m clab bash -c <span class="hljs-string">&#x27;cd &quot;$PWD&quot;; sudo bash configure_all.sh&#x27;</span>
+</code></pre>
+<p>※ IOL のブート + crypto 鍵生成で SSH 可能まで概ね 1～3 分。<code>configure_all.sh</code> は各機器のSSH起動を待ってから投入する。</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-環境">1. 環境</a></li>
+<li class="lvl-2"><a href="#2-直面した問題とできなかった原因根本原因">2. 直面した問題と「できなかった原因」（根本原因）</a></li>
+<li class="lvl-3"><a href="#主因l2スイッチに管理ipが付かず-ssh-不可">【主因】L2スイッチに管理IPが付かず SSH 不可</a></li>
+<li class="lvl-3"><a href="#併発バグ①-管理ipのドリフト--誤指定">併発バグ① 管理IPのドリフト + 誤指定</a></li>
+<li class="lvl-3"><a href="#併発バグ②-ssh-host-key-の残留再デプロイで弾かれる">併発バグ② SSH host key の残留（再デプロイで弾かれる）</a></li>
+<li class="lvl-3"><a href="#設計ギャップ疎通ゴールに必要だが未実装だった点">設計ギャップ（疎通ゴールに必要だが未実装だった点）</a></li>
+<li class="lvl-2"><a href="#3-実施した解決策">3. 実施した解決策</a></li>
+<li class="lvl-3"><a href="#step-1--完全クリーンアップ">Step 1 — 完全クリーンアップ</a></li>
+<li class="lvl-3"><a href="#step-2--トポロジ修正-capstoneclabyml">Step 2 — トポロジ修正 capstone.clab.yml</a></li>
+<li class="lvl-3"><a href="#step-3--再デプロイ--検証">Step 3 — 再デプロイ + 検証</a></li>
+<li class="lvl-3"><a href="#step-4--全6台の管理ssh疎通確認">Step 4 — 全6台の管理SSH疎通確認</a></li>
+<li class="lvl-3"><a href="#step-5--設定投入configure_allsh-を1本に統合堅牢化">Step 5 — 設定投入（configure_all.sh を1本に統合・堅牢化）</a></li>
+<li class="lvl-3"><a href="#step-6--疎通正常性確認">Step 6 — 疎通・正常性確認</a></li>
+<li class="lvl-2"><a href="#4-ファイル変更削除一覧">4. ファイル変更・削除一覧</a></li>
+<li class="lvl-2"><a href="#5-残課題--対象外">5. 残課題 / 対象外</a></li>
+<li class="lvl-2"><a href="#6-クリーン再構築の手順再現用">6. クリーン再構築の手順（再現用）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

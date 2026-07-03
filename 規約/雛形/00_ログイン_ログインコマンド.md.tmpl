@@ -1,0 +1,80 @@
+---
+type: login
+theme: "{{THEME_DIR}}"
+status: draft
+date: {{DATE}}
+tags: [containerlab, login, operation]
+title: "{{THEME_TITLE}} 機器別ログインコマンド"
+---
+
+# {{THEME_TITLE}} 機器別ログインコマンド
+
+## 1. VM接続
+
+以下はすべてOrbStack Linux VM `clab` で実行します。
+
+```bash
+ssh clab@orb
+cd /path/to/Mac仮想環境構築/{{THEME_DIR}}
+```
+<!-- 上記パスはVM内での相対的な作業ディレクトリを示す例。本文に実際の絶対パスは書かない。 -->
+
+## 2. 稼働確認
+
+```bash
+cd 04_構築
+./deploy.sh inspect
+```
+
+すべてのノード（IOLおよびLinuxコンテナ）が `running` であることを確認します。
+
+## 3. 機器コンソール（docker attach）
+
+<!-- ノードごとに見出しを立てる。IOL/Cisco系はdocker attach、離脱はCtrl-P→Ctrl-Q。 -->
+
+### {{ノード名}}
+```bash
+sudo docker attach --sig-proxy=false clab-{{TOPO_NAME}}-<node>
+```
+
+### コンテナを止めずに離脱
+`Ctrl-p` を押し、続けて `Ctrl-q` を押します。`Ctrl-c` は離脱には使いません。
+
+## 4. エンドポイント接続（docker exec）
+
+<!-- Linux端末系ノードはdocker execでシェルに入る。 -->
+
+### {{ノード名}}
+```bash
+docker exec -it <node> sh
+```
+
+Linuxシェルからは `exit` で抜けます。
+
+## 5. ログインできない場合
+
+### 5.1 コンテナ確認
+```bash
+sudo docker ps --format 'table {{.Names}}\t{{.Status}}' | grep {{TOPO_NAME}}
+```
+
+### 5.2 起動ログ確認
+```bash
+sudo docker logs --tail 50 clab-{{TOPO_NAME}}-<node>
+```
+
+### 5.3 ラボを作り直す場合
+> 保存していない設定は消えるため、必要な設定を保存してから実行します。
+```bash
+cd 04_構築
+./deploy.sh destroy
+./deploy.sh deploy
+```
+
+## 6. 全機器実ログイン確認日
+
+<!-- 2026-06-30決定事項: 新規テーマは全ノードの実ログインを確認してから完了とする。 -->
+
+| ノード名 | 確認日 | 確認者 | 備考 |
+|---|---|---|---|
+| | | | |

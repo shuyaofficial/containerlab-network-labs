@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>実務案件ログ（マスキング済み・参照用）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ロードマップ</span>
+<span class="sep">/</span>
+<span>実務案件ログ</span></nav>
+      <h1 class="doc-title">実務案件ログ（マスキング済み・参照用）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>実務で扱った／参照した3案件のネットワーク技術棚卸し（<strong>マスキング済み</strong>）。
+顧客名・案件名・拠点名・IPアドレス・機器固有名・ファイル名・認証情報などは除外済みで、<strong>機密は含まない</strong>。
+ここは原本の保管庫で、これを学習計画に落とし込んだのが親フォルダの
+<a href="../%E5%AE%9F%E5%8B%99%E6%A1%88%E4%BB%B6_%E5%86%8D%E7%8F%BE%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html"><code>../実務案件_再現ロードマップ.md</code></a>。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ファイル</th>
+<th>案件の「顔」</th>
+<th>濃い領域</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>1ch案件ネットワーク技術.log</code></td>
+<td>報道/通信社系</td>
+<td>VRF分離×iBGP/eBGP×HSRPv2＋FortiGate多VDOM、監視/フロー分析(NDR/NetFlow/IPFIX)、特権アクセス(CyberArk/PIM)、MQ/NewsML</td>
+</tr>
+<tr>
+<td><code>Boat案件ネットワーク技術.log</code></td>
+<td>店舗/集配信系</td>
+<td>Catalyst中心の王道キャンパス。L2冗長(PVST+/Flex Link+/L2ループ防止/Stack)とQoS(優先制御/帯域制御装置)</td>
+</tr>
+<tr>
+<td><code>C案件.log</code></td>
+<td>DC/クラウド/ゼロトラスト系</td>
+<td>NTTキャリア閉域網(Arcstar/UNO/FIC)＋AWS/Azure/OCI、ASA/Firepower→FortiGate更改、Zscaler/ZPA/ZIA/FRA、BIG-IP、Smart Licensing</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>出典: <code>~/Downloads/天野秀哉-selected/</code> のコピー（2026-06-26時点）。</p>
+</blockquote>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <p class="toc-empty">（見出しなし）</p>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>パラメータシート（IP・インターフェース編）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>21_cisco_capstone</span>
+<span class="sep">/</span>
+<span>03_詳細設計</span></nav>
+      <h1 class="doc-title">パラメータシート（IP・インターフェース編）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>本ドキュメントは、ネットワーク上の全ルーターおよびL3スイッチにおける、物理・論理インターフェースに対するIPアドレスやVLAN等の設定パラメータを定義します。
+構築作業時は、本シートの内容を元に各機器へコンフィグを流し込みます。</p>
+<h2 id="1-ispルーター-isp" tabindex="-1">1. ISPルーター (ISP) <a class="header-anchor" href="#1-ispルーター-isp" aria-hidden="true">#</a></h2>
+<p>※実環境では通信キャリア側が管理するため設定不要ですが、検証環境では以下のIPを設定します。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:left">インターフェース</th>
+<th style="text-align:left">接続先機器</th>
+<th style="text-align:left">IPアドレス</th>
+<th style="text-align:left">サブネットマスク</th>
+<th style="text-align:left">備考 / 用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">e0/1</td>
+<td style="text-align:left">HQ-Edge1</td>
+<td style="text-align:left">200.0.1.254</td>
+<td style="text-align:left">255.255.255.0</td>
+<td style="text-align:left">eBGPピア用（本社向けメイン）</td>
+</tr>
+<tr>
+<td style="text-align:left">e0/2</td>
+<td style="text-align:left">HQ-Edge2</td>
+<td style="text-align:left">200.0.2.254</td>
+<td style="text-align:left">255.255.255.0</td>
+<td style="text-align:left">eBGPピア用（本社向けサブ）</td>
+</tr>
+<tr>
+<td style="text-align:left">e0/3</td>
+<td style="text-align:left">BR-Edge</td>
+<td style="text-align:left">200.0.3.254</td>
+<td style="text-align:left">255.255.255.0</td>
+<td style="text-align:left">インターネット向け（支社）</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="2-本社-エッジルーター1-hq-edge1" tabindex="-1">2. 本社 エッジルーター1 (HQ-Edge1) <a class="header-anchor" href="#2-本社-エッジルーター1-hq-edge1" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:left">インターフェース</th>
+<th style="text-align:left">接続先機器</th>
+<th style="text-align:left">IPアドレス</th>
+<th style="text-align:left">サブネットマスク</th>
+<th style="text-align:left">備考 / 用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">e0/1</td>
+<td style="text-align:left">ISP</td>
+<td style="text-align:left">200.0.1.1</td>
+<td style="text-align:left">255.255.255.0</td>
+<td style="text-align:left">インターネット接続（メイン回線）/ NAT Outside</td>
+</tr>
+<tr>
+<td style="text-align:left">e0/2</td>
+<td style="text-align:left">HQ-Core1</td>
+<td style="text-align:left">10.0.0.1</td>
+<td style="text-align:left">255.255.255.252</td>
+<td style="text-align:left">OSPF Area 0 / NAT Inside</td>
+</tr>
+<tr>
+<td style="text-align:left">e0/3</td>
+<td style="text-align:left">HQ-Core2</td>
+<td style="text-align:left">10.0.0.5</td>
+<td style="text-align:left">255.255.255.252</td>
+<td style="text-align:left">OSPF Area 0 / NAT Inside</td>
+</tr>
+<tr>
+<td style="text-align:left">Loopback0</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">1.1.1.1</td>
+<td style="text-align:left">255.255.255.255</td>
+<td style="text-align:left">BGPルータID / OSPFルータID</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="3-本社-エッジルーター2-hq-edge2" tabindex="-1">3. 本社 エッジルーター2 (HQ-Edge2) <a class="header-anchor" href="#3-本社-エッジルーター2-hq-edge2" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:left">インターフェース</th>
+<th style="text-align:left">接続先機器</th>
+<th style="text-align:left">IPアドレス</th>
+<th style="text-align:left">サブネットマスク</th>
+<th style="text-align:left">備考 / 用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">e0/1</td>
+<td style="text-align:left">ISP</td>
+<td style="text-align:left">200.0.2.1</td>
+<td style="text-align:left">255.255.255.0</td>
+<td style="text-align:left">インターネット接続（サブ回線）/ NAT Outside</td>
+</tr>
+<tr>
+<td style="text-align:left">e0/2</td>
+<td style="text-align:left">HQ-Core1</td>
+<td style="text-align:left">10.0.0.9</td>
+<td style="text-align:left">255.255.255.252</td>
+<td style="text-align:left">OSPF Area 0 / NAT Inside</td>
+</tr>
+<tr>
+<td style="text-align:left">e0/3</td>
+<td style="text-align:left">HQ-Core2</td>
+<td style="text-align:left">10.0.0.13</td>
+<td style="text-align:left">255.255.255.252</td>
+<td style="text-align:left">OSPF Area 0 / NAT Inside</td>
+</tr>
+<tr>
+<td style="text-align:left">Loopback0</td>
+<td style="text-align:left">-</td>
+<td style="text-align:left">2.2.2.2</td>
+<td style="text-align:left">255.255.255.255</td>
+<td style="text-align:left">BGPルータID / OSPFルータID</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="4-本社-コアスイッチ1-hq-core1" tabindex="-1">4. 本社 コアスイッチ1 (HQ-Core1) <a class="header-anchor" href="#4-本社-コアスイッチ1-hq-core1" aria-hidden="true">#</a></h2>
+<p>L3スイッチとして動作し、社内のルーティングとVLAN間通信（SVI）を担います。</p>
+<h3 id="物理インターフェースl2設定" tabindex="-1">物理インターフェース・L2設定 <a class="header-anchor" href="#物理インターフェースl2設定" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:left">インターフェース</th>
+<th style="text-align:left">接続先機器</th>
+<th style="text-align:left">モード</th>
+<th style="text-align:left">VLAN / 設定</th>
+<th style="text-align:left">備考 / 用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">e0/1</td>
+<td style="text-align:left">HQ-Edge1</td>
+<td style="text-align:left">Routed Port</td>
+<td style="text-align:left">(L3ポート)</td>
+<td style="text-align:left">L3接続</td>
+</tr>
+<tr>
+<td style="text-align:left">e0/2</td>
+<td style="text-align:left">HQ-Edge2</td>
+<td style="text-align:left">Routed Port</td>
+<td style="text-align:left">(L3ポート)</td>
+<td style="text-align:left">L3接続</td>
+</tr>
+<tr>
+<td style="text-align:left">e1/1</td>
+<td style="text-align:left">HQ-Core2</td>
+<td style="text-align:left">Trunk</td>
+<td style="text-align:left">LACP (Port-Channel 1)</td>
+<td style="text-align:left">Core間リンク冗長化</td>
+</tr>
+<tr>
+<td style="text-align:left">e1/2</td>
+<td style="text-align:left">HQ-Core2</td>
+<td style="text-align:left">Trunk</td>
+<td style="text-align:left">LACP (Port-Channel 1)</td>
+<td style="text-align:left">Core間リンク冗長化</td>
+</tr>
+<tr>
+<td style="text-align:left">e1/3</td>
+<td style="text-align:left">HQ-PC-Sales</td>
+<td style="text-align:left">Access</td>
+<td style="text-align:left">VLAN 10</td>
+<td style="text-align:left">営業部PC用ポート</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="論理インターフェースl3設定-svi--port-channel" tabindex="-1">論理インターフェース・L3設定 (SVI / Port-Channel) <a class="header-anchor" href="#論理インターフェースl3設定-svi--port-channel" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:left">インターフェース</th>
+<th style="text-align:left">IPアドレス</th>
+<th style="text-align:left">サブネットマスク</th>
+<th style="text-align:left">備考 / 用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">e0/1</td>
+<td style="text-align:left">10.0.0.2</td>
+<td style="text-align:left">255.255.255.252</td>
+<td style="text-align:left">OSPF Area 0</td>
+</tr>
+<tr>
+<td style="text-align:left">e0/2</td>
+<td style="text-align:left">10.0.0.10</td>
+<td style="text-align:left">255.255.255.252</td>
+<td style="text-align:left">OSPF Area 0</td>
+</tr>
+<tr>
+<td style="text-align:left">Vlan 10</td>
+<td style="text-align:left">10.1.10.252</td>
+<td style="text-align:left">255.255.255.0</td>
+<td style="text-align:left">営業部向けSVI（HSRP実IP）</td>
+</tr>
+<tr>
+<td style="text-align:left">Loopback0</td>
+<td style="text-align:left">3.3.3.3</td>
+<td style="text-align:left">255.255.255.255</td>
+<td style="text-align:left">OSPFルータID</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="5-本社-コアスイッチ2-hq-core2" tabindex="-1">5. 本社 コアスイッチ2 (HQ-Core2) <a class="header-anchor" href="#5-本社-コアスイッチ2-hq-core2" aria-hidden="true">#</a></h2>
+<h3 id="物理インターフェースl2設定-1" tabindex="-1">物理インターフェース・L2設定 <a class="header-anchor" href="#物理インターフェースl2設定-1" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:left">インターフェース</th>
+<th style="text-align:left">接続先機器</th>
+<th style="text-align:left">モード</th>
+<th style="text-align:left">VLAN / 設定</th>
+<th style="text-align:left">備考 / 用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">e0/1</td>
+<td style="text-align:left">HQ-Edge1</td>
+<td style="text-align:left">Routed Port</td>
+<td style="text-align:left">(L3ポート)</td>
+<td style="text-align:left">L3接続</td>
+</tr>
+<tr>
+<td style="text-align:left">e0/2</td>
+<td style="text-align:left">HQ-Edge2</td>
+<td style="text-align:left">Routed Port</td>
+<td style="text-align:left">(L3ポート)</td>
+<td style="text-align:left">L3接続</td>
+</tr>
+<tr>
+<td style="text-align:left">e1/1</td>
+<td style="text-align:left">HQ-Core1</td>
+<td style="text-align:left">Trunk</td>
+<td style="text-align:left">LACP (Port-Channel 1)</td>
+<td style="text-align:left">Core間リンク冗長化</td>
+</tr>
+<tr>
+<td style="text-align:left">e1/2</td>
+<td style="text-align:left">HQ-Core1</td>
+<td style="text-align:left">Trunk</td>
+<td style="text-align:left">LACP (Port-Channel 1)</td>
+<td style="text-align:left">Core間リンク冗長化</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="論理インターフェースl3設定-svi--port-channel-1" tabindex="-1">論理インターフェース・L3設定 (SVI / Port-Channel) <a class="header-anchor" href="#論理インターフェースl3設定-svi--port-channel-1" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:left">インターフェース</th>
+<th style="text-align:left">IPアドレス</th>
+<th style="text-align:left">サブネットマスク</th>
+<th style="text-align:left">備考 / 用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">e0/1</td>
+<td style="text-align:left">10.0.0.6</td>
+<td style="text-align:left">255.255.255.252</td>
+<td style="text-align:left">OSPF Area 0</td>
+</tr>
+<tr>
+<td style="text-align:left">e0/2</td>
+<td style="text-align:left">10.0.0.14</td>
+<td style="text-align:left">255.255.255.252</td>
+<td style="text-align:left">OSPF Area 0</td>
+</tr>
+<tr>
+<td style="text-align:left">Vlan 10</td>
+<td style="text-align:left">10.1.10.253</td>
+<td style="text-align:left">255.255.255.0</td>
+<td style="text-align:left">営業部向けSVI（HSRP実IP）</td>
+</tr>
+<tr>
+<td style="text-align:left">Loopback0</td>
+<td style="text-align:left">4.4.4.4</td>
+<td style="text-align:left">255.255.255.255</td>
+<td style="text-align:left">OSPFルータID</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="6-支社-エッジルーター-br-edge" tabindex="-1">6. 支社 エッジルーター (BR-Edge) <a class="header-anchor" href="#6-支社-エッジルーター-br-edge" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:left">インターフェース</th>
+<th style="text-align:left">接続先機器</th>
+<th style="text-align:left">IPアドレス</th>
+<th style="text-align:left">サブネットマスク</th>
+<th style="text-align:left">備考 / 用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">e0/1</td>
+<td style="text-align:left">ISP</td>
+<td style="text-align:left">200.0.3.1</td>
+<td style="text-align:left">255.255.255.0</td>
+<td style="text-align:left">インターネット接続 / IPsec</td>
+</tr>
+<tr>
+<td style="text-align:left">e0/2</td>
+<td style="text-align:left">BR-PC</td>
+<td style="text-align:left">10.2.40.254</td>
+<td style="text-align:left">255.255.255.0</td>
+<td style="text-align:left">支社LAN側 デフォルトGW</td>
+</tr>
+<tr>
+<td style="text-align:left">Tunnel 0</td>
+<td style="text-align:left">HQ-Edge1</td>
+<td style="text-align:left">192.168.100.2</td>
+<td style="text-align:left">255.255.255.252</td>
+<td style="text-align:left">IPsec VPN用 論理インターフェース</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="7-エンドポイント-pc" tabindex="-1">7. エンドポイント (PC) <a class="header-anchor" href="#7-エンドポイント-pc" aria-hidden="true">#</a></h2>
+<p>Containerlab上で稼働するLinuxコンテナ（PC役）に設定するIPパラメータです。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:left">機器名</th>
+<th style="text-align:left">インターフェース</th>
+<th style="text-align:left">IPアドレス</th>
+<th style="text-align:left">サブネットマスク</th>
+<th style="text-align:left">デフォルトゲートウェイ</th>
+<th style="text-align:left">接続先機器</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">HQ-PC-Sales</td>
+<td style="text-align:left">eth1</td>
+<td style="text-align:left">10.1.10.100</td>
+<td style="text-align:left">255.255.255.0</td>
+<td style="text-align:left">10.1.10.254 (HSRP仮想IP)</td>
+<td style="text-align:left">HQ-Core1 (e1/3)</td>
+</tr>
+<tr>
+<td style="text-align:left">BR-PC</td>
+<td style="text-align:left">eth1</td>
+<td style="text-align:left">10.2.40.100</td>
+<td style="text-align:left">255.255.255.0</td>
+<td style="text-align:left">10.2.40.254 (BR-Edge)</td>
+<td style="text-align:left">BR-Edge (e0/2)</td>
+</tr>
+</tbody>
+</table></div>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-ispルーター-isp">1. ISPルーター (ISP)</a></li>
+<li class="lvl-2"><a href="#2-本社-エッジルーター1-hq-edge1">2. 本社 エッジルーター1 (HQ-Edge1)</a></li>
+<li class="lvl-2"><a href="#3-本社-エッジルーター2-hq-edge2">3. 本社 エッジルーター2 (HQ-Edge2)</a></li>
+<li class="lvl-2"><a href="#4-本社-コアスイッチ1-hq-core1">4. 本社 コアスイッチ1 (HQ-Core1)</a></li>
+<li class="lvl-3"><a href="#物理インターフェースl2設定">物理インターフェース・L2設定</a></li>
+<li class="lvl-3"><a href="#論理インターフェースl3設定-svi--port-channel">論理インターフェース・L3設定 (SVI / Port-Channel)</a></li>
+<li class="lvl-2"><a href="#5-本社-コアスイッチ2-hq-core2">5. 本社 コアスイッチ2 (HQ-Core2)</a></li>
+<li class="lvl-3"><a href="#物理インターフェースl2設定-1">物理インターフェース・L2設定</a></li>
+<li class="lvl-3"><a href="#論理インターフェースl3設定-svi--port-channel-1">論理インターフェース・L3設定 (SVI / Port-Channel)</a></li>
+<li class="lvl-2"><a href="#6-支社-エッジルーター-br-edge">6. 支社 エッジルーター (BR-Edge)</a></li>
+<li class="lvl-2"><a href="#7-エンドポイント-pc">7. エンドポイント (PC)</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

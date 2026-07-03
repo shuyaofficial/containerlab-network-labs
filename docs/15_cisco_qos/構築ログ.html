@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマ15: QoS / DiffServ 構築ログと教訓</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>15_cisco_qos</span></nav>
+      <h1 class="doc-title">テーマ15: QoS / DiffServ 構築ログと教訓</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>本ドキュメントは、QoS（Quality of Service）の構築時のトラブルシューティングノウハウ、および実務上の教訓を記録する。</p>
+<h2 id="1-mqc-modular-qos-cli-の3段構造" tabindex="-1">1. MQC (Modular QoS CLI) の3段構造 <a class="header-anchor" href="#1-mqc-modular-qos-cli-の3段構造" aria-hidden="true">#</a></h2>
+<p>CiscoルーターにおけるQoS設定は、MQCと呼ばれる3つのモジュールに分かれている。実務ではこの階層構造を意識することが不可欠である。</p>
+<ol>
+<li><strong>Class-Map (分類)</strong>: 「誰を対象にするか」。ACL等で通信を特定し、グループ化する。</li>
+<li><strong>Policy-Map (アクション)</strong>: 「対象にどういう処理をするか」。DSCPによるマーキングや、帯域の割り当て（Priority等）を定義する。</li>
+<li><strong>Service-Policy (適用)</strong>: 「どこで実行するか」。インターフェースの入力(in)か出力(out)にポリシーを適用する。</li>
+</ol>
+<h2 id="2-マーキング-dscp-と-キューイング-priority-の関係性" tabindex="-1">2. マーキング (DSCP) と キューイング (Priority) の関係性 <a class="header-anchor" href="#2-マーキング-dscp-と-キューイング-priority-の関係性" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>概念</strong>: DSCPによるマーキング（シール貼り）だけでは、パケットの優先順位は変わらない。実際にルーターの出口でパケットを先に送り出す（VIPレーンを通す）には、Priority Queue（優先キュー）の設定が不可欠である。</li>
+<li><strong>実務での利用</strong>: 電話（VoIP）やWeb会議（Zoom/Teams等）のトラフィックに対しては、遅延やジッタ（揺らぎ）を防ぐため、DSCP値 <code>ef</code> (Expedited Forwarding) をマーキングし、<code>priority</code> コマンドで低遅延キュー（LLQ: Low Latency Queuing）に割り当てるのが世界的なベストプラクティスである。</li>
+</ul>
+<h2 id="3-検証におけるカウンター確認の重要性" tabindex="-1">3. 検証におけるカウンター確認の重要性 <a class="header-anchor" href="#3-検証におけるカウンター確認の重要性" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>教訓</strong>: QoSは「パケットが捨てられているか（Drop）」「優先レーンを通っているか（Matched）」を数字で証明しなければならない。</li>
+<li><code>show policy-map interface</code> コマンドにより、特定のClass（例: CLASS-TELNET）にパケットがマッチし、<code>Packets marked</code> のカウンターが上昇していることを確認するのが、QoS動作確認の基本である。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-mqc-modular-qos-cli-の3段構造">1. MQC (Modular QoS CLI) の3段構造</a></li>
+<li class="lvl-2"><a href="#2-マーキング-dscp-と-キューイング-priority-の関係性">2. マーキング (DSCP) と キューイング (Priority) の関係性</a></li>
+<li class="lvl-2"><a href="#3-検証におけるカウンター確認の重要性">3. 検証におけるカウンター確認の重要性</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

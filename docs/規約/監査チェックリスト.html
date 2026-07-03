@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>監査チェックリスト — 新規テーマ完成時のセルフ監査</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>規約</span></nav>
+      <h1 class="doc-title">監査チェックリスト — 新規テーマ完成時のセルフ監査</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-03</span>
+        <span class="tags"><span class="tag">standard</span><span class="tag">audit</span><span class="tag">checklist</span><span class="tag">quality-gate</span></span>
+      </div>
+      
+      <div class="content">
+<p>新規テーマ（テーマ28以降・テーマZERO含む）が完成した際のセルフ監査表。上から順にチェックし、全項目「済」になってからロードマップを完了扱いにする。</p>
+<h2 id="使い方" tabindex="-1">使い方 <a class="header-anchor" href="#使い方" aria-hidden="true">#</a></h2>
+<ul>
+<li>「確認方法」列のコマンド・手順を実際に実行し、「判定」列に <code>済</code> / <code>未</code> / <code>対象外</code> を記入する。</li>
+<li><code>対象外</code> は理由をコメントで残す（例: IOL未使用テーマの iouyap 関連項目）。</li>
+<li>監査は新規テーマ1件につき1回、テーマの <code>05_試験/</code> 完了後に実施する。</li>
+</ul>
+<h2 id="監査表" tabindex="-1">監査表 <a class="header-anchor" href="#監査表" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>項目</th>
+<th>確認方法</th>
+<th>判定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>ディレクトリ標準準拠（00〜05＋必須ファイル）</td>
+<td><a href="%E3%83%89%E3%82%AD%E3%83%A5%E3%83%A1%E3%83%B3%E3%83%88%E6%A8%99%E6%BA%96.html">ドキュメント標準.md</a> §1のツリーとテーマ配下を目視突合</td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td>全MDファイルにfrontmatter付与</td>
+<td><code>grep -L '^---$' NN_theme_name/**/*.md</code> で漏れ0件を確認（<a href="frontmatter%E3%82%B9%E3%82%AD%E3%83%BC%E3%83%9E.html">frontmatterスキーマ.md</a>）</td>
+<td></td>
+</tr>
+<tr>
+<td>3</td>
+<td>H1見出しはファイルに1つのみ</td>
+<td><code>grep -c '^# ' &lt;file&gt;</code> が全ファイルで1であることを確認</td>
+<td></td>
+</tr>
+<tr>
+<td>4</td>
+<td>ビルドチェックpass</td>
+<td><code>node 規約/ビルド/build.mjs --check</code> を実行し、NFD混入・リンク切れ・frontmatter欠落・H1複数＝0件</td>
+<td></td>
+</tr>
+<tr>
+<td>5</td>
+<td>clab.ymlが <code>04_構築/</code> 配下に配置</td>
+<td>テーマルート直下に <code>*.clab.yml</code> が無いことを確認（<a href="clab%E9%81%8B%E7%94%A8%E8%A6%8F%E7%B4%84.html">clab運用規約.md</a> §1）</td>
+<td></td>
+</tr>
+<tr>
+<td>6</td>
+<td>deploy.shが4サブコマンド動作</td>
+<td><code>ssh clab@orb &quot;cd .../04_構築 &amp;&amp; ./deploy.sh deploy&quot;</code> → <code>inspect</code> → <code>destroy</code> を実行し全て成功（IOL使用時は<code>iouyap</code>も）</td>
+<td></td>
+</tr>
+<tr>
+<td>7</td>
+<td>00_ログイン全機器の実ログイン確認</td>
+<td><code>ログインコマンド.md</code> 記載の全ノードへ <code>docker attach --sig-proxy=false</code> で実接続し、確認日付を記録</td>
+<td></td>
+</tr>
+<tr>
+<td>8</td>
+<td>READMEから00_ログインへの導線</td>
+<td>README_Lab_Challenge.md の「開始手順」章に <code>00_ログイン/ログインコマンド.md</code> へのリンクがあることを確認</td>
+<td></td>
+</tr>
+<tr>
+<td>9</td>
+<td>試験計画書の全項目に判定記入</td>
+<td><code>05_試験/試験計画書.md</code> の試験項目表を全行走査し、判定列に空欄が無いことを確認</td>
+<td></td>
+</tr>
+<tr>
+<td>10</td>
+<td>切り分けシートの複製運用を理解</td>
+<td><code>05_試験/切り分けシート.md</code> はテンプレートであり、障害発生時に複製して使うものであることを確認（原本を直接書き換えない）</td>
+<td></td>
+</tr>
+<tr>
+<td>11</td>
+<td>絶対パスリンク0件</td>
+<td><code>grep -rn '/Users/shuya' NN_theme_name/**/*.md</code> がヒット0件であることを確認（<a href="%E3%83%89%E3%82%AD%E3%83%A5%E3%83%A1%E3%83%B3%E3%83%88%E6%A8%99%E6%BA%96.html">ドキュメント標準.md</a> §3）</td>
+<td></td>
+</tr>
+<tr>
+<td>12</td>
+<td>NFCファイル名</td>
+<td><code>find NN_theme_name -name '*' | iconv -f utf-8 -t utf-8-mac</code> 等でNFD混入ファイル名が無いことを確認（<code>build.mjs --check</code> でも検出）</td>
+<td></td>
+</tr>
+<tr>
+<td>13</td>
+<td>学習テーマ: 設定コマンドの答え非掲載</td>
+<td>文書内に <code>switchport mode trunk</code> 等の完成コマンドが答えとして書かれていないことを確認（<a href="../mentor_guidelines.html">../mentor_guidelines.md</a>準拠。showコマンドのヒントは許容）</td>
+<td></td>
+</tr>
+<tr>
+<td>14</td>
+<td>ロードマップ/進捗管理.md 更新</td>
+<td><a href="../%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97/%E9%80%B2%E6%8D%97%E7%AE%A1%E7%90%86.html">../ロードマップ/進捗管理.md</a> の該当テーマ行のステータス（⬜→◐→✅）とリンクを更新済みであることを確認</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="判定基準" tabindex="-1">判定基準 <a class="header-anchor" href="#判定基準" aria-hidden="true">#</a></h2>
+<ul>
+<li>全項目「済」（<code>対象外</code>含む）でテーマ完成とみなす。</li>
+<li><code>未</code> が1件でも残る場合はロードマップのステータスを ✅完了 にしない。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="README.html">README.md</a> — 品質ゲート（全新規テーマ共通）の全体像</li>
+<li><a href="%E3%83%89%E3%82%AD%E3%83%A5%E3%83%A1%E3%83%B3%E3%83%88%E6%A8%99%E6%BA%96.html">ドキュメント標準.md</a> — ディレクトリ・記法規律の詳細</li>
+<li><a href="clab%E9%81%8B%E7%94%A8%E8%A6%8F%E7%B4%84.html">clab運用規約.md</a> — <a href="http://deploy.sh">deploy.sh</a>・実行パターンの詳細</li>
+<li><a href="%E6%A7%8B%E6%88%90%E5%9B%B3%E8%A6%8F%E7%B4%84.html">構成図規約.md</a> — Mermaid構成図の詳細</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#使い方">使い方</a></li>
+<li class="lvl-2"><a href="#監査表">監査表</a></li>
+<li class="lvl-2"><a href="#判定基準">判定基準</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

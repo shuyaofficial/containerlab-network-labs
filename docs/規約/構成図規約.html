@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>構成図規約 — Mermaid第一・HTML併用・drawio非推奨</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>規約</span></nav>
+      <h1 class="doc-title">構成図規約 — Mermaid第一・HTML併用・drawio非推奨</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-03</span>
+        <span class="tags"><span class="tag">standard</span><span class="tag">diagram</span><span class="tag">mermaid</span><span class="tag">drawio</span></span>
+      </div>
+      
+      <div class="content">
+<p>ネットワーク物理構成図・論理構成図の作成方式を定義する。<strong>Mermaid第一の原則</strong>を採用する。</p>
+<h2 id="1-mermaid第一の原則" tabindex="-1">1. Mermaid第一の原則 <a class="header-anchor" href="#1-mermaid第一の原則" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>規約</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ソースファイル</td>
+<td><code>02_基本設計/ネットワーク物理構成図.mermaid</code></td>
+</tr>
+<tr>
+<td>README埋め込み</td>
+<td>README_Lab_Challenge.md の「トポロジ」章に <code>```mermaid</code> コードブロックで直接埋め込む</td>
+</tr>
+<tr>
+<td>根拠</td>
+<td>GitHub がMermaidコードブロックをネイティブ描画する（追加ツール・ビルド不要でリポジトリ上にそのまま図が見える）</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>物理構成図は必ずMermaidで作成する。drawio等のバイナリ形式を新規の一次ソースにしない。</li>
+<li>README内の埋め込みとファイル単体（<code>.mermaid</code>）は同一内容を保つ（差分が出たら<code>.mermaid</code>側を正とし、READMEに再埋め込みする）。</li>
+</ul>
+<h2 id="2-ゾーン表現" tabindex="-1">2. ゾーン表現 <a class="header-anchor" href="#2-ゾーン表現" aria-hidden="true">#</a></h2>
+<p>セキュリティゾーン（Trust / DMZ / Untrust / WAN等）は <code>subgraph</code> で色分け表現する。テーマ26のHTML構成図が採用したゾーン概念とMermaid側でも対応させる。</p>
+<pre class="mermaid">graph LR
+    subgraph Trust[&quot;Trust Zone&quot;]
+        hq-core[HQ-Core]
+        hq-dist[HQ-Dist]
+    end
+
+    subgraph DMZ[&quot;DMZ Zone&quot;]
+        hq-dmz[HQ-DMZ]
+        dmz-srv[dmz-srv]
+    end
+
+    subgraph Untrust[&quot;Untrust / WAN&quot;]
+        isp[ISP]
+    end
+
+    hq-core --&gt;|Gi0/1| hq-dist
+    hq-core --&gt;|Gi0/2 10.26.30.0/24| hq-dmz
+    hq-dmz --&gt; dmz-srv
+    hq-core --&gt;|Gi0/3| isp
+
+    classDef trust fill:#1b4332,stroke:#40916c,color:#fff
+    classDef dmz fill:#7f5539,stroke:#b08968,color:#fff
+    classDef untrust fill:#6a040f,stroke:#d00000,color:#fff
+    class hq-core,hq-dist trust
+    class hq-dmz,dmz-srv dmz
+    class isp untrust
+</pre>
+<ul>
+<li>ゾーンごとに <code>classDef</code> で色を固定し、テーマ間で同じゾーンには同じ配色を使う（Trust=緑系、DMZ=橙系、Untrust/WAN=赤系を既定とする）。</li>
+<li>ゾーンをまたぐリンクにはインターフェース名・サブネットをラベルとして付ける（§5参照）。</li>
+</ul>
+<h2 id="3-詳細印刷版html許容パターン" tabindex="-1">3. 詳細・印刷版HTML（許容パターン） <a class="header-anchor" href="#3-詳細印刷版html許容パターン" aria-hidden="true">#</a></h2>
+<ul>
+<li>詳細な配線図・印刷向けレイアウトが必要な場合のみ、手作りHTMLを <code>02_基本設計/ネットワーク構成図.html</code> として許容する（テーマ26 <a href="../26_dynamic_routing_deep_dive/02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E3%83%8D%E3%83%83%E3%83%88%E3%83%AF%E3%83%BC%E3%82%AF%E6%A7%8B%E6%88%90%E5%9B%B3.html">ネットワーク構成図.html</a> 方式）。</li>
+<li>位置づけは <strong>Mermaidの補助</strong>。Mermaid図が一次情報、HTMLは詳細版・印刷版という上下関係を崩さない。</li>
+<li>このHTMLは <code>規約/ビルド/build.mjs</code> の自動生成対象ではない（手作りのため手編集を許容する例外）。<a href="%E3%83%89%E3%82%AD%E3%83%A5%E3%83%A1%E3%83%B3%E3%83%88%E6%A8%99%E6%BA%96.html">ドキュメント標準.md</a> §5参照。</li>
+</ul>
+<h2 id="4-drawio方針" tabindex="-1">4. drawio方針 <a class="header-anchor" href="#4-drawio方針" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>規約</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>新規作成</td>
+<td><strong>非推奨</strong>。新規テーマでdrawioを一次ソースにしない</td>
+</tr>
+<tr>
+<td>非推奨の理由</td>
+<td>バイナリ同然のXML圧縮形式でgit差分が実質不能。GitHub上でネイティブ描画されない（画像化しないと見えない）</td>
+</tr>
+<tr>
+<td>既存資産（テーマ22）</td>
+<td>残置する。遡及移行はしない（<a href="README.html">README.md</a> の適用範囲方針に準拠）</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="5-mermaid記法の統一ルール" tabindex="-1">5. Mermaid記法の統一ルール <a class="header-anchor" href="#5-mermaid記法の統一ルール" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>規約</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>方向指定</td>
+<td>階層構造（コア→ディストリ→エッジ等の縦の関係）は <code>graph TB</code>。拠点間・左右の接続関係は <code>graph LR</code></td>
+</tr>
+<tr>
+<td>ノードID</td>
+<td>ノードIDはclab.ymlのノード名と一致させる（例: <code>hq-core</code>, <code>hq-dist</code>）。表示ラベルは <code>hq-core[HQ-Core]</code> のように大文字化・略称展開して見やすくする</td>
+</tr>
+<tr>
+<td>リンクラベル</td>
+<td>ゾーン間・拠点間リンクには <strong>IF名 と サブネット</strong> を `--&gt;</td>
+</tr>
+<tr>
+<td>サブグラフID</td>
+<td><code>subgraph &lt;英語ID&gt;[&quot;&lt;表示名&gt;&quot;]</code> の形式。IDはゾーン名の英語表記（Trust/DMZ/Untrust/WAN）</td>
+</tr>
+<tr>
+<td>ノード数が多い場合</td>
+<td>拠点単位でsubgraphを分け、拠点内はTB・拠点間はLRのように混在させてよい</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="6-参照" tabindex="-1">6. 参照 <a class="header-anchor" href="#6-参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="%E3%83%89%E3%82%AD%E3%83%A5%E3%83%A1%E3%83%B3%E3%83%88%E6%A8%99%E6%BA%96.html">ドキュメント標準.md</a> — README必須章「トポロジ」の定義</li>
+<li><a href="clab%E9%81%8B%E7%94%A8%E8%A6%8F%E7%B4%84.html">clab運用規約.md</a> — ノード命名・mgmt-ipv4規約（構成図のノードIDと一致させる対象）</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-mermaid第一の原則">1. Mermaid第一の原則</a></li>
+<li class="lvl-2"><a href="#2-ゾーン表現">2. ゾーン表現</a></li>
+<li class="lvl-2"><a href="#3-詳細印刷版html許容パターン">3. 詳細・印刷版HTML（許容パターン）</a></li>
+<li class="lvl-2"><a href="#4-drawio方針">4. drawio方針</a></li>
+<li class="lvl-2"><a href="#5-mermaid記法の統一ルール">5. Mermaid記法の統一ルール</a></li>
+<li class="lvl-2"><a href="#6-参照">6. 参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

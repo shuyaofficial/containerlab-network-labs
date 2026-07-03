@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>ADR: ドキュメント形式としてMarkdownを継続する</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>規約</span></nav>
+      <h1 class="doc-title">ADR: ドキュメント形式としてMarkdownを継続する</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-03</span>
+        <span class="tags"><span class="tag">standard</span><span class="tag">adr</span><span class="tag">markdown</span><span class="tag">format</span></span>
+      </div>
+      
+      <div class="content">
+<ul>
+<li><strong>ステータス</strong>: 採択（2026-07-03）</li>
+<li><strong>決定者</strong>: ユーザー（形式再検討の指示）＋ Claude（検討・起案）</li>
+</ul>
+<h2 id="背景" tabindex="-1">背景 <a class="header-anchor" href="#背景" aria-hidden="true">#</a></h2>
+<p>テーマ02〜27の設計文書はすべてMarkdownで作成してきたが、テーマ数の増加とGitHub公開・HTML出力の要件を機に「本当にMDのままでよいのか」を徹底検討した。</p>
+<h2 id="決定" tabindex="-1">決定 <a class="header-anchor" href="#決定" aria-hidden="true">#</a></h2>
+<p><strong>Markdownをソース・オブ・トゥルースとして継続する。</strong> ただし下記の頑健化策をセットで義務付ける（素のMD運用は継続しない）。</p>
+<h2 id="根拠" tabindex="-1">根拠 <a class="header-anchor" href="#根拠" aria-hidden="true">#</a></h2>
+<ol>
+<li><strong>git差分が意味単位で読める</strong> — 設計変更のレビュー・履歴追跡が行単位で成立する。バイナリ形式（xlsx/docx/drawio）では不可能</li>
+<li><strong>CLIログ・設定がそのまま貼れる</strong> — NW検証はテキストの塊であり、変換工程ゼロで一次情報を保存できる</li>
+<li><strong>GitHubでそのまま読める＋Mermaidがネイティブ描画される</strong> — 公開時に追加変換なしで閲覧品質が確保される</li>
+<li><strong>全既存資産（26テーマ分）がMD</strong> — 形式移行はコストのみ大きく、学習フローも壊す</li>
+<li><strong>AIエージェントが最も安定して生成・監査できる形式</strong> — 雛形生成・規約検査・HTML変換の全パイプラインが単純になる</li>
+</ol>
+<h2 id="頑健化策素のmdとの差分" tabindex="-1">頑健化策（素のMDとの差分） <a class="header-anchor" href="#頑健化策素のmdとの差分" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>弱点</th>
+<th>対策</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>メタデータがなく機械検索に弱い</td>
+<td>YAML frontmatter必須（<a href="frontmatter%E3%82%B9%E3%82%AD%E3%83%BC%E3%83%9E.html">frontmatterスキーマ.md</a>）</td>
+</tr>
+<tr>
+<td>図が別ファイル・別形式に散る</td>
+<td>Mermaid第一（<a href="%E6%A7%8B%E6%88%90%E5%9B%B3%E8%A6%8F%E7%B4%84.html">構成図規約.md</a>）。テキストで差分管理、GitHub/HTML両描画</td>
+</tr>
+<tr>
+<td>表の書式が崩れやすい</td>
+<td>表の規律（ヘッダ必須・<code>&lt;br&gt;</code>改行・巨大表分割）を標準化</td>
+</tr>
+<tr>
+<td>リンク切れ・移植性</td>
+<td>相対リンク規約＋<code>build.mjs --check</code> の自動検査</td>
+</tr>
+<tr>
+<td>日本語ファイル名のNFD/NFC問題</td>
+<td>NFC正規化必須＋ビルド時検出</td>
+</tr>
+<tr>
+<td>「見せられる品質」にならない</td>
+<td><code>build.mjs</code> でHTML生成（紙系デザイントークン・印刷対応・TOC）</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="却下した代替案" tabindex="-1">却下した代替案 <a class="header-anchor" href="#却下した代替案" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>代替案</th>
+<th>却下理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AsciiDoc / reStructuredText</td>
+<td>表現力は上だがGitHubネイティブ描画・AIツール適合・既存資産の面でMDに劣後。学習コストに見合わない</td>
+</tr>
+<tr>
+<td>Word / Excel（docx/xlsx）</td>
+<td>git差分不能・CLIログ貼付に不向き・自動検査不能。PJ管理資料（WBS等）の数値管理用途に限定して併用は継続</td>
+</tr>
+<tr>
+<td>Notion / Confluence 等SaaS</td>
+<td>ローカル完結・オフライン・git管理の原則に反する。エクスポート形式のロックインリスク</td>
+</tr>
+<tr>
+<td>drawio中心の図管理</td>
+<td>バイナリ同然のXMLで差分不能、GitHub非描画。既存図は残すが新規は非推奨</td>
+</tr>
+<tr>
+<td>YAML/データ全面化（パラメータをすべて構造化）</td>
+<td>学習時の手記入フロー（詳細設計を自分で書く）を壊す。ユーザー決定（2026-07-03）によりMD＋HTML両生成の方針を採用</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="リスクと緩和" tabindex="-1">リスクと緩和 <a class="header-anchor" href="#リスクと緩和" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>frontmatter記入漏れ</strong> → <code>--check</code> ゲートで機械検出、雛形に既定値を埋め込み</li>
+<li><strong>Mermaidで表現しきれない詳細図</strong> → 手作りHTML図（テーマ26方式）を例外として許容</li>
+<li><strong>HTML生成物とMDの乖離</strong> → HTMLは常に再生成可能な派生物とし、手編集を禁止</li>
+</ul>
+<h2 id="再検討の条件" tabindex="-1">再検討の条件 <a class="header-anchor" href="#再検討の条件" aria-hidden="true">#</a></h2>
+<p>以下のいずれかが発生したら本ADRを見直す：
+パラメータ転記ミスがテーマ3回連続で発生（→データソース化を再検討）／GitHub以外への移行／チーム共同編集の開始。</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#背景">背景</a></li>
+<li class="lvl-2"><a href="#決定">決定</a></li>
+<li class="lvl-2"><a href="#根拠">根拠</a></li>
+<li class="lvl-2"><a href="#頑健化策素のmdとの差分">頑健化策（素のMDとの差分）</a></li>
+<li class="lvl-2"><a href="#却下した代替案">却下した代替案</a></li>
+<li class="lvl-2"><a href="#リスクと緩和">リスクと緩和</a></li>
+<li class="lvl-2"><a href="#再検討の条件">再検討の条件</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

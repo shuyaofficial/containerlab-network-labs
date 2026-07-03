@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>CLI投入コマンド（コピー＆ペースト用）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>26_dynamic_routing_deep_dive</span>
+<span class="sep">/</span>
+<span>03_詳細設計</span></nav>
+      <h1 class="doc-title">CLI投入コマンド（コピー＆ペースト用）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>本ファイルは、<code>パラメータシート_設定順.md</code> のフェーズに沿って、各機器のコンソールにそのままペーストして実行できるCLIコマンドをまとめたものです。</p>
+<h2 id="phase-1-loopback0-を最初に作る全7台" tabindex="-1">Phase 1. Loopback0 を最初に作る（全7台） <a class="header-anchor" href="#phase-1-loopback0-を最初に作る全7台" aria-hidden="true">#</a></h2>
+<h3 id="hq-core" tabindex="-1">hq-core <a class="header-anchor" href="#hq-core" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">en
+conf t
+interface Loopback0
+ ip address 10.26.255.1 255.255.255.255
+ no shutdown
+exit
+</code></pre>
+<h3 id="hq-dist" tabindex="-1">hq-dist <a class="header-anchor" href="#hq-dist" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">en
+conf t
+interface Loopback0
+ ip address 10.26.255.2 255.255.255.255
+ no shutdown
+exit
+</code></pre>
+<h3 id="hq-edge" tabindex="-1">hq-edge <a class="header-anchor" href="#hq-edge" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">en
+conf t
+interface Loopback0
+ ip address 10.26.255.254 255.255.255.255
+ no shutdown
+exit
+</code></pre>
+<h3 id="hq-dmz" tabindex="-1">hq-dmz <a class="header-anchor" href="#hq-dmz" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">en
+conf t
+interface Loopback0
+ ip address 10.26.255.3 255.255.255.255
+ no shutdown
+exit
+</code></pre>
+<h3 id="isp" tabindex="-1">isp <a class="header-anchor" href="#isp" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">en
+conf t
+interface Loopback0
+ ip address 10.26.255.100 255.255.255.255
+ no shutdown
+exit
+</code></pre>
+<h3 id="br-edge" tabindex="-1">br-edge <a class="header-anchor" href="#br-edge" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">en
+conf t
+interface Loopback0
+ ip address 10.26.255.12 255.255.255.255
+ no shutdown
+exit
+</code></pre>
+<h3 id="br-core" tabindex="-1">br-core <a class="header-anchor" href="#br-core" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">en
+conf t
+interface Loopback0
+ ip address 10.26.255.11 255.255.255.255
+ no shutdown
+exit
+</code></pre>
+<hr>
+<h2 id="phase-2-物理ifのipを設定全7台" tabindex="-1">Phase 2. 物理IFのIPを設定（全7台） <a class="header-anchor" href="#phase-2-物理ifのipを設定全7台" aria-hidden="true">#</a></h2>
+<h3 id="hq-core-1" tabindex="-1">hq-core <a class="header-anchor" href="#hq-core-1" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">en
+conf t
+interface Ethernet0/1
+ ip address 10.26.1.1 255.255.255.252
+ no shutdown
+exit
+interface Ethernet0/2
+ ip address 10.26.1.5 255.255.255.252
+ no shutdown
+exit
+interface Ethernet0/3
+ ip address 10.26.1.9 255.255.255.252
+ no shutdown
+exit
+</code></pre>
+<h3 id="hq-dist-1" tabindex="-1">hq-dist <a class="header-anchor" href="#hq-dist-1" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">en
+conf t
+interface Ethernet0/1
+ ip address 10.26.1.2 255.255.255.252
+ no shutdown
+exit
+interface Ethernet0/2
+ ip address 10.26.10.1 255.255.255.0
+ no shutdown
+exit
+</code></pre>
+<h3 id="hq-edge-1" tabindex="-1">hq-edge <a class="header-anchor" href="#hq-edge-1" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">en
+conf t
+interface Ethernet0/1
+ ip address 10.26.1.6 255.255.255.252
+ no shutdown
+exit
+interface Ethernet0/2
+ ip address 198.51.100.1 255.255.255.252
+ no shutdown
+exit
+</code></pre>
+<h3 id="hq-dmz-1" tabindex="-1">hq-dmz <a class="header-anchor" href="#hq-dmz-1" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">en
+conf t
+interface Ethernet0/1
+ ip address 10.26.1.10 255.255.255.252
+ no shutdown
+exit
+interface Ethernet0/2
+ ip address 10.26.30.1 255.255.255.0
+ no shutdown
+exit
+</code></pre>
+<h3 id="isp-1" tabindex="-1">isp <a class="header-anchor" href="#isp-1" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">en
+conf t
+interface Ethernet0/1
+ ip address 198.51.100.2 255.255.255.252
+ no shutdown
+exit
+interface Ethernet0/2
+ ip address 198.51.100.5 255.255.255.252
+ no shutdown
+exit
+</code></pre>
+<h3 id="br-edge-1" tabindex="-1">br-edge <a class="header-anchor" href="#br-edge-1" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">en
+conf t
+interface Ethernet0/1
+ ip address 198.51.100.6 255.255.255.252
+ no shutdown
+exit
+interface Ethernet0/2
+ ip address 10.26.2.1 255.255.255.252
+ no shutdown
+exit
+</code></pre>
+<h3 id="br-core-1" tabindex="-1">br-core <a class="header-anchor" href="#br-core-1" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">en
+conf t
+interface Ethernet0/1
+ ip address 10.26.2.2 255.255.255.252
+ no shutdown
+exit
+interface Ethernet0/2
+ ip address 10.26.20.1 255.255.255.0
+ no shutdown
+exit
+</code></pre>
+<hr>
+<p>※ 以降のフェーズ（ルーティング設定など）は、学習の目的上、手動での構築を推奨しています。</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#phase-1-loopback0-を最初に作る全7台">Phase 1. Loopback0 を最初に作る（全7台）</a></li>
+<li class="lvl-3"><a href="#hq-core">hq-core</a></li>
+<li class="lvl-3"><a href="#hq-dist">hq-dist</a></li>
+<li class="lvl-3"><a href="#hq-edge">hq-edge</a></li>
+<li class="lvl-3"><a href="#hq-dmz">hq-dmz</a></li>
+<li class="lvl-3"><a href="#isp">isp</a></li>
+<li class="lvl-3"><a href="#br-edge">br-edge</a></li>
+<li class="lvl-3"><a href="#br-core">br-core</a></li>
+<li class="lvl-2"><a href="#phase-2-物理ifのipを設定全7台">Phase 2. 物理IFのIPを設定（全7台）</a></li>
+<li class="lvl-3"><a href="#hq-core-1">hq-core</a></li>
+<li class="lvl-3"><a href="#hq-dist-1">hq-dist</a></li>
+<li class="lvl-3"><a href="#hq-edge-1">hq-edge</a></li>
+<li class="lvl-3"><a href="#hq-dmz-1">hq-dmz</a></li>
+<li class="lvl-3"><a href="#isp-1">isp</a></li>
+<li class="lvl-3"><a href="#br-edge-1">br-edge</a></li>
+<li class="lvl-3"><a href="#br-core-1">br-core</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

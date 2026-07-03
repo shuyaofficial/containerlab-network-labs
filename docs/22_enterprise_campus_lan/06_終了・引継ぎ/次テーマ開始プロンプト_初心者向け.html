@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>次テーマ開始プロンプト（初心者向け）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>22_enterprise_campus_lan</span>
+<span class="sep">/</span>
+<span>06_終了・引継ぎ</span></nav>
+      <h1 class="doc-title">次テーマ開始プロンプト（初心者向け）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>以下を次回のAIへの依頼文として、そのまま使用できる。</p>
+<pre><code class="language-text">/Users/shuya/Documents/claude/Mac仮想環境構築/ の学習を続けたいです。
+テーマ22は部分達成で終了しました。テーマ22を修理・再deployせず、次の独立したテーマ23を新規作成してください。
+
+私はネットワークやDockerの環境構成をほとんど理解していない前提で進めてください。専門用語を使う場合は、最初に「何のためのものか」を1〜2文で説明してください。コマンドは、Macで実行するのか、`ssh clab@orb`で入ったLinux VM内で実行するのかを毎回明記してください。
+
+最初に必ず読む資料:
+1. /Users/shuya/Documents/claude/Mac仮想環境構築/22_enterprise_campus_lan/06_終了・引継ぎ/README.md
+2. /Users/shuya/Documents/claude/Mac仮想環境構築/22_enterprise_campus_lan/05_試験/試験結果_2026-06-29.md
+3. /Users/shuya/Documents/claude/Mac仮想環境構築/ロードマップ/拡張ロードマップ_セキュリティ・マルチベンダー.md
+4. /Users/shuya/Documents/claude/Mac仮想環境構築/12_cisco_network_services/ の既存資料
+5. /Users/shuya/Documents/claude/Mac仮想環境構築/21_cisco_capstone/ の要件定義・設計・試験の構成
+
+現在の環境:
+- 操作用PCはApple SiliconのMac mini（arm64）です。
+- OrbStackを使っています。
+- containerlabの主な実行場所は、Macから`ssh clab@orb`で入るaarch64 Linux VMです。
+- Mac側のDockerとLinux VM「clab」側のDockerは、イメージ一覧や実行状態が同じとは限りません。
+- x86仮想アプライアンス用の`/dev/kvm`はありません。ASAv、FTDv、FortiGateなどのx86仮想FWは今回使わないでください。
+- テーマ22のラボや設定ファイルは証跡として残し、変更しないでください。
+
+作成するテーマ:
+- フォルダ名: /Users/shuya/Documents/claude/Mac仮想環境構築/23_internal_dns/
+- 題材: 企業内で使う小規模な内部DNS
+- 目的: IPアドレスではなく名前で社内サーバへ接続できる仕組みと、DNS障害の切り分けを学ぶ
+- 技術候補: ARM64対応のBINDまたはUnbound。採用前に現在の公式イメージがarm64対応か確認する
+- 最初はDNSサーバ1台、クライアント1台の最小構成にする
+- Cisco仮想機器は、DNS学習に必須でなければ最初の構成には入れない
+
+フォルダ内に作るもの:
+1. README_Lab_Challenge.md
+2. 01_要件定義/要件定義書.md
+3. 02_基本設計/基本設計書.md
+4. 02_基本設計/IPアドレス管理表.md
+5. 03_詳細設計/パラメータシート_DNS.md
+6. 04_構築/構築手順書.md
+7. 05_試験/試験計画書.md
+8. containerlabで動かす場合は、トポロジYAMLと設定ファイル
+
+最低限の試験:
+- 正引き: `portal.corp.example`からIPアドレスを取得できる
+- 逆引き: IPアドレスから名前を取得できる
+- 存在しない名前: NXDOMAINを確認できる
+- キャッシュ: 1回目と2回目の問い合わせ結果を比較できる
+- 障害試験: DNSサーバ停止時に、名前解決だけが失敗しIP直打ち通信は別問題だと切り分けられる
+- ログ: 問い合わせがDNSサーバへ到達した証拠を残す
+
+進め方:
+1. まず現在の環境を読み取り専用コマンドで確認し、結果を初心者向けに説明する
+2. テーマ12、21、22の既存形式を参考に設計する
+3. 作成予定ファイルと最小構成を示す
+4. ファイルを作成する
+5. ARM64で起動できることを確認する
+6. 正常系、異常系、障害試験を実施する
+7. 試験結果と、できたこと・できなかったことを保存する
+8. ロードマップの進捗管理を更新する
+
+安全条件:
+- テーマ22の`destroy`、`deploy`、設定変更をしない
+- ライセンス素材や鍵をGit管理対象へコピーしない
+- x86イメージがDockerに存在するだけで動作可能と判断しない
+- 破壊的操作の前に対象と影響を説明する
+- 推測で成功扱いにせず、コマンド出力または通信試験を証拠として残す
+
+最初の返答では、現在の環境を図で説明し、テーマ23の最小構成、参考にする既存資料、作業順序を提示してください。その後は確認だけで止まらず、作成と検証まで進めてください。
+</code></pre>
+<h2 id="このプロンプトの狙い" tabindex="-1">このプロンプトの狙い <a class="header-anchor" href="#このプロンプトの狙い" aria-hidden="true">#</a></h2>
+<ul>
+<li>テーマ22を誤って壊さない。</li>
+<li>MacとOrbStack Linux VMの実行場所を混同しない。</li>
+<li>最初から大規模構成にせず、DNSの仕組みだけを観察できる。</li>
+<li>成功だけでなく、名前解決障害を通信障害から分ける練習をする。</li>
+<li>作成物、試験、証跡、ロードマップ更新までを一つの作業として完結させる。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#このプロンプトの狙い">このプロンプトの狙い</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

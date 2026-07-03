@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜Phase 6 デバイス統制（step-ca mTLS）</title>
+  <link rel="stylesheet" href="../../../assets/doc.css">
+  <link rel="stylesheet" href="../../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>04_構築</span>
+<span class="sep">/</span>
+<span>phase6_device</span></nav>
+      <h1 class="doc-title">テーマZERO｜Phase 6 デバイス統制（step-ca mTLS）</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">phase</span><span class="tag">device</span><span class="tag">step-ca</span><span class="tag">mtls</span></span>
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>今回スコープでは<strong>未デプロイ</strong>（設計値）。このスタブは実装着手時の作業起点。詳細は <a href="../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a> Phase 6。</p>
+</blockquote>
+<h2 id="目的" tabindex="-1">目的 <a class="header-anchor" href="#目的" aria-hidden="true">#</a></h2>
+<p>端末証明書（mTLS）で「管理された端末か」を検証し、posture claim（端末状態を表す属性）を認可判断の入力にして条件分岐する。ID（誰か）＋デバイス（何の端末か）の二軸で「明示的検証」を成立させる。</p>
+<h2 id="コンポーネント" tabindex="-1">コンポーネント <a class="header-anchor" href="#コンポーネント" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>役割</th>
+<th>ゾーン</th>
+<th>予定 IP</th>
+<th>待受</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>step-ca</td>
+<td>mTLS 証明書発行・posture claim モック</td>
+<td>DMZ (zt-dmz)</td>
+<td>172.30.10.41</td>
+<td>9000/HTTPS (ACME)</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>posture 収集は osquery 補助。実収集が難しければ posture claim を<strong>モック</strong>（固定属性で分岐を示す。FR-2）。発展: Wazuh エージェント。</li>
+<li>判定連携先は Phase 2 の IAP（Pomerium）。証明書と posture を認可ポリシーの入力にする。</li>
+</ul>
+<h2 id="依存" tabindex="-1">依存 <a class="header-anchor" href="#依存" aria-hidden="true">#</a></h2>
+<ul>
+<li>Phase 2（posture を渡す先の IAP）、Phase 3（判定ログの確認）。</li>
+</ul>
+<h2 id="ゲート条件次へ進む条件" tabindex="-1">ゲート条件（次へ進む条件） <a class="header-anchor" href="#ゲート条件次へ進む条件" aria-hidden="true">#</a></h2>
+<p>証明書を持たない端末を拒否し、posture claim（例: 準拠/非準拠）で <code>app</code> への到達可否を条件分岐できる（<a href="../../01_%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9/%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9%E6%9B%B8.html">要件定義書</a> AC-6 / 試験 T-6-*）。</p>
+<h2 id="実装時の作業リスト" tabindex="-1">実装時の作業リスト <a class="header-anchor" href="#実装時の作業リスト" aria-hidden="true">#</a></h2>
+<ul>
+<li>[ ] <code>phase6_device/</code> に clab.yml（step-ca ノード）と <a href="http://deploy.sh">deploy.sh</a></li>
+<li>[ ] arm64 manifest 確認（step-ca は Med。発行フローを軽く確認）</li>
+<li>[ ] CA を初期化し、端末証明書の発行フロー（ACME/mTLS）を用意</li>
+<li>[ ] <code>client</code> に端末証明書を配布、<code>external</code> は証明書なしのまま</li>
+<li>[ ] Pomerium に mTLS 検証を設定（証明書なし端末を拒否）（T-6-1）</li>
+<li>[ ] posture claim をモック（準拠/非準拠の属性）</li>
+<li>[ ] posture で到達可否が変わることを確認（T-6-2）</li>
+<li>[ ] 拒否・許可の判定が SIEM に記録されることを確認（T-6-3）</li>
+<li>[ ] <a href="../%E6%A7%8B%E7%AF%89%E3%83%AD%E3%82%B0_%E3%83%86%E3%83%B3%E3%83%97%E3%83%AC%E3%83%BC%E3%83%88.html">構築ログ</a> を複製して記録</li>
+</ul>
+<h2 id="学べること" tabindex="-1">学べること <a class="header-anchor" href="#学べること" aria-hidden="true">#</a></h2>
+<p>デバイス識別の mTLS、posture ベース認可、ID＋デバイスの二軸で明示的検証を成立させる設計、モックで実装可能性を先行確認する考え方。</p>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a></li>
+<li><a href="../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a>（デバイス統制）</li>
+<li><a href="../phase2_iap/README.html">phase2_iap</a></li>
+<li><a href="../../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#目的">目的</a></li>
+<li class="lvl-2"><a href="#コンポーネント">コンポーネント</a></li>
+<li class="lvl-2"><a href="#依存">依存</a></li>
+<li class="lvl-2"><a href="#ゲート条件次へ進む条件">ゲート条件（次へ進む条件）</a></li>
+<li class="lvl-2"><a href="#実装時の作業リスト">実装時の作業リスト</a></li>
+<li class="lvl-2"><a href="#学べること">学べること</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

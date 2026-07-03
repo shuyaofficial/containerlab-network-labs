@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Phase 6 解説 — デバイス統制（step-ca / mTLS）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>解説</span></nav>
+      <h1 class="doc-title">Phase 6 解説 — デバイス統制（step-ca / mTLS）</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">explainer</span><span class="tag">device</span><span class="tag">step-ca</span><span class="tag">mtls</span><span class="tag">posture</span></span>
+      </div>
+      
+      <div class="content">
+<h2 id="1-このフェーズで何が実現されるか" tabindex="-1">1. このフェーズで何が実現されるか <a class="header-anchor" href="#1-このフェーズで何が実現されるか" aria-hidden="true">#</a></h2>
+<p>Phase 6 では端末証明書（mTLS: 相互 TLS 認証）を使い、「管理された端末かどうか」を検証する。あわせて posture claim（端末状態を表す属性、例: OS のバージョンが準拠しているか）を認可判断の入力にし、条件によって到達可否を分岐させる。ID（誰か、Phase 1）＋デバイス（何の端末か、Phase 6）の二軸で「明示的検証」を完成させる、本ラボの最終フェーズ。</p>
+<ul>
+<li><strong>ビフォー</strong>: Phase 2 までの状態では、「正しい ID でログインした」ことは検証できるが、その ID が使っている端末が管理された正当な端末かどうかは問われない。個人の私物端末でも、正しいパスワードさえ知っていれば <code>app</code> に到達できてしまう。</li>
+<li><strong>アフター</strong>: <code>client</code> は step-ca が発行した証明書を持つ端末として mTLS でその正当性を証明する。証明書を持たない端末（<code>external</code> はこの状態のまま）は拒否される。さらに posture claim（準拠/非準拠）によって、同じ証明書を持つ端末でも状態次第でアクセス可否が変わる。</li>
+</ul>
+<h2 id="2-なぜこの構成か" tabindex="-1">2. なぜこの構成か <a class="header-anchor" href="#2-なぜこの構成か" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>観点</th>
+<th>商用製品</th>
+<th>本ラボの OSS 選定</th>
+<th>選定理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>デバイス統制（MDM/EPP/EDR）</td>
+<td>Microsoft Intune, CrowdStrike</td>
+<td><strong>step-ca</strong>（mTLS 証明書発行・posture claim モック）＋ osquery 補助</td>
+<td><a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果</a> で step-ca は arm64 対応済み（High）。一方 osquery の公式 Docker イメージは arm64 非対応（amd64 のみ実測確認）と確定</td>
+</tr>
+</tbody>
+</table></div>
+<p>なぜ posture claim をモックにするか（FR-2）:</p>
+<ul>
+<li>osquery（端末の詳細な状態を SQL クエリで取得するツール）は本来デバイス統制の要だが、公式 Docker イメージが arm64 をサポートしていないことが実測で判明した。ネイティブバイナリの自前ビルドや Wazuh agent への統合機能での代替は工数が大きいため、本ラボでは posture claim を<strong>固定属性のモック</strong>（例: 「この端末は準拠 = true」という値を決め打ちで持たせる）に割り切る。</li>
+<li>重要なのは「posture という属性を認可判断の入力にできる設計になっているか」を示すことであり、posture 収集の実装の作り込みそのものは主眼ではない（実装可能性の PoC という要件定義の位置づけに合致）。</li>
+</ul>
+<p><strong>実務でこの知識がどこで効くか</strong>: Intune や CrowdStrike のようなデバイス管理製品は、端末に常駐エージェントを入れてデバイス証明書を配布し、コンプライアンス状態（暗号化の有無、OS パッチレベル等）を継続的にレポートする。この「証明書でデバイスを識別し、posture で状態を条件分岐する」という発想は、企業の Conditional Access（条件付きアクセス）ポリシーの根幹。mTLS のハンドシェイクを自分の手で構築・検証しておくと、企業ネットワークで「証明書のない端末が弾かれる」「OS が古いと VPN に繋がらない」といった挙動の裏側が具体的に見えるようになる。</p>
+<h2 id="3-仕組みの核心" tabindex="-1">3. 仕組みの核心 <a class="header-anchor" href="#3-仕組みの核心" aria-hidden="true">#</a></h2>
+<p>mTLS ハンドシェイクと posture claim の連携が Phase 6 の核心。</p>
+<pre class="mermaid">sequenceDiagram
+    participant C as client (端末)
+    participant S as step-ca (CA)
+    participant P as Pomerium (IAP)
+    participant A as app (Trust)
+    C-&gt;&gt;S: (1) 証明書発行リクエスト（ACME）
+    S--&gt;&gt;C: (2) 端末証明書を発行
+    C-&gt;&gt;P: (3) app へアクセス（TLS handshake、client 証明書を提示）
+    P-&gt;&gt;P: (4) 証明書チェーンを検証（正当な CA から発行されたか）
+    alt 証明書なし/不正
+        P--&gt;&gt;C: (5a) 拒否
+    else 証明書あり
+        P-&gt;&gt;P: (5b) posture claim を確認（準拠/非準拠）
+        alt 非準拠
+            P--&gt;&gt;C: (6a) 拒否 or 制限付きアクセス
+        else 準拠
+            P-&gt;&gt;A: (6b) 認可済みとして転送
+        end
+    end
+</pre>
+<p>ポイント:</p>
+<ul>
+<li><strong>mTLS は「相互」認証</strong>。通常の HTTPS はサーバー証明書のみでサーバーの正当性を検証するが、mTLS ではクライアント（<code>client</code>）側も証明書を提示し、サーバー（ここでは IAP）がそれを検証する。「あなたが誰か」（Phase 1 の ID）とは独立した「あなたの端末が何か」を証明する層。</li>
+<li><strong>posture claim は証明書とは別の判断材料</strong>。証明書があっても posture が非準拠なら拒否・制限、という条件分岐ができることで、「端末を持っているか」と「その端末が今、安全な状態か」を分けて評価できる。これが二軸検証（ID×デバイス）の実体。</li>
+<li><strong>CA（step-ca）が信頼の起点</strong>。IAP（Pomerium）は「step-ca が発行した証明書かどうか」だけを確認すればよく、個々の端末を個別に信頼する必要がない。CA を中心にした信頼のスケーラビリティがこの仕組みの本質。</li>
+</ul>
+<h2 id="4-自分で触って確認する手順実装後にこの手順で確認" tabindex="-1">4. 自分で触って確認する手順（実装後にこの手順で確認） <a class="header-anchor" href="#4-自分で触って確認する手順実装後にこの手順で確認" aria-hidden="true">#</a></h2>
+<p>Phase 6 は今回スコープでは未デプロイ（設計値）。実装後、<a href="../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a> T-6-* に沿って以下を確認する想定。</p>
+<h3 id="手順1-ca-を初期化しclient-に証明書を発行する" tabindex="-1">手順1: CA を初期化し、<code>client</code> に証明書を発行する <a class="header-anchor" href="#手順1-ca-を初期化しclient-に証明書を発行する" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">docker <span class="hljs-built_in">exec</span> clab-zero-step-ca step ca health
+docker <span class="hljs-built_in">exec</span> clab-zero-client step ca certificate <span class="hljs-string">&quot;client.zt.local&quot;</span> client.crt client.key \
+  --ca-url https://step-ca:9000 --root /path/to/root_ca.crt
+</code></pre>
+<p>期待結果: <code>client</code> に証明書（<code>client.crt</code>）と秘密鍵（<code>client.key</code>）が生成される。</p>
+<h3 id="手順2-証明書を持たない端末externalを拒否することを確認するt-6-1学習の核心" tabindex="-1">手順2: 証明書を持たない端末（<code>external</code>）を拒否することを確認する（T-6-1、学習の核心） <a class="header-anchor" href="#手順2-証明書を持たない端末externalを拒否することを確認するt-6-1学習の核心" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-comment"># external は証明書なしのまま app へのアクセスを試みる</span>
+docker <span class="hljs-built_in">exec</span> clab-zero-external curl -sv https://&lt;iap-host&gt;/
+</code></pre>
+<p>期待結果: TLS ハンドシェイクの段階で拒否される（<code>alert handshake failure</code> 等）。認証（Phase 1）や認可（Phase 2）の話に到達する前に、mTLS の層で弾かれることを確認する。</p>
+<h3 id="手順3-証明書を持つ-client-はアクセスできることを対照確認する" tabindex="-1">手順3: 証明書を持つ <code>client</code> はアクセスできることを対照確認する <a class="header-anchor" href="#手順3-証明書を持つ-client-はアクセスできることを対照確認する" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">docker <span class="hljs-built_in">exec</span> clab-zero-client curl -sv --cert client.crt --key client.key https://&lt;iap-host&gt;/
+</code></pre>
+<p>期待結果: mTLS ハンドシェイクが成功し、以降 Phase 1/2 の認証・認可フローに進む。手順2 との対照で「証明書の有無だけで結果が変わる」ことを確認する。</p>
+<h3 id="手順4-posture-claim準拠非準拠で到達可否が変わることを確認するt-6-2" tabindex="-1">手順4: posture claim（準拠/非準拠）で到達可否が変わることを確認する（T-6-2） <a class="header-anchor" href="#手順4-posture-claim準拠非準拠で到達可否が変わることを確認するt-6-2" aria-hidden="true">#</a></h3>
+<p>posture のモック値を切り替える（設定ファイルまたは環境変数、実装時に確定）。</p>
+<pre><code class="language-bash"><span class="hljs-comment"># posture = 非準拠 に切り替えた状態で再試行</span>
+docker <span class="hljs-built_in">exec</span> clab-zero-client curl -sv --cert client.crt --key client.key https://&lt;iap-host&gt;/
+</code></pre>
+<p>期待結果: 証明書は正当でも、posture が非準拠であれば拒否/制限される。**「証明書があるだけでは十分ではない」**ことを、同じ証明書のまま posture 値だけ変えて確認するのがこの手順の核心。</p>
+<h3 id="手順5-拒否許可の判定が-siem-に記録されることを確認するt-6-3" tabindex="-1">手順5: 拒否・許可の判定が SIEM に記録されることを確認する（T-6-3） <a class="header-anchor" href="#手順5-拒否許可の判定が-siem-に記録されることを確認するt-6-3" aria-hidden="true">#</a></h3>
+<pre><code class="language-logql">{container=&quot;clab-zero-pomerium&quot;} |= &quot;mtls&quot; or &quot;posture&quot;
+</code></pre>
+<h2 id="5-考えどころ" tabindex="-1">5. 考えどころ <a class="header-anchor" href="#5-考えどころ" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>本番設計ならどうするか</strong>: 本番の MDM/EPP は継続的なエージェント常駐でリアルタイムに posture を収集し（ディスク暗号化状態、EDR 稼働状況、パッチレベルなど）、証明書の失効・再発行のライフサイクル管理（CRL/OCSP）も運用する。本ラボは証明書発行と固定 posture のモックに留まる。</li>
+<li><strong>このラボの簡略化ポイント</strong>:
+<ul>
+<li><strong>posture 収集は実装しない（モック）</strong>。osquery の arm64 非対応という制約もあり、実際のエンドポイント状態を継続的に取得する仕組みは本ラボのスコープ外。</li>
+<li><strong>証明書のライフサイクル管理は最小</strong>。失効（revocation）・自動更新（renewal）のフローは本格実装しない。本番ではこれが運用の中心課題になる。</li>
+<li><strong>CA の可用性・鍵管理</strong>。本番の CA はHSM（ハードウェアセキュリティモジュール）等で秘密鍵を保護するが、本ラボの step-ca は単一コンテナで完結する簡易構成。</li>
+</ul>
+</li>
+</ul>
+<h2 id="6-つまずきポイント" tabindex="-1">6. つまずきポイント <a class="header-anchor" href="#6-つまずきポイント" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>証明書はあるのに拒否される</strong>: <a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a> の重複パターンにある通り、mTLS（L3 相当）は通っても、posture claim の値が想定と違う、または IAP 側のポリシー設定漏れという別レイヤーの問題であることが多い。まず TLS ハンドシェイク自体が成功しているかを <code>openssl s_client</code> で切り分ける。</li>
+<li><strong>ACME 発行フローでエラーになる</strong>: step-ca と <code>client</code> の時刻がずれている（NTP 未同期）と証明書の有効期間の検証で失敗することがある。</li>
+<li><strong>posture 値を変えても挙動が変わらない</strong>: Pomerium 側のポリシー設定で posture claim を条件式に組み込み忘れているケースが多い。「証明書の検証」と「posture の評価」は別の設定項目であることを意識する。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a>（デバイス統制）</li>
+<li><a href="../04_%E6%A7%8B%E7%AF%89/phase6_device/README.html">phase6_device 構築スタブ</a></li>
+<li><a href="phase2_%E8%A7%A3%E8%AA%AC.html">phase2_解説</a></li>
+<li><a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果</a></li>
+<li><a href="../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a></li>
+<li><a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-このフェーズで何が実現されるか">1. このフェーズで何が実現されるか</a></li>
+<li class="lvl-2"><a href="#2-なぜこの構成か">2. なぜこの構成か</a></li>
+<li class="lvl-2"><a href="#3-仕組みの核心">3. 仕組みの核心</a></li>
+<li class="lvl-2"><a href="#4-自分で触って確認する手順実装後にこの手順で確認">4. 自分で触って確認する手順（実装後にこの手順で確認）</a></li>
+<li class="lvl-3"><a href="#手順1-ca-を初期化しclient-に証明書を発行する">手順1: CA を初期化し、client に証明書を発行する</a></li>
+<li class="lvl-3"><a href="#手順2-証明書を持たない端末externalを拒否することを確認するt-6-1学習の核心">手順2: 証明書を持たない端末（external）を拒否することを確認する（T-6-1、学習の核心）</a></li>
+<li class="lvl-3"><a href="#手順3-証明書を持つ-client-はアクセスできることを対照確認する">手順3: 証明書を持つ client はアクセスできることを対照確認する</a></li>
+<li class="lvl-3"><a href="#手順4-posture-claim準拠非準拠で到達可否が変わることを確認するt-6-2">手順4: posture claim（準拠/非準拠）で到達可否が変わることを確認する（T-6-2）</a></li>
+<li class="lvl-3"><a href="#手順5-拒否許可の判定が-siem-に記録されることを確認するt-6-3">手順5: 拒否・許可の判定が SIEM に記録されることを確認する（T-6-3）</a></li>
+<li class="lvl-2"><a href="#5-考えどころ">5. 考えどころ</a></li>
+<li class="lvl-2"><a href="#6-つまずきポイント">6. つまずきポイント</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

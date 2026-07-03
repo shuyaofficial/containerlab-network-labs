@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>試験計画書 — テーマ23: Collapsed Core Campus LAN</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>23_campus_collapsed_core</span>
+<span class="sep">/</span>
+<span>05_試験</span></nav>
+      <h1 class="doc-title">試験計画書 — テーマ23: Collapsed Core Campus LAN</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>各機器の設定が完了したら、以下の試験項目に沿って動作確認を行ってください。
+確認方法のコマンド（<code>show</code> コマンドや <code>ping</code> など）は自分で考えながら進めましょう！</p>
+</blockquote>
+<h2 id="凡例" tabindex="-1">凡例 <a class="header-anchor" href="#凡例" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>判定</strong>: ✅合格 / ❌不合格 / —未実施</li>
+</ul>
+<hr>
+<h2 id="t-1xx-正常系試験疎通確認" tabindex="-1">T-1xx 正常系試験（疎通確認） <a class="header-anchor" href="#t-1xx-正常系試験疎通確認" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>試験内容</th>
+<th>期待結果</th>
+<th>確認方法（観点）</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-101</td>
+<td>PC-1 → PC-3 の疎通 (同一VLAN)</td>
+<td>ping成功</td>
+<td><code>PC-1</code> から <code>10.10.10.3</code> へping</td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-102</td>
+<td>PC-1 → PC-2 の疎通 (VLAN間ルーティング)</td>
+<td>ping成功</td>
+<td><code>PC-1</code> から <code>10.10.20.2</code> へping</td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-103</td>
+<td>PC-2 → PC-3 の疎通 (VLAN間ルーティング)</td>
+<td>ping成功</td>
+<td><code>PC-2</code> から <code>10.10.10.3</code> へping</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="t-2xx-l2試験stpの負荷分散" tabindex="-1">T-2xx L2試験（STPの負荷分散） <a class="header-anchor" href="#t-2xx-l2試験stpの負荷分散" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>試験内容</th>
+<th>期待結果</th>
+<th>確認方法（観点）</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-201</td>
+<td>VLAN 10 の STP ルートブリッジ</td>
+<td>CoreDist-1 がRoot Bridgeとして認識されていること</td>
+<td>各スイッチで <code>show spanning-tree vlan 10</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-202</td>
+<td>VLAN 20 の STP ルートブリッジ</td>
+<td>CoreDist-2 がRoot Bridgeとして認識されていること</td>
+<td>各スイッチで <code>show spanning-tree vlan 20</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-203</td>
+<td>アクセススイッチのブロッキングポート (VLAN 10)</td>
+<td>Access-1, Access-2 の CoreDist-2 向けポートが Blocking (Altn) になっていること</td>
+<td>アクセススイッチでSTPの状態確認</td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-204</td>
+<td>アクセススイッチのブロッキングポート (VLAN 20)</td>
+<td>Access-1, Access-2 の CoreDist-1 向けポートが Blocking (Altn) になっていること</td>
+<td>アクセススイッチでSTPの状態確認</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="t-3xx-l3試験hsrpospfの確認" tabindex="-1">T-3xx L3試験（HSRP・OSPFの確認） <a class="header-anchor" href="#t-3xx-l3試験hsrpospfの確認" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>試験内容</th>
+<th>期待結果</th>
+<th>確認方法（観点）</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-301</td>
+<td>HSRPステータス (VLAN 10)</td>
+<td>CoreDist-1 が Active、CoreDist-2 が Standby になっていること</td>
+<td>CoreDist1/2で <code>show standby brief</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-302</td>
+<td>HSRPステータス (VLAN 20)</td>
+<td>CoreDist-2 が Active、CoreDist-1 が Standby になっていること</td>
+<td>CoreDist1/2で <code>show standby brief</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-303</td>
+<td>OSPFネイバーの確立</td>
+<td>CoreDist-1 と CoreDist-2 の間でOSPFネイバー (FULL) が確立していること</td>
+<td><code>show ip ospf neighbor</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-304</td>
+<td>OSPFの経路交換</td>
+<td>互いのVLANの経路がルーティングテーブルに存在すること</td>
+<td><code>show ip route ospf</code></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="t-4xx-障害試験フェイルオーバー本テーマの山場" tabindex="-1">T-4xx 障害試験（フェイルオーバー）★本テーマの山場 <a class="header-anchor" href="#t-4xx-障害試験フェイルオーバー本テーマの山場" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>試験内容</th>
+<th>期待結果</th>
+<th>確認方法（観点）</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-401</td>
+<td>CoreDist-1 ダウン時の HSRP/STP 切替</td>
+<td>VLAN 10 の Active が CoreDist-2 に移り、疎通が数秒以内に回復すること</td>
+<td><code>PC-1</code> から ping を連打したまま、<code>CoreDist-1</code> を停止（またはポートをshutdown）して断時間を計測</td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-402</td>
+<td>CoreDist-1 復旧時の Preempt (切り戻し)</td>
+<td>CoreDist-1 復旧後、VLAN 10 の Active に戻り、STPルートも元に戻ること</td>
+<td>機器を起動後、<code>show standby</code> で状態を確認</td>
+<td>—</td>
+</tr>
+<tr>
+<td>T-403</td>
+<td>アップリンク単一障害の L2 迂回</td>
+<td>Access-1 の CoreDist-1 向けリンクのみを切断した場合、ブロッキングポートが開放され、VLAN 10 の通信が CoreDist-2 経由で CoreDist-1 に到達し、通信が継続すること</td>
+<td>リンクを切断し、ping疎通維持とSTPのポート状態遷移を確認</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#凡例">凡例</a></li>
+<li class="lvl-2"><a href="#t-1xx-正常系試験疎通確認">T-1xx 正常系試験（疎通確認）</a></li>
+<li class="lvl-2"><a href="#t-2xx-l2試験stpの負荷分散">T-2xx L2試験（STPの負荷分散）</a></li>
+<li class="lvl-2"><a href="#t-3xx-l3試験hsrpospfの確認">T-3xx L3試験（HSRP・OSPFの確認）</a></li>
+<li class="lvl-2"><a href="#t-4xx-障害試験フェイルオーバー本テーマの山場">T-4xx 障害試験（フェイルオーバー）★本テーマの山場</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

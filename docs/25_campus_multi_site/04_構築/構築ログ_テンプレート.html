@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>構築ログ — Theme 25 Multi-Campus</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>25_campus_multi_site</span>
+<span class="sep">/</span>
+<span>04_構築</span></nav>
+      <h1 class="doc-title">構築ログ — Theme 25 Multi-Campus</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>テンプレート: コピーしてファイル名を<code>構築ログ_YYYY-MM-DD.md</code>に変更して使用。</p>
+</blockquote>
+<h2 id="基本情報" tabindex="-1">基本情報 <a class="header-anchor" href="#基本情報" aria-hidden="true">#</a></h2>
+<ul>
+<li>実施日:</li>
+<li>実施者:</li>
+<li>目的:</li>
+</ul>
+<h2 id="環境起動" tabindex="-1">環境起動 <a class="header-anchor" href="#環境起動" aria-hidden="true">#</a></h2>
+<pre><code class="language-bash">ssh clab@orb
+<span class="hljs-built_in">cd</span> /Users/shuya/Documents/claude/Mac仮想環境構築/25_campus_multi_site/04_構築
+./deploy.sh deploy
+</code></pre>
+<h3 id="起動確認" tabindex="-1">起動確認 <a class="header-anchor" href="#起動確認" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">./deploy.sh inspect
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>Status</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>main-core</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>main-edge</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>branch-edge</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>branch-core</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>main-pc</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>branch-pc</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="iol-pid1確認" tabindex="-1">IOL PID1確認 <a class="header-anchor" href="#iol-pid1確認" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker top clab-campus-multi-site-main-core
+</code></pre>
+<h2 id="設定投入ログ" tabindex="-1">設定投入ログ <a class="header-anchor" href="#設定投入ログ" aria-hidden="true">#</a></h2>
+<h3 id="mission-1-ospf独立構築" tabindex="-1">Mission 1: OSPF独立構築 <a class="header-anchor" href="#mission-1-ospf独立構築" aria-hidden="true">#</a></h3>
+<p>作業メモ:</p>
+<h3 id="mission-2-ebgp接続" tabindex="-1">Mission 2: eBGP接続 <a class="header-anchor" href="#mission-2-ebgp接続" aria-hidden="true">#</a></h3>
+<p>作業メモ:</p>
+<h3 id="mission-3-集約と再配信" tabindex="-1">Mission 3: 集約と再配信 <a class="header-anchor" href="#mission-3-集約と再配信" aria-hidden="true">#</a></h3>
+<p>作業メモ:</p>
+<h3 id="mission-4-通信と障害試験" tabindex="-1">Mission 4: 通信と障害試験 <a class="header-anchor" href="#mission-4-通信と障害試験" aria-hidden="true">#</a></h3>
+<p>作業メモ:</p>
+<h2 id="問題気づき" tabindex="-1">問題・気づき <a class="header-anchor" href="#問題気づき" aria-hidden="true">#</a></h2>
+<ul>
+<li></li>
+</ul>
+<h2 id="次回アクション" tabindex="-1">次回アクション <a class="header-anchor" href="#次回アクション" aria-hidden="true">#</a></h2>
+<ul>
+<li></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#基本情報">基本情報</a></li>
+<li class="lvl-2"><a href="#環境起動">環境起動</a></li>
+<li class="lvl-3"><a href="#起動確認">起動確認</a></li>
+<li class="lvl-3"><a href="#iol-pid1確認">IOL PID1確認</a></li>
+<li class="lvl-2"><a href="#設定投入ログ">設定投入ログ</a></li>
+<li class="lvl-3"><a href="#mission-1-ospf独立構築">Mission 1: OSPF独立構築</a></li>
+<li class="lvl-3"><a href="#mission-2-ebgp接続">Mission 2: eBGP接続</a></li>
+<li class="lvl-3"><a href="#mission-3-集約と再配信">Mission 3: 集約と再配信</a></li>
+<li class="lvl-3"><a href="#mission-4-通信と障害試験">Mission 4: 通信と障害試験</a></li>
+<li class="lvl-2"><a href="#問題気づき">問題・気づき</a></li>
+<li class="lvl-2"><a href="#次回アクション">次回アクション</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

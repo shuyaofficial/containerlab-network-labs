@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>規約 — 索引と目的</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>規約</span></nav>
+      <h1 class="doc-title">規約 — 索引と目的</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-03</span>
+        <span class="tags"><span class="tag">standard</span><span class="tag">index</span></span>
+      </div>
+      
+      <div class="content">
+<p><code>Mac仮想環境構築/</code> 配下のラボテーマを新規作成・運用するときの標準を定義する。
+既存の <code>環境/</code>（現状の説明）・<code>ロードマップ/</code>（未来の計画）に対し、<code>規約/</code> は「あるべき形の定義」を担う三点セットの一角。</p>
+<h2 id="適用範囲" tabindex="-1">適用範囲 <a class="header-anchor" href="#適用範囲" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>新規テーマ（テーマ28以降・テーマZERO含む）に適用する。</strong></li>
+<li>既存テーマ02〜27には遡及しない（不整合の指摘は <a href="%E6%8F%90%E6%A1%88_%E9%81%8B%E7%94%A8%E6%94%B9%E5%96%84.html">提案_運用改善.md</a> に記録のみ）。</li>
+<li>新規テーマの雛形生成は <code>containerlab-theme</code> スキルが本規約の <code>雛形/</code> を単一ソースとして参照する。</li>
+</ul>
+<h2 id="索引" tabindex="-1">索引 <a class="header-anchor" href="#索引" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ファイル</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="%E3%83%89%E3%82%AD%E3%83%A5%E3%83%A1%E3%83%B3%E3%83%88%E6%A8%99%E6%BA%96.html">ドキュメント標準.md</a></td>
+<td>ディレクトリ構成・必須ドキュメント・章立て・記法規律・命名規約</td>
+</tr>
+<tr>
+<td><a href="frontmatter%E3%82%B9%E3%82%AD%E3%83%BC%E3%83%9E.html">frontmatterスキーマ.md</a></td>
+<td>全MDに付与するYAML frontmatterの値辞書とgrepレシピ</td>
+</tr>
+<tr>
+<td><a href="clab%E9%81%8B%E7%94%A8%E8%A6%8F%E7%B4%84.html">clab運用規約.md</a></td>
+<td>clab.yml配置・deploy.sh標準・VM実行パターン・禁止事項</td>
+</tr>
+<tr>
+<td><a href="%E6%A7%8B%E6%88%90%E5%9B%B3%E8%A6%8F%E7%B4%84.html">構成図規約.md</a></td>
+<td>Mermaid第一・HTML併用・drawio新規非推奨の判断基準</td>
+</tr>
+<tr>
+<td><a href="Markdown%E6%8E%A1%E7%94%A8%E5%88%A4%E6%96%AD.html">Markdown採用判断.md</a></td>
+<td>「MDでよいのか」の検討結論（ADR）</td>
+</tr>
+<tr>
+<td><a href="%E6%8F%90%E6%A1%88_%E9%81%8B%E7%94%A8%E6%94%B9%E5%96%84.html">提案_運用改善.md</a></td>
+<td>既存環境への改善提案（非改変・記録のみ）</td>
+</tr>
+<tr>
+<td><a href="%E7%9B%A3%E6%9F%BB%E3%83%81%E3%82%A7%E3%83%83%E3%82%AF%E3%83%AA%E3%82%B9%E3%83%88.html">監査チェックリスト.md</a></td>
+<td>新規テーマの規約適合セルフ監査</td>
+</tr>
+<tr>
+<td><code>雛形/</code></td>
+<td>テーマ生成用テンプレート一式（.tmpl）</td>
+</tr>
+<tr>
+<td><code>ビルド/</code></td>
+<td>MD→HTML ビルドシステム（build.mjs）</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="品質ゲート全新規テーマ共通" tabindex="-1">品質ゲート（全新規テーマ共通） <a class="header-anchor" href="#品質ゲート全新規テーマ共通" aria-hidden="true">#</a></h2>
+<ol>
+<li><code>node 規約/ビルド/build.mjs --check</code> がpass（NFD命名・リンク切れ・frontmatter欠落・H1複数 = 0件）</li>
+<li><a href="%E7%9B%A3%E6%9F%BB%E3%83%81%E3%82%A7%E3%83%83%E3%82%AF%E3%83%AA%E3%82%B9%E3%83%88.html">監査チェックリスト.md</a> のセルフ監査を完了</li>
+<li><code>00_ログイン/ログインコマンド.md</code> の全機器実ログイン確認（2026-06-30決定事項）</li>
+</ol>
+<h2 id="改訂ルール" tabindex="-1">改訂ルール <a class="header-anchor" href="#改訂ルール" aria-hidden="true">#</a></h2>
+<ul>
+<li>規約の変更は本フォルダ内ファイルの編集＋下表への追記で行う。雛形とスキルの二重管理は禁止（スキルは雛形を参照する）。</li>
+<li>改訂が既存テーマに影響する場合も遡及修正はせず、<code>提案_運用改善.md</code> に移行推奨として記録する。</li>
+</ul>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>日付</th>
+<th>変更</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-07-03</td>
+<td>初版制定（標準化プロジェクトWave 1）</td>
+</tr>
+</tbody>
+</table></div>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#適用範囲">適用範囲</a></li>
+<li class="lvl-2"><a href="#索引">索引</a></li>
+<li class="lvl-2"><a href="#品質ゲート全新規テーマ共通">品質ゲート（全新規テーマ共通）</a></li>
+<li class="lvl-2"><a href="#改訂ルール">改訂ルール</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

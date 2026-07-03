@@ -1,0 +1,50 @@
+graph TB
+    subgraph INTERNET["インターネット（模擬）"]
+        ISP["ISP<br/>Lo0: 8.8.8.8/32"]
+    end
+
+    subgraph BRANCH["支社（OSPF外・10.2.0.0/16）"]
+        BREDGE["BR-Edge (Cisco)<br/>WAN: 200.0.3.1<br/>LAN GW: 10.2.40.254"]
+        BRPC["br-pc<br/>10.2.40.100<br/>VLAN40"]
+        BREDGE --- BRPC
+    end
+
+    subgraph AREA0["OSPF Area 0（バックボーン）"]
+        FGT["FGT-Edge (FortiGate 7.2)<br/>WAN: 200.0.1.1<br/>デフォルトルート広報・SNAT"]
+        CORE1["Core1 (L3SW)<br/>Lo: 10.255.0.1"]
+        CORE2["Core2 (L3SW)<br/>Lo: 10.255.0.2"]
+        FGT ---|"P08: 10.0.0.28/30"| CORE1
+        FGT ---|"P09: 10.0.0.32/30"| CORE2
+        CORE1 ---|"P01: 10.0.0.0/30"| CORE2
+    end
+
+    subgraph AREA1["OSPF Area 1（A棟 10.10.0.0/16 ← ABRで集約）"]
+        DISTA1["Dist-A1 (ABR)<br/>HSRP Active / MST Root<br/>Lo: 10.255.0.11"]
+        DISTA2["Dist-A2 (ABR)<br/>HSRP Standby<br/>Lo: 10.255.0.12"]
+        VLAN10["VLAN10 営業部<br/>10.10.10.0/24<br/>GW(VIP): .254"]
+        VLAN20["VLAN20 開発部<br/>10.10.20.0/24<br/>GW(VIP): .254"]
+        DISTA1 ---|"VLAN901: 10.10.255.0/30<br/>(OSPF隣接)"| DISTA2
+        DISTA1 --- VLAN10
+        DISTA1 --- VLAN20
+        DISTA2 --- VLAN10
+        DISTA2 --- VLAN20
+    end
+
+    subgraph AREA2["OSPF Area 2（B棟 10.20.0.0/16 ← ABRで集約）"]
+        DISTB1["Dist-B1 (ABR・単機)<br/>Lo: 10.255.0.21"]
+        VLAN30["VLAN30 サーバ<br/>10.20.30.0/24 GW: .254<br/>srv-portal .20 / srv-file .10"]
+        VLAN99["VLAN99 運用管理<br/>10.20.99.0/24 GW: .254"]
+        DISTB1 --- VLAN30
+        DISTB1 --- VLAN99
+    end
+
+    ISP ---|"200.0.1.0/24"| FGT
+    ISP ---|"200.0.3.0/24"| BREDGE
+    FGT -.-|"IPsec VTI (IKEv2)<br/>172.16.40.0/30<br/>許可: 支社→VLAN30のみ"| BREDGE
+
+    CORE1 ---|"P02"| DISTA1
+    CORE1 ---|"P03"| DISTA2
+    CORE2 ---|"P04"| DISTA1
+    CORE2 ---|"P05"| DISTA2
+    CORE1 ---|"P06"| DISTB1
+    CORE2 ---|"P07"| DISTB1

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>要件定義書（Requirements Document）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>21_cisco_capstone</span>
+<span class="sep">/</span>
+<span>01_要件定義</span></nav>
+      <h1 class="doc-title">要件定義書（Requirements Document）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="1-プロジェクトの目的" tabindex="-1">1. プロジェクトの目的 <a class="header-anchor" href="#1-プロジェクトの目的" aria-hidden="true">#</a></h2>
+<p>株式会社XXX（架空）の事業拡大に伴い、現行の老朽化した社内ネットワークを刷新する。
+「止まらない（高可用性）」「守られる（セキュリティ）」「運用できる（拡張性・監視）」をテーマに、モダンな企業ネットワークインフラを構築する。</p>
+<h2 id="2-事業利用要件" tabindex="-1">2. 事業・利用要件 <a class="header-anchor" href="#2-事業利用要件" aria-hidden="true">#</a></h2>
+<h3 id="21-拠点および利用者数" tabindex="-1">2.1 拠点および利用者数 <a class="header-anchor" href="#21-拠点および利用者数" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>本社（Headquarters）</strong>: 約100名</li>
+<li><strong>支社（Branch）</strong>: 約20名</li>
+</ul>
+<h3 id="22-業務セグメント部署" tabindex="-1">2.2 業務セグメント（部署） <a class="header-anchor" href="#22-業務セグメント部署" aria-hidden="true">#</a></h3>
+<p>本社内はセキュリティとトラフィック管理の観点から、以下のセグメントに分割する。</p>
+<ul>
+<li>営業部（インターネットアクセス主体の一般業務）</li>
+<li>開発部（機密情報を取り扱う業務）</li>
+<li>サーバ群（社内システム・ファイルサーバ等）
+※支社は小規模なため、単一のLANセグメントとする。</li>
+</ul>
+<h3 id="23-拠点間の通信要件" tabindex="-1">2.3 拠点間の通信要件 <a class="header-anchor" href="#23-拠点間の通信要件" aria-hidden="true">#</a></h3>
+<ul>
+<li>支社のPCから、本社の「サーバ群」に対するアクセスを必須とする。</li>
+<li>支社から本社の「開発部」など、業務上不要なセグメントへのアクセスは制限する方針とする。</li>
+</ul>
+<h2 id="3-非機能要件" tabindex="-1">3. 非機能要件 <a class="header-anchor" href="#3-非機能要件" aria-hidden="true">#</a></h2>
+<h3 id="31-可用性sla" tabindex="-1">3.1 可用性（SLA） <a class="header-anchor" href="#31-可用性sla" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>本社コアネットワーク</strong>: 単一の機器やケーブルが故障しても、業務通信が停止しないこと（SPOFの排除）。</li>
+<li><strong>インターネット接続</strong>: メイン回線とサブ回線の2系統を契約し、メイン回線の障害時に自動でサブ回線へ迂回すること。</li>
+</ul>
+<h3 id="32-セキュリティ" tabindex="-1">3.2 セキュリティ <a class="header-anchor" href="#32-セキュリティ" aria-hidden="true">#</a></h3>
+<ul>
+<li>インターネット境界にはNAT（NAPT）を配置し、外部からの直接侵入を防ぐこと。</li>
+<li>拠点間（本社〜支社）の通信はインターネットを経由するため、必ず暗号化（VPN）して盗聴を防ぐこと。</li>
+</ul>
+<h3 id="33-運用保守性" tabindex="-1">3.3 運用・保守性 <a class="header-anchor" href="#33-運用保守性" aria-hidden="true">#</a></h3>
+<ul>
+<li>各フロアに将来VLANを追加しやすいよう、IPアドレスの体系を規則的に設計すること。</li>
+<li>（将来要件）各種監視プロトコル（SNMP/Syslog）を用いて障害を即座に検知できる基盤を想定しておくこと。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-プロジェクトの目的">1. プロジェクトの目的</a></li>
+<li class="lvl-2"><a href="#2-事業利用要件">2. 事業・利用要件</a></li>
+<li class="lvl-3"><a href="#21-拠点および利用者数">2.1 拠点および利用者数</a></li>
+<li class="lvl-3"><a href="#22-業務セグメント部署">2.2 業務セグメント（部署）</a></li>
+<li class="lvl-3"><a href="#23-拠点間の通信要件">2.3 拠点間の通信要件</a></li>
+<li class="lvl-2"><a href="#3-非機能要件">3. 非機能要件</a></li>
+<li class="lvl-3"><a href="#31-可用性sla">3.1 可用性（SLA）</a></li>
+<li class="lvl-3"><a href="#32-セキュリティ">3.2 セキュリティ</a></li>
+<li class="lvl-3"><a href="#33-運用保守性">3.3 運用・保守性</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

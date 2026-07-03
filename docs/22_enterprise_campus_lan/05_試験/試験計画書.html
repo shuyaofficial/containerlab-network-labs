@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>試験計画書 — テーマ22: 大規模キャンパス社内LAN</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>22_enterprise_campus_lan</span>
+<span class="sep">/</span>
+<span>05_試験</span></nav>
+      <h1 class="doc-title">試験計画書 — テーマ22: 大規模キャンパス社内LAN</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>結果・エビデンス列は試験実施時に記入し、完了後に <code>試験結果_YYYY-MM-DD.md</code> として成績をまとめること（テーマ21の形式を踏襲）。
+確認方法欄は「観点」のみ。具体的なコマンドは自分で選ぶこと（showコマンドのヒントは可、設定の答えは載せない）。</p>
+<p>2026-06-26時点: <code>fgt-edge</code> はFortiGate VMからCisco IOL HQ VPN edgeへ置換済み。T-105/T-602はCisco-Cisco IPsec VPNとして確認する。FortiGate policy/NAT前提の項目は旧Forti版またはASAv版へ戻す際の観点として扱う。</p>
+</blockquote>
+<h2 id="凡例" tabindex="-1">凡例 <a class="header-anchor" href="#凡例" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>区分</strong>: T-1xx=疎通(正常系) / T-2xx=構成ゲート(構築中) / T-3xx=L2 / T-4xx=L3・冗長 / T-5xx=セキュリティ / T-6xx=境界・VPN</li>
+<li><strong>判定</strong>: ✅合格 / ❌不合格 / —未実施</li>
+</ul>
+<hr>
+<h2 id="t-1xx-疎通試験正常系各フェーズの締め" tabindex="-1">T-1xx 疎通試験（正常系・各フェーズの締め） <a class="header-anchor" href="#t-1xx-疎通試験正常系各フェーズの締め" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>試験内容</th>
+<th>期待結果</th>
+<th>確認方法（観点）</th>
+<th>結果</th>
+<th>エビデンス</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-101</td>
+<td>pc-sales → srv-portal (10.20.30.20) HTTP</td>
+<td>ポータル画面のHTML取得成功</td>
+<td>ping＋curl</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-102</td>
+<td>pc-dev → srv-file (10.20.30.10) HTTP</td>
+<td>ファイル一覧の取得成功</td>
+<td>curl</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-103</td>
+<td>pc-sales → 8.8.8.8（インターネット模擬）</td>
+<td>Cisco置換版ではNAT未対象。FW/NAT版で再実施</td>
+<td>ping＋FW/NATセッション確認</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-104</td>
+<td>br-pc → 8.8.8.8</td>
+<td>ping成功（支社PAT経由）</td>
+<td>ping＋NAT変換テーブル</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-105</td>
+<td>br-pc → srv-portal (10.20.30.20)</td>
+<td>ping/HTTP成功（Cisco-Cisco VPN経由）</td>
+<td>ping＋HTTP 200確認</td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="t-2xx-構成ゲート構築中に都度確認" tabindex="-1">T-2xx 構成ゲート（構築中に都度確認） <a class="header-anchor" href="#t-2xx-構成ゲート構築中に都度確認" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>試験内容</th>
+<th>期待結果</th>
+<th>確認方法（観点）</th>
+<th>結果</th>
+<th>エビデンス</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-201</td>
+<td>コア〜ディストリ〜HQ edge間が<strong>ルーテッドリンク</strong>になっているか</td>
+<td>当該ポートがswitchportでなくL3ポートとして動作。STPがコアへ伸びていない</td>
+<td>IF状態とSTP参加状況の確認（L3SWのデフォルトはswitchport。基本設計§1の設計ゲート）</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-202</td>
+<td>EtherChannelがLACPでバンドルされているか</td>
+<td>Po1が(SU)・メンバーポートが(P)状態</td>
+<td>EtherChannelサマリ確認（mode onは禁止・quirks Issue 1）</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-203</td>
+<td>OSPF隣接の確立（Cisco同士）</td>
+<td>設計どおりの隣接がFULL</td>
+<td>ネイバーテーブルを設計（基本設計§4.1）と突合</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-204</td>
+<td>HQ VPN edge⇔core1/core2のOSPF隣接</td>
+<td>両リンクともFULL</td>
+<td>両側から確認。Cisco置換版ではE0/2/E0/3をpoint-to-pointで揃える</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-205</td>
+<td>デフォルトルートの全社配布</td>
+<td>Cisco置換版では未投入。インターネット模擬を復旧する場合に実施</td>
+<td>経路種別（O*E1/E2等）と次ホップの確認</td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="t-3xx-l2試験mstアクセス層" tabindex="-1">T-3xx L2試験（MST・アクセス層） <a class="header-anchor" href="#t-3xx-l2試験mstアクセス層" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>試験内容</th>
+<th>期待結果</th>
+<th>確認方法（観点）</th>
+<th>結果</th>
+<th>エビデンス</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-301</td>
+<td>MSTリージョンの一致（A棟4台/B棟2台）</td>
+<td>棟内全SWが同一リージョンとして認識（境界なし）</td>
+<td>Region名/Revision/マッピングのダイジェスト一致確認（基本設計§3.1の設計ゲート）</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-302</td>
+<td>MSTのRootとブロッキングポート</td>
+<td>Root=dist-a1（A棟）/dist-b1（B棟）。アクセスSWの上位片側がブロック</td>
+<td>シート②の「予想」と実測の答え合わせ</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-303</td>
+<td>ポートセキュリティ違反時の動作</td>
+<td>設定した違反動作（err-disable等）が発動し、不正端末が通信不能</td>
+<td>エンドポイントのMACを偽装/付け替えて違反を誘発</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-304</td>
+<td>アクセス上位リンク断のL2切替</td>
+<td>acc-a1のActive上位リンク断→ブロック側がフォワーディングへ遷移し疎通回復</td>
+<td>断時間も計測（pingの欠け数）</td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="t-4xx-l3冗長試験-本テーマの山場" tabindex="-1">T-4xx L3・冗長試験 ★本テーマの山場 <a class="header-anchor" href="#t-4xx-l3冗長試験-本テーマの山場" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>試験内容</th>
+<th>期待結果</th>
+<th>確認方法（観点）</th>
+<th>結果</th>
+<th>エビデンス</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-401</td>
+<td>マルチエリアの経路種別</td>
+<td>コアでA/B棟経路が**エリア間経路(O IA)**として見える</td>
+<td>経路テーブルの種別確認</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-402</td>
+<td><strong>経路集約の効果</strong></td>
+<td>コアの経路テーブルに棟内/24が並ばず、10.10.0.0/16・10.20.0.0/16の<strong>各1本のみ</strong></td>
+<td>集約設定前後の経路数を比較記録（ビフォーアフターが最高のエビデンス）</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-403</td>
+<td>集約とdiscard route（ブラックホール対策）</td>
+<td>ABR上に集約プレフィックス宛Null0経路が存在。具体経路喪失時に集約宛パケットがループしない</td>
+<td>ABRの経路テーブルでNull0確認→A棟VLANを停止して挙動観測（基本設計§4.2の既知問題）</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-404</td>
+<td>上位リンク断とHSRP連動＋<strong>L2/L3非対称の観察</strong></td>
+<td>dist-a1の上位2本断→トラッキングでdist-a2がActiveへ。<strong>ただしMST Rootはdist-a1のまま</strong>＝L2フローとL3フローの非対称を観測</td>
+<td>HSRP状態遷移と、pc-salesからの実際のフレーム経路を観察（基本設計§5の学習ポイント）</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-405</td>
+<td>戻り経路の非対称（ECMP）</td>
+<td>コア→A棟がECMPのため、戻りがdist-a2（Standby）を通るフローが存在しても通信成立</td>
+<td>両ディストリでパケット転送を観測（基本設計§4.3の意図的許容）</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-406</td>
+<td>HSRPフェイルオーバ</td>
+<td>dist-a1停止→dist-a2がActive昇格、pc-salesの通信が数秒以内に回復</td>
+<td>ping連打中に障害注入、断時間計測</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-407</td>
+<td>dist-a1復旧時のpreempt</td>
+<td>dist-a1復帰→Active権がdist-a1へ戻る</td>
+<td>状態遷移ログ</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-408</td>
+<td>LACP片系断</td>
+<td>Po1メンバー1本断→残り1本で通信継続（瞬断レベル）</td>
+<td>断時間計測</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-409</td>
+<td>コア片系停止</td>
+<td>core1停止→全棟間・境界向き通信が core2 経由で継続</td>
+<td>経路再収束の確認</td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="t-5xx-セキュリティ試験" tabindex="-1">T-5xx セキュリティ試験 <a class="header-anchor" href="#t-5xx-セキュリティ試験" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>試験内容</th>
+<th>期待結果</th>
+<th>確認方法（観点）</th>
+<th>結果</th>
+<th>エビデンス</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-501</td>
+<td>営業⇔開発の直接通信制限</td>
+<td>要件2.3どおり制限される（サーバ・インターネット向けは許可のまま）</td>
+<td>pc-sales⇔pc-devで拒否、T-101/103が引き続き成功すること</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-502</td>
+<td>支社→開発部の通信拒否</td>
+<td>Cisco置換版ではFW policy対象外。ACL/ASAv/Forti版で再実施</td>
+<td>ping/curlで不達確認＋ACL/FWログ</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-503</td>
+<td><strong>HSRP切替後もACLが有効か</strong></td>
+<td>dist-a2がActiveの状態でもT-501が成立</td>
+<td>dist-a1停止→T-501再実施（ACLの片側適用漏れ検出。基本設計§8）</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-504</td>
+<td>インターネット→社内の拒否</td>
+<td>ISP側から社内への新規通信が全て拒否</td>
+<td>ISPから社内宛にping/接続試行</td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="t-6xx-境界vpn試験" tabindex="-1">T-6xx 境界・VPN試験 <a class="header-anchor" href="#t-6xx-境界vpn試験" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>試験内容</th>
+<th>期待結果</th>
+<th>確認方法（観点）</th>
+<th>結果</th>
+<th>エビデンス</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-601</td>
+<td>SNATの動作</td>
+<td>Cisco置換版では対象外（FortiGate/ASAv版で再実施）</td>
+<td>ISP側でキャプチャ or FWセッションテーブル</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-602</td>
+<td><strong>拠点間通信の暗号化</strong></td>
+<td>br-pc⇔srv-portalの通信が、ISP上ではESPのみ見え平文が見えない（Cisco-Cisco VPN）</td>
+<td>ISPを通るリンクでtcpdump（テーマ21のfailover_test.pcapの手法を応用）</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-603</td>
+<td><strong>interopトラブルシュート演習（意図的破壊）</strong></td>
+<td>Cisco-Cisco版ではPSK/プロポーザル不一致を確認。Forti interop版は別途再挑戦</td>
+<td>両側のVPNログ/デバッグを突き合わせる</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td>T-604</td>
+<td>VPNポリシーの通信先限定</td>
+<td>Cisco置換版ではFW policy対象外。支社→他セグメント拒否はACL/ASAv/Forti版で実施</td>
+<td>許可/拒否の対比表を作る</td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="合格基準" tabindex="-1">合格基準 <a class="header-anchor" href="#合格基準" aria-hidden="true">#</a></h2>
+<ul>
+<li>T-1xx〜T-6xx の必須項目（T-405/T-603は観察・演習項目）がすべて✅</li>
+<li><strong>エビデンス</strong>（コマンド出力・キャプチャ・断時間）が試験結果ファイルに残っていること</li>
+<li>終了後: <code>試験結果_YYYY-MM-DD.md</code> 作成 → 振り返り → <code>ロードマップ/進捗管理.md</code> 更新</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#凡例">凡例</a></li>
+<li class="lvl-2"><a href="#t-1xx-疎通試験正常系各フェーズの締め">T-1xx 疎通試験（正常系・各フェーズの締め）</a></li>
+<li class="lvl-2"><a href="#t-2xx-構成ゲート構築中に都度確認">T-2xx 構成ゲート（構築中に都度確認）</a></li>
+<li class="lvl-2"><a href="#t-3xx-l2試験mstアクセス層">T-3xx L2試験（MST・アクセス層）</a></li>
+<li class="lvl-2"><a href="#t-4xx-l3冗長試験-本テーマの山場">T-4xx L3・冗長試験 ★本テーマの山場</a></li>
+<li class="lvl-2"><a href="#t-5xx-セキュリティ試験">T-5xx セキュリティ試験</a></li>
+<li class="lvl-2"><a href="#t-6xx-境界vpn試験">T-6xx 境界・VPN試験</a></li>
+<li class="lvl-2"><a href="#合格基準">合格基準</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

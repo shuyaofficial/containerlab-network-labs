@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>🚀 Challenge 07: BGPインバウンド制御（AS Path Prepend）＆ BFD超高速障害検知</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>07_cisco_bgp_route_control</span></nav>
+      <h1 class="doc-title">🚀 Challenge 07: BGPインバウンド制御（AS Path Prepend）＆ BFD超高速障害検知</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>本ラボは、物理結線のみが完了した「まっさらなルータ5台」を使い、BGPの経路制御の中でも最高峰に重要な**「インバウンド（外部から社内に入ってくる）トラフィックの制御」<strong>と、</strong>「BFD（Bidirectional Forwarding Detection）による超高速な障害検知」**を組み合わせた、実務レベルの高度なハンズオン課題です。</p>
+<p>あなたが提供してくれた**「ネットワーク技術分析カタログ（RFC）」<strong>および</strong>「rfc5880.txt」**のリファレンスをフルに活かして、プロフェッショナルなインフラ設計を体験しましょう！</p>
+<hr>
+<h2 id="-トポロジーと設計要件" tabindex="-1">🗺️ トポロジーと設計要件 <a class="header-anchor" href="#-トポロジーと設計要件" aria-hidden="true">#</a></h2>
+<pre><code>     [ ISP-A (AS 65001) ]            [ ISP-B (AS 65003) ]
+     (Loopback: 8.8.8.8/32)          (Loopback: 8.8.8.8/32)
+        |                               |
+        | eBGP (192.168.11.0/24)        | eBGP (192.168.22.0/24)
+        | (BFD 100ms 監視エリア)        |
+        |                               |
+     [ R1 (AS 65002) ] ============== [ R2 (AS 65002) ]
+     社内境界ルータ1  (iBGP / OSPF)   社内境界ルータ2
+       \                               /
+        \ OSPF (192.168.13.0/24)      / OSPF (192.168.23.0/24)
+         \                           /
+          \                         /
+                    [ R3 ] AS 65002
+                    社内PC/コアスイッチ
+                    (Loopback0: 3.3.3.3/32)
+</code></pre>
+<h3 id="1-インターフェースip設計" tabindex="-1">1. インターフェースIP設計 <a class="header-anchor" href="#1-インターフェースip設計" aria-hidden="true">#</a></h3>
+<p>（前回の構成と全く同じ物理結線・IP設計です。コピペ用IP集を使って一瞬で立ち上げられます！）</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>デバイス</th>
+<th>インターフェース</th>
+<th>IPアドレス / サブネット</th>
+<th>役割・プロトコル</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ISP-A</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.11.100/24</code></td>
+<td>R1接続用（eBGP）</td>
+</tr>
+<tr>
+<td><strong>ISP-A</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>8.8.8.8/32</code></td>
+<td>仮想DNSサーバ</td>
+</tr>
+<tr>
+<td><strong>ISP-B</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.22.100/24</code></td>
+<td>R2接続用（eBGP）</td>
+</tr>
+<tr>
+<td><strong>ISP-B</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>8.8.8.8/32</code></td>
+<td>仮想DNSサーバ</td>
+</tr>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.11.1/24</code></td>
+<td>ISP-A接続用（eBGP）</td>
+</tr>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Ethernet0/2</code></td>
+<td><code>192.168.12.1/24</code></td>
+<td>R2接続用（OSPF &amp; iBGP）</td>
+</tr>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Ethernet0/3</code></td>
+<td><code>192.168.13.1/24</code></td>
+<td>R3接続用（OSPF）</td>
+</tr>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>1.1.1.1/32</code></td>
+<td>iBGPピア用</td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.22.2/24</code></td>
+<td>ISP-B接続用（eBGP）</td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Ethernet0/2</code></td>
+<td><code>192.168.12.2/24</code></td>
+<td>R1接続用（OSPF &amp; iBGP）</td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Ethernet0/3</code></td>
+<td><code>192.168.23.2/24</code></td>
+<td>R3接続用（OSPF）</td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>2.2.2.2/32</code></td>
+<td>iBGPピア用</td>
+</tr>
+<tr>
+<td><strong>R3</strong></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.13.3/24</code></td>
+<td>R1接続用（OSPF）</td>
+</tr>
+<tr>
+<td><strong>R3</strong></td>
+<td><code>Ethernet0/2</code></td>
+<td><code>192.168.23.3/24</code></td>
+<td>R2接続用（OSPF）</td>
+</tr>
+<tr>
+<td><strong>R3</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>3.3.3.3/32</code></td>
+<td>社内テストPC</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="-3つのミッション" tabindex="-1">🎯 3つのミッション <a class="header-anchor" href="#-3つのミッション" aria-hidden="true">#</a></h2>
+<h3 id="mission-1-基本インフラの構築再配布とデフォルトインバウンド挙動の観測" tabindex="-1">Mission 1: 基本インフラの構築（再配布とデフォルトインバウンド挙動の観測） <a class="header-anchor" href="#mission-1-基本インフラの構築再配布とデフォルトインバウンド挙動の観測" aria-hidden="true">#</a></h3>
+<ol>
+<li>各ルータのインターフェースおよびLoopbackにIPを設定し、OSPFおよびBGP（eBGP/iBGP）を確立します。</li>
+<li><strong>OSPF再配布（Redistribution）の導入</strong>:
+<ul>
+<li>前回学んだ教訓を活かし、BGPの <code>network</code> コマンドで個別に登録する代わりに、<strong><code>redistribute ospf 1</code></strong> を使って社内ネットワーク（<code>1.1.1.1</code>, <code>2.2.2.2</code>, <code>3.3.3.3</code> など）をスマートにBGPへ流し込み、ISP-AとISP-Bに広告します。</li>
+<li><strong>R1/R2での設定コマンドヒント</strong>:<pre><code class="language-ios">router bgp 65002
+ redistribute ospf 1
+</code></pre>
+</li>
+</ul>
+</li>
+<li><strong>デフォルトルートの広報（復習）</strong>:
+<ul>
+<li>通常時にR3がヘアピン遠回りしないよう、R1とR2で適切にデフォルトルートを広報します（メトリック制御とIP SLA/Trackによる自動停止を組み込みます）。
+<ul>
+<li>R1: <code>default-information originate metric 10</code> (SLA/Track連動)</li>
+<li>R2: <code>default-information originate metric 100</code> (SLA/Track連動または通常スタティック)</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>観測ポイント</strong>:
+<ul>
+<li>外部（<strong>ISP-B</strong>）のルータから、社内の R3（<code>3.3.3.3</code>）宛てに <code>traceroute</code> を実行します。</li>
+<li>デフォルト状態では、<code>3.3.3.3/32</code> へのルートが「R2経由（eBGP）」と「ISP-A ➔ R1経由（iBGP）」で同じASパス長（AS65002のみ）に見えるため、BGPの選定基準により <strong><code>ISP-B ➔ R2</code> へ直接（最短）でパケットが入ってくる</strong>ことを確認します。</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h3 id="mission-2-as-path-prepend-によるインバウンドトラフィック制御" tabindex="-1">Mission 2: AS Path Prepend によるインバウンドトラフィック制御 <a class="header-anchor" href="#mission-2-as-path-prepend-によるインバウンドトラフィック制御" aria-hidden="true">#</a></h3>
+<p>企業ポリシー <strong>「インターネット（外部）から社内（<code>3.3.3.3</code>）に入ってくるパケットも、通常時はすべて ISP-A ➔ R1 からのメインルートを通し、R2 ➔ ISP-B ルートは完全なバックアップ（休眠）にする」</strong> を満たす制御を実装します。</p>
+<ol>
+<li>**R2（バックアップ側）**において、上流の ISP-B（<code>192.168.22.100</code>）へルートを広告する際、自身のAS番号（<code>65002</code>）を複数回追加（Prepend）して広告することで、ルートをわざと「ものすごく遠く」見せかけます。
+<ul>
+<li><strong>R2での設定コマンドヒント</strong>:<pre><code class="language-ios">! --- route-mapを作成し、AS Pathを3つ追加（自身を4重にする）します ---
+route-map AS_PREPEND permit 10
+ set as-path prepend 65002 65002 65002
+!
+router bgp 65002
+ ! --- 対向ISP-Bへの「送信（out）」方向にroute-mapを適用します ---
+ neighbor 192.168.22.100 route-map AS_PREPEND out
+</code></pre>
+</li>
+<li>設定後、BGPのソフトクリア（<code>clear ip bgp * soft out</code>）を実行します。</li>
+</ul>
+</li>
+<li><strong>観測ポイント</strong>:
+<ul>
+<li><strong>ISP-B</strong> で <code>show ip bgp</code> を実行し、<code>3.3.3.3/32</code> の AS Path が <strong><code>65002 65002 65002 65002</code></strong> に肥大化していることを目撃します！</li>
+<li><strong>ISP-B</strong> から <code>traceroute 3.3.3.3</code> を実行した際、パケットが目の前のR2に直接入らず、**<code>ISP-B ➔ ISP-A ➔ R1 ➔ R3</code> という「AS Pathが短い方」を大きく迂回して入ってくる（インバウンドがR1経由に一本化された）**様子を観測します！</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h3 id="mission-3-bfdbidirectional-forwarding-detectionによる超高速障害検知rfc-5880準拠" tabindex="-1">Mission 3: BFD（Bidirectional Forwarding Detection）による超高速障害検知（RFC 5880準拠） <a class="header-anchor" href="#mission-3-bfdbidirectional-forwarding-detectionによる超高速障害検知rfc-5880準拠" aria-hidden="true">#</a></h3>
+<p>通常のBGPは、隣接リンクの物理断を検知できない中間スイッチなどを挟む障害の場合、ホールドタイム（デフォルト180秒）が切れるまで相手のダウンを検知できません。
+これをミリ秒単位で超高速検知し、瞬時に迂回させるため、<strong>R1 ➔ ISP-A 間</strong>に <strong>BFD</strong> を導入します。</p>
+<ol>
+<li><strong>R1</strong> と <strong>ISP-A</strong> の両方で、接続ポートに BFD 監視を有効化し、BGPネイバーと連動させます。
+<ul>
+<li><strong>設定コマンドヒント (R1 / ISP-A 共通)</strong>:<pre><code class="language-ios">! --- インターフェース設定 ---
+interface Ethernet0/1
+ ! 100ms間隔で送信、100ms間隔で受信を期待、3回無応答（計300ms）でダウン判定
+ bfd interval 100 min_rx 100 multiplier 3
+exit
+!
+! --- BGP設定でBFDと連動させる ---
+router bgp &lt;AS番号&gt;
+ neighbor &lt;対向IP&gt; fall-over bfd
+</code></pre>
+</li>
+</ul>
+</li>
+<li><strong>観測ポイント</strong>:
+<ul>
+<li><strong>R1</strong> で <code>show bfd neighbors</code> を実行し、BFDのステータスが <code>Active / Up</code> になってミリ秒単位での超高速監視が始まっていることを確認します。</li>
+<li>R3（<code>3.3.3.3</code>）から ISP-A の <code>8.8.8.8</code> に向けて <code>ping 8.8.8.8 repeat 1000</code> を流しっぱなしにします。</li>
+<li>その状態で、R1とISP-Aの接続ポートを <code>shutdown</code> し、<strong>Pingがほとんど1発も落ちることなく（わずか300ms未満で）超高速で R2 ➔ ISP-B へ迂回フェイルオーバーする瞬間</strong>を目撃します！</li>
+</ul>
+</li>
+</ol>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-トポロジーと設計要件">🗺️ トポロジーと設計要件</a></li>
+<li class="lvl-3"><a href="#1-インターフェースip設計">1. インターフェースIP設計</a></li>
+<li class="lvl-2"><a href="#-3つのミッション">🎯 3つのミッション</a></li>
+<li class="lvl-3"><a href="#mission-1-基本インフラの構築再配布とデフォルトインバウンド挙動の観測">Mission 1: 基本インフラの構築（再配布とデフォルトインバウンド挙動の観測）</a></li>
+<li class="lvl-3"><a href="#mission-2-as-path-prepend-によるインバウンドトラフィック制御">Mission 2: AS Path Prepend によるインバウンドトラフィック制御</a></li>
+<li class="lvl-3"><a href="#mission-3-bfdbidirectional-forwarding-detectionによる超高速障害検知rfc-5880準拠">Mission 3: BFD（Bidirectional Forwarding Detection）による超高速障害検知（RFC 5880準拠）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

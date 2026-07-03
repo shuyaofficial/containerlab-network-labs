@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>パラメータシート② L2・MST・HSRP編（記入済）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>22_enterprise_campus_lan</span>
+<span class="sep">/</span>
+<span>03_詳細設計</span></nav>
+      <h1 class="doc-title">パラメータシート② L2・MST・HSRP編（記入済）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="1-vlan定義" tabindex="-1">1. VLAN定義 <a class="header-anchor" href="#1-vlan定義" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>VLAN ID</th>
+<th>名前</th>
+<th>定義するスイッチ</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10</td>
+<td>営業部</td>
+<td>dist-a1, dist-a2, acc-a1</td>
+<td>営業部</td>
+</tr>
+<tr>
+<td>20</td>
+<td>開発部</td>
+<td>dist-a1, dist-a2, acc-a2</td>
+<td>開発部</td>
+</tr>
+<tr>
+<td>901</td>
+<td>OSPF連携</td>
+<td>dist-a1, dist-a2</td>
+<td>ディストリ間L3連携</td>
+</tr>
+<tr>
+<td>30</td>
+<td>サーバ</td>
+<td>dist-b1, acc-b1</td>
+<td>サーバ</td>
+</tr>
+<tr>
+<td>99</td>
+<td>管理</td>
+<td>dist-b1</td>
+<td>運用管理</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="2-etherchannel" tabindex="-1">2. EtherChannel <a class="header-anchor" href="#2-etherchannel" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Po番号</th>
+<th>機器ペア</th>
+<th>メンバーポート</th>
+<th>モード</th>
+<th>トランク許可VLAN</th>
+<th>投入✅</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>dist-a1 ⇔ dist-a2</td>
+<td>e0/3, e0/4</td>
+<td>active</td>
+<td>10, 20, 901</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>1</td>
+<td>dist-b1 ⇔ acc-b1</td>
+<td>e0/3, e1/0 (acc-b1側 e0/1, e0/2)</td>
+<td>active</td>
+<td>30</td>
+<td><input type="checkbox"></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="3-mst" tabindex="-1">3. MST <a class="header-anchor" href="#3-mst" aria-hidden="true">#</a></h2>
+<h3 id="a棟リージョンdist-a1--dist-a2--acc-a1--acc-a2-の4台共通" tabindex="-1">A棟リージョン（dist-a1 / dist-a2 / acc-a1 / acc-a2 の4台共通） <a class="header-anchor" href="#a棟リージョンdist-a1--dist-a2--acc-a1--acc-a2-の4台共通" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>設計値（基本設計より）</th>
+<th>記入値</th>
+<th>投入✅</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Region名</td>
+<td>CAMPUS-A</td>
+<td>CAMPUS-A</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>Revision</td>
+<td>1</td>
+<td>1</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>インスタンス→VLANマッピング</td>
+<td>MST1 = VLAN 10,20,901</td>
+<td>instance 1 vlan 10,20,901</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>Root Primary（MST1）</td>
+<td>dist-a1</td>
+<td>priority: 4096</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>Root Secondary（MST1）</td>
+<td>dist-a2</td>
+<td>priority: 8192</td>
+<td><input type="checkbox"></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="b棟リージョンdist-b1--acc-b1-の2台共通" tabindex="-1">B棟リージョン（dist-b1 / acc-b1 の2台共通） <a class="header-anchor" href="#b棟リージョンdist-b1--acc-b1-の2台共通" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>設計値（基本設計より）</th>
+<th>記入値</th>
+<th>投入✅</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Region名</td>
+<td>CAMPUS-B</td>
+<td>CAMPUS-B</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>Revision</td>
+<td>1</td>
+<td>1</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>インスタンス→VLANマッピング</td>
+<td>MST1 = VLAN 30,99</td>
+<td>instance 1 vlan 30,99</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>Root（MST1）</td>
+<td>dist-b1</td>
+<td>priority: 4096</td>
+<td><input type="checkbox"></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="予想されるブロッキングポート記入してから構築で答え合わせ" tabindex="-1">予想されるブロッキングポート（記入してから構築で答え合わせ） <a class="header-anchor" href="#予想されるブロッキングポート記入してから構築で答え合わせ" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>場所</th>
+<th>予想</th>
+<th>実測</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>acc-a1 の上位2本のうちブロックされる側</td>
+<td>dist-a2側 (e0/2)</td>
+<td>□</td>
+</tr>
+<tr>
+<td>acc-a2 の上位2本のうちブロックされる側</td>
+<td>dist-a2側 (e0/2)</td>
+<td>□</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="4-hsrpa棟" tabindex="-1">4. HSRP（A棟） <a class="header-anchor" href="#4-hsrpa棟" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>VLAN</th>
+<th>グループ番号</th>
+<th>VIP</th>
+<th>Active機 / 優先度</th>
+<th>Standby機 / 優先度</th>
+<th>preempt</th>
+<th>トラッキング対象 / 減算値</th>
+<th>投入✅</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10</td>
+<td>10</td>
+<td>10.10.10.254</td>
+<td>dist-a1 / 110</td>
+<td>dist-a2 / 90</td>
+<td>yes</td>
+<td>e0/1, e0/2 / 20</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>20</td>
+<td>20</td>
+<td>10.10.20.254</td>
+<td>dist-a1 / 110</td>
+<td>dist-a2 / 90</td>
+<td>yes</td>
+<td>e0/1, e0/2 / 20</td>
+<td><input type="checkbox"></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="5-ポートセキュリティアクセス層保護" tabindex="-1">5. ポートセキュリティ・アクセス層保護 <a class="header-anchor" href="#5-ポートセキュリティアクセス層保護" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>機器</th>
+<th>ポート</th>
+<th>最大MAC数</th>
+<th>違反時動作</th>
+<th>未使用ポート処置</th>
+<th>投入✅</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>acc-a1</td>
+<td>E0/3</td>
+<td>1</td>
+<td>restrict</td>
+<td>shutdown</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>acc-a2</td>
+<td>E0/3</td>
+<td>1</td>
+<td>restrict</td>
+<td>shutdown</td>
+<td><input type="checkbox"></td>
+</tr>
+<tr>
+<td>acc-b1</td>
+<td>E0/3, E1/0</td>
+<td>1</td>
+<td>restrict</td>
+<td>shutdown</td>
+<td><input type="checkbox"></td>
+</tr>
+</tbody>
+</table></div>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-vlan定義">1. VLAN定義</a></li>
+<li class="lvl-2"><a href="#2-etherchannel">2. EtherChannel</a></li>
+<li class="lvl-2"><a href="#3-mst">3. MST</a></li>
+<li class="lvl-3"><a href="#a棟リージョンdist-a1--dist-a2--acc-a1--acc-a2-の4台共通">A棟リージョン（dist-a1 / dist-a2 / acc-a1 / acc-a2 の4台共通）</a></li>
+<li class="lvl-3"><a href="#b棟リージョンdist-b1--acc-b1-の2台共通">B棟リージョン（dist-b1 / acc-b1 の2台共通）</a></li>
+<li class="lvl-3"><a href="#予想されるブロッキングポート記入してから構築で答え合わせ">予想されるブロッキングポート（記入してから構築で答え合わせ）</a></li>
+<li class="lvl-2"><a href="#4-hsrpa棟">4. HSRP（A棟）</a></li>
+<li class="lvl-2"><a href="#5-ポートセキュリティアクセス層保護">5. ポートセキュリティ・アクセス層保護</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

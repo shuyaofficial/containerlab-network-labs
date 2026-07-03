@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>パラメータシート（詳細設計）— Theme 24: Routed Access Campus LAN</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>24_campus_routed_access</span>
+<span class="sep">/</span>
+<span>03_詳細設計</span></nav>
+      <h1 class="doc-title">パラメータシート（詳細設計）— Theme 24: Routed Access Campus LAN</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>設計値をIOS/Linuxの設定へ変換する作業は学習者が行います。本書にコンフィグコマンドやstartup-configは記載しません。</p>
+</blockquote>
+<h2 id="1-共通ルーティング設計" tabindex="-1">1. 共通ルーティング設計 <a class="header-anchor" href="#1-共通ルーティング設計" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>設計値</th>
+<th>投入・確認</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IGP</td>
+<td>OSPFv2</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>Process ID</td>
+<td>1</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>Area</td>
+<td>0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>Router ID</td>
+<td>各ノードのLoopback0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>インフラNetwork Type</td>
+<td>Point-to-Point</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>Core—Accessコスト</td>
+<td>全リンク同一</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>利用者セグメント</td>
+<td>広告するが隣接形成しない</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>最大ECMP経路</td>
+<td>2経路以上</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="2-core1" tabindex="-1">2. core1 <a class="header-anchor" href="#2-core1" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF</th>
+<th>接続先</th>
+<th>種別</th>
+<th style="text-align:right">IP設計値</th>
+<th>OSPF</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E0/1 (<code>eth1</code>)</td>
+<td>access1 E0/1</td>
+<td>Routed P2P</td>
+<td style="text-align:right">10.24.0.1/30</td>
+<td>area 0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>E0/2 (<code>eth2</code>)</td>
+<td>access2 E0/1</td>
+<td>Routed P2P</td>
+<td style="text-align:right">10.24.0.9/30</td>
+<td>area 0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>E0/3 (<code>eth3</code>)</td>
+<td>core2 E0/3</td>
+<td>Routed P2P</td>
+<td style="text-align:right">10.24.0.17/30</td>
+<td>area 0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>—</td>
+<td>Loopback</td>
+<td style="text-align:right">10.24.255.1/32</td>
+<td>area 0</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="3-core2" tabindex="-1">3. core2 <a class="header-anchor" href="#3-core2" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF</th>
+<th>接続先</th>
+<th>種別</th>
+<th style="text-align:right">IP設計値</th>
+<th>OSPF</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E0/1 (<code>eth1</code>)</td>
+<td>access1 E0/2</td>
+<td>Routed P2P</td>
+<td style="text-align:right">10.24.0.5/30</td>
+<td>area 0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>E0/2 (<code>eth2</code>)</td>
+<td>access2 E0/2</td>
+<td>Routed P2P</td>
+<td style="text-align:right">10.24.0.13/30</td>
+<td>area 0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>E0/3 (<code>eth3</code>)</td>
+<td>core1 E0/3</td>
+<td>Routed P2P</td>
+<td style="text-align:right">10.24.0.18/30</td>
+<td>area 0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>—</td>
+<td>Loopback</td>
+<td style="text-align:right">10.24.255.2/32</td>
+<td>area 0</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="4-access1" tabindex="-1">4. access1 <a class="header-anchor" href="#4-access1" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF</th>
+<th>接続先</th>
+<th>種別</th>
+<th style="text-align:right">IP設計値</th>
+<th>OSPF</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E0/1 (<code>eth1</code>)</td>
+<td>core1 E0/1</td>
+<td>Routed P2P</td>
+<td style="text-align:right">10.24.0.2/30</td>
+<td>area 0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>E0/2 (<code>eth2</code>)</td>
+<td>core2 E0/1</td>
+<td>Routed P2P</td>
+<td style="text-align:right">10.24.0.6/30</td>
+<td>area 0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>E0/3 (<code>eth3</code>)</td>
+<td>pc-a eth1</td>
+<td>利用者GW</td>
+<td style="text-align:right">10.24.10.1/24</td>
+<td>広告・隣接なし</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>—</td>
+<td>Loopback</td>
+<td style="text-align:right">10.24.255.11/32</td>
+<td>area 0</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="5-access2" tabindex="-1">5. access2 <a class="header-anchor" href="#5-access2" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>IF</th>
+<th>接続先</th>
+<th>種別</th>
+<th style="text-align:right">IP設計値</th>
+<th>OSPF</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>E0/1 (<code>eth1</code>)</td>
+<td>core1 E0/2</td>
+<td>Routed P2P</td>
+<td style="text-align:right">10.24.0.10/30</td>
+<td>area 0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>E0/2 (<code>eth2</code>)</td>
+<td>core2 E0/2</td>
+<td>Routed P2P</td>
+<td style="text-align:right">10.24.0.14/30</td>
+<td>area 0</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>E0/3 (<code>eth3</code>)</td>
+<td>pc-b eth1</td>
+<td>利用者GW</td>
+<td style="text-align:right">10.24.20.1/24</td>
+<td>広告・隣接なし</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>Loopback0</td>
+<td>—</td>
+<td>Loopback</td>
+<td style="text-align:right">10.24.255.12/32</td>
+<td>area 0</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="6-endpoint" tabindex="-1">6. Endpoint <a class="header-anchor" href="#6-endpoint" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>IF</th>
+<th style="text-align:right">IP設計値</th>
+<th>GW / 対向経路</th>
+<th>投入</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pc-a</td>
+<td>eth1</td>
+<td style="text-align:right">10.24.10.10/24</td>
+<td>access1の10.24.10.1</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>pc-b</td>
+<td>eth1</td>
+<td style="text-align:right">10.24.20.10/24</td>
+<td>access2の10.24.20.1</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="7-ecmp確認値" tabindex="-1">7. ECMP確認値 <a class="header-anchor" href="#7-ecmp確認値" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>確認元</th>
+<th>宛先</th>
+<th>正常時ネクストホップ</th>
+<th>障害時</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>access1</td>
+<td>10.24.20.0/24</td>
+<td>core1、core2</td>
+<td>残存Coreのみ</td>
+</tr>
+<tr>
+<td>access2</td>
+<td>10.24.10.0/24</td>
+<td>core1、core2</td>
+<td>残存Coreのみ</td>
+</tr>
+<tr>
+<td>access1</td>
+<td>10.24.255.12/32</td>
+<td>core1、core2</td>
+<td>残存Coreのみ</td>
+</tr>
+<tr>
+<td>access2</td>
+<td>10.24.255.11/32</td>
+<td>core1、core2</td>
+<td>残存Coreのみ</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="8-構築チェック" tabindex="-1">8. 構築チェック <a class="header-anchor" href="#8-構築チェック" aria-hidden="true">#</a></h2>
+<ul>
+<li>[ ] IPアドレス管理表との照合</li>
+<li>[ ] インフラ5リンクのL3化</li>
+<li>[ ] 4台のLoopback0作成</li>
+<li>[ ] OSPF Router ID固定</li>
+<li>[ ] OSPF隣接確認</li>
+<li>[ ] 対向利用者セグメントのECMP確認</li>
+<li>[ ] pc-a / pc-bのIP・経路設定</li>
+<li>[ ] E2E疎通</li>
+<li>[ ] 単一リンク障害試験</li>
+<li>[ ] core1障害・復旧試験</li>
+<li>[ ] 設定保存</li>
+<li>[ ] 試験結果とAAR記録</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-共通ルーティング設計">1. 共通ルーティング設計</a></li>
+<li class="lvl-2"><a href="#2-core1">2. core1</a></li>
+<li class="lvl-2"><a href="#3-core2">3. core2</a></li>
+<li class="lvl-2"><a href="#4-access1">4. access1</a></li>
+<li class="lvl-2"><a href="#5-access2">5. access2</a></li>
+<li class="lvl-2"><a href="#6-endpoint">6. Endpoint</a></li>
+<li class="lvl-2"><a href="#7-ecmp確認値">7. ECMP確認値</a></li>
+<li class="lvl-2"><a href="#8-構築チェック">8. 構築チェック</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

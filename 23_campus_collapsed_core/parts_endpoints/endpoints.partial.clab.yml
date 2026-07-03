@@ -1,0 +1,64 @@
+# =============================================================
+# エンドポイント部材（Claude提供）— テーマ22
+# =============================================================
+# ⚠️ このファイル単体ではデプロイできません（部品集です）。
+# あなたが作成する campus.clab.yml の topology.nodes 配下に
+# 以下の5ノードをコピーして組み込んでください。
+#
+# - links への追記は結線表（02_基本設計/ネットワーク物理構成図_テキスト版.md）の #18〜21, #24 を参照
+#   例) - endpoints: ["acc-a1:eth3", "pc-sales:eth1"]
+# - イメージは wbitt/network-multitool（quirks Issue 2 のAlpine問題回避・テーマ21実績あり）
+# - binds のパスは campus.clab.yml をテーマフォルダ直下
+#   （22_enterprise_campus_lan/）に置く前提の相対パスです
+# - mgmt-ipv4 を固定したい場合はテーマ21の capstone.clab.yml を参考に
+#   各ノードへ追記してください
+# =============================================================
+
+    # ---- A棟 営業部PC（VLAN10）----
+    pc-sales:
+      kind: linux
+      image: wbitt/network-multitool
+      exec:
+        - ip addr add 10.10.10.100/24 dev eth1
+        - ip route del default
+        - ip route add default via 10.10.10.254 dev eth1
+
+    # ---- A棟 開発部PC（VLAN20）----
+    pc-dev:
+      kind: linux
+      image: wbitt/network-multitool
+      exec:
+        - ip addr add 10.10.20.100/24 dev eth1
+        - ip route del default
+        - ip route add default via 10.10.20.254 dev eth1
+
+    # ---- B棟 ファイルサーバ（VLAN30）HTTPで共有ファイルを配信 ----
+    srv-file:
+      kind: linux
+      image: wbitt/network-multitool
+      binds:
+        - parts_endpoints/shared_files:/usr/share/nginx/html:ro
+      exec:
+        - ip addr add 10.20.30.10/24 dev eth1
+        - ip route del default
+        - ip route add default via 10.20.30.254 dev eth1
+
+    # ---- B棟 社内ポータル（VLAN30）社内システムのWeb画面 ----
+    srv-portal:
+      kind: linux
+      image: wbitt/network-multitool
+      binds:
+        - parts_endpoints/portal_html:/usr/share/nginx/html:ro
+      exec:
+        - ip addr add 10.20.30.20/24 dev eth1
+        - ip route del default
+        - ip route add default via 10.20.30.254 dev eth1
+
+    # ---- 支社PC（VLAN40相当）----
+    br-pc:
+      kind: linux
+      image: wbitt/network-multitool
+      exec:
+        - ip addr add 10.2.40.100/24 dev eth1
+        - ip route del default
+        - ip route add default via 10.2.40.254 dev eth1

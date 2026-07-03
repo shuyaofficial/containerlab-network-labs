@@ -1,0 +1,52 @@
+{
+  "freeTextAnnotations": [],
+  "freeShapeAnnotations": [],
+  "trafficRateAnnotations": [],
+  "groupStyleAnnotations": [],
+  "networkNodeAnnotations": [],
+  "nodeAnnotations": [
+    {
+      "id": "tokyo-pc",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 120,
+        "y": 360
+      }
+    },
+    {
+      "id": "tokyo-r1",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 280,
+        "y": 340
+      }
+    },
+    {
+      "id": "isp",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 460,
+        "y": 360
+      }
+    },
+    {
+      "id": "osaka-r1",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 620,
+        "y": 340
+      }
+    },
+    {
+      "id": "osaka-pc",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 780,
+        "y": 360
+      }
+    }
+  ],
+  "edgeAnnotations": [],
+  "aliasEndpointAnnotations": [],
+  "viewerSettings": {}
+}

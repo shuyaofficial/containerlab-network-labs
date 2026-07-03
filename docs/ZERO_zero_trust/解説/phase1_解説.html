@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Phase 1 解説 — ID統制（Keycloak / OIDC）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>解説</span></nav>
+      <h1 class="doc-title">Phase 1 解説 — ID統制（Keycloak / OIDC）</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">explainer</span><span class="tag">keycloak</span><span class="tag">oidc</span><span class="tag">idp</span></span>
+      </div>
+      
+      <div class="content">
+<h2 id="1-このフェーズで何が実現されるか" tabindex="-1">1. このフェーズで何が実現されるか <a class="header-anchor" href="#1-このフェーズで何が実現されるか" aria-hidden="true">#</a></h2>
+<p>Phase 1 では Keycloak を OIDC の IdP（Identity Provider）として立て、認可コードフローで ID トークン・アクセストークンを発行できる状態を作る。これは Zero Trust の「誰であるか」を一元的に検証する起点であり、Phase 2（IAP）・Phase 6（デバイス統制）が認証を委譲する先になる。</p>
+<ul>
+<li><strong>ビフォー</strong>: Phase 0 の <code>client</code>/<code>app</code>/<code>external</code> は疎通できるが、誰がアクセスしているかを検証する仕組みが無い。</li>
+<li><strong>アフター</strong>: <code>client</code> は Keycloak にログインして OIDC トークンを取得できる。realm・client・ユーザー・ロールが Keycloak の内蔵 DB で管理され、以降の Phase がこのトークンを認可判断の材料にできる。</li>
+</ul>
+<p>このフェーズ単体では「誰が」を検証できるようになるだけで、<code>app</code> へのアクセス制御はまだ行われない（それは Phase 2 の役目）。</p>
+<h2 id="2-なぜこの構成か" tabindex="-1">2. なぜこの構成か <a class="header-anchor" href="#2-なぜこの構成か" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>観点</th>
+<th>商用製品</th>
+<th>本ラボの OSS 選定</th>
+<th>選定理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ID統制（IdP/SSO）</td>
+<td>Okta, Microsoft Entra ID</td>
+<td><strong>Keycloak</strong></td>
+<td><a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果</a> で arm64 ネイティブ対応を実測確認（confidence: High）。追加のエミュレーションが不要で、そのまま VM 上で動く</td>
+</tr>
+</tbody>
+</table></div>
+<p>なぜ Keycloak か:</p>
+<ul>
+<li><strong>arm64 実績</strong>: <code>quay.io/keycloak/keycloak:latest</code> の manifest list に arm64 プラットフォームが含まれることを実測済み。ブロッカーになる懸念がない。</li>
+<li><strong>内蔵 DB で完結</strong>: OpenLDAP のような外部ディレクトリ連携は発展課題に回し、Phase 1 では Keycloak 内蔵の DB でユーザー・ロールを完結させる（YAGNI）。</li>
+<li><strong>なぜ ID統制が最初か</strong>: <a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a> の依存関係の骨子にある通り、「ID（P1）が全ての起点」。IAP（P2）は認証判断を IdP に委譲する構成のため、IdP が先に立っていなければ IAP のテストすらできない。</li>
+</ul>
+<p><strong>実務でこの知識がどこで効くか</strong>: Okta や Entra ID を業務で使ったことがあっても、その裏側の OIDC のプロトコル的な動きまでは意識しないことが多い。Keycloak は管理画面もログもすべて手元で見えるため、「realm」「client」「redirect URI」「scope」といった OIDC の語彙を、ブラックボックスの商用 IdP ではなく自分のログで確認しながら身につけられる。SASE/ZTNA 案件でIdP連携の設定を読む・書く場面（Entra ID アプリ登録、Okta アプリ統合など）でこの語彙がそのまま通じる。</p>
+<h2 id="3-仕組みの核心" tabindex="-1">3. 仕組みの核心 <a class="header-anchor" href="#3-仕組みの核心" aria-hidden="true">#</a></h2>
+<p>OIDC の認可コードフロー（Authorization Code Flow）が Phase 1 の核。</p>
+<pre class="mermaid">sequenceDiagram
+    participant C as client (ブラウザ)
+    participant K as Keycloak (IdP)
+    C-&gt;&gt;K: (1) /auth へリダイレクト（client_id, redirect_uri, scope）
+    K--&gt;&gt;C: (2) ログイン画面を表示
+    C-&gt;&gt;K: (3) ユーザー名/パスワードを送信
+    K--&gt;&gt;C: (4) 認可コード（code）付きで redirect_uri へリダイレクト
+    C-&gt;&gt;K: (5) /token へ code を提示（client_secret も添付）
+    K--&gt;&gt;C: (6) ID トークン + アクセストークンを返却
+</pre>
+<p>ポイント:</p>
+<ul>
+<li><strong>認可コードは1回限り・短命</strong>。ブラウザの URL に一瞬現れる <code>code</code> パラメータをそのままトークンとして使うわけではなく、裏でサーバー間通信（<code>client_secret</code> 付き）に交換することで、フロントチャネルにトークン本体が露出しない設計になっている。</li>
+<li><strong>ID トークンとアクセストークンは別物</strong>。ID トークン（JWT）は「誰であるか」の証明で <code>email</code>・<code>sub</code> などの claim を持つ。アクセストークンは「何ができるか」の証明で、API 呼び出しの認可に使う。</li>
+<li><strong>realm/client/scope の役割分担</strong>: realm はユーザー・ロールの管理単位（テナントに相当）。client は「このアプリからログインを許可する」という登録単位。scope は要求する情報の範囲（<code>openid</code>, <code>profile</code>, <code>email</code> など）。</li>
+</ul>
+<h2 id="4-自分で触って確認する手順実装後にこの手順で確認" tabindex="-1">4. 自分で触って確認する手順（実装後にこの手順で確認） <a class="header-anchor" href="#4-自分で触って確認する手順実装後にこの手順で確認" aria-hidden="true">#</a></h2>
+<p>Phase 1 は今回スコープでは未デプロイ（設計値）。実装後、以下の手順で <a href="../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a> T-1-* のゲート条件を確認する想定。</p>
+<h3 id="手順1-keycloak-が起動し管理画面に到達できるかt-1-1" tabindex="-1">手順1: Keycloak が起動し、管理画面に到達できるか（T-1-1） <a class="header-anchor" href="#手順1-keycloak-が起動し管理画面に到達できるかt-1-1" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">ssh clab@orb
+docker ps --format <span class="hljs-string">&#x27;table {{.Names}}\t{{.Image}}\t{{.Status}}&#x27;</span> | grep keycloak
+</code></pre>
+<p>ブラウザ or curl で管理画面 URL（実装時に確定、<a href="../00_%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3/%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89.html">ログインコマンド</a> 参照）にアクセスし、admin 認証情報（環境変数で注入したもの。設定に直書きしない）でログインできることを確認する。</p>
+<h3 id="手順2-realmclient-が作成されているか確認するt-1-2" tabindex="-1">手順2: realm/client が作成されているか確認する（T-1-2） <a class="header-anchor" href="#手順2-realmclient-が作成されているか確認するt-1-2" aria-hidden="true">#</a></h3>
+<p>Keycloak 管理コンソールで対象 realm を開き、Clients 一覧に認可コードフロー用の client（<code>redirect_uri</code> が Phase 2 の IAP に一致）が存在することを確認する。</p>
+<h3 id="手順3-oidc-トークンを-curl-で取得するt-1-3学習の核心" tabindex="-1">手順3: OIDC トークンを curl で取得する（T-1-3、学習の核心） <a class="header-anchor" href="#手順3-oidc-トークンを-curl-で取得するt-1-3学習の核心" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">curl -X POST <span class="hljs-string">&quot;http://&lt;keycloak-host&gt;:8080/realms/&lt;realm&gt;/protocol/openid-connect/token&quot;</span> \
+  -d <span class="hljs-string">&quot;grant_type=password&quot;</span> \
+  -d <span class="hljs-string">&quot;client_id=&lt;client-id&gt;&quot;</span> \
+  -d <span class="hljs-string">&quot;client_secret=&lt;client-secret&gt;&quot;</span> \
+  -d <span class="hljs-string">&quot;username=&lt;test-user&gt;&quot;</span> \
+  -d <span class="hljs-string">&quot;password=&lt;test-password&gt;&quot;</span>
+</code></pre>
+<p>期待結果: <code>access_token</code> / <code>id_token</code> / <code>refresh_token</code> を含む JSON が返る。</p>
+<h3 id="手順4-取得した-id-トークンの中身を自分の目で確認する学習のための追加手順" tabindex="-1">手順4: 取得した ID トークンの中身を自分の目で確認する（学習のための追加手順） <a class="header-anchor" href="#手順4-取得した-id-トークンの中身を自分の目で確認する学習のための追加手順" aria-hidden="true">#</a></h3>
+<p>JWT は <code>ヘッダー.ペイロード.署名</code> の3パートを <code>.</code> で連結した文字列。ペイロード部分だけ base64url デコードすれば中身が読める。</p>
+<pre><code class="language-bash"><span class="hljs-comment"># id_token の2番目のセグメント(ペイロード)を取り出してデコード</span>
+<span class="hljs-built_in">echo</span> <span class="hljs-string">&quot;&lt;id_token の2番目のドット区切り文字列&gt;&quot;</span> | <span class="hljs-built_in">base64</span> -d 2&gt;/dev/null | python3 -m json.tool
+</code></pre>
+<p>期待結果: <code>sub</code>（ユーザーID）、<code>email</code>、<code>exp</code>（有効期限）などの claim が JSON で見える。<strong>「トークンとはただの署名付き JSON である」ことを自分の目で確認する</strong>のがこの手順のねらい。ブラックボックスの商用 IdP では得にくい体験。</p>
+<h2 id="5-考えどころ" tabindex="-1">5. 考えどころ <a class="header-anchor" href="#5-考えどころ" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>本番設計ならどうするか</strong>: 本番では Keycloak の内蔵 DB ではなく外部 RDB（PostgreSQL 等）に永続化し、クラスタ構成で冗長化する。TLS 終端も Keycloak 単体ではなくリバースプロキシ（本ラボなら Pomerium）側で行うのが一般的。</li>
+<li><strong>このラボの簡略化ポイント</strong>:
+<ul>
+<li><strong>内蔵 DB のみ</strong>（外部 RDB・OpenLDAP 連携なし）。実運用では既存の社内ディレクトリ（AD 等）との連携が必須になることが多いが、これは発展課題。</li>
+<li><strong>シークレット管理</strong>: admin 初期認証情報・client secret は環境変数注入と設計されているが、本番なら Vault 等のシークレットマネージャで管理し、ローテーションする運用が必要。</li>
+<li><strong>HA なし</strong>: 単一インスタンスのため、Keycloak が落ちれば ID統制全体が止まる。本番は最低限の冗長化が必須。</li>
+</ul>
+</li>
+</ul>
+<h2 id="6-つまずきポイント" tabindex="-1">6. つまずきポイント <a class="header-anchor" href="#6-つまずきポイント" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>redirect_uri 不一致でエラー</strong>: Phase 2 の IAP 側の redirect URI と Keycloak client 設定の redirect URI が1文字でも違うと <code>invalid_redirect_uri</code> になる。末尾スラッシュの有無に注意。</li>
+<li><strong>トークンが取れるのに Phase 2 で拒否される</strong>: それは Phase 1 の問題ではなく Phase 2（IAP のポリシー設定）側の切り分け対象。<a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a> の層別（L4 認証 と L5 認可 は別層）で混同しないこと。</li>
+<li><strong>admin ログインができない</strong>: 環境変数注入のタイミング（コンテナ起動時のみ読まれる等）によって反映されていないことがある。<code>docker logs</code> で Keycloak の起動ログに admin 作成関連の行があるか確認する。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a>（認証フロー）</li>
+<li><a href="../04_%E6%A7%8B%E7%AF%89/phase1_id/README.html">phase1_id 構築スタブ</a></li>
+<li><a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果</a></li>
+<li><a href="../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a></li>
+<li><a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-このフェーズで何が実現されるか">1. このフェーズで何が実現されるか</a></li>
+<li class="lvl-2"><a href="#2-なぜこの構成か">2. なぜこの構成か</a></li>
+<li class="lvl-2"><a href="#3-仕組みの核心">3. 仕組みの核心</a></li>
+<li class="lvl-2"><a href="#4-自分で触って確認する手順実装後にこの手順で確認">4. 自分で触って確認する手順（実装後にこの手順で確認）</a></li>
+<li class="lvl-3"><a href="#手順1-keycloak-が起動し管理画面に到達できるかt-1-1">手順1: Keycloak が起動し、管理画面に到達できるか（T-1-1）</a></li>
+<li class="lvl-3"><a href="#手順2-realmclient-が作成されているか確認するt-1-2">手順2: realm/client が作成されているか確認する（T-1-2）</a></li>
+<li class="lvl-3"><a href="#手順3-oidc-トークンを-curl-で取得するt-1-3学習の核心">手順3: OIDC トークンを curl で取得する（T-1-3、学習の核心）</a></li>
+<li class="lvl-3"><a href="#手順4-取得した-id-トークンの中身を自分の目で確認する学習のための追加手順">手順4: 取得した ID トークンの中身を自分の目で確認する（学習のための追加手順）</a></li>
+<li class="lvl-2"><a href="#5-考えどころ">5. 考えどころ</a></li>
+<li class="lvl-2"><a href="#6-つまずきポイント">6. つまずきポイント</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

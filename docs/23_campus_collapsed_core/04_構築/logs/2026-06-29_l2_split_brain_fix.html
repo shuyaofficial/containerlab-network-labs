@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>作業ログ: テーマ23 Collapsed Core のL2全断（Split Brain / HSRP unknown）根本原因特定と修正</title>
+  <link rel="stylesheet" href="../../../assets/doc.css">
+  <link rel="stylesheet" href="../../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../../index.html">Home</a>
+<span class="sep">/</span>
+<span>23_campus_collapsed_core</span>
+<span class="sep">/</span>
+<span>04_構築</span>
+<span class="sep">/</span>
+<span>logs</span></nav>
+      <h1 class="doc-title">作業ログ: テーマ23 Collapsed Core のL2全断（Split Brain / HSRP unknown）根本原因特定と修正</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="発生日時" tabindex="-1">発生日時 <a class="header-anchor" href="#発生日時" aria-hidden="true">#</a></h2>
+<p>2026-06-29</p>
+<h2 id="事象" tabindex="-1">事象 <a class="header-anchor" href="#事象" aria-hidden="true">#</a></h2>
+<ul>
+<li>Collapsed Core（coredist1/2, access1/2 + pc1/2/3）で <strong>L2が一切通らない</strong>。
+<ul>
+<li><code>show spanning-tree vlan 10</code> で coredist1 / coredist2 の <strong>両方が &quot;This bridge is the root&quot;</strong>（Split Brain）。</li>
+<li>HSRP の Standby が永遠に <code>unknown</code>。</li>
+<li>インターフェースは UP/UP、Trunk・VLAN(10,20)・<code>switchport trunk allowed vlan 10,20</code> は設定済み。</li>
+</ul>
+</li>
+<li>これは設定ミスではなく、<strong>コンテナ内の veth↔IOL ブリッジ(<code>iouyap</code>) が正しく動いていない</strong>ことが原因だった。</li>
+<li>同じ問題は <strong>テーマ22(22_enterprise_campus_lan) で 2026-06-19 に解決済み</strong>で、テーマ23だけが古い・壊れた起動方式のまま取り残されていた。</li>
+</ul>
+<h2 id="切り分けプロセス" tabindex="-1">切り分けプロセス <a class="header-anchor" href="#切り分けプロセス" aria-hidden="true">#</a></h2>
+<ol>
+<li>
+<p>公式ドキュメント(containerlab cisco_iol)とテーマ22の実績構成を確認。</p>
+<ul>
+<li>コンソールは <strong>SSH / <code>docker exec</code></strong> が公式。<code>docker attach</code> は使わない。</li>
+<li>L2ノードは <strong><code>type: l2</code></strong> が必須。</li>
+<li>旧2017タグ・15.x由来イメージの stock entrypoint は <strong>iouyap を自動起動しない世代</strong>で、テーマ22は deploy 後に手動起動して開通させていた。</li>
+</ul>
+</li>
+<li>
+<p>実績比較（決定的証拠）：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>テーマ22(動く)</th>
+<th>テーマ23(壊れ)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>カスタムentrypoint</td>
+<td>無し(stock)</td>
+<td>有り(壊れたiouyap)</td>
+</tr>
+<tr>
+<td><code>type: l2</code></td>
+<td>全ノード有り</td>
+<td><strong>無し</strong></td>
+</tr>
+<tr>
+<td>iouyap起動</td>
+<td>deploy後 <code>iouyap 513</code>(<code>-w /iol</code>)</td>
+<td>entrypoint内 <code>iouyap $IOL_PID</code>(誤)</td>
+</tr>
+<tr>
+<td>コンソール</td>
+<td>SSH</td>
+<td>docker attach(固まる)</td>
+</tr>
+</tbody>
+</table></div>
+</li>
+<li>
+<p>テーマ23の <code>entrypoint_fixed.sh:29</code> を確認し、誤起動を特定。</p>
+</li>
+</ol>
+<h2 id="根本原因" tabindex="-1">根本原因 <a class="header-anchor" href="#根本原因" aria-hidden="true">#</a></h2>
+<h3 id="主因aiouyap-の起動引数が壊れていた" tabindex="-1">主因A：<code>iouyap</code> の起動引数が壊れていた <a class="header-anchor" href="#主因aiouyap-の起動引数が壊れていた" aria-hidden="true">#</a></h3>
+<p><code>entrypoint_fixed.sh</code> の</p>
+<pre><code class="language-bash">( <span class="hljs-built_in">sleep</span> 2 ; /usr/bin/iouyap <span class="hljs-variable">$IOL_PID</span> ) &amp;
+</code></pre>
+<ul>
+<li><code>$IOL_PID</code> は containerlab が各ノードに振る <strong>IOLインスタンスID（1,2,3…）</strong>。<code>iouyap</code> の第1引数は本来 <strong>NETIOベースポート=<code>513</code></strong>。インスタンスIDを渡すと IOL本体(<code>iol.bin 3</code>)が握る NETIO ID 3 と衝突し <strong><code>PID xx already has a lock on ID 3</code></strong> で iouyap が即死。</li>
+<li><code>-f /iol/iouyap.ini -n /iol/NETMAP</code> と作業ディレクトリ <code>/iol</code> の指定が無く、起動してもブリッジ表が無いため <strong>ブラックホール</strong>（input=0：2026-06-19 incident と同症状）。</li>
+<li>手動リトライ <code>/usr/bin/iouyap 3 &amp;</code> も同じ誤り（ポート3・ini/NETMAP無し）で「ログは出るがL2は通らない」ままだった。</li>
+<li><strong>教訓：「iouyap が起動している」≠「iouyap が橋渡ししている」。</strong></li>
+</ul>
+<h3 id="主因btype-l2-未指定" tabindex="-1">主因B：<code>type: l2</code> 未指定 <a class="header-anchor" href="#主因btype-l2-未指定" aria-hidden="true">#</a></h3>
+<p><code>campus.clab.yml</code> の4ノードに <code>type: l2</code> が無かった（テーマ22は全ノード付与）。cisco_iol kind はこのフィールドでL2/L3を区別する。</p>
+<h3 id="副次カスタム-entrypoint-自体が有害" tabindex="-1">副次：カスタム entrypoint 自体が有害 <a class="header-anchor" href="#副次カスタム-entrypoint-自体が有害" aria-hidden="true">#</a></h3>
+<ul>
+<li><code>docker attach</code> 固まり回避を動機に <code>iol.bin</code> を <code>exec</code> 無し起動していたが、コンソールは SSH/<code>docker exec</code> が公式で、PID1回避は不要だった。</li>
+<li><code>-c config.txt</code> を使うため <strong>containerlab の startup-config 自動注入（SSH/admin/admin・hostname・mgmt）をバイパス</strong>していた。</li>
+<li>ライセンス(<code>.iourc</code>)注入もテーマ22が示す通りイメージにビルド時同梱済みで、ランタイム注入は不要だった。</li>
+</ul>
+<h2 id="解決策テーマ22方式に揃える" tabindex="-1">解決策（テーマ22方式に揃える） <a class="header-anchor" href="#解決策テーマ22方式に揃える" aria-hidden="true">#</a></h2>
+<p>対象: <code>23_campus_collapsed_core/04_構築/</code></p>
+<ol>
+<li><strong><code>campus.clab.yml</code></strong>：4 cisco_iol ノードから <code>binds: ./entrypoint_fixed.sh:/entrypoint.sh:ro</code> を撤去し、<code>kind: cisco_iol</code> 直後に <strong><code>type: l2</code></strong> を追加。</li>
+<li><strong><code>deploy.sh</code>（新規）</strong>：<code>containerlab deploy</code> の後に、全IOLノードへ正しい引数で iouyap を起動。<pre><code class="language-bash"><span class="hljs-keyword">for</span> c <span class="hljs-keyword">in</span> $(<span class="hljs-built_in">sudo</span> docker ps --format <span class="hljs-string">&#x27;{{.Names}}&#x27;</span> \
+            | grep <span class="hljs-string">&#x27;^clab-campus-collapsed-core-&#x27;</span> | grep -v -E <span class="hljs-string">&#x27;pc[0-9]&#x27;</span>); <span class="hljs-keyword">do</span>
+  <span class="hljs-built_in">sudo</span> docker <span class="hljs-built_in">exec</span> -d -w /iol <span class="hljs-string">&quot;<span class="hljs-variable">$c</span>&quot;</span> /usr/bin/iouyap 513 2&gt;/dev/null || <span class="hljs-literal">true</span>
+<span class="hljs-keyword">done</span>
+</code></pre>
+ポイント：<strong><code>513</code></strong>（インスタンスIDではない） + <strong><code>-w /iol</code></strong>（iouyap.ini/NETMAP をカレントで参照）。</li>
+<li><strong><code>entrypoint_fixed.sh</code></strong>：先頭に非推奨バナーを付与。どのノードからも bind しない（記録目的で残置）。</li>
+<li><strong>コンソール接続</strong>：<code>docker attach</code> をやめ、<code>ssh admin@clab-campus-collapsed-core-coredist1</code>（admin/admin）または <code>docker exec -it &lt;node&gt; bash</code>。</li>
+</ol>
+<h3 id="検証手順構築はユーザー本人が実施" tabindex="-1">検証手順（構築はユーザー本人が実施） <a class="header-anchor" href="#検証手順構築はユーザー本人が実施" aria-hidden="true">#</a></h3>
+<ol>
+<li><code>docker exec &lt;c&gt; ps aux | grep iouyap</code> → <code>513</code> で常駐・<code>lock on ID</code> ログが無いこと。</li>
+<li>IOL CLI：<code>show cdp neighbors</code>（隣接表示）／<code>show interfaces Et0/2 | inc packets</code>（<strong>input が増える</strong>）。</li>
+<li><code>show spanning-tree vlan 10</code> → Root が1台に収束（Split Brain 解消）。</li>
+<li><code>show standby brief</code> → Active/Standby 確立（<code>unknown</code> 解消）。</li>
+<li>pc1→pc3（VLAN10）ping → VLAN間（10⇄20）ping。</li>
+</ol>
+<p>ロールバック：<code>./deploy.sh destroy</code> 後、変更前の <code>campus.clab.yml</code> に戻すだけ（可逆）。</p>
+<h2 id="実機適用検証2026-06-29claudeが-clab-vm-上で実施" tabindex="-1">実機適用・検証（2026-06-29、Claudeが clab VM 上で実施） <a class="header-anchor" href="#実機適用検証2026-06-29claudeが-clab-vm-上で実施" aria-hidden="true">#</a></h2>
+<p>ユーザー依頼により、OrbStack「clab」VM 上の稼働ラボを <strong>非破壊で</strong>（デバイス設定は触らず）診断・修正。</p>
+<ul>
+<li><strong>現状</strong>: ユーザーは既に修正版 yaml で再デプロイ済み（mounts にカスタム entrypoint 無し、<code>clab-node-type=l2</code> 確認）。だが <code>./deploy.sh</code> ではなく <code>containerlab deploy</code> を直接実行したため <strong>iouyap 起動ステップが未実行</strong>だった。</li>
+<li><strong>確定診断</strong>: 全4ノードで <code>iouyap</code> プロセス = <strong>0</strong>（<code>/proc/*/cmdline</code> で確認）。<code>iol.bin</code>(qemu-i386) は稼働、<code>/iol/iouyap.ini</code>・<code>NETMAP</code> は clab 生成で正常（IOLインスタンス=3 ↔ iouyap port=513）。→ HSRP standby unknown の主因＝iouyap 未起動で確定。</li>
+<li><strong>適用</strong>: 全4ノードに <code>docker exec -d -w /iol &lt;node&gt; /usr/bin/iouyap 513</code> を実行。4台とも <code>iouyap 513</code> で常駐、<code>lock on ID</code> エラー無し。</li>
+<li><strong>検証(L2開通)</strong>: 各トランクの TX↔RX が完全一致（576↔576 / 577↔577 / 583↔583 / 305↔305 等）。修正前 RX=0 のブラックホールが両方向疎通に回復。BPDU/HSRP/CDP が流れ始めた。</li>
+<li><strong>未確認(ユーザー側)</strong>: <code>show standby brief</code> の Standby 表示は各自コンソールで確認（mgmt SSH 172.20.20.x は L2イメージのEt0/0ルーテッドmgmtの癖で ARP 不応答＝本件のL2データプレーンとは別問題、任意対応）。</li>
+<li><strong>注意（揮発性）</strong>: 今回の iouyap 起動は稼働中コンテナへの手動適用。<code>destroy</code>→<code>deploy</code> 時は必ず <code>./deploy.sh deploy</code>（または plain deploy 後に <code>./deploy.sh iouyap</code>）で再起動すること。</li>
+</ul>
+<h2 id="追記2iouyap-修正後も残ったstandby-unknown第2の原因デバイス設定" tabindex="-1">追記2：iouyap 修正後も残った「standby unknown」＝第2の原因（デバイス設定） <a class="header-anchor" href="#追記2iouyap-修正後も残ったstandby-unknown第2の原因デバイス設定" aria-hidden="true">#</a></h2>
+<p>iouyap 修正で L2 ファブリックは開通（coredist1 の <code>show cdp neighbors</code> が coredist2/access1/access2 を全て表示）。だが HSRP は依然 <code>standby unknown</code>・両コア Split Brain のまま。実機を切り分けた結果、<strong>iouyap とは別の、coredist2 のコンフィグ不備</strong>が判明。</p>
+<ul>
+<li><strong>access1（正常）</strong>: <code>show spanning-tree vlan 10</code> で Root = coredist1(aabb.cc00.0300) を正しく認識、Et0/2(coredist2向け)=Desg FWD。トランクは VLAN10,20 が allowed <strong>かつ active</strong>。→ access 層は健全で、coredist1 の BPDU を coredist2 側へ中継している。</li>
+<li><strong>coredist2（異常）</strong>:
+<ul>
+<li><code>show spanning-tree vlan 10</code> → <strong>「Spanning tree instance(s) for vlan 10 does not exist.」</strong></li>
+<li><code>show interfaces trunk</code> → Et0/2,Et0/3 は VLAN10,20 が <em>allowed</em> だが <strong>「allowed and active … none」「forwarding state … none」</strong>。</li>
+<li><code>show vlan brief</code> → <strong>VLAN 10 / 20 がデータベースに存在しない</strong>（VLAN1 と既定1002-1005のみ）。</li>
+</ul>
+</li>
+<li><strong>根本原因（第2）</strong>: coredist2 の <strong>VLANデータベースに VLAN 10/20 が無い</strong>。SVI(<code>interface vlan 10</code>)を作っても L2 VLAN は自動生成されない。L2 VLAN が無いため、coredist2 はトランク上の VLAN10/20 フレーム（STP BPDU・HSRP Hello）を処理できず、STPインスタンス未生成・SVIダウン・HSRP不参加 → coredist1 から見て standby unknown、両コア Split Brain。</li>
+<li><strong>対応</strong>: coredist2（必要なら全ノード）で VLAN 10/20 を VLANデータベースに作成する。<strong>設定投入はユーザー本人</strong>（本ラボは自分で設定を考えて投入する学習課題のため、コマンドは記載しない）。作成後、VLAN10/20 の STP インスタンス生成 → SVI Up → HSRP 収束 → Split Brain 解消を確認する。</li>
+<li>パラメータシート設計値の再確認推奨: CoreDist1=VLAN10 Root Primary(4096)/VLAN20 Secondary(8192)、CoreDist2=VLAN10 Secondary(8192)/VLAN20 Root Primary(4096)。HSRP Active と STP Root を一致させる（達成条件#1,#2）。</li>
+</ul>
+<h2 id="追記3解決2026-06-29-sviダウンが最後の関門だった" tabindex="-1">追記3：解決（2026-06-29）— SVIダウンが最後の関門だった <a class="header-anchor" href="#追記3解決2026-06-29-sviダウンが最後の関門だった" aria-hidden="true">#</a></h2>
+<p>VLAN作成後も <code>standby unknown</code> が残ったため再追跡。coredist2 の HSRP は <strong>State=Init「interface down」</strong>＝SVI Vlan10/20 自体がダウンしていた。SVI(<code>interface VlanX</code>)は autostate により「当該VLANが trunk 上で active かつ STP forwarding」になって初めて line-protocol up する。VLANデータベース作成→trunkでVLAN active→SVI Up の連鎖が揃った時点で HSRP が Init を脱し収束。</p>
+<p>最終確認（coredist1 <code>show standby brief</code>）:</p>
+<ul>
+<li>Vl10: <strong>Active</strong>(pri110)/Standby=10.10.10.252(coredist2)</li>
+<li>Vl20: <strong>Standby</strong>/Active=10.10.20.252(coredist2)
+→ <code>unknown</code> 解消、VLANごとに Active を分ける負荷分散（達成条件#1・#2）も成立。<strong>RESOLVED</strong>。</li>
+</ul>
+<h3 id="原因の全体像同一症状-standby-unknown-に3層が重なっていた" tabindex="-1">原因の全体像（同一症状 standby unknown に3層が重なっていた） <a class="header-anchor" href="#原因の全体像同一症状-standby-unknown-に3層が重なっていた" aria-hidden="true">#</a></h3>
+<ol>
+<li>インフラ: iouyap 未起動（Claudeが <code>iouyap 513</code>/<code>-w /iol</code> で修正・確認）。</li>
+<li>設定: coredist2 の VLANデータベースに VLAN10/20 が無い（ユーザーが作成）。</li>
+<li>連鎖: VLAN作成だけでは SVI が上がらず、trunkでVLAN activeになりSVIがautostateでUp→HSRP収束（自然解消）。</li>
+</ol>
+<h3 id="残タスクユーザー" tabindex="-1">残タスク（ユーザー） <a class="header-anchor" href="#残タスクユーザー" aria-hidden="true">#</a></h3>
+<ul>
+<li>STPルート配置が設計通りか（CD1=VLAN10 Root/CD2=VLAN20 Root）を <code>show spanning-tree root</code> で確認。</li>
+<li>PC間 end-to-end（達成条件#4, #5）。※Linuxコンテナ(network-multitool)をIOLアクセスポートに繋ぐと <code>%AMDP2_FE-6-EXCESSCOLL</code>（duplex不一致のエミュレータ既知バグ、切り分けノート#2）が出て不通になる場合あり。出たら該当ポートで speed/duplex 固定 か 擬似PCをIOL化で回避。</li>
+</ul>
+<h2 id="担当" tabindex="-1">担当 <a class="header-anchor" href="#担当" aria-hidden="true">#</a></h2>
+<ul>
+<li>根本原因特定・部材(yaml/deploy.sh/entrypoint非推奨化)修正：Claude</li>
+<li>実デプロイ・STP/HSRP等のデバイスCLI設定・試験：ユーザー本人（学習対象）</li>
+</ul>
+<h2 id="参考" tabindex="-1">参考 <a class="header-anchor" href="#参考" aria-hidden="true">#</a></h2>
+<ul>
+<li>containerlab Cisco IOL: <a href="https://containerlab.dev/manual/kinds/cisco_iol/">https://containerlab.dev/manual/kinds/cisco_iol/</a></li>
+<li>packetswitch「Running Cisco IOL Devices in Containerlab」: <a href="https://www.packetswitch.co.uk/running-cisco-iol-devices-in-containerlab/">https://www.packetswitch.co.uk/running-cisco-iol-devices-in-containerlab/</a></li>
+<li>関連: <code>22_enterprise_campus_lan/04_構築/logs/2026-06-19_iouyap_incident.md</code>（同根の先行事例）</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#発生日時">発生日時</a></li>
+<li class="lvl-2"><a href="#事象">事象</a></li>
+<li class="lvl-2"><a href="#切り分けプロセス">切り分けプロセス</a></li>
+<li class="lvl-2"><a href="#根本原因">根本原因</a></li>
+<li class="lvl-3"><a href="#主因aiouyap-の起動引数が壊れていた">主因A：iouyap の起動引数が壊れていた</a></li>
+<li class="lvl-3"><a href="#主因btype-l2-未指定">主因B：type: l2 未指定</a></li>
+<li class="lvl-3"><a href="#副次カスタム-entrypoint-自体が有害">副次：カスタム entrypoint 自体が有害</a></li>
+<li class="lvl-2"><a href="#解決策テーマ22方式に揃える">解決策（テーマ22方式に揃える）</a></li>
+<li class="lvl-3"><a href="#検証手順構築はユーザー本人が実施">検証手順（構築はユーザー本人が実施）</a></li>
+<li class="lvl-2"><a href="#実機適用検証2026-06-29claudeが-clab-vm-上で実施">実機適用・検証（2026-06-29、Claudeが clab VM 上で実施）</a></li>
+<li class="lvl-2"><a href="#追記2iouyap-修正後も残ったstandby-unknown第2の原因デバイス設定">追記2：iouyap 修正後も残った「standby unknown」＝第2の原因（デバイス設定）</a></li>
+<li class="lvl-2"><a href="#追記3解決2026-06-29-sviダウンが最後の関門だった">追記3：解決（2026-06-29）— SVIダウンが最後の関門だった</a></li>
+<li class="lvl-3"><a href="#原因の全体像同一症状-standby-unknown-に3層が重なっていた">原因の全体像（同一症状 standby unknown に3層が重なっていた）</a></li>
+<li class="lvl-3"><a href="#残タスクユーザー">残タスク（ユーザー）</a></li>
+<li class="lvl-2"><a href="#担当">担当</a></li>
+<li class="lvl-2"><a href="#参考">参考</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Phase 2 解説 — NWセキュリティ（IAP / Pomerium）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>解説</span></nav>
+      <h1 class="doc-title">Phase 2 解説 — NWセキュリティ（IAP / Pomerium）</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">explainer</span><span class="tag">iap</span><span class="tag">pomerium</span><span class="tag">oauth2-proxy</span><span class="tag">ztna</span></span>
+      </div>
+      
+      <div class="content">
+<h2 id="1-このフェーズで何が実現されるか" tabindex="-1">1. このフェーズで何が実現されるか <a class="header-anchor" href="#1-このフェーズで何が実現されるか" aria-hidden="true">#</a></h2>
+<p>Phase 2 では <code>app</code>（Trust ゾーン）の手前に関所（IAP: Identity-Aware Proxy）を置き、未認証アクセスを拒否する。認証そのものは Phase 1 の Keycloak に委譲し、認可済みリクエストのみ <code>app</code> へ転送する。まず oauth2-proxy で「未認証拒否」を最小構成で示し、Pomerium で認可ポリシーへ段階的に高度化する（D-5）。</p>
+<ul>
+<li><strong>ビフォー</strong>: Phase 0 の状態では <code>client</code>→<code>app</code> が素通りだった。Phase 1 で IdP はできたが、<code>app</code> 自体はまだ誰でもアクセスできる。</li>
+<li><strong>アフター</strong>: <code>client</code> が <code>app</code> に未認証でアクセスすると拒否/リダイレクトされる。Keycloak でログインした後にのみ <code>app</code> へ到達できる。Untrust から Trust への直通経路は消え、必ず DMZ の関所を経由する構成になる。</li>
+</ul>
+<h2 id="2-なぜこの構成か" tabindex="-1">2. なぜこの構成か <a class="header-anchor" href="#2-なぜこの構成か" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>観点</th>
+<th>商用製品</th>
+<th>本ラボの OSS 選定</th>
+<th>選定理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NWセキュリティ（ZTNA/IAP）</td>
+<td>Zscaler ZPA, Cisco Secure Access, Palo Alto Prisma Access</td>
+<td><strong>oauth2-proxy → Pomerium</strong>（発展: OpenZiti）</td>
+<td><a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果</a> で両イメージとも arm64 ネイティブ対応を実測確認（confidence: High）</td>
+</tr>
+</tbody>
+</table></div>
+<p>なぜ2段階（oauth2-proxy → Pomerium）にするか（D-5）:</p>
+<ul>
+<li>oauth2-proxy は「認証されているか / いないか」の二値判定に特化した軽量なリバースプロキシ。まず「未認証拒否」という ZTNA の最も基本的な性質を最小構成で確認する。</li>
+<li>Pomerium はさらに認可ポリシー（誰の・どの条件で・何を許可するか）を柔軟に書ける。段階的に導入することで、いきなり複雑な認可ポリシー言語に触れるコストを避ける（KISS）。</li>
+<li>Pomerium は Phase 6 の step-ca（mTLS/posture）とも連携できる設計であり、認可の入口を1点に集約する（基本設計書のセキュリティ方針「関所集中」）。</li>
+</ul>
+<p><strong>実務でこの知識がどこで効くか</strong>: Cisco の実務経験がある読者にとって、IAP は「アプリケーション層のファイアウォール + 認証」の合わせ技として理解すると早い。VPN でネットワークに参加させてから ACL で絞る発想（Cisco AnyConnect + ASA ACL）に対し、ZTNA/IAP は「そもそもネットワークに参加させず、アプリ単位でリクエストごとに検証する」。この違いが Zscaler ZPA や Cisco Secure Access の営業資料で語られる「VPN 代替」の技術的な中身であり、Pomerium の設定ファイルを読むとそれが具体的にどう実装されているかが見える。</p>
+<h2 id="3-仕組みの核心" tabindex="-1">3. 仕組みの核心 <a class="header-anchor" href="#3-仕組みの核心" aria-hidden="true">#</a></h2>
+<p><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a> のフロー1（認証フロー）がそのまま Phase 2 の核心。</p>
+<pre class="mermaid">sequenceDiagram
+    participant C as client (Untrust)
+    participant P as pomerium/oauth2-proxy (DMZ:IAP)
+    participant K as keycloak (DMZ:IdP)
+    participant A as app (Trust)
+    C-&gt;&gt;P: (1) app へアクセス要求
+    P--&gt;&gt;C: (2) 未認証 → Keycloak へリダイレクト
+    C-&gt;&gt;K: (3) OIDC ログイン（認可コードフロー）
+    K--&gt;&gt;C: (4) 認可コード
+    C-&gt;&gt;P: (5) コードを提示
+    P-&gt;&gt;K: (6) トークン検証
+    K--&gt;&gt;P: (7) ID/アクセストークン
+    P-&gt;&gt;A: (8) 認可済のみ転送
+    A--&gt;&gt;C: (9) 応答（IAP 経由）
+</pre>
+<p>ポイント:</p>
+<ul>
+<li><strong>IAP はマルチホーム</strong>。Untrust（<code>client</code> からの受信）・DMZ（Keycloak への照会）・Trust（<code>app</code> への転送）の3ゾーンに足を持つ。これにより物理的にも「Untrust から Trust へは IAP を通らない限り届かない」構成になる。</li>
+<li><strong>セッションは IAP 側が持つ</strong>。ユーザーは一度ログインすればセッションクッキーで以降のリクエストが検証される。トークンの検証・更新は IAP が肩代わりし、<code>app</code> 自体は認証ロジックを持たなくてよい（アプリケーション側の実装負担を減らす ZTNA のメリット）。</li>
+<li><strong>認可ポリシーは IAP の設定でコントロール</strong>。Pomerium ではユーザー属性・グループ・（発展的には）posture claim を条件にポリシーを書ける。これが「最小権限」の原則を実現する箇所。</li>
+</ul>
+<h2 id="4-自分で触って確認する手順実装後にこの手順で確認" tabindex="-1">4. 自分で触って確認する手順（実装後にこの手順で確認） <a class="header-anchor" href="#4-自分で触って確認する手順実装後にこの手順で確認" aria-hidden="true">#</a></h2>
+<p>Phase 2 は今回スコープでは未デプロイ（設計値）。実装後、<a href="../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a> T-2-* に沿って以下を確認する想定。</p>
+<h3 id="手順1-未認証アクセスが拒否されることを確認するt-2-1" tabindex="-1">手順1: 未認証アクセスが拒否されることを確認する（T-2-1） <a class="header-anchor" href="#手順1-未認証アクセスが拒否されることを確認するt-2-1" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">docker <span class="hljs-built_in">exec</span> clab-zero-client curl -sv http://&lt;iap-host&gt;/  <span class="hljs-comment"># app への直接アクセスを試みる</span>
+</code></pre>
+<p>期待結果: 200 ではなく、302（Keycloak へのリダイレクト）や 401/403 が返る。ここで**「未認証だと何も見えない」ことを実際に体験する**のが ZTNA の核心を理解する近道。</p>
+<h3 id="手順2-keycloak-でログインした後にアクセスできることを確認するt-2-2" tabindex="-1">手順2: Keycloak でログインした後にアクセスできることを確認する（T-2-2） <a class="header-anchor" href="#手順2-keycloak-でログインした後にアクセスできることを確認するt-2-2" aria-hidden="true">#</a></h3>
+<p>ブラウザで IAP の URL にアクセスし、Keycloak のログイン画面にリダイレクトされることを確認、ログイン後に <code>app</code> の応答が返ることを確認する。</p>
+<h3 id="手順3-untrusttrust-の直通が不可であることを確認するt-2-3最重要" tabindex="-1">手順3: Untrust→Trust の直通が不可であることを確認する（T-2-3、最重要） <a class="header-anchor" href="#手順3-untrusttrust-の直通が不可であることを確認するt-2-3最重要" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">docker <span class="hljs-built_in">exec</span> clab-zero-client curl -sv --connect-timeout 3 http://app/   <span class="hljs-comment"># app に IAP を経由せず直接アクセス</span>
+</code></pre>
+<p>期待結果: 到達できない（タイムアウト or 接続拒否）。<strong>Phase 0 では通っていたこの経路が、Phase 2 導入後は塞がれている</strong>ことを確認する。これが「関所を後から挿入する」という Phase 0→2 の設計意図そのものであり、変化を自分の目で見る手順として重要。</p>
+<h3 id="手順4-認可-allowdeny-のログを確認する" tabindex="-1">手順4: 認可 allow/deny のログを確認する <a class="header-anchor" href="#手順4-認可-allowdeny-のログを確認する" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">docker logs --<span class="hljs-built_in">tail</span> 50 clab-zero-pomerium   <span class="hljs-comment"># または oauth2-proxy</span>
+</code></pre>
+<p>期待結果: allow/deny の判定行が出力される。Phase 3 でこれを Loki/Grafana に集約する前段として、まず生ログで判定の中身を見る。</p>
+<h2 id="5-考えどころ" tabindex="-1">5. 考えどころ <a class="header-anchor" href="#5-考えどころ" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>本番設計ならどうするか</strong>: 本番の ZTNA/IAP はグローバル分散配置（エッジ PoP）で遅延を抑え、デバイス証明書・posture・地理情報・時間帯など多数のシグナルを認可判定に組み込む。本ラボの Pomerium 設定はそのごく一部（ID + 将来的な posture claim）のみを扱う。</li>
+<li><strong>このラボの簡略化ポイント</strong>:
+<ul>
+<li><strong>TLS 終端</strong>: 本ラボの IAP は自己署名証明書 or 平文で検証する想定（設計値）。本番は正規 CA 証明書での終端が必須。</li>
+<li><strong>HA なし</strong>: IAP が単一障害点になる。本番は複数リージョン・複数インスタンスでの冗長化が前提。</li>
+<li><strong>認可ポリシーの粒度</strong>: 本ラボは「ログイン済みか否か」程度の粗い粒度から始める。本番はロール・グループ・リソース単位の細かい認可ポリシーが必要。</li>
+</ul>
+</li>
+</ul>
+<h2 id="6-つまずきポイント" tabindex="-1">6. つまずきポイント <a class="header-anchor" href="#6-つまずきポイント" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>ログインしても <code>app</code> に届かない</strong>: <a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a> の重複パターンにある通り、「redirect URL 不一致（L4）＋ Trust 側転送経路欠落（L2）」の二重障害であることが多い。まず L2（IAP→app のネットワーク到達）を確認してから L4/L5 を疑う。</li>
+<li><strong>未認証拒否が効かない</strong>: IAP がそもそも <code>app</code> への経路上に無い（Untrust→Trust の直通が生きたまま）ケースが典型。docker network の所属を再確認する。</li>
+<li><strong>ループリダイレクトになる</strong>: セッションクッキーのドメイン設定や、IAP と Keycloak の時刻ズレ（NTP）が原因になることがある。<code>docker logs</code> で Keycloak 側のトークン検証エラーを確認する。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a>（認証フロー）</li>
+<li><a href="../04_%E6%A7%8B%E7%AF%89/phase2_iap/README.html">phase2_iap 構築スタブ</a></li>
+<li><a href="phase1_%E8%A7%A3%E8%AA%AC.html">phase1_解説</a></li>
+<li><a href="../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a></li>
+<li><a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-このフェーズで何が実現されるか">1. このフェーズで何が実現されるか</a></li>
+<li class="lvl-2"><a href="#2-なぜこの構成か">2. なぜこの構成か</a></li>
+<li class="lvl-2"><a href="#3-仕組みの核心">3. 仕組みの核心</a></li>
+<li class="lvl-2"><a href="#4-自分で触って確認する手順実装後にこの手順で確認">4. 自分で触って確認する手順（実装後にこの手順で確認）</a></li>
+<li class="lvl-3"><a href="#手順1-未認証アクセスが拒否されることを確認するt-2-1">手順1: 未認証アクセスが拒否されることを確認する（T-2-1）</a></li>
+<li class="lvl-3"><a href="#手順2-keycloak-でログインした後にアクセスできることを確認するt-2-2">手順2: Keycloak でログインした後にアクセスできることを確認する（T-2-2）</a></li>
+<li class="lvl-3"><a href="#手順3-untrusttrust-の直通が不可であることを確認するt-2-3最重要">手順3: Untrust→Trust の直通が不可であることを確認する（T-2-3、最重要）</a></li>
+<li class="lvl-3"><a href="#手順4-認可-allowdeny-のログを確認する">手順4: 認可 allow/deny のログを確認する</a></li>
+<li class="lvl-2"><a href="#5-考えどころ">5. 考えどころ</a></li>
+<li class="lvl-2"><a href="#6-つまずきポイント">6. つまずきポイント</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

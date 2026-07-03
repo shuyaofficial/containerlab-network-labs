@@ -1,0 +1,23 @@
+name: hsrp-vrrp
+topology:
+  kinds:
+    cisco_iol:
+      type: l2
+  nodes:
+    sw1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+    sw2:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+    sw3:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-15.2
+    pc1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-15.2
+
+  links:
+    - endpoints: ["sw1:eth1", "sw3:eth1"]
+    - endpoints: ["sw2:eth1", "sw3:eth2"]
+    - endpoints: ["sw3:eth3", "pc1:eth1"]

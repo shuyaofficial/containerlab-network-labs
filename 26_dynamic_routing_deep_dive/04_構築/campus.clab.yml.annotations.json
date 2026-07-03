@@ -1,0 +1,89 @@
+{
+  "freeTextAnnotations": [],
+  "freeShapeAnnotations": [],
+  "trafficRateAnnotations": [],
+  "groupStyleAnnotations": [],
+  "networkNodeAnnotations": [],
+  "nodeAnnotations": [
+    {
+      "id": "hq-core",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 440,
+        "y": 20
+      }
+    },
+    {
+      "id": "hq-dist",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 380,
+        "y": 120
+      }
+    },
+    {
+      "id": "hq-edge",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 440,
+        "y": -80
+      }
+    },
+    {
+      "id": "hq-dmz",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 500,
+        "y": 120
+      }
+    },
+    {
+      "id": "br-core",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 700,
+        "y": 100
+      }
+    },
+    {
+      "id": "br-edge",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 700,
+        "y": -80
+      }
+    },
+    {
+      "id": "isp",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 560,
+        "y": -180
+      }
+    },
+    {
+      "id": "hq-pc",
+      "position": {
+        "x": 380,
+        "y": 240
+      }
+    },
+    {
+      "id": "br-pc",
+      "position": {
+        "x": 700,
+        "y": 240
+      }
+    },
+    {
+      "id": "dmz-srv",
+      "position": {
+        "x": 500,
+        "y": 240
+      }
+    }
+  ],
+  "edgeAnnotations": [],
+  "aliasEndpointAnnotations": [],
+  "viewerSettings": {}
+}

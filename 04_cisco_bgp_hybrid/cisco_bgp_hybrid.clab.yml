@@ -1,0 +1,16 @@
+name: cisco-bgp-hybrid
+
+topology:
+  kinds:
+    cisco_iol:
+      image: vrnetlab/cisco_iol:15.6.3M3a
+  nodes:
+    r1:
+      kind: cisco_iol
+    r2:
+      kind: cisco_iol
+    r3:
+      kind: cisco_iol
+  links:
+    - endpoints: ["r1:Ethernet0/1", "r2:Ethernet0/1"]
+    - endpoints: ["r2:Ethernet0/2", "r3:Ethernet0/1"]

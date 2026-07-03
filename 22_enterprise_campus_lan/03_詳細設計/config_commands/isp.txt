@@ -1,0 +1,19 @@
+enable
+configure terminal
+hostname isp
+ip routing
+no ip domain-lookup
+interface Loopback0
+ip address 8.8.8.8 255.255.255.255
+interface Ethernet0/1
+no switchport
+ip address 200.0.1.254 255.255.255.0
+no shutdown
+interface Ethernet0/2
+no switchport
+ip address 200.0.3.254 255.255.255.0
+no shutdown
+interface Ethernet0/3
+shutdown
+end
+write memory

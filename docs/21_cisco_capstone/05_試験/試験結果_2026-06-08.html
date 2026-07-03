@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>試験結果（疎通・正常性確認）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>21_cisco_capstone</span>
+<span class="sep">/</span>
+<span>05_試験</span></nav>
+      <h1 class="doc-title">試験結果（疎通・正常性確認）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<ul>
+<li><strong>日付</strong>: 2026-06-08</li>
+<li><strong>対象</strong>: capstone ラボ（全6台 Cisco IOL + PC 2台）</li>
+<li><strong>総合判定</strong>: ✅ <strong>全項目 PASS</strong></li>
+<li><strong>関連</strong>: 構築の経緯・根本原因は <code>04_構築/構築ログ_2026-06-08.md</code> を参照。</li>
+</ul>
+<hr>
+<h2 id="0-試験項目サマリ" tabindex="-1">0. 試験項目サマリ <a class="header-anchor" href="#0-試験項目サマリ" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:left">#</th>
+<th style="text-align:left">試験項目</th>
+<th style="text-align:left">期待値</th>
+<th style="text-align:center">結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">T1</td>
+<td style="text-align:left">全6台の管理SSH疎通</td>
+<td style="text-align:left">6台すべてSSH可（core含む）</td>
+<td style="text-align:center">✅ PASS</td>
+</tr>
+<tr>
+<td style="text-align:left">T2</td>
+<td style="text-align:left">OSPF 隣接</td>
+<td style="text-align:left">hq-core1 で3隣接が <code>FULL</code></td>
+<td style="text-align:center">✅ PASS</td>
+</tr>
+<tr>
+<td style="text-align:left">T3</td>
+<td style="text-align:left">HSRP（VLAN10）</td>
+<td style="text-align:left">core1=Active(150) / core2=Standby(100), VIP 10.1.10.254</td>
+<td style="text-align:center">✅ PASS</td>
+</tr>
+<tr>
+<td style="text-align:left">T4</td>
+<td style="text-align:left">EtherChannel（コア間）</td>
+<td style="text-align:left"><code>Po1(SU)</code> LACP, Et1/1・Et1/2 bundled</td>
+<td style="text-align:center">✅ PASS</td>
+</tr>
+<tr>
+<td style="text-align:left">T5</td>
+<td style="text-align:left">eBGP（対ISP）</td>
+<td style="text-align:left">edge1/edge2 とも <code>Established</code>、デフォルト受信</td>
+<td style="text-align:center">✅ PASS</td>
+</tr>
+<tr>
+<td style="text-align:left">T6</td>
+<td style="text-align:left">デフォルトルート伝播</td>
+<td style="text-align:left">edge=BGP由来 / core=OSPF E2</td>
+<td style="text-align:center">✅ PASS</td>
+</tr>
+<tr>
+<td style="text-align:left">T7</td>
+<td style="text-align:left">本社PC→インターネット</td>
+<td style="text-align:left"><code>8.8.8.8</code> へ ping 0% loss（HSRP-GW経由）</td>
+<td style="text-align:center">✅ PASS</td>
+</tr>
+<tr>
+<td style="text-align:left">T8</td>
+<td style="text-align:left">支社PC→インターネット</td>
+<td style="text-align:left"><code>8.8.8.8</code> へ ping 0% loss（br-edge経由）</td>
+<td style="text-align:center">✅ PASS</td>
+</tr>
+<tr>
+<td style="text-align:left">T9</td>
+<td style="text-align:left">NAT（PAT）変換</td>
+<td style="text-align:left">edge1/br-edge で変換エントリ生成</td>
+<td style="text-align:center">✅ PASS</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="t1-管理ssh疎通全6台" tabindex="-1">T1. 管理SSH疎通（全6台） <a class="header-anchor" href="#t1-管理ssh疎通全6台" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th style="text-align:left">機器</th>
+<th style="text-align:left">管理IP</th>
+<th style="text-align:center">結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">isp</td>
+<td style="text-align:left">172.20.20.11</td>
+<td style="text-align:center">✅ <code>hostname isp</code></td>
+</tr>
+<tr>
+<td style="text-align:left">hq-edge1</td>
+<td style="text-align:left">172.20.20.12</td>
+<td style="text-align:center">✅ <code>hostname hq-edge1</code></td>
+</tr>
+<tr>
+<td style="text-align:left">hq-edge2</td>
+<td style="text-align:left">172.20.20.13</td>
+<td style="text-align:center">✅ <code>hostname hq-edge2</code></td>
+</tr>
+<tr>
+<td style="text-align:left">br-edge</td>
+<td style="text-align:left">172.20.20.14</td>
+<td style="text-align:center">✅ <code>hostname br-edge</code></td>
+</tr>
+<tr>
+<td style="text-align:left">hq-core1</td>
+<td style="text-align:left">172.20.20.21</td>
+<td style="text-align:center">✅ <code>hostname hq-core1</code></td>
+</tr>
+<tr>
+<td style="text-align:left">hq-core2</td>
+<td style="text-align:left">172.20.20.22</td>
+<td style="text-align:center">✅ <code>hostname hq-core2</code></td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="t2-ospf-隣接hq-core1" tabindex="-1">T2. OSPF 隣接（hq-core1） <a class="header-anchor" href="#t2-ospf-隣接hq-core1" aria-hidden="true">#</a></h2>
+<pre><code>hq-core1#show ip ospf neighbor
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+4.4.4.4           1   FULL/BDR        00:00:37    10.1.10.253     Vlan10
+2.2.2.2           1   FULL/BDR        00:00:30    10.0.0.9        Ethernet0/2
+1.1.1.1           1   FULL/BDR        00:00:38    10.0.0.1        Ethernet0/1
+</code></pre>
+<p>→ core2(4.4.4.4) / edge2(2.2.2.2) / edge1(1.1.1.1) と <strong>3隣接すべて FULL</strong>。</p>
+<hr>
+<h2 id="t3-hsrpvlan10" tabindex="-1">T3. HSRP（VLAN10） <a class="header-anchor" href="#t3-hsrpvlan10" aria-hidden="true">#</a></h2>
+<pre><code>hq-core1#show standby brief
+Interface   Grp  Pri P State   Active          Standby         Virtual IP
+Vl10        10   150 P Active  local           10.1.10.253     10.1.10.254
+
+hq-core2#show standby brief
+Interface   Grp  Pri P State   Active          Standby         Virtual IP
+Vl10        10   100 P Standby 10.1.10.252     local           10.1.10.254
+</code></pre>
+<p>→ <strong>core1=Active(pri150) / core2=Standby(pri100)</strong>、仮想IP <code>10.1.10.254</code>、preempt 有効。設計どおり。</p>
+<hr>
+<h2 id="t4-etherchannelコア間-po1--lacp" tabindex="-1">T4. EtherChannel（コア間 Po1 / LACP） <a class="header-anchor" href="#t4-etherchannelコア間-po1--lacp" aria-hidden="true">#</a></h2>
+<pre><code>hq-core1#show etherchannel summary
+Number of channel-groups in use: 1
+Number of aggregators:           1
+
+Group  Port-channel  Protocol    Ports
+------+-------------+-----------+-----------------------------------------------
+1      Po1(SU)         LACP      Et1/1(P)    Et1/2(P)
+</code></pre>
+<p>→ <code>Po1(SU)</code>（S=Layer2, U=in use）、Et1/1・Et1/2 とも <code>(P)=bundled</code>。LACP 正常。</p>
+<hr>
+<h2 id="t5-ebgp対-isp" tabindex="-1">T5. eBGP（対 ISP） <a class="header-anchor" href="#t5-ebgp対-isp" aria-hidden="true">#</a></h2>
+<pre><code>hq-edge1#show ip bgp summary | begin Neighbor
+Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+200.0.1.254     4        65000      21      20        2    0    0 00:15:42        1
+
+hq-edge2#show ip bgp summary | begin Neighbor
+Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+200.0.2.254     4        65000      21      20        2    0    0 00:15:33        1
+</code></pre>
+<p>→ edge1/edge2 とも ISP(AS65000) と Established、<code>PfxRcd=1</code>（デフォルトルート受信）。Up時間も安定。</p>
+<hr>
+<h2 id="t6-デフォルトルート伝播" tabindex="-1">T6. デフォルトルート伝播 <a class="header-anchor" href="#t6-デフォルトルート伝播" aria-hidden="true">#</a></h2>
+<pre><code>hq-edge1#show ip route 0.0.0.0
+Routing entry for 0.0.0.0/0, supernet
+  Known via &quot;bgp 65001&quot;, distance 20, metric 0, candidate default path
+  * 200.0.1.254, from 200.0.1.254 ...
+
+hq-core1#show ip route 0.0.0.0
+Routing entry for 0.0.0.0/0, supernet
+  Known via &quot;ospf 1&quot;, distance 110, metric 1, candidate default path
+  Tag 1, type extern 2, forward metric 10
+  * 10.0.0.9, from 2.2.2.2, via Ethernet0/2
+    10.0.0.1, from 1.1.1.1, via Ethernet0/1
+</code></pre>
+<p>→ edge は BGP 由来、core は OSPF <strong>E2</strong> で学習（edge1/edge2 両方経由＝ECMP）。
+（補足: IOSの <code>show ip route 8.8.8.8</code>（ホスト指定）は仕様上デフォルト経路を表示せず <code>% Network not in table</code> を返すが、<code>show ip route 0.0.0.0</code> のとおりデフォルト経路は導入済み。実際の疎通は T7/T8 で確認。）</p>
+<hr>
+<h2 id="t7-本社pchq-pc-sales-10110100-インターネット" tabindex="-1">T7. 本社PC（HQ-PC-Sales 10.1.10.100）→ インターネット <a class="header-anchor" href="#t7-本社pchq-pc-sales-10110100-インターネット" aria-hidden="true">#</a></h2>
+<pre><code>hq-pc-sales:~# ping -c 3 10.1.10.254   # HSRP 仮想GW
+3 packets transmitted, 3 received, 0% packet loss
+
+hq-pc-sales:~# ping -c 3 8.8.8.8         # NAT 越しインターネット
+64 bytes from 8.8.8.8: icmp_seq=3 ttl=253 time=4.55 ms
+3 packets transmitted, 3 received, 0% packet loss
+</code></pre>
+<p>→ GW（HSRP-VIP）・インターネットとも <strong>0% loss</strong>。経路: PC → core(HSRP) → OSPFデフォルト → edge → NAT → ISP(8.8.8.8)。</p>
+<hr>
+<h2 id="t8-支社pcbr-pc-10240100-インターネット" tabindex="-1">T8. 支社PC（BR-PC 10.2.40.100）→ インターネット <a class="header-anchor" href="#t8-支社pcbr-pc-10240100-インターネット" aria-hidden="true">#</a></h2>
+<pre><code>br-pc:~# ping -c 3 10.2.40.254          # 支社GW(br-edge)
+3 packets transmitted, 3 received, 0% packet loss
+
+br-pc:~# ping -c 3 8.8.8.8                # NAT 越しインターネット
+64 bytes from 8.8.8.8: icmp_seq=3 ttl=254 time=2.29 ms
+3 packets transmitted, 3 received, 0% packet loss
+</code></pre>
+<p>→ GW・インターネットとも <strong>0% loss</strong>。経路: PC → br-edge → 静的デフォルト → NAT → ISP(8.8.8.8)。</p>
+<hr>
+<h2 id="t9-natpat変換テーブル" tabindex="-1">T9. NAT（PAT）変換テーブル <a class="header-anchor" href="#t9-natpat変換テーブル" aria-hidden="true">#</a></h2>
+<pre><code>hq-edge1#show ip nat translations
+Pro Inside global      Inside local       Outside local      Outside global
+icmp 200.0.1.1:4140    10.1.10.100:4140   8.8.8.8:4140       8.8.8.8:4140
+
+br-edge#show ip nat translations
+Pro Inside global      Inside local       Outside local      Outside global
+icmp 200.0.3.1:35446   10.2.40.100:35446  8.8.8.8:35446      8.8.8.8:35446
+</code></pre>
+<p>→ 本社: <code>10.1.10.100 → 200.0.1.1</code>、支社: <code>10.2.40.100 → 200.0.3.1</code> で <strong>PAT 変換が実機動作</strong>していることを確認。</p>
+<hr>
+<h2 id="参考-採取コマンドclab-マシン内で実行" tabindex="-1">参考: 採取コマンド（clab マシン内で実行） <a class="header-anchor" href="#参考-採取コマンドclab-マシン内で実行" aria-hidden="true">#</a></h2>
+<pre><code class="language-bash">SSH_OPTS=<span class="hljs-string">&quot;-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 \
+-o KexAlgorithms=+diffie-hellman-group14-sha1 -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa&quot;</span>
+<span class="hljs-function"><span class="hljs-title">run</span></span>() { <span class="hljs-built_in">printf</span> <span class="hljs-string">&quot;terminal length 0\n%b\nexit\n&quot;</span> <span class="hljs-string">&quot;<span class="hljs-variable">$2</span>&quot;</span> | sshpass -p admin ssh <span class="hljs-variable">$SSH_OPTS</span> admin@<span class="hljs-variable">$1</span>; }
+<span class="hljs-comment"># 例: run 172.20.20.21 &quot;show ip ospf neighbor\nshow standby brief\nshow etherchannel summary&quot;</span>
+<span class="hljs-comment"># PC: sudo docker exec clab-capstone-hq-pc-sales ping -c 3 8.8.8.8</span>
+</code></pre>
+<p>※ IOS への show 投入は <code>;</code> 区切りでは動かないため、<strong>標準入力にコマンドを流し込む</strong>方式を使う。</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#0-試験項目サマリ">0. 試験項目サマリ</a></li>
+<li class="lvl-2"><a href="#t1-管理ssh疎通全6台">T1. 管理SSH疎通（全6台）</a></li>
+<li class="lvl-2"><a href="#t2-ospf-隣接hq-core1">T2. OSPF 隣接（hq-core1）</a></li>
+<li class="lvl-2"><a href="#t3-hsrpvlan10">T3. HSRP（VLAN10）</a></li>
+<li class="lvl-2"><a href="#t4-etherchannelコア間-po1--lacp">T4. EtherChannel（コア間 Po1 / LACP）</a></li>
+<li class="lvl-2"><a href="#t5-ebgp対-isp">T5. eBGP（対 ISP）</a></li>
+<li class="lvl-2"><a href="#t6-デフォルトルート伝播">T6. デフォルトルート伝播</a></li>
+<li class="lvl-2"><a href="#t7-本社pchq-pc-sales-10110100-インターネット">T7. 本社PC（HQ-PC-Sales 10.1.10.100）→ インターネット</a></li>
+<li class="lvl-2"><a href="#t8-支社pcbr-pc-10240100-インターネット">T8. 支社PC（BR-PC 10.2.40.100）→ インターネット</a></li>
+<li class="lvl-2"><a href="#t9-natpat変換テーブル">T9. NAT（PAT）変換テーブル</a></li>
+<li class="lvl-2"><a href="#参考-採取コマンドclab-マシン内で実行">参考: 採取コマンド（clab マシン内で実行）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

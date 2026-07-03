@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>📖 Cisco IOL BGP応用（eBGP / iBGP混在）手動構築ガイド</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>04_cisco_bgp_hybrid</span></nav>
+      <h1 class="doc-title">📖 Cisco IOL BGP応用（eBGP / iBGP混在）手動構築ガイド</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>本ファイルは、メンターである私（AI）との対話を通じて、完全に真っ白なCisco IOLルータ3台を手動でBGP（eBGP/iBGP混在）接続していくステップバイステップの進行記録ガイドです。</p>
+<hr>
+<h2 id="-トポロジーと設計要件" tabindex="-1">🗺️ トポロジーと設計要件 <a class="header-anchor" href="#-トポロジーと設計要件" aria-hidden="true">#</a></h2>
+<p>R1-R2間を異なるAS（eBGP）で結び、R2-R3間を同じAS（iBGP）で結ぶ直線構成を設計します。</p>
+<pre><code class="language-text">           [ AS 65001 ]                     [ AS 65002 (同一AS組織) ]
+         +--------------+                 +--------------+                 +--------------+
+         |      R1      |                 |      R2      |                 |      R3      |
+         |  Loopback0:  |                 |  Loopback0:  |                 |  Loopback0:  |
+         |   1.1.1.1    |                 |   2.2.2.2    |                 |   3.3.3.3    |
+         +------+-------+                 +------+-------+                 +------+-------+
+                | Ethernet0/1                    | Ethernet0/1                    | Ethernet0/1
+                | .1                             | .2 (Eth0/2: .2)                | .3
+                +--------------------------------+--------------------------------+
+                        192.168.12.0/24                  192.168.23.0/24
+                            [ eBGP ]                         [ iBGP ]
+</code></pre>
+<h3 id="インターフェースbgp設計" tabindex="-1">インターフェース＆BGP設計 <a class="header-anchor" href="#インターフェースbgp設計" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>デバイス</th>
+<th>インターフェース</th>
+<th>IPアドレス / サブネット</th>
+<th>BGP AS番号</th>
+<th>接続相手</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>R1</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>1.1.1.1/32</code></td>
+<td><strong>AS 65001</strong></td>
+<td>(eBGP)</td>
+</tr>
+<tr>
+<td></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.12.1/24</code></td>
+<td></td>
+<td>R2 (<code>192.168.12.2</code>)</td>
+</tr>
+<tr>
+<td><strong>R2</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>2.2.2.2/32</code></td>
+<td><strong>AS 65002</strong></td>
+<td>(境界ルータ)</td>
+</tr>
+<tr>
+<td></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.12.2/24</code></td>
+<td></td>
+<td>R1 (<code>192.168.12.1</code>)</td>
+</tr>
+<tr>
+<td></td>
+<td><code>Ethernet0/2</code></td>
+<td><code>192.168.23.2/24</code></td>
+<td></td>
+<td>R3 (<code>192.168.23.3</code>)</td>
+</tr>
+<tr>
+<td><strong>R3</strong></td>
+<td><code>Loopback0</code></td>
+<td><code>3.3.3.3/32</code></td>
+<td><strong>AS 65002</strong></td>
+<td>(iBGP)</td>
+</tr>
+<tr>
+<td></td>
+<td><code>Ethernet0/1</code></td>
+<td><code>192.168.23.3/24</code></td>
+<td></td>
+<td>R2 (<code>192.168.23.2</code>)</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="-step-1-物理トポロジーの起動とログイン" tabindex="-1">🏁 STEP 1: 物理トポロジーの起動とログイン <a class="header-anchor" href="#-step-1-物理トポロジーの起動とログイン" aria-hidden="true">#</a></h2>
+<h3 id="1-機器の-cli-へのログイン方法" tabindex="-1">1. 機器の CLI へのログイン方法 <a class="header-anchor" href="#1-機器の-cli-へのログイン方法" aria-hidden="true">#</a></h3>
+<p>Cisco IOLイメージには初期IPやSSH設定が入っていないため、**コンソール接続（docker attach）**でログインします。</p>
+<ul>
+<li><strong>R1 に接続:</strong><pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker attach clab-cisco-bgp-hybrid-r1
+</code></pre>
+</li>
+<li><strong>R2 に接続:</strong><pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker attach clab-cisco-bgp-hybrid-r2
+</code></pre>
+</li>
+<li><strong>R3 に接続:</strong><pre><code class="language-bash"><span class="hljs-built_in">sudo</span> docker attach clab-cisco-bgp-hybrid-r3
+</code></pre>
+</li>
+</ul>
+<blockquote>
+<p>[!CAUTION]
+<strong>コンソールからの切断方法:</strong>
+アタッチしたコンソールから抜ける（ホストに戻る）ときは、<strong><code>Ctrl + P</code> の後に <code>Ctrl + Q</code></strong> を順番に押してください。</p>
+</blockquote>
+<hr>
+<h2 id="-ミッション一覧" tabindex="-1">🛠️ ミッション一覧 <a class="header-anchor" href="#-ミッション一覧" aria-hidden="true">#</a></h2>
+<h3 id="-mission-1-ipアドレス設定と-ebgpr1-r2接続-step-1" tabindex="-1">💻 Mission 1: IPアドレス設定と eBGP（R1-R2）接続 (STEP 1) <a class="header-anchor" href="#-mission-1-ipアドレス設定と-ebgpr1-r2接続-step-1" aria-hidden="true">#</a></h3>
+<p>R1、R2、R3のすべての物理ポートおよびLoopbackのIPアドレスを設定し、eBGP部分を開通させます。</p>
+<ul>
+<li><strong>設定手順:</strong>
+<ol>
+<li>R1, R2, R3のすべてのインターフェースに設計通りのIPアドレスを投入し、<code>no shutdown</code> で有効化します。</li>
+<li>R1とR2の間で <strong>eBGPネイバー</strong> を確立します。
+<ul>
+<li>R1: <code>router bgp 65001</code> / <code>neighbor 192.168.12.2 remote-as 65002</code></li>
+<li>R2: <code>router bgp 65002</code> / <code>neighbor 192.168.12.1 remote-as 65001</code></li>
+</ul>
+</li>
+<li>R1で Loopback0（<code>1.1.1.1</code>）をBGPで広告（<code>network 1.1.1.1 mask 255.255.255.255</code>）します。</li>
+<li>R2で <code>show ip bgp</code> を実行し、<code>1.1.1.1/32</code> が <strong><code>*&gt;</code> (ベストルート)</strong> で届いていることを確認します。</li>
+</ol>
+</li>
+</ul>
+<hr>
+<h3 id="-mission-2-ibgpピアの確立とnext-hop-unreachableの観測-step-2" tabindex="-1">💻 Mission 2: iBGPピアの確立と「Next-Hop Unreachable」の観測 (STEP 2) <a class="header-anchor" href="#-mission-2-ibgpピアの確立とnext-hop-unreachableの観測-step-2" aria-hidden="true">#</a></h3>
+<p>同じAS内（AS 65002）にあるR2とR3の間で <strong>iBGPネイバー</strong> を確立し、ルートの伝播の様子を観測します。</p>
+<ul>
+<li><strong>設定手順:</strong>
+<ol>
+<li>R2とR3の間で iBGPネイバーを確立します。（AS番号が同じ <code>65002</code> 同士になります）
+<ul>
+<li>R2: <code>router bgp 65002</code> / <code>neighbor 192.168.23.3 remote-as 65002</code></li>
+<li>R3: <code>router bgp 65002</code> / <code>neighbor 192.168.23.2 remote-as 65002</code></li>
+</ul>
+</li>
+<li><strong>R3のコンソール</strong>で、BGPテーブルを確認します。<pre><code class="language-ios">show ip bgp
+</code></pre>
+</li>
+<li><strong>【観測ポイント】</strong>
+R1の <code>1.1.1.1/32</code> はR3に届いているでしょうか？
+届いている場合、先頭のマークは <strong><code>*&gt;</code></strong> になっているでしょうか？それとも、<code>*</code>（Valid）も <code>&gt;</code>（Best）も付かない不思議な状態でしょうか？
+また、R3で <code>show ip route</code> を実行して、BGPルートが載っているか確認してみてください。</li>
+</ol>
+</li>
+</ul>
+<hr>
+<h3 id="-mission-3-next-hop-self-による解決と疎通確認-step-3" tabindex="-1">💻 Mission 3: <code>next-hop-self</code> による解決と疎通確認 (STEP 3) <a class="header-anchor" href="#-mission-3-next-hop-self-による解決と疎通確認-step-3" aria-hidden="true">#</a></h3>
+<p>eBGPから学習したルートをiBGP隣人に伝える際、BGPのデフォルト仕様では「ネクストホップアドレスが書き換わらない」という性質があります。この問題を解決します。</p>
+<ul>
+<li><strong>デバッグ手順:</strong>
+<ol>
+<li>R2で、iBGPの隣人（R3）に向けて、ネクストホップを自分自身（R2）のアドレスに書き換えて送るように設定（<code>next-hop-self</code>）を追加します。<pre><code class="language-ios">router bgp 65002
+ neighbor 192.168.23.3 next-hop-self
+</code></pre>
+</li>
+<li>再び<strong>R3のコンソール</strong>で <code>show ip bgp</code> を実行し、ネクストホップのアドレスが <code>192.168.23.2</code>（R2）に書き換わり、先頭に <strong><code>*&gt;</code></strong> が点灯することを確認します。</li>
+<li>R3で <code>show ip route bgp</code> を実行し、ルーティングテーブルに登録されたことを確認します。</li>
+<li>R3から <code>ping 1.1.1.1</code> が無事に開通することを確認します！</li>
+</ol>
+</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-トポロジーと設計要件">🗺️ トポロジーと設計要件</a></li>
+<li class="lvl-3"><a href="#インターフェースbgp設計">インターフェース＆BGP設計</a></li>
+<li class="lvl-2"><a href="#-step-1-物理トポロジーの起動とログイン">🏁 STEP 1: 物理トポロジーの起動とログイン</a></li>
+<li class="lvl-3"><a href="#1-機器の-cli-へのログイン方法">1. 機器の CLI へのログイン方法</a></li>
+<li class="lvl-2"><a href="#-ミッション一覧">🛠️ ミッション一覧</a></li>
+<li class="lvl-3"><a href="#-mission-1-ipアドレス設定と-ebgpr1-r2接続-step-1">💻 Mission 1: IPアドレス設定と eBGP（R1-R2）接続 (STEP 1)</a></li>
+<li class="lvl-3"><a href="#-mission-2-ibgpピアの確立とnext-hop-unreachableの観測-step-2">💻 Mission 2: iBGPピアの確立と「Next-Hop Unreachable」の観測 (STEP 2)</a></li>
+<li class="lvl-3"><a href="#-mission-3-next-hop-self-による解決と疎通確認-step-3">💻 Mission 3: next-hop-self による解決と疎通確認 (STEP 3)</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

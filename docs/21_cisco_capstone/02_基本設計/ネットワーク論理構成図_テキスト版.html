@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>ネットワーク論理構成図（テキスト版）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>21_cisco_capstone</span>
+<span class="sep">/</span>
+<span>02_基本設計</span></nav>
+      <h1 class="doc-title">ネットワーク論理構成図（テキスト版）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<pre><code class="language-text">====================================================================
+ [BGP AS 65000 / インターネット]
+====================================================================
+               (ISP)
+                 |
+        eBGP ピアリング (デフォルトルート受信)
+                 |
+====================================================================
+ [NAT境界 / BGP AS 65001 / 本社]
+====================================================================
+                 |                                       |
+  (200.0.1.1) [HQ-Edge1]                      [HQ-Edge2] (200.0.2.1)
+                 |                                       |
+                 |      【OSPF Area 0 (社内網)】         |
+                 |                                       |
+  (10.0.0.2) [HQ-Core1] ===================== [HQ-Core2] (10.0.0.6)
+            (HSRP Active)                   (HSRP Standby)
+                 |                                       |
+-----------------+---------------------------------------+----------
+                 |      【VLAN 10: 営業部 (10.1.10.0/24)】
+                 |                                       
+        [仮想IP (10.1.10.254)] &lt;--- PC群のデフォルトGW
+                 |
+        [HQ-PC-Sales] (10.1.10.100)
+
+====================================================================
+ [IPsec VPN トンネル]
+====================================================================
+HQ-Edge1 からインターネット越しに支社への暗号化通信
+                 |
+             [BR-Edge] (200.0.3.1)
+                 |
+-----------------+--------------------------------------------------
+                 |      【VLAN 40: 支社LAN (10.2.40.0/24)】
+                 |
+             [BR-PC] (10.2.40.100)
+
+■ ルーティングのポイント（論理層）
+・物理的に何本ケーブルが繋がっていようと、HQ-Core1/2の下は「1つのVLAN10」という論理空間です。
+・HSRPの仮想IPがあるため、PCから見ると「1台のルーター（10.1.10.254）」にしか見えません。
+・IPsecトンネルがあるため、論理的にはHQ-Edge1とBR-Edgeは「直結」されているように振る舞います。
+</code></pre>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <p class="toc-empty">（見出しなし）</p>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

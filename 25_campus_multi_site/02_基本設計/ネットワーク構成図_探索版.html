@@ -1,0 +1,813 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Theme 25｜Multi-Campus 構成図 探索版</title>
+<meta name="description" content="containerlabで組んだMulti-Campus(OSPF10/20 + eBGP)ラボを、ドラッグ回転・スクロールカメラ・クリック詳細で探索するインタラクティブ構成図。物理/論理レイヤーを切り替えて理解する。">
+<style>
+  :root{
+    --bg-0:#0B0F1A; --bg-1:#111827; --bg-2:#0E1322;
+    --text:#E5E7EB; --muted:#9CA3AF; --faint:#6B7280;
+    --line:rgba(255,255,255,.09); --card:rgba(255,255,255,.045);
+    --cyan:#22D3EE;   /* Main Campus / OSPF10 */
+    --green:#34D399;  /* Branch Campus / OSPF20 */
+    --violet:#8B5CF6; /* eBGP境界 / Edge */
+    --indigo:#818CF8; /* Edge(物理) */
+    --silver:#CBD5E1; /* 物理ニュートラル */
+    --amber:#FBBF24;  /* 集約強調 */
+    --grad:linear-gradient(92deg,#22D3EE 0%,#8B5CF6 100%);
+    --radius-lg:20px; --radius-md:14px; --radius-sm:9px;
+    --dur:480ms; --dur-fast:200ms; --ease:cubic-bezier(.22,1,.36,1);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg-0); color:var(--text);
+    font-family:system-ui,-apple-system,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+    line-height:1.7;
+  }
+  .mono{font-family:"SF Mono",SFMono-Regular,Menlo,Consolas,monospace}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+  a{color:var(--cyan)}
+  #bg-canvas{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+  #progress{position:fixed;top:0;left:0;height:3px;width:0;background:var(--grad);z-index:50;transition:width .1s linear}
+
+  .dotnav{position:fixed;right:18px;top:50%;transform:translateY(-50%);z-index:40;display:flex;flex-direction:column;gap:14px}
+  .dotnav a{position:relative;display:block;width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.18);text-decoration:none}
+  .dotnav a span{position:absolute;right:18px;top:50%;transform:translateY(-50%);white-space:nowrap;font-size:.72rem;color:var(--muted);opacity:0;transition:opacity .18s}
+  .dotnav a:hover span{opacity:1}
+  .dotnav a.active{background:var(--cyan);box-shadow:0 0 10px var(--cyan)}
+  @media (max-width:900px){ .dotnav{display:none} }
+
+  main.page{position:relative;z-index:1}
+
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease)}
+  .reveal.visible{opacity:1;transform:none}
+  .reveal.d1{transition-delay:.06s} .reveal.d2{transition-delay:.12s} .reveal.d3{transition-delay:.18s}
+
+  .kicker{display:inline-flex;align-items:center;gap:8px;margin:0 0 14px;color:var(--cyan);font-size:.74rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
+  .kicker::before{content:"";width:26px;height:2px;background:currentColor}
+  .grad-text{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .eyebrow{margin:0 0 8px;color:var(--violet);font-size:.72rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
+  .h{margin:0 0 6px;font-size:clamp(1.5rem,1.1rem + 1.8vw,2.3rem);letter-spacing:-.02em}
+  .lead{margin:0;color:var(--muted);font-size:clamp(.92rem,.86rem + .3vw,1.05rem);max-width:760px}
+
+  .hero{min-height:78vh;display:flex;align-items:center;padding:120px 0 60px}
+  .hero h1{margin:0 0 18px;font-size:clamp(1.9rem,1.1rem + 4.2vw,3.4rem);line-height:1.18;letter-spacing:-.03em;max-width:820px}
+  .reduced-note{max-width:700px;margin:16px 0 0;padding:10px 14px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--card);color:var(--muted);font-size:.82rem}
+  .scrollcue{display:inline-flex;align-items:center;gap:10px;margin-top:30px;color:var(--muted);font-size:.8rem;font-weight:700;letter-spacing:.04em}
+  .chev{display:inline-block;animation:bob 1.6s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(6px)}}
+
+  /* ---------------- pinned topology stage ---------------- */
+  .stage-wrap{position:relative;height:500vh}
+  .stage-pin{position:sticky;top:0;height:100vh;overflow:hidden;background:
+      radial-gradient(ellipse at 50% 30%,rgba(139,92,246,.10),transparent 60%),
+      radial-gradient(ellipse at 20% 80%,rgba(34,211,238,.08),transparent 55%),
+      var(--bg-1)}
+  #topo-canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:pan-y}
+
+  .stage-caption{position:absolute;left:24px;top:26px;z-index:6;max-width:min(94vw,420px);pointer-events:none}
+  .cap-count{display:inline-block;margin-bottom:6px;padding:3px 10px;border-radius:999px;background:rgba(34,211,238,.12);color:var(--cyan);font-size:.68rem;font-weight:800;letter-spacing:.1em}
+  .stage-caption h2{margin:0 0 6px;font-size:clamp(1.1rem,1vw + 1rem,1.5rem);letter-spacing:-.01em}
+  .stage-caption p{margin:0;color:var(--muted);font-size:.85rem}
+
+  .layer-toggle{position:absolute;right:24px;top:26px;z-index:6;display:flex;gap:2px;padding:3px;border:1px solid var(--line);border-radius:999px;background:rgba(11,15,26,.8);backdrop-filter:blur(6px)}
+  .lt-btn{border:0;padding:8px 16px;border-radius:999px;background:transparent;color:var(--muted);font:inherit;font-weight:700;font-size:.82rem;cursor:pointer;transition:background .18s,color .18s}
+  .lt-btn:hover{color:var(--text)}
+  .lt-btn.active{background:var(--grad);color:#08111C}
+  .lt-btn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+
+  .legend{position:absolute;right:24px;top:76px;z-index:6;display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);background:rgba(11,15,26,.7);font-size:.72rem;color:var(--muted)}
+  .legend-item{display:flex;align-items:center;gap:8px}
+  .legend-dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+
+  .chapter-dots{position:absolute;left:24px;bottom:88px;z-index:6;display:flex;gap:8px}
+  .chapter-dots button{width:26px;height:6px;border-radius:4px;border:0;background:rgba(255,255,255,.16);cursor:pointer;padding:0;transition:background .2s,width .2s}
+  .chapter-dots button.active{background:var(--cyan);width:38px}
+  .chapter-dots button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+
+  .stage-hint{position:absolute;left:24px;bottom:60px;z-index:6;margin:0;color:var(--faint);font-size:.7rem}
+
+  .detail-panel{position:absolute;right:24px;bottom:24px;z-index:8;width:min(88vw,320px);max-height:60vh;overflow:auto;padding:18px;border:1px solid rgba(139,92,246,.35);border-radius:var(--radius-md);background:rgba(14,19,34,.94);backdrop-filter:blur(10px);box-shadow:0 20px 50px rgba(0,0,0,.4);transform:translateY(16px);opacity:0;pointer-events:none;transition:opacity var(--dur-fast) var(--ease),transform var(--dur-fast) var(--ease)}
+  .detail-panel.show{opacity:1;transform:none;pointer-events:auto}
+  .detail-close{position:absolute;right:10px;top:10px;width:26px;height:26px;border:0;border-radius:50%;background:rgba(255,255,255,.08);color:var(--text);font-size:1rem;line-height:1;cursor:pointer}
+  .detail-role{display:inline-block;margin-bottom:6px;padding:2px 9px;border-radius:999px;font-size:.68rem;font-weight:800;letter-spacing:.06em;color:#08111C}
+  .detail-panel h3{margin:0 0 10px;font-size:1.05rem}
+  .detail-panel dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:.8rem}
+  .detail-panel dt{color:var(--muted)}
+  .detail-panel dd{margin:0;color:var(--text);font-family:"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;overflow-wrap:anywhere}
+
+  .a11y-panel{position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden}
+  .a11y-panel:focus-within{position:absolute;left:24px;top:120px;width:min(80vw,300px);height:auto;padding:14px;border-radius:var(--radius-sm);background:rgba(11,15,26,.95);border:1px solid var(--line);z-index:20}
+  .a11y-lead{margin:0 0 8px;font-size:.72rem;color:var(--muted)}
+  #a11y-list button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--text);padding:.35rem 0;cursor:pointer;font-size:.8rem;border-bottom:1px solid var(--line)}
+  .a11y-jump{display:inline-block;margin-top:10px;font-size:.76rem}
+
+  @media (max-width:760px){
+    .stage-caption{max-width:78vw}
+    .legend{display:none}
+    .chapter-dots{bottom:120px}
+  }
+
+  /* ---------------- checklist ---------------- */
+  #checklist{padding:110px 0}
+  .na-grid{margin-top:26px;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+  .na-card{padding:16px 18px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--card)}
+  .na-badge{display:inline-block;margin-bottom:8px;padding:2px 10px;border-radius:999px;background:rgba(251,113,133,.14);color:#FB7185;font-size:.68rem;font-weight:800;letter-spacing:.06em}
+  .na-card h3{margin:0 0 6px;font-size:.98rem}
+  .na-card p{margin:0;color:var(--muted);font-size:.83rem}
+
+  /* ---------------- data appendix ---------------- */
+  #data{padding:20px 0 110px}
+  .data-details{margin-top:16px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--card);overflow:hidden}
+  .data-details summary{cursor:pointer;padding:16px 18px;font-weight:700;font-size:.9rem;list-style:none}
+  .data-details summary::-webkit-details-marker{display:none}
+  .data-details summary::before{content:"▸ ";color:var(--cyan)}
+  .data-details[open] summary::before{content:"▾ "}
+  .data-details-body{padding:0 18px 18px}
+  table.dtable{width:100%;border-collapse:collapse;font-size:.8rem;margin:0 0 22px}
+  table.dtable caption{text-align:left;font-weight:800;font-size:.86rem;margin-bottom:8px;color:var(--text)}
+  table.dtable th,table.dtable td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+  table.dtable thead th{background:rgba(255,255,255,.03);color:#CBD5E1;font-size:.72rem}
+  table.dtable td{color:var(--muted)}
+  table.dtable td.mono{font-family:"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;color:var(--text)}
+  .table-scroll{overflow-x:auto}
+  .table-scroll table{min-width:620px}
+
+  .colophon{padding:70px 0 90px;border-top:1px solid var(--line)}
+  .colophon .big{font-size:clamp(1.3rem,1vw + 1.4rem,2rem);margin:0 0 14px}
+  .colophon .meta{color:var(--faint);font-size:.78rem;max-width:760px}
+
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto}
+    .chev{animation:none}
+    .reveal{transition-duration:.001ms}
+  }
+</style>
+</head>
+<body>
+<canvas id="bg-canvas" aria-hidden="true"></canvas>
+<div id="progress" role="progressbar" aria-label="読み進み" aria-valuemin="0" aria-valuemax="100"></div>
+
+<nav class="dotnav" aria-label="セクション">
+  <a href="#hero" data-dot="hero"><span>はじめに</span></a>
+  <a href="#stage" data-dot="stage"><span>探索</span></a>
+  <a href="#checklist" data-dot="checklist"><span>対象外項目</span></a>
+  <a href="#data" data-dot="data"><span>詳細データ</span></a>
+</nav>
+
+<main class="page">
+
+  <section id="hero" class="hero">
+    <div class="wrap">
+      <p class="kicker reveal">Theme 25 · Multi-Campus · 探索版</p>
+      <h1 class="reveal d1"><span class="grad-text">同じ配線を、物理と論理、<br>2つのレンズで見る。</span></h1>
+      <p class="lead reveal d2">ドラッグで視点を回転、スクロールでMain Campus → WAN境界 → Branch Campusへとカメラが進みます。機器をクリックすると詳細が開き、右上の切替で「物理」と「論理」を行き来できます。</p>
+      <p class="reduced-note" id="reduced-note" hidden>お使いの環境はモーション低減設定です。自動回転・カメラの慣性・粒子アニメーションを止め、ドラッグ回転とクリック詳細のみ有効にしています。</p>
+      <span class="scrollcue reveal d3"><span class="chev" aria-hidden="true">↓</span>スクロールして探索</span>
+    </div>
+  </section>
+
+  <section id="stage" class="stage-wrap">
+    <div class="stage-pin">
+      <canvas id="topo-canvas" role="img" aria-label="Theme25 Multi-Campusのインタラクティブなネットワーク構成図。ドラッグで回転、クリックで機器の詳細が開く。"></canvas>
+
+      <div class="stage-caption" id="stage-caption">
+        <span class="cap-count" id="cap-count">1 / 5</span>
+        <h2 id="cap-title">全体像</h2>
+        <p id="cap-detail">Main CampusとBranch Campusが、eBGPで結ばれる2つの独立したOSPFドメインです。</p>
+      </div>
+
+      <div class="layer-toggle" role="group" aria-label="表示レイヤー切替">
+        <button type="button" class="lt-btn active" data-layer="physical" id="btn-physical" aria-pressed="true">物理</button>
+        <button type="button" class="lt-btn" data-layer="logical" id="btn-logical" aria-pressed="false">論理</button>
+      </div>
+
+      <div class="legend" id="legend" aria-hidden="true"></div>
+
+      <div class="chapter-dots" id="chapter-dots" aria-label="チャプター移動"></div>
+
+      <p class="stage-hint" aria-hidden="true">ドラッグで回転 ・ クリックで機器の詳細 ・ スクロールでカメラ移動</p>
+
+      <div class="detail-panel" id="detail" role="dialog" aria-label="機器の詳細">
+        <button class="detail-close" id="detail-close" aria-label="閉じる">×</button>
+        <span class="detail-role" id="detail-role"></span>
+        <h3 id="detail-name"></h3>
+        <dl id="detail-body"></dl>
+      </div>
+
+      <div class="a11y-panel">
+        <p class="a11y-lead">キーボード操作用の機器一覧:</p>
+        <div id="a11y-list"></div>
+        <a href="#data" class="a11y-jump">→ すべての数値データを表で見る</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="checklist">
+    <div class="wrap">
+      <p class="eyebrow reveal">Not applicable</p>
+      <h2 class="h reveal">このテーマで対象外の項目</h2>
+      <p class="lead reveal d1">L3ルーテッドアクセス構成のため、次の3項目は本テーマの設計に登場しない。他テーマ（VLAN/HSRP/FW中心の構成）と比較する際のチェック観点として使う。</p>
+      <div class="na-grid" id="na-mount"></div>
+    </div>
+  </section>
+
+  <section id="data">
+    <div class="wrap">
+      <p class="eyebrow reveal">Appendix</p>
+      <h2 class="h reveal">詳細データ表</h2>
+      <p class="lead reveal d1">キャンバス上のラベル・詳細パネルと同じ値を、検索・印刷できる表でも確認できる（表もラベルもこの1ファイル内の同じデータから生成）。</p>
+      <details class="data-details reveal">
+        <summary>物理データ表を開く（機器情報・リンク情報）</summary>
+        <div class="data-details-body" id="physical-tables"></div>
+      </details>
+      <details class="data-details reveal">
+        <summary>論理データ表を開く（L3アドレス・ルーティングドメイン・集約再配信）</summary>
+        <div class="data-details-body" id="logical-tables"></div>
+      </details>
+    </div>
+  </section>
+
+  <footer class="colophon">
+    <div class="wrap">
+      <p class="big grad-text">同じ配線、2つの見方。</p>
+      <p class="meta">本図は設計値。実投入前に <a href="基本設計書.md">基本設計書.md</a>・<a href="IPアドレス管理表.md">IPアドレス管理表.md</a>・<a href="../03_詳細設計/パラメータシート.md">パラメータシート.md</a>と照合すること。表形式で一覧したい場合は <a href="ネットワーク構成図.html">ネットワーク構成図.html</a>（タブ切替版）も参照。自己完結HTML・外部依存なし。Built with Claude Code。</p>
+    </div>
+  </footer>
+
+</main>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ================= データ（単一ソース。表もキャンバスもここから生成） ================= */
+  var NODES = [
+    { id:"main-pc", name:"main-pc", role:"pc", cluster:"main", pos:{x:-320,y:60,z:-40},
+      physical:{role:"Linux Endpoint（Main）", hw:"wbitt/network-multitool", os:"latest", mgmt:"172.25.25.101/24", install:"containerlabホスト（mgmt bridge: campus-multi-site-mgmt）"},
+      logical:{role:"利用者端末", ip:"10.50.10.10/24", gw:"main-core 10.50.10.1", note:"OSPF Process10で広報されるMain利用者セグメント"} },
+    { id:"main-core", name:"main-core", role:"core", cluster:"main", pos:{x:-215,y:0,z:0},
+      physical:{role:"Core Router（Main）", hw:"Cisco IOL", os:"15.7.3M2", mgmt:"172.25.25.11/24", install:"containerlabホスト（mgmt bridge: campus-multi-site-mgmt）"},
+      logical:{role:"OSPF10 内部ルーター", loopback:"10.50.255.1/32", rid:"10.50.255.1", note:"Area0でmain-edgeと隣接"} },
+    { id:"main-edge", name:"main-edge", role:"edge", cluster:"main", pos:{x:-110,y:-40,z:55},
+      physical:{role:"Edge Router（Main／BGP境界）", hw:"Cisco IOL", os:"15.7.3M2", mgmt:"172.25.25.12/24", install:"containerlabホスト（mgmt bridge: campus-multi-site-mgmt）"},
+      logical:{role:"OSPF10 ⇄ eBGP AS65050", loopback:"10.50.255.254/32", rid:"10.50.255.254", advertise:"→ 10.50.0.0/16（summary-only）", receive:"← 10.60.0.0/16（tag 65060）"} },
+    { id:"branch-edge", name:"branch-edge", role:"edge", cluster:"branch", pos:{x:110,y:-40,z:55},
+      physical:{role:"Edge Router（Branch／BGP境界）", hw:"Cisco IOL", os:"15.7.3M2", mgmt:"172.25.25.21/24", install:"containerlabホスト（mgmt bridge: campus-multi-site-mgmt）"},
+      logical:{role:"OSPF20 ⇄ eBGP AS65060", loopback:"10.60.255.254/32", rid:"10.60.255.254", advertise:"→ 10.60.0.0/16（summary-only）", receive:"← 10.50.0.0/16（tag 65050）"} },
+    { id:"branch-core", name:"branch-core", role:"core", cluster:"branch", pos:{x:215,y:0,z:0},
+      physical:{role:"Core Router（Branch）", hw:"Cisco IOL", os:"15.7.3M2", mgmt:"172.25.25.22/24", install:"containerlabホスト（mgmt bridge: campus-multi-site-mgmt）"},
+      logical:{role:"OSPF20 内部ルーター", loopback:"10.60.255.1/32", rid:"10.60.255.1", note:"Area0でbranch-edgeと隣接"} },
+    { id:"branch-pc", name:"branch-pc", role:"pc", cluster:"branch", pos:{x:320,y:60,z:-40},
+      physical:{role:"Linux Endpoint（Branch）", hw:"wbitt/network-multitool", os:"latest", mgmt:"172.25.25.102/24", install:"containerlabホスト（mgmt bridge: campus-multi-site-mgmt）"},
+      logical:{role:"利用者端末", ip:"10.60.10.10/24", gw:"branch-core 10.60.10.1", note:"OSPF Process20で広報されるBranch利用者セグメント"} }
+  ];
+
+  var LINKS = [
+    { a:"main-pc", b:"main-core", subnet:"10.50.10.0/24", ifaceA:"eth1", ifaceB:"E0/2", protocol:"OSPF10", kind:"user" },
+    { a:"main-core", b:"main-edge", subnet:"10.255.50.0/30", ifaceA:"E0/1", ifaceB:"E0/1", protocol:"OSPF10", kind:"p2p" },
+    { a:"main-edge", b:"branch-edge", subnet:"198.51.100.0/30", ifaceA:"E0/2", ifaceB:"E0/2", protocol:"eBGP AS65050⇄65060", kind:"wan" },
+    { a:"branch-edge", b:"branch-core", subnet:"10.255.60.0/30", ifaceA:"E0/1", ifaceB:"E0/1", protocol:"OSPF20", kind:"p2p" },
+    { a:"branch-core", b:"branch-pc", subnet:"10.60.10.0/24", ifaceA:"E0/2", ifaceB:"eth1", protocol:"OSPF20", kind:"user" }
+  ];
+
+  var REDISTRIBUTION = [
+    { dir:"OSPF → BGP", node:"Main（main-edge）", prefixList:"10.50.0.0/16 le 32", routeMap:"redistribute ospf 10（prefix-list適用）", tag:"—", purpose:"自拠点プレフィックスのみBGPへ渡す" },
+    { dir:"OSPF → BGP", node:"Branch（branch-edge）", prefixList:"10.60.0.0/16 le 32", routeMap:"redistribute ospf 20（prefix-list適用）", tag:"—", purpose:"自拠点プレフィックスのみBGPへ渡す" },
+    { dir:"集約", node:"Main（main-edge）", prefixList:"—", routeMap:"aggregate-address 10.50.0.0/16 summary-only", tag:"—", purpose:"/24以下の個別広告を抑止し/16のみ広報" },
+    { dir:"集約", node:"Branch（branch-edge）", prefixList:"—", routeMap:"aggregate-address 10.60.0.0/16 summary-only", tag:"—", purpose:"/24以下の個別広告を抑止し/16のみ広報" },
+    { dir:"BGP → OSPF", node:"Main（main-edge）", prefixList:"10.60.0.0/16のみ許可", routeMap:"redistribute bgp 65050（tag付与route-map）", tag:"65060", purpose:"相手拠点/16のみOSPF10へ。再注入防止でループ回避" },
+    { dir:"BGP → OSPF", node:"Branch（branch-edge）", prefixList:"10.50.0.0/16のみ許可", routeMap:"redistribute bgp 65060（tag付与route-map）", tag:"65050", purpose:"相手拠点/16のみOSPF20へ。再注入防止でループ回避" }
+  ];
+
+  var NA_ITEMS = [
+    { title:"VLAN設計", reason:"Core—Edge／Core—PC間はすべてL3ルーテッドP2Pリンクであり、トランクVLANや複数VLAN収容は存在しない（Routed Access構成）。" },
+    { title:"FHRP（HSRP／VRRP）", reason:"各キャンパスのCoreは単一ノード構成のため、仮想IPによるActive/Standby冗長化を行わない。" },
+    { title:"FWゾーン／NAT", reason:"拠点間境界はeBGPのみで構成する。FWノードやNAT/PAT変換ルールは本テーマの範囲外。" }
+  ];
+
+  var KEYFRAMES = [
+    { camZ:560, focusX:0,    title:"全体像", detail:"Main CampusとBranch Campusが、eBGPで結ばれる2つの独立したOSPFドメインです。" },
+    { camZ:380, focusX:-215, title:"Main Campus — OSPF Process10", detail:"main-pc → main-core → main-edge。Area0の内部でLoopbackとP2Pリンクが隣接します。" },
+    { camZ:300, focusX:0,    title:"WAN境界 — eBGP", detail:"main-edgeとbranch-edgeだけがeBGPで直接会話します。OSPFはこのリンクへ参加しません。" },
+    { camZ:380, focusX:215,  title:"Branch Campus — OSPF Process20", detail:"branch-edge → branch-core → branch-pc。同じくArea0内部で完結します。" },
+    { camZ:560, focusX:0,    title:"論理レイヤーで見る集約", detail:"右上の切替で「論理」を選ぶと、/16集約とtagつき再配信の流れが粒子で見えます。" }
+  ];
+
+  var NODES_BY_ID = {};
+  NODES.forEach(function(n){ NODES_BY_ID[n.id] = n; });
+
+  var REDUCE = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function $(s,r){ return (r||document).querySelector(s); }
+  function el(tag,cls,html){ var e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; }
+  function esc(s){ return String(s).replace(/[&<>"]/g,function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+  function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+  function lerp(a,b,t){ return a+(b-a)*t; }
+
+  /* ================= reveal / progress / dotnav / starfield ================= */
+  function initReveal(){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add("visible"); io.unobserve(e.target); } });
+    }, { threshold:.12, rootMargin:"0px 0px -8% 0px" });
+    document.querySelectorAll(".reveal").forEach(function(n){ io.observe(n); });
+  }
+
+  function initProgressNav(){
+    var bar = $("#progress"), ticking=false;
+    function upd(){
+      ticking=false;
+      var h=document.documentElement;
+      var max=h.scrollHeight-h.clientHeight;
+      var pct = max>0 ? (h.scrollTop||window.scrollY)/max*100 : 0;
+      bar.style.width = pct.toFixed(2)+"%";
+      bar.setAttribute("aria-valuenow", Math.round(pct));
+    }
+    window.addEventListener("scroll", function(){ if(!ticking){ ticking=true; requestAnimationFrame(upd); } }, {passive:true});
+    upd();
+
+    var dots={};
+    document.querySelectorAll(".dotnav a").forEach(function(a){ dots[a.dataset.dot]=a; });
+    var navIo = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        var d=dots[e.target.id];
+        if(d && e.isIntersecting){ Object.keys(dots).forEach(function(k){ dots[k].classList.remove("active"); }); d.classList.add("active"); }
+      });
+    }, { threshold:.4 });
+    ["hero","stage","checklist","data"].forEach(function(id){ var s=document.getElementById(id); if(s) navIo.observe(s); });
+  }
+
+  function initStarfield(){
+    var cv=$("#bg-canvas"), ctx=cv.getContext("2d");
+    var dpr=Math.min(window.devicePixelRatio||1,2), W=0,H=0, stars=[];
+    function resize(){
+      W = cv.width = innerWidth*dpr; H = cv.height = innerHeight*dpr;
+      cv.style.width = innerWidth+"px"; cv.style.height = innerHeight+"px";
+      var n = Math.round((innerWidth*innerHeight)/16000); n = Math.max(50, Math.min(130, n));
+      stars=[];
+      for(var i=0;i<n;i++){ stars.push({x:Math.random()*W, y:Math.random()*H, z:Math.random(), r:(Math.random()*1.2+.3)*dpr, ph:Math.random()*6.28}); }
+    }
+    function draw(t){
+      ctx.clearRect(0,0,W,H);
+      var sy=(window.scrollY||0)*dpr;
+      for(var i=0;i<stars.length;i++){
+        var s=stars[i];
+        var y=(s.y - sy*(0.02+s.z*0.05)); y=((y%H)+H)%H;
+        var tw = REDUCE ? .7 : .55+.45*Math.sin(t*.001+s.ph);
+        ctx.globalAlpha=(0.2+s.z*0.55)*tw;
+        ctx.fillStyle = s.z>0.8 ? "#8B5CF6" : (s.z>0.5 ? "#22D3EE" : "#E5E7EB");
+        ctx.beginPath(); ctx.arc(s.x,y,s.r,0,6.2832); ctx.fill();
+      }
+      ctx.globalAlpha=1;
+    }
+    resize(); window.addEventListener("resize", resize);
+    if(REDUCE){ draw(0); return; }
+    (function loop(t){ draw(t); requestAnimationFrame(loop); })(0);
+  }
+
+  /* ================= 対象外チェックリスト ================= */
+  function renderChecklist(){
+    var m=$("#na-mount");
+    NA_ITEMS.forEach(function(it,i){
+      var c=el("div","na-card reveal" + (i? " d"+i : ""));
+      c.innerHTML = '<span class="na-badge">対象外</span><h3>'+esc(it.title)+'</h3><p>'+esc(it.reason)+"</p>";
+      m.appendChild(c);
+    });
+  }
+
+  /* ================= 詳細データ表(物理/論理) ================= */
+  function tbl(caption, headers, rows){
+    var t = el("table","dtable");
+    var cap = el("caption",null,esc(caption));
+    t.appendChild(cap);
+    var thead = el("thead"); var trh = el("tr");
+    headers.forEach(function(h){ trh.appendChild(el("th",null,esc(h))); });
+    thead.appendChild(trh); t.appendChild(thead);
+    var tbody = el("tbody");
+    rows.forEach(function(r){
+      var tr = el("tr");
+      r.forEach(function(cell){
+        var isMono = typeof cell === "object" && cell !== null;
+        var text = isMono ? cell.v : cell;
+        tr.appendChild(el("td", isMono ? "mono" : null, esc(text)));
+      });
+      tbody.appendChild(tr);
+    });
+    t.appendChild(tbody);
+    return t;
+  }
+  function mono(v){ return { v:v }; }
+
+  function renderPhysicalTables(){
+    var host = $("#physical-tables");
+    var wrap1 = el("div","table-scroll");
+    wrap1.appendChild(tbl("機器物理情報", ["ホスト名","役割","HW・イメージ","OS・バージョン","管理IP","設置"],
+      NODES.map(function(n){ return [mono(n.id), n.physical.role, n.physical.hw, mono(n.physical.os), mono(n.physical.mgmt), n.physical.install]; })
+    ));
+    host.appendChild(wrap1);
+    var wrap2 = el("div","table-scroll");
+    wrap2.appendChild(tbl("リンク・ケーブル情報", ["リンク","サブネット","ノードA / IF","ノードB / IF","リンク種別"],
+      LINKS.map(function(l){
+        return [ l.a+"—"+l.b, mono(l.subnet), mono(l.a+" "+l.ifaceA), mono(l.b+" "+l.ifaceB), "仮想P2Pリンク（veth, containerlab）" ];
+      })
+    ));
+    host.appendChild(wrap2);
+  }
+
+  function renderLogicalTables(){
+    var host = $("#logical-tables");
+    var w1 = el("div","table-scroll");
+    w1.appendChild(tbl("L3アドレス・ルーティング情報", ["機器","役割","IP / Loopback","BGP広告・受信 / 備考"],
+      NODES.map(function(n){
+        var addr = n.logical.loopback || n.logical.ip || "—";
+        var note = n.logical.advertise ? (n.logical.advertise + " ／ " + n.logical.receive) : (n.logical.note || "—");
+        return [ mono(n.id), n.logical.role, mono(addr), note ];
+      })
+    ));
+    host.appendChild(w1);
+    var w2 = el("div","table-scroll");
+    w2.appendChild(tbl("リンク・ルーティングドメイン", ["リンク","サブネット","プロトコル"],
+      LINKS.map(function(l){ return [ l.a+"—"+l.b, mono(l.subnet), l.protocol ]; })
+    ));
+    host.appendChild(w2);
+    var w3 = el("div","table-scroll");
+    w3.appendChild(tbl("集約・再配信設計", ["方向","拠点 / ノード","prefix-list許可範囲","route-map動作","tag","目的"],
+      REDISTRIBUTION.map(function(r){ return [ r.dir, r.node, mono(r.prefixList), r.routeMap, mono(r.tag), r.purpose ]; })
+    ));
+    host.appendChild(w3);
+  }
+
+  /* ================= トポロジー キャンバス(自前3D投影) ================= */
+  function initTopology(){
+    var cv = $("#topo-canvas"), ctx = cv.getContext("2d");
+    var pin = $(".stage-pin"), stageSection = $("#stage");
+    var dpr = Math.min(window.devicePixelRatio||1,2), W=0,H=0;
+
+    var layer = "physical";
+    var ry=0.35, rx=-0.12, targetRy=0.35, targetRx=-0.12;
+    var camZ=560, targetCamZ=560, focusX=0, targetFocusX=0;
+    var dragging=false, lastX=0, lastY=0, moved=0, hoverId=null;
+    var visible=false, lastAggSpawn=0;
+    var particles=[];
+    var lastCapIdx=-1;
+
+    function resize(){
+      W = cv.width = pin.clientWidth*dpr; H = cv.height = pin.clientHeight*dpr;
+      cv.style.width = pin.clientWidth+"px"; cv.style.height = pin.clientHeight+"px";
+    }
+
+    function project(px,py,pz){
+      var fx = px - focusX;
+      var cy=Math.cos(ry), sy=Math.sin(ry);
+      var x1 = fx*cy - pz*sy, z1 = fx*sy + pz*cy, y1=py;
+      var cx=Math.cos(rx), sx=Math.sin(rx);
+      var y2 = y1*cx - z1*sx, z2 = y1*sx + z1*cx, x2=x1;
+      var zc = z2+camZ;
+      if(zc<=1) return null;
+      var f = 620/zc;
+      return { x: W/2 + x2*f*dpr, y: H/2 + y2*f*dpr, s:f, depth:zc };
+    }
+
+    function roleColor(node){
+      if(layer==="physical"){ return node.role==="edge" ? "#818CF8" : "#CBD5E1"; }
+      return node.cluster==="main" ? "#22D3EE" : "#34D399";
+    }
+    function auraColor(node){
+      if(node.role==="edge") return "#8B5CF6";
+      if(layer==="physical") return "#94A3B8";
+      return node.cluster==="main" ? "#22D3EE" : "#34D399";
+    }
+    function baseRadius(node){ return node.role==="edge" ? 9 : (node.role==="core" ? 7.5 : 6); }
+
+    function linkLabel(l){
+      return layer==="physical" ? (l.ifaceA+" ↔ "+l.ifaceB) : l.protocol;
+    }
+    function linkSub(l){ return l.subnet; }
+
+    function drawLinks(){
+      for(var i=0;i<LINKS.length;i++){
+        var l=LINKS[i], A=NODES_BY_ID[l.a], B=NODES_BY_ID[l.b];
+        var pa=project(A.pos.x,A.pos.y,A.pos.z), pb=project(B.pos.x,B.pos.y,B.pos.z);
+        if(!pa||!pb) continue;
+        var near = clamp((640-((pa.depth+pb.depth)/2))/560, 0, 1);
+        var isWan = l.kind==="wan";
+        ctx.save();
+        ctx.lineCap="round";
+        ctx.strokeStyle = isWan ? "rgba(139,92,246,"+(0.45+near*0.4)+")" : "rgba(148,163,184,"+(0.35+near*0.35)+")";
+        ctx.lineWidth = (isWan?2.4:2)*dpr;
+        if(isWan){ ctx.setLineDash([6*dpr,6*dpr]); }
+        ctx.beginPath(); ctx.moveTo(pa.x,pa.y); ctx.lineTo(pb.x,pb.y); ctx.stroke();
+        ctx.restore();
+
+        var mx=(pa.x+pb.x)/2, my=(pa.y+pb.y)/2;
+        var alpha = 0.35+near*0.55;
+        var text1 = linkLabel(l), text2 = linkSub(l);
+        ctx.font = (10.5*dpr)+'px system-ui,"Noto Sans JP",sans-serif';
+        var tw = Math.max(ctx.measureText(text1).width, ctx.measureText(text2).width)+14*dpr;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = isWan ? "rgba(30,20,50,.85)" : "rgba(10,14,24,.82)";
+        ctx.strokeStyle = isWan ? "rgba(139,92,246,.5)" : "rgba(255,255,255,.12)";
+        ctx.lineWidth = 1*dpr;
+        roundRect(ctx, mx-tw/2, my-15*dpr, tw, 30*dpr, 6*dpr);
+        ctx.fill(); ctx.stroke();
+        ctx.fillStyle = isWan ? "#C4B5FD" : "#E2E8F0";
+        ctx.textAlign="center";
+        ctx.fillText(text1, mx, my-2*dpr);
+        ctx.fillStyle = "#8891A8";
+        ctx.font = (9.5*dpr)+'px system-ui,"Noto Sans JP",sans-serif';
+        ctx.fillText(text2, mx, my+11*dpr);
+        ctx.globalAlpha=1;
+      }
+    }
+
+    function roundRect(c,x,y,w,h,r){
+      c.beginPath();
+      c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r);
+      c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath();
+    }
+
+    function lerp3(A,B,t){ return { x:lerp(A.x,B.x,t), y:lerp(A.y,B.y,t), z:lerp(A.z,B.z,t) }; }
+
+    function updateParticles(dt,now){
+      if(layer!=="logical" || REDUCE){ particles.length=0; return; }
+      for(var i=0;i<LINKS.length;i++){
+        var l=LINKS[i];
+        var countFwd=0,countBwd=0;
+        for(var j=0;j<particles.length;j++){ if(particles[j].link===i){ if(particles[j].dir===1) countFwd++; else countBwd++; } }
+        if(countFwd<1) particles.push({link:i, t:Math.random()*0.4, dir:1, speed:0.00028+Math.random()*0.00012, kind:"ambient"});
+        if(countBwd<1) particles.push({link:i, t:Math.random()*0.4, dir:-1, speed:0.00028+Math.random()*0.00012, kind:"ambient"});
+      }
+      var wanIdx=2;
+      if(now-lastAggSpawn>4200){
+        lastAggSpawn=now;
+        particles.push({link:wanIdx, t:0, dir:1, speed:0.00042, kind:"agg", label:"10.50.0.0/16", color:"#22D3EE"});
+        particles.push({link:wanIdx, t:0, dir:-1, speed:0.00042, kind:"agg", label:"10.60.0.0/16", color:"#34D399"});
+      }
+      for(var k=particles.length-1;k>=0;k--){
+        particles[k].t += particles[k].speed*dt;
+        if(particles[k].t>1) particles.splice(k,1);
+      }
+    }
+
+    function drawParticles(){
+      if(layer!=="logical" || REDUCE) return;
+      for(var i=0;i<particles.length;i++){
+        var pt=particles[i], l=LINKS[pt.link], A=NODES_BY_ID[l.a], B=NODES_BY_ID[l.b];
+        var tt = pt.dir===1 ? pt.t : 1-pt.t;
+        var w = lerp3(A.pos,B.pos,tt);
+        var pr = project(w.x,w.y,w.z); if(!pr) continue;
+        var color = pt.color || (l.kind==="wan" ? "#8B5CF6" : (A.cluster==="main"?"#22D3EE":"#34D399"));
+        var rad = (pt.kind==="agg"?3.4:2.2)*pr.s*dpr;
+        ctx.globalAlpha=0.9;
+        ctx.fillStyle=color;
+        ctx.beginPath(); ctx.arc(pr.x,pr.y,Math.max(1.4,rad),0,6.2832); ctx.fill();
+        if(pt.kind==="agg"){
+          ctx.globalAlpha=0.85;
+          ctx.font=(9.5*dpr)+'px system-ui,"Noto Sans JP",sans-serif';
+          ctx.fillStyle=color; ctx.textAlign="center";
+          ctx.fillText(pt.label, pr.x, pr.y-8*dpr);
+        }
+        ctx.globalAlpha=1;
+      }
+    }
+
+    function drawNodes(){
+      var list=[];
+      for(var i=0;i<NODES.length;i++){
+        var n=NODES[i], pr=project(n.pos.x,n.pos.y,n.pos.z);
+        if(pr) list.push({n:n, pr:pr});
+      }
+      list.sort(function(a,b){ return b.pr.depth-a.pr.depth; });
+      for(i=0;i<list.length;i++){
+        var o=list[i].n, q=list[i].pr;
+        var rad = baseRadius(o)*q.s*dpr;
+        var near = clamp((640-q.depth)/560,0,1);
+        var isHover = hoverId===o.id;
+        var g = ctx.createRadialGradient(q.x,q.y,0,q.x,q.y,rad*4.4);
+        g.addColorStop(0, auraColor(o)); g.addColorStop(1,"rgba(0,0,0,0)");
+        ctx.globalAlpha=(0.18+near*0.5)*(isHover?1:0.82);
+        ctx.fillStyle=g;
+        ctx.beginPath(); ctx.arc(q.x,q.y,rad*4.4,0,6.2832); ctx.fill();
+
+        ctx.globalAlpha=0.6+near*0.4;
+        ctx.fillStyle= isHover ? "#fff" : roleColor(o);
+        ctx.beginPath(); ctx.arc(q.x,q.y,rad*(isHover?1.35:1),0,6.2832); ctx.fill();
+        ctx.lineWidth=1.4*dpr; ctx.strokeStyle="rgba(255,255,255,.5)"; ctx.stroke();
+
+        if(isHover || near>0.5){
+          ctx.globalAlpha = isHover?1:near;
+          ctx.fillStyle="#F1F5F9";
+          ctx.font="bold "+(12.5*dpr)+'px system-ui,"Noto Sans JP",sans-serif';
+          ctx.textAlign="center";
+          ctx.fillText(o.name, q.x, q.y-rad-8*dpr);
+        }
+        o._sx=q.x/dpr; o._sy=q.y/dpr; o._sr=Math.max(11, rad/dpr+6);
+      }
+      ctx.globalAlpha=1;
+    }
+
+    function draw(){
+      ctx.clearRect(0,0,W,H);
+      drawLinks();
+      drawParticles();
+      drawNodes();
+    }
+
+    function scrollProgress(){
+      var r = stageSection.getBoundingClientRect();
+      var span = stageSection.offsetHeight - innerHeight;
+      var sp = span>0 ? (-r.top)/span : 0;
+      return clamp(sp,0,1);
+    }
+
+    function applyCaption(idx){
+      if(idx===lastCapIdx) return;
+      lastCapIdx=idx;
+      var kf=KEYFRAMES[idx];
+      $("#cap-count").textContent = (idx+1)+" / "+KEYFRAMES.length;
+      $("#cap-title").textContent = kf.title;
+      $("#cap-detail").textContent = kf.detail;
+      document.querySelectorAll(".chapter-dots button").forEach(function(b,i){ b.classList.toggle("active", i===idx); });
+    }
+
+    var lastT = performance.now();
+    function frame(now){
+      var dt = now-lastT; lastT=now;
+      if(visible){
+        var progress = scrollProgress();
+        var t = progress*(KEYFRAMES.length-1);
+        var idx = clamp(Math.floor(t), 0, KEYFRAMES.length-2);
+        var localT = REDUCE ? 0 : (t-idx);
+        var kfA=KEYFRAMES[idx], kfB=KEYFRAMES[idx+1];
+        targetCamZ = lerp(kfA.camZ, kfB.camZ, localT);
+        targetFocusX = lerp(kfA.focusX, kfB.focusX, localT);
+        applyCaption(localT<0.5 ? idx : idx+1);
+
+        if(REDUCE){ camZ=targetCamZ; focusX=targetFocusX; }
+        else { camZ += (targetCamZ-camZ)*0.07; focusX += (targetFocusX-focusX)*0.07; }
+
+        if(!dragging && !REDUCE){ targetRy += 0.0012; }
+        if(REDUCE){ ry=targetRy; rx=targetRx; }
+        else { ry += (targetRy-ry)*0.09; rx += (targetRx-rx)*0.09; }
+
+        updateParticles(dt, now);
+        draw();
+      }
+      requestAnimationFrame(frame);
+    }
+
+    /* --- interaction --- */
+    function pos(ev){ var b=cv.getBoundingClientRect(); return { x: ev.clientX-b.left, y: ev.clientY-b.top }; }
+    function pick(x,y){
+      var best=null, bd=1e9;
+      for(var i=0;i<NODES.length;i++){
+        var o=NODES[i]; if(o._sx==null) continue;
+        var dd=(o._sx-x)*(o._sx-x)+(o._sy-y)*(o._sy-y);
+        if(dd<o._sr*o._sr && dd<bd){ bd=dd; best=o; }
+      }
+      return best;
+    }
+    cv.addEventListener("pointerdown", function(ev){
+      moved=0; lastX=ev.clientX; lastY=ev.clientY;
+      if(ev.pointerType!=="touch"){ dragging=true; cv.setPointerCapture(ev.pointerId); cv.style.cursor="grabbing"; }
+    });
+    cv.addEventListener("pointermove", function(ev){
+      if(ev.pointerType==="touch") return;
+      var p=pos(ev), hit=pick(p.x,p.y);
+      hoverId = hit ? hit.id : null;
+      if(!dragging) cv.style.cursor = hit ? "pointer" : "grab";
+      if(dragging){
+        var dx=ev.clientX-lastX, dy=ev.clientY-lastY;
+        moved += Math.abs(dx)+Math.abs(dy);
+        targetRy += dx*0.005; targetRx = clamp(targetRx+dy*0.005, -1.1, 1.1);
+        lastX=ev.clientX; lastY=ev.clientY;
+      }
+    });
+    cv.addEventListener("pointerup", function(ev){
+      dragging=false; cv.style.cursor="grab";
+      if(moved<6){ var p=pos(ev), hit=pick(p.x,p.y); if(hit) openDetail(hit); }
+    });
+    cv.addEventListener("pointercancel", function(){ dragging=false; });
+
+    /* --- detail panel --- */
+    var detail=$("#detail");
+    function buildFields(node){
+      var f=[];
+      if(layer==="physical"){
+        f.push(["役割", node.physical.role]);
+        f.push(["HW・イメージ", node.physical.hw]);
+        f.push(["OS・バージョン", node.physical.os]);
+        f.push(["管理IP", node.physical.mgmt]);
+        f.push(["設置", node.physical.install]);
+      } else {
+        f.push(["役割", node.logical.role]);
+        if(node.logical.loopback) f.push(["Loopback0", node.logical.loopback]);
+        if(node.logical.rid) f.push(["Router ID", node.logical.rid]);
+        if(node.logical.ip) f.push(["IPアドレス", node.logical.ip]);
+        if(node.logical.gw) f.push(["ゲートウェイ", node.logical.gw]);
+        if(node.logical.advertise) f.push(["BGP広告", node.logical.advertise]);
+        if(node.logical.receive) f.push(["BGP受信", node.logical.receive]);
+        if(node.logical.note) f.push(["備考", node.logical.note]);
+      }
+      return f;
+    }
+    function openDetail(node){
+      hoverId=node.id;
+      var roleTag = node.role==="edge" ? "Edge / BGP境界" : (node.role==="core" ? "Core Router" : "Endpoint");
+      var badgeColor = layer==="physical" ? (node.role==="edge" ? "#818CF8" : "#CBD5E1") : (node.cluster==="main" ? "#22D3EE" : "#34D399");
+      var roleEl = $("#detail-role"); roleEl.textContent=roleTag; roleEl.style.background=badgeColor;
+      $("#detail-name").textContent = node.name;
+      var body=$("#detail-body"); body.innerHTML="";
+      buildFields(node).forEach(function(pair){
+        var dt=el("dt",null,esc(pair[0])); var dd=el("dd",null,esc(pair[1]));
+        body.appendChild(dt); body.appendChild(dd);
+      });
+      detail.classList.add("show");
+    }
+    $("#detail-close").addEventListener("click", function(){ detail.classList.remove("show"); hoverId=null; });
+    document.addEventListener("keydown", function(e){ if(e.key==="Escape") detail.classList.remove("show"); });
+
+    /* --- a11y list --- */
+    var a11y=$("#a11y-list");
+    NODES.forEach(function(n){
+      var summary = n.role==="edge" ? "Edge（BGP境界）" : (n.role==="core" ? "Core" : "Endpoint");
+      var b=el("button",null, esc(n.name)+" — "+esc(summary));
+      b.addEventListener("click", function(){ openDetail(n); });
+      a11y.appendChild(b);
+    });
+
+    /* --- layer toggle --- */
+    var legend=$("#legend");
+    function renderLegend(){
+      legend.innerHTML="";
+      var items = layer==="physical"
+        ? [["#CBD5E1","Core / Endpoint"],["#818CF8","Edge（BGP境界）"]]
+        : [["#22D3EE","Main Campus（OSPF10）"],["#34D399","Branch Campus（OSPF20）"],["#8B5CF6","eBGP境界（Edge）"]];
+      items.forEach(function(it){
+        var s=el("span","legend-item");
+        s.innerHTML='<span class="legend-dot" style="background:'+it[0]+'"></span>'+esc(it[1]);
+        legend.appendChild(s);
+      });
+    }
+    function setLayer(v){
+      layer=v;
+      $("#btn-physical").classList.toggle("active", v==="physical");
+      $("#btn-physical").setAttribute("aria-pressed", String(v==="physical"));
+      $("#btn-logical").classList.toggle("active", v==="logical");
+      $("#btn-logical").setAttribute("aria-pressed", String(v==="logical"));
+      renderLegend();
+      if(detail.classList.contains("show") && hoverId){ openDetail(NODES_BY_ID[hoverId]); }
+    }
+    $("#btn-physical").addEventListener("click", function(){ setLayer("physical"); });
+    $("#btn-logical").addEventListener("click", function(){ setLayer("logical"); });
+    renderLegend();
+
+    /* --- chapter dots --- */
+    var dotsHost=$("#chapter-dots");
+    KEYFRAMES.forEach(function(kf,i){
+      var b=el("button",null,""); b.setAttribute("aria-label", (i+1)+": "+kf.title);
+      b.addEventListener("click", function(){
+        var rect = stageSection.getBoundingClientRect();
+        var top = window.scrollY + rect.top;
+        var span = stageSection.offsetHeight - innerHeight;
+        var target = top + (i/(KEYFRAMES.length-1))*Math.max(span,0);
+        window.scrollTo({ top: target, behavior: REDUCE ? "auto" : "smooth" });
+      });
+      dotsHost.appendChild(b);
+    });
+
+    var io = new IntersectionObserver(function(en){ en.forEach(function(e){ visible=e.isIntersecting; }); }, { threshold:.01 });
+    io.observe(pin);
+
+    resize();
+    window.addEventListener("resize", resize);
+    applyCaption(0);
+    if(REDUCE){ camZ=KEYFRAMES[0].camZ; focusX=KEYFRAMES[0].focusX; draw(); }
+    requestAnimationFrame(frame);
+  }
+
+  /* ================= reduced-motion note ================= */
+  function initReducedNote(){
+    if(REDUCE){ var n=$("#reduced-note"); n.hidden=false; }
+  }
+
+  /* ================= init ================= */
+  function init(){
+    initReducedNote();
+    renderChecklist();
+    renderPhysicalTables();
+    renderLogicalTables();
+    initReveal();
+    initProgressNav();
+    initStarfield();
+    initTopology();
+  }
+  if(document.readyState==="loading"){ document.addEventListener("DOMContentLoaded", init); } else { init(); }
+})();
+</script>
+</body>
+</html>

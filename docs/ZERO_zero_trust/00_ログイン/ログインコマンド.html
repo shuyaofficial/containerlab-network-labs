@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜ログインコマンド</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>00_ログイン</span></nav>
+      <h1 class="doc-title">テーマZERO｜ログインコマンド</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-03</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">login</span><span class="tag">orbstack</span><span class="tag">docker</span><span class="tag">ssh</span></span>
+      </div>
+      
+      <div class="content">
+<p>VM への接続、Phase 0 ノードへのアクセス、Phase 1 以降の予定アクセス方法をまとめる。
+Phase 1 以降の URL・認証情報は <strong>各 Phase 実装時に確定</strong>する（本ラボの今回スコープでは未デプロイ）。</p>
+<h2 id="vm-接続" tabindex="-1">VM 接続 <a class="header-anchor" href="#vm-接続" aria-hidden="true">#</a></h2>
+<pre><code class="language-bash"><span class="hljs-comment"># OrbStack VM clab へ SSH</span>
+ssh clab@orb
+
+<span class="hljs-comment"># 接続確認</span>
+docker --version
+containerlab version
+</code></pre>
+<h2 id="phase-0-ノードへのアクセスdocker-exec" tabindex="-1">Phase 0 ノードへのアクセス（docker exec） <a class="header-anchor" href="#phase-0-ノードへのアクセスdocker-exec" aria-hidden="true">#</a></h2>
+<p>Phase 0 は <code>wbitt/network-multitool</code> を <code>client</code> / <code>app</code> / <code>external</code> に流用する。
+コンテナ名は containerlab のプレフィックス規約により <code>clab-&lt;lab名&gt;-&lt;node名&gt;</code> になる（実際の名前は <code>docker ps</code> で確認）。</p>
+<pre><code class="language-bash"><span class="hljs-comment"># 起動中コンテナ一覧</span>
+docker ps --format <span class="hljs-string">&#x27;table {{.Names}}\t{{.Image}}\t{{.Status}}&#x27;</span>
+
+<span class="hljs-comment"># client 端末に入る（シェル）</span>
+docker <span class="hljs-built_in">exec</span> -it clab-zero-client bash
+
+<span class="hljs-comment"># app サービス側に入る</span>
+docker <span class="hljs-built_in">exec</span> -it clab-zero-app bash
+
+<span class="hljs-comment"># external（外部/未管理端末）に入る</span>
+docker <span class="hljs-built_in">exec</span> -it clab-zero-external bash
+</code></pre>
+<h2 id="エンドポイント疎通確認phase-0-ゲート" tabindex="-1">エンドポイント疎通確認（Phase 0 ゲート） <a class="header-anchor" href="#エンドポイント疎通確認phase-0-ゲート" aria-hidden="true">#</a></h2>
+<pre><code class="language-bash"><span class="hljs-comment"># client → app への疎通（Phase 0 の合格条件）</span>
+docker <span class="hljs-built_in">exec</span> clab-zero-client ping -c 3 app
+docker <span class="hljs-built_in">exec</span> clab-zero-client curl -sS http://app/
+
+<span class="hljs-comment"># ネットワーク所属の確認</span>
+docker <span class="hljs-built_in">exec</span> clab-zero-client ip -4 addr show
+</code></pre>
+<h2 id="phase-1-以降の予定アクセス方法実装時に確定" tabindex="-1">Phase 1 以降の予定アクセス方法（実装時に確定） <a class="header-anchor" href="#phase-1-以降の予定アクセス方法実装時に確定" aria-hidden="true">#</a></h2>
+<p>以下は目標像。<strong>URL・ポート・認証情報は各 Phase 実装時に確定</strong>する。現段階では設計上の見込み値。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>コンポーネント</th>
+<th>予定アクセス方法</th>
+<th>確定時期</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Keycloak 管理画面</td>
+<td><code>http://&lt;VM&gt;:8080/admin</code>（admin/初期PWは実装時に設定）</td>
+<td>Phase 1 実装時に確定</td>
+</tr>
+<tr>
+<td>1</td>
+<td>OIDC トークン取得</td>
+<td><code>curl</code> で token endpoint に POST（realm/client 名は実装時に確定）</td>
+<td>Phase 1 実装時に確定</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Pomerium / oauth2-proxy</td>
+<td><code>http://&lt;VM&gt;:&lt;port&gt;/</code>（保護対象 app への入口）</td>
+<td>Phase 2 実装時に確定</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Grafana</td>
+<td><code>http://&lt;VM&gt;:3000/</code>（初期 admin/admin、実装時に変更）</td>
+<td>Phase 3 実装時に確定</td>
+</tr>
+<tr>
+<td>4</td>
+<td>mitmproxy Web</td>
+<td><code>http://&lt;VM&gt;:8081/</code>（mitmweb UI）</td>
+<td>Phase 4 実装時に確定</td>
+</tr>
+<tr>
+<td>6</td>
+<td>step-ca</td>
+<td><code>https://&lt;VM&gt;:9000/</code>（ACME/証明書発行）</td>
+<td>Phase 6 実装時に確定</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>Phase 1 以降は今回デプロイしないため、上記は設計値である。実装着手時にこの表を確定値へ更新する。</p>
+</blockquote>
+<h2 id="確認済み日付" tabindex="-1">確認済み日付 <a class="header-anchor" href="#確認済み日付" aria-hidden="true">#</a></h2>
+<ul>
+<li>VM 接続方法（<code>ssh clab@orb</code>）: 2026-07-03 時点の設計前提。</li>
+<li>Phase 0 ノードアクセス（docker exec）: 未デプロイ（設計値）。</li>
+<li>Phase 1-6 アクセス方法: 未確定（各 Phase 実装時に確定）。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#vm-接続">VM 接続</a></li>
+<li class="lvl-2"><a href="#phase-0-ノードへのアクセスdocker-exec">Phase 0 ノードへのアクセス（docker exec）</a></li>
+<li class="lvl-2"><a href="#エンドポイント疎通確認phase-0-ゲート">エンドポイント疎通確認（Phase 0 ゲート）</a></li>
+<li class="lvl-2"><a href="#phase-1-以降の予定アクセス方法実装時に確定">Phase 1 以降の予定アクセス方法（実装時に確定）</a></li>
+<li class="lvl-2"><a href="#確認済み日付">確認済み日付</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

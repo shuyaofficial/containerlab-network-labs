@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>第3章: ネットワークサービス（✅ 完了）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ロードマップ</span>
+<span class="sep">/</span>
+<span>章別アウトライン</span></nav>
+      <h1 class="doc-title">第3章: ネットワークサービス（✅ 完了）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>ルーティングとL2が整ったら、社内を「使える」状態にする土台サービスを載せる。
+どれもカタログ「サービス・制御」の<strong>初級</strong>だが、実務での障害発生頻度は非常に高い定番。</p>
+</blockquote>
+<hr>
+<h2 id="-章の狙い" tabindex="-1">🎯 章の狙い <a class="header-anchor" href="#-章の狙い" aria-hidden="true">#</a></h2>
+<ul>
+<li>クライアントに自動で IP を配る（DHCP、サブネット跨ぎは<strong>リレー</strong>）</li>
+<li>名前解決（DNS）の階層委任とレコードの基本が分かる</li>
+<li>全機器の時刻を合わせる（NTP）＝ログ相関・証明書・認証の前提</li>
+</ul>
+<h2 id="前提" tabindex="-1">前提 <a class="header-anchor" href="#前提" aria-hidden="true">#</a></h2>
+<ul>
+<li>第2章（VLAN/SVI）。DHCPリレーは Inter-VLAN 環境で真価を発揮する</li>
+</ul>
+<hr>
+<h2 id="-テーマ一覧" tabindex="-1">📋 テーマ一覧 <a class="header-anchor" href="#-テーマ一覧" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>タイトル</th>
+<th>狙い</th>
+<th>対応RFC</th>
+<th>難易度</th>
+<th>到達条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>12</td>
+<td>DHCP / DNS / NTP</td>
+<td>DHCPプール＆<strong>リレー(ip helper-address)</strong>、DNS委任、NTP階層同期</td>
+<td><code>rfc2131</code> / <code>rfc1034</code> <code>rfc1035</code> / <code>rfc5905</code></td>
+<td>初級</td>
+<td>別VLANのPCがリレー経由でIP取得、<code>show ntp associations</code> で同期確立</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>💡 1テーマに3サービスを束ねているのは、いずれも「設定は軽いが繋がらない時の切り分けが命」だから。
+パケットキャプチャ（DORA / DNSクエリ / NTPパケット）を見て動きを掴むのが近道。</p>
+</blockquote>
+<hr>
+<h2 id="-つまずきポイント先回り" tabindex="-1">🔑 つまずきポイント先回り <a class="header-anchor" href="#-つまずきポイント先回り" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>DHCPリレー</strong>: クライアントとサーバが別セグメントなら L3SW/ルータに <code>ip helper-address</code> が必須</li>
+<li><strong>DNS</strong>: 正引き/逆引き、権威/キャッシュ、TTL の違い</li>
+<li><strong>NTP</strong>: Stratum の概念、片方向 ACL でNTPだけ通す時のハマり</li>
+</ul>
+<h2 id="-章末チェック" tabindex="-1">✅ 章末チェック <a class="header-anchor" href="#-章末チェック" aria-hidden="true">#</a></h2>
+<ul>
+<li>[ ] DHCP の DORA 4ステップを言え、リレー時にどのフィールドが効くか説明できる</li>
+<li>[ ] DNS の権威サーバとキャッシュサーバの役割分担を説明できる</li>
+<li>[ ] NTP の Stratum と、機器を内部NTPサーバにする構成を作れる</li>
+<li>[ ] <code>振り返りシート</code> 作成済み</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-章の狙い">🎯 章の狙い</a></li>
+<li class="lvl-2"><a href="#前提">前提</a></li>
+<li class="lvl-2"><a href="#-テーマ一覧">📋 テーマ一覧</a></li>
+<li class="lvl-2"><a href="#-つまずきポイント先回り">🔑 つまずきポイント先回り</a></li>
+<li class="lvl-2"><a href="#-章末チェック">✅ 章末チェック</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

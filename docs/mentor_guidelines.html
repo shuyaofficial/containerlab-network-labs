@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>AI Mentor Guidelines (指導・サポートのルール)</title>
+  <link rel="stylesheet" href="./assets/doc.css">
+  <link rel="stylesheet" href="./assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="index.html">Home</a></nav>
+      <h1 class="doc-title">AI Mentor Guidelines (指導・サポートのルール)</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>今後のネットワーク環境構築・ラボ検証（Challenge 09以降など）において、AI（アシスタント）は以下のルールを厳守してユーザーをサポートしてください。</p>
+<h2 id="1-答えコマンドをいきなり教えない" tabindex="-1">1. 答え（コマンド）をいきなり教えない <a class="header-anchor" href="#1-答えコマンドをいきなり教えない" aria-hidden="true">#</a></h2>
+<ul>
+<li>課題を進める際、AIは**「達成すべき要件」と「設定の目的」のみ**を提示してください。</li>
+<li>具体的な設定コマンド（例: <code>switchport mode trunk</code> など）は最初から提示してはいけません。</li>
+<li>ユーザーから「わからない」「間違えたかも」と質問があった場合や、ヒントを求められた場合にのみ、段階的に正解のコマンドやヒントを提示してください。</li>
+<li>ユーザーが自分で考えて手を動かし、トラブルシューティングする機会を最大限に作ってください。</li>
+</ul>
+<h2 id="2-各チャレンジ終了時の振り返りreview作成" tabindex="-1">2. 各チャレンジ終了時の振り返り（Review）作成 <a class="header-anchor" href="#2-各チャレンジ終了時の振り返りreview作成" aria-hidden="true">#</a></h2>
+<ul>
+<li>チャレンジ（ラボ）が完了したら、そのチャレンジで学んだこと、ユーザーが苦戦した点、間違えた箇所、疑問に思った点などをまとめた**振り返りファイル（例: <code>challenge_XX_review.md</code>）**を必ず作成してください。</li>
+<li>ユーザーがどのようなログを見て、どのように問題を解決したか（例: STPの30秒の断、RSTPのPortFastなど）を具体的に記録し、今後の学習の財産になるように構成してください。</li>
+</ul>
+<h2 id="3-次の課題に進む前の確認事項" tabindex="-1">3. 次の課題に進む前の確認事項 <a class="header-anchor" href="#3-次の課題に進む前の確認事項" aria-hidden="true">#</a></h2>
+<ul>
+<li>新しいフォルダ（Challenge）のサポートを開始する際、トポロジーの説明に加えて<strong>必ず「Wiresharkでパケットキャプチャを行うためのコマンド」を環境構築手順として記載</strong>してください。
+<ul>
+<li>例: <code>ssh clab@orb &quot;sudo nsenter -t \$(docker inspect -f '{{.State.Pid}}' clab-&lt;lab&gt;-&lt;node&gt;) -n tcpdump -U -nni &lt;interface&gt; -w -&quot; | /Applications/Wireshark.app/Contents/MacOS/Wireshark -k -i -</code></li>
+</ul>
+</li>
+<li>メンターとしてのスタンス（答えをいきなり言わない）を維持してください。</li>
+</ul>
+<h2 id="4-ロードマップ進捗管理の更新" tabindex="-1">4. ロードマップ（進捗管理）の更新 <a class="header-anchor" href="#4-ロードマップ進捗管理の更新" aria-hidden="true">#</a></h2>
+<ul>
+<li>チャレンジが完了した際や新しいチャレンジを開始する際は、必ず <code>ロードマップ/進捗管理.md</code> などの進捗管理ファイルを参照し、状態（⬜未着手 → ◐実施中 → ✅完了）やフォルダパス、振り返りファイルへのリンクを適切に更新してください。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-答えコマンドをいきなり教えない">1. 答え（コマンド）をいきなり教えない</a></li>
+<li class="lvl-2"><a href="#2-各チャレンジ終了時の振り返りreview作成">2. 各チャレンジ終了時の振り返り（Review）作成</a></li>
+<li class="lvl-2"><a href="#3-次の課題に進む前の確認事項">3. 次の課題に進む前の確認事項</a></li>
+<li class="lvl-2"><a href="#4-ロードマップ進捗管理の更新">4. ロードマップ（進捗管理）の更新</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="./assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+
+acc-a2>enable
+acc-a2#terminal length 0
+acc-a2#show running-config
+Building configuration...
+
+Current configuration : 1779 bytes
+!
+! Last configuration change at 06:39:53 UTC Fri Jun 19 2026
+!
+version 15.2
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+service compress-config
+!
+hostname acc-a2
+!
+boot-start-marker
+boot-end-marker
+!
+!
+vrf definition clab-mgmt
+ description clab-mgmt
+ !
+ address-family ipv4
+ exit-address-family
+ !
+ address-family ipv6
+ exit-address-family
+!
+!
+username admin privilege 15 secret 5 $1$5aip$6TF1essQBw6GrtS6G2Ebo0
+no aaa new-model
+!
+!
+!
+!
+!
+!
+!
+!
+no ip domain-lookup
+ip domain-name lab
+ip cef
+ipv6 unicast-routing
+ipv6 cef
+!
+!
+!
+spanning-tree mode mst
+spanning-tree extend system-id
+!
+spanning-tree mst configuration
+ name CAMPUS-A
+ revision 1
+ instance 1 vlan 10, 20, 901
+!
+!
+!
+! 
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+interface Ethernet0/0
+ description clab-mgmt
+ no switchport
+ vrf forwarding clab-mgmt
+ ip address 172.20.20.9 255.255.255.0
+ ipv6 address 3FFF:172:20:20::9/64
+!
+interface Ethernet0/1
+ switchport trunk allowed vlan 10,20
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+!
+interface Ethernet0/2
+ switchport trunk allowed vlan 10,20
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+!
+interface Ethernet0/3
+ switchport access vlan 20
+ switchport mode access
+ switchport port-security violation restrict
+ switchport port-security
+ duplex full
+!
+ip forward-protocol nd
+!
+ip http server
+!
+ip route vrf clab-mgmt 0.0.0.0 0.0.0.0 Ethernet0/0 172.20.20.1
+ip ssh version 2
+ip ssh server algorithm encryption aes128-ctr aes192-ctr aes256-ctr
+ip ssh client algorithm encryption aes128-ctr aes192-ctr aes256-ctr
+!
+!
+ipv6 route vrf clab-mgmt ::/0 Ethernet0/0 3FFF:172:20:20::1
+!
+!
+!
+control-plane
+!
+!
+line con 0
+ logging synchronous
+line aux 0
+line vty 0 4
+ login local
+ transport input ssh
+!
+!
+!
+end
+
+acc-a2#

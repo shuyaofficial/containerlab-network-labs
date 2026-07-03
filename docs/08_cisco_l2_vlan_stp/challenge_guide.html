@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>🚀 Challenge 08: VLAN / 802.1Q トランク ＆ STP・RSTP（L2冗長の基礎）</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>08_cisco_l2_vlan_stp</span></nav>
+      <h1 class="doc-title">🚀 Challenge 08: VLAN / 802.1Q トランク ＆ STP・RSTP（L2冗長の基礎）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>🧩 <strong>雛形（ドラフト）です。</strong> 第2章「LAN/L2 スイッチングと冗長」の入口。
+ここから先は L3 ルーティングを離れ、<strong>社内ローカルの冗長化</strong>＝スイッチングの世界に入ります。
+⚠ VLAN/STP は <strong>IEEE規格（802.1Q / 802.1D / 802.1w）でRFCカタログには無い</strong>領域。
+第1章で身につけた「Hello→断検知→切替」の感覚が、ここでも丸ごと効きます（メンターTheme F）。</p>
+</blockquote>
+<p>メンター対応: <strong>Theme F（STP / L2ループ防止）</strong>　｜　難易度: 初〜中級</p>
+<hr>
+<h2 id="-トポロジーと設計要件" tabindex="-1">🗺️ トポロジーと設計要件 <a class="header-anchor" href="#-トポロジーと設計要件" aria-hidden="true">#</a></h2>
+<p>スイッチ3台を**三角形（＝物理ループ）**に結線し、STP がどのポートを <strong>Blocking</strong> にするかを観測します。
+PC2台を同一VLANに置き、ループを跨いだ疎通と、リンク断時の <strong>RSTP高速収束</strong> を体験します。</p>
+<pre><code>                 [ PC1 ]                         [ PC2 ]
+              VLAN10 10.10.10.11             VLAN10 10.10.10.12
+                  │ (access e0/3)                │ (access e0/3)
+              ┌─[ SW1 ]──────── trunk ───────[ SW3 ]─┐
+              │   e0/1   (802.1Q)        e0/1    │   │
+              │                                   │   │
+            trunk e0/2                       e0/2 trunk
+              │                                   │   │
+              └──────────────[ SW2 ]─────────────┘   │
+                        e0/1        e0/2                │
+              （SW1-SW2-SW3-SW1 の三角ループ → STPが1ポートをBlockingにする）
+</code></pre>
+<blockquote>
+<p>💡 ループがあると放置すればブロードキャストストームでL2が全滅する。
+それを <strong>STP が自動でループを1か所切って（Blocking）防ぐ</strong> ——これがこのラボの主役。</p>
+</blockquote>
+<h3 id="1-vlan--ip-設計" tabindex="-1">1. VLAN / IP 設計 <a class="header-anchor" href="#1-vlan--ip-設計" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>デバイス</th>
+<th>役割</th>
+<th>インターフェース</th>
+<th>設定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>SW1</strong></td>
+<td>L2スイッチ</td>
+<td>e0/1, e0/2</td>
+<td>トランク（802.1Q, allow VLAN10,20）</td>
+</tr>
+<tr>
+<td><strong>SW1</strong></td>
+<td>〃</td>
+<td>e0/3</td>
+<td>アクセス VLAN10（PC1収容）</td>
+</tr>
+<tr>
+<td><strong>SW2</strong></td>
+<td>L2スイッチ</td>
+<td>e0/1, e0/2</td>
+<td>トランク</td>
+</tr>
+<tr>
+<td><strong>SW3</strong></td>
+<td>L2スイッチ</td>
+<td>e0/1, e0/2</td>
+<td>トランク</td>
+</tr>
+<tr>
+<td><strong>SW3</strong></td>
+<td>〃</td>
+<td>e0/3</td>
+<td>アクセス VLAN10（PC2収容）</td>
+</tr>
+<tr>
+<td><strong>PC1</strong></td>
+<td>linux(alpine)</td>
+<td>eth1</td>
+<td><code>10.10.10.11/24</code>（VLAN10）</td>
+</tr>
+<tr>
+<td><strong>PC2</strong></td>
+<td>linux(alpine)</td>
+<td>eth1</td>
+<td><code>10.10.10.12/24</code>（VLAN10）</td>
+</tr>
+</tbody>
+</table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>VLAN</th>
+<th>用途</th>
+<th>サブネット</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10</td>
+<td>営業（本ラボの疎通対象）</td>
+<td>10.10.10.0/24</td>
+</tr>
+<tr>
+<td>20</td>
+<td>開発（拡張課題用に定義のみ）</td>
+<td>10.10.20.0/24</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>⚠ インターフェース名（<code>Ethernet0/1</code>〜）は使用イメージで異なる場合あり。
+<code>show ip int brief</code> / <code>show interfaces status</code> で実機の名前を確認してから設定すること。</p>
+</blockquote>
+<hr>
+<h2 id="-3つのミッション" tabindex="-1">🎯 3つのミッション <a class="header-anchor" href="#-3つのミッション" aria-hidden="true">#</a></h2>
+<h3 id="mission-1-vlan-とトランクで疎通させる" tabindex="-1">Mission 1: VLAN とトランクで疎通させる <a class="header-anchor" href="#mission-1-vlan-とトランクで疎通させる" aria-hidden="true">#</a></h3>
+<ol>
+<li>SW1/SW3 にVLAN10を作成し、PC収容ポート（e0/3）を <strong>アクセスVLAN10</strong> にする。</li>
+<li>スイッチ間リンク（e0/1, e0/2）を <strong>802.1Q トランク</strong>にし、VLAN10/20を許可する。<pre><code class="language-ios">vlan 10
+ name Sales
+!
+interface Ethernet0/3
+ switchport mode access
+ switchport access vlan 10
+!
+interface range Ethernet0/1 - 2
+ switchport trunk encapsulation dot1q   ! 必要な機種のみ
+ switchport mode trunk
+ switchport trunk allowed vlan 10,20
+</code></pre>
+</li>
+<li>PC側（alpine）でIP付与:<pre><code class="language-sh">ip addr add 10.10.10.11/24 dev eth1 &amp;&amp; ip <span class="hljs-built_in">link</span> <span class="hljs-built_in">set</span> eth1 up   <span class="hljs-comment"># PC1</span>
+ip addr add 10.10.10.12/24 dev eth1 &amp;&amp; ip <span class="hljs-built_in">link</span> <span class="hljs-built_in">set</span> eth1 up   <span class="hljs-comment"># PC2</span>
+</code></pre>
+</li>
+<li><strong>観測</strong>: <code>PC1 → ping 10.10.10.12</code> が成功。<code>show vlan brief</code> / <code>show interfaces trunk</code> で確認。</li>
+</ol>
+<h3 id="mission-2-stp-の-root選出と-blocking-ポートを観測" tabindex="-1">Mission 2: STP の Root選出と Blocking ポートを観測 <a class="header-anchor" href="#mission-2-stp-の-root選出と-blocking-ポートを観測" aria-hidden="true">#</a></h3>
+<ol>
+<li>3台が三角ループになっている状態で、各SWで <code>show spanning-tree vlan 10</code> を確認。</li>
+<li><strong>観測ポイント</strong>:
+<ul>
+<li><strong>Root Bridge</strong> はどれか（既定ではBridge IDが最小＝MAC最小のSW）。</li>
+<li>どのSWのどのポートが <strong>BLK(Blocking/ALTN)</strong> になっているか（ループが1か所切れている）。</li>
+<li>ポートの <strong>Role（Root/Designated/Alternate）</strong> と <strong>State</strong> を読み解く。</li>
+</ul>
+</li>
+<li><strong>設計してみる</strong>: <code>spanning-tree vlan 10 root primary</code>（または <code>priority 4096</code>）で
+<strong>狙ったSWをRootに固定</strong>し、Blockingポートが意図通り移動することを確認。<pre><code class="language-ios">spanning-tree vlan 10 root primary       ! このSWをRootにする
+</code></pre>
+</li>
+</ol>
+<h3 id="mission-3-rstp-高速収束リンク断フェイルオーバ" tabindex="-1">Mission 3: RSTP 高速収束（リンク断フェイルオーバ） <a class="header-anchor" href="#mission-3-rstp-高速収束リンク断フェイルオーバ" aria-hidden="true">#</a></h3>
+<ol>
+<li>収束を速くするため RSTP を有効化（対応機種）:<pre><code class="language-ios">spanning-tree mode rapid-pvst
+</code></pre>
+</li>
+<li><code>PC1 → ping 10.10.10.12</code> を<strong>流しっぱなし</strong>にする。</li>
+<li>その状態で、現在 <strong>Forwarding</strong> している経路上のトランクを片方 <code>shutdown</code>。</li>
+<li><strong>観測ポイント</strong>:
+<ul>
+<li>これまで <strong>Blocking</strong> だったポートが <strong>Forwarding</strong> に昇格し、<strong>数秒以内</strong>で ping が復活する。</li>
+<li>旧STP（802.1D）なら最大 ~30〜50秒、<strong>RSTP（802.1w）なら数秒</strong>で収束する差を体感する。</li>
+<li><code>show spanning-tree</code> の Role/State 変化と、収束に要したping落ち数を記録する。</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2 id="-仕上げの確認振り返りシートに書くと良い観点" tabindex="-1">🔎 仕上げの確認（振り返りシートに書くと良い観点） <a class="header-anchor" href="#-仕上げの確認振り返りシートに書くと良い観点" aria-hidden="true">#</a></h2>
+<ul>
+<li>Root Bridge を「MAC任せ」にせず<strong>明示設計</strong>すべき理由は？（経路最適化・予測可能性）</li>
+<li>トランクの <strong>native VLAN</strong> を既定(1)のままにするリスクは？（VLANホッピング）</li>
+<li>第1章の <strong>BFD/Helloタイマー</strong> と STP/RSTP の収束は、考え方がどう同じでどう違う？</li>
+</ul>
+<hr>
+<h2 id="-次テーマ09への布石" tabindex="-1">▶️ 次テーマ（09）への布石 <a class="header-anchor" href="#-次テーマ09への布石" aria-hidden="true">#</a></h2>
+<p>09 では <strong>EtherChannel(LACP)</strong> で複数リンクを1本に束ねて「STPに切られない冗長」を作り、
+<strong>L3スイッチ + SVI</strong> で VLAN間ルーティングへ進みます。STPで「切る」冗長との対比を意識して。</p>
+<hr>
+<h3 id="-起動メモ環境共通" tabindex="-1">🛠 起動メモ（環境共通） <a class="header-anchor" href="#-起動メモ環境共通" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash">ssh clab@orb
+<span class="hljs-built_in">cd</span> &lt;このフォルダの clab マシン上のパス&gt;
+<span class="hljs-built_in">sudo</span> containerlab deploy  -t cisco_l2_vlan_stp.clab.yml   <span class="hljs-comment"># 各ノード起動（IOLは約2分）</span>
+<span class="hljs-built_in">sudo</span> containerlab destroy -t cisco_l2_vlan_stp.clab.yml   <span class="hljs-comment"># 破棄</span>
+<span class="hljs-comment"># CLI: sudo docker attach clab-cisco-l2-vlan-stp-sw1  （抜ける: Ctrl-P → Ctrl-Q）</span>
+</code></pre>
+<blockquote>
+<p>STP の BPDU は EdgeShark/Wireshark（<code>../環境/環境説明.md</code> §8）で覗くと挙動が腑に落ちる。</p>
+</blockquote>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-トポロジーと設計要件">🗺️ トポロジーと設計要件</a></li>
+<li class="lvl-3"><a href="#1-vlan--ip-設計">1. VLAN / IP 設計</a></li>
+<li class="lvl-2"><a href="#-3つのミッション">🎯 3つのミッション</a></li>
+<li class="lvl-3"><a href="#mission-1-vlan-とトランクで疎通させる">Mission 1: VLAN とトランクで疎通させる</a></li>
+<li class="lvl-3"><a href="#mission-2-stp-の-root選出と-blocking-ポートを観測">Mission 2: STP の Root選出と Blocking ポートを観測</a></li>
+<li class="lvl-3"><a href="#mission-3-rstp-高速収束リンク断フェイルオーバ">Mission 3: RSTP 高速収束（リンク断フェイルオーバ）</a></li>
+<li class="lvl-2"><a href="#-仕上げの確認振り返りシートに書くと良い観点">🔎 仕上げの確認（振り返りシートに書くと良い観点）</a></li>
+<li class="lvl-2"><a href="#-次テーマ09への布石">▶️ 次テーマ（09）への布石</a></li>
+<li class="lvl-3"><a href="#-起動メモ環境共通">🛠 起動メモ（環境共通）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

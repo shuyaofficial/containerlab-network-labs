@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>第2章: LAN/L2 スイッチングと冗長（✅ 完了）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ロードマップ</span>
+<span class="sep">/</span>
+<span>章別アウトライン</span></nav>
+      <h1 class="doc-title">第2章: LAN/L2 スイッチングと冗長（✅ 完了）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p><strong>制覇済みの章</strong>（08〜11 完了）。社内LANは L3 だけでは動かない——
+「PCの最初の1ホップ」を支える L2（VLAN/STP/EtherChannel）と GW冗長（HSRP）、さらに統合冗長まで固めた。
+⚠ この章の中核は <strong>IEEE/Cisco規格でRFCカタログに無い</strong>（<code>00_カリキュラム対応表.md</code> B表で補完）。</p>
+</blockquote>
+<hr>
+<h2 id="-章の狙い" tabindex="-1">🎯 章の狙い <a class="header-anchor" href="#-章の狙い" aria-hidden="true">#</a></h2>
+<ul>
+<li>VLAN で部署/用途ごとにブロードキャストドメインを分割し、トランクで束ねられる</li>
+<li>STP/RSTP で L2ループを防ぎ、Root と Blocking ポートを意図通り設計できる</li>
+<li>EtherChannel で帯域集約・リンク冗長、L3スイッチで Inter-VLAN ルーティングができる</li>
+<li>HSRP/VRRP でデフォルトGWを冗長化できる</li>
+<li><strong>【山場】</strong> 上流断を Track で検知し、HSRP・OSPF・BGP を<strong>連動</strong>させて一斉迂回できる</li>
+</ul>
+<h2 id="前提" tabindex="-1">前提 <a class="header-anchor" href="#前提" aria-hidden="true">#</a></h2>
+<ul>
+<li>第1章（OSPF/BGP/Track の感覚、<code>docker attach</code> での構築、障害試験の作法）</li>
+</ul>
+<hr>
+<h2 id="-テーマ一覧" tabindex="-1">📋 テーマ一覧 <a class="header-anchor" href="#-テーマ一覧" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>タイトル</th>
+<th>狙い</th>
+<th>規格</th>
+<th>難易度</th>
+<th>到達条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>08</strong></td>
+<td>VLAN / 802.1Q / STP・RSTP</td>
+<td>VLAN分割・トランク疎通、STP Root選出と Blockingポート観測、RSTP高速収束</td>
+<td>802.1Q/D/w</td>
+<td>初〜中級</td>
+<td>ループ構成でブロッキングを目視→リンク断でRSTP収束を観測（=<strong>Theme F</strong>）</td>
+</tr>
+<tr>
+<td>09</td>
+<td>EtherChannel / L3SW・Inter-VLAN</td>
+<td>LACPで束ねる、SVIでVLAN間ルーティング</td>
+<td>802.3ad/Cisco</td>
+<td>中級</td>
+<td>1本抜いても無瞬断、VLAN10⇔20がSVI経由で疎通</td>
+</tr>
+<tr>
+<td>10</td>
+<td>FHRP: HSRP / VRRP</td>
+<td>仮想IP/MAC、Active/Standby、Priority/Preempt</td>
+<td>Cisco/RFC5798</td>
+<td>中級</td>
+<td>Active落として仮想GW無瞬断、<code>show standby</code>理解（=<strong>Theme G</strong>）</td>
+</tr>
+<tr>
+<td><strong>11</strong></td>
+<td>統合冗長: Track×HSRP×OSPF/BGP</td>
+<td>上流断→HSRP切替→IGP/BGP迂回を一斉連動</td>
+<td>統合</td>
+<td>上級</td>
+<td>「社内PCの上流リンク断→GW切替→BGP経由で外へ」を自力構築（=<strong>Theme H</strong>）</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="-第1章との本質は同じつながりメンターの開眼ポイント" tabindex="-1">💡 第1章との「本質は同じ」つながり（メンターの開眼ポイント） <a class="header-anchor" href="#-第1章との本質は同じつながりメンターの開眼ポイント" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>観点</th>
+<th>L3（第1章）</th>
+<th>L2/FHRP（第2章）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>生存確認</td>
+<td>Hello（OSPF/BGP Keepalive）</td>
+<td>Hello（STP BPDU / HSRP Hello）</td>
+</tr>
+<tr>
+<td>断検知</td>
+<td>Dead/Hold タイマー、BFD</td>
+<td>Max Age、HSRP Holdtime</td>
+</tr>
+<tr>
+<td>切替</td>
+<td>経路再計算・再収束</td>
+<td>Root再選出 / Active→Standby</td>
+</tr>
+<tr>
+<td>高速化</td>
+<td>RSTP相当＝BFD</td>
+<td>RSTP（802.1w）／HSRP短縮タイマー</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>「世界の冗長化（BGP）」も「社内の冗長化（STP/HSRP）」も <em>Hello→断検知→切替</em> で同じ。
+11 で両者を <strong>物理的に連動</strong>させると、エンタープライズ冗長化が完成する。</p>
+</blockquote>
+<hr>
+<h2 id="-環境メモ" tabindex="-1">🖥️ 環境メモ <a class="header-anchor" href="#-環境メモ" aria-hidden="true">#</a></h2>
+<ul>
+<li>スイッチは L2 IOL イメージ（例 <code>vrnetlab/cisco_iol:L2-15.2</code>、<code>../環境/環境説明.md</code> §4）</li>
+<li>PCは軽量 linux コンテナ（alpine）で代用可</li>
+<li>STP観測は EdgeShark/Wireshark（<code>../環境/環境説明.md</code> §8）で BPDU を見ると理解が深まる</li>
+</ul>
+<h2 id="-章末チェック" tabindex="-1">✅ 章末チェック <a class="header-anchor" href="#-章末チェック" aria-hidden="true">#</a></h2>
+<ul>
+<li>[ ] <code>show spanning-tree</code> から Root Bridge・Role・State を読み、設計意図通りか判断できる</li>
+<li>[ ] トランクの allowed vlan / native vlan の事故（VLAN hopping含む）を説明できる</li>
+<li>[ ] L3スイッチの SVI と ルーテッドポートの違いを使い分けられる</li>
+<li>[ ] HSRP の Active/Standby を Priority と Preempt で意図通り固定できる</li>
+<li>[ ] <strong>11</strong>: 上流断時に「GW(HSRP)・経路(OSPF/BGP)が連動して切り替わる」図を描いて説明できる</li>
+<li>[ ] 各テーマの <code>振り返りシート</code> を作成済み</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-章の狙い">🎯 章の狙い</a></li>
+<li class="lvl-2"><a href="#前提">前提</a></li>
+<li class="lvl-2"><a href="#-テーマ一覧">📋 テーマ一覧</a></li>
+<li class="lvl-2"><a href="#-第1章との本質は同じつながりメンターの開眼ポイント">💡 第1章との「本質は同じ」つながり（メンターの開眼ポイント）</a></li>
+<li class="lvl-2"><a href="#-環境メモ">🖥️ 環境メモ</a></li>
+<li class="lvl-2"><a href="#-章末チェック">✅ 章末チェック</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

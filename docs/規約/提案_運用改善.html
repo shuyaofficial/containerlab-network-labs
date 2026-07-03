@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>運用改善提案書 — Containerlabラボ環境</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>規約</span></nav>
+      <h1 class="doc-title">運用改善提案書 — Containerlabラボ環境</h1>
+      <div class="meta">
+        <span class="badge badge--review">レビュー中</span>
+        <span class="dot"></span><span class="date">2026-07-03</span>
+        <span class="tags"><span class="tag">proposal</span><span class="tag">operations</span><span class="tag">git</span><span class="tag">image-manifest</span><span class="tag">aar</span></span>
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>対象: <code>Mac仮想環境構築/</code> 配下の全テーマ運用。<strong>既存テーマ02〜27には遡及しない</strong>（<a href="README.html">README.md</a> の適用範囲どおり）。
+本書は「あるべき運用」を提案として記録するものであり、指摘のための指摘ではない。次にそのテーマへ手を入れる時の判断材料とする。</p>
+</blockquote>
+<hr>
+<h2 id="b-1-vmイメージ再構築性" tabindex="-1">B-1. VM/イメージ再構築性 <a class="header-anchor" href="#b-1-vmイメージ再構築性" aria-hidden="true">#</a></h2>
+<h3 id="課題" tabindex="-1">課題 <a class="header-anchor" href="#課題" aria-hidden="true">#</a></h3>
+<p>2026-06-15にOrbStack VM「clab」が消失し、ビルド済みイメージ18個を失った。復旧に3日を要した。原因は「頭の中にしかない再構築手順」と「イメージの現状を一覧できる場所がなかったこと」の二つ。</p>
+<h3 id="提案" tabindex="-1">提案 <a class="header-anchor" href="#提案" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>施策</th>
+<th>内容</th>
+<th>状態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>イメージマニフェストの常設</td>
+<td><code>環境/イメージマニフェスト.md</code> に稼働中の全イメージ（タグ・kind・アーキテクチャ・ビルド日・素材の入手経路）を一覧化</td>
+<td>別タスクで実データ生成中（本書と並行）</td>
+</tr>
+<tr>
+<td>再構築runbookの常設</td>
+<td><a href="../%E7%92%B0%E5%A2%83/rebuild_runbook.html">rebuild_runbook.md</a> をVM再構築の単一手順書として維持</td>
+<td>本タスクで新規作成</td>
+</tr>
+<tr>
+<td>四半期arm64棚卸し</td>
+<td><code>docker manifest inspect &lt;image&gt;</code> で各イメージのプラットフォーム（linux/amd64 か linux/arm64 か）を確認し、arm64ネイティブ版が新規に出ていないか確認する。QEMUエミュ実行しているイメージ（IOL・FortiGate等）は起動が遅く、ネイティブ代替（cEOS・SR Linux・cRPD等）が出ていれば移行を検討</td>
+<td>未着手・四半期毎（次回目安: 2026-10）</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="運用ルール" tabindex="-1">運用ルール <a class="header-anchor" href="#運用ルール" aria-hidden="true">#</a></h3>
+<ul>
+<li>イメージマニフェストとrunbookは<strong>セットで更新する</strong>。イメージを追加・変更したらマニフェストに追記し、再構築手順に影響があればrunbookも直す。</li>
+<li>VM消失は「起きるもの」として扱う。マニフェスト＋runbookの2点があれば、次回消失時の復旧は「素材の再DL待ち」のみに縮退できる（今回の教訓）。</li>
+</ul>
+<hr>
+<h2 id="b-2-gitgithub公開手順" tabindex="-1">B-2. Git/GitHub公開手順 <a class="header-anchor" href="#b-2-gitgithub公開手順" aria-hidden="true">#</a></h2>
+<h3 id="課題-1" tabindex="-1">課題 <a class="header-anchor" href="#課題-1" aria-hidden="true">#</a></h3>
+<p><code>Mac仮想環境構築/</code> は現状<strong>未git管理</strong>（132MB）。公開判断は個別テーマ単位で発生しうるが、以下がリポジトリ直下に混在している。</p>
+<ul>
+<li>実行時生成物: <code>clab-*/</code> ランタイムディレクトリ（<strong>TLS CA秘密鍵を含む</strong>。2026-07-03時点で12箇所の <code>clab-*/.tls/ca/ca.key</code> を確認済み）</li>
+<li>大容量バイナリ: Ciscoの <code>.bin</code>（IOL）・<code>.qcow2</code>（FortiGate等）</li>
+<li>ライセンス関連: <code>IOURC*</code> およびその展開物</li>
+<li>生成された構成図・ビルド出力（<code>規約/ビルド/</code> のHTML出力想定）</li>
+</ul>
+<p>これらを未サニタイズのままpushすると、秘密鍵の漏洩・ライセンス条項違反・リポジトリ肥大化のいずれかが起きる。</p>
+<h3 id="提案-gitignore-方針" tabindex="-1">提案: <code>.gitignore</code> 方針 <a class="header-anchor" href="#提案-gitignore-方針" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>パターン</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>clab-*/</code></td>
+<td>TLS CA秘密鍵・実行時状態を含むランタイムディレクトリ全体を除外</td>
+</tr>
+<tr>
+<td><code>*.bin</code></td>
+<td>Cisco IOLバイナリ（配布不可のライセンス素材）</td>
+</tr>
+<tr>
+<td><code>*.qcow2</code></td>
+<td>FortiGate等のVMイメージ本体</td>
+</tr>
+<tr>
+<td><code>IOURC*</code></td>
+<td>Cisco IOLライセンスファイルおよびzip展開物</td>
+</tr>
+<tr>
+<td><code>*license*</code></td>
+<td>ライセンス関連ファイルの汎用除外（大文字小文字問わず運用）</td>
+</tr>
+<tr>
+<td><code>node_modules/</code></td>
+<td>ビルドツール（<code>規約/ビルド/build.mjs</code>）の依存物</td>
+</tr>
+<tr>
+<td><code>docs/assets/</code> などビルド生成物</td>
+<td>MD→HTMLビルドの出力物（再生成可能なため）</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="提案-サニタイズ工程公開前の走査手順" tabindex="-1">提案: サニタイズ工程（公開前の走査手順） <a class="header-anchor" href="#提案-サニタイズ工程公開前の走査手順" aria-hidden="true">#</a></h3>
+<ol>
+<li><strong>秘密鍵走査</strong>: <code>find . -path &quot;*clab-*/.tls*&quot;</code> で残存確認 → 上記gitignoreが効いていれば0件のはず。念のため <code>git status --ignored</code> で除外漏れがないか確認。</li>
+<li><strong>ライセンス文字列走査</strong>: <code>grep -ril &quot;iourc\|hostid\|license&quot; --include='*.md' --include='*.yml'</code> でライセンス関連の記述を洗い出し、実際のキー・シリアル値が平文で書かれていないか確認（手順書としての言及は可、実値の埋め込みは不可）。</li>
+<li><strong>個人情報・認証情報走査</strong>: <code>grep -rilE &quot;password|passwd|secret|token&quot; --include='*.md' --include='*.yml' --include='*.sh'</code> でハードコード認証情報を確認。ラボ環境の初期パスワード（例: FortiGateの初回未設定パスワード）は「未設定である旨の説明」であればドキュメント上問題ないが、実際に設定した本番相当の値は除外する。</li>
+<li><strong>ユーザー名・パス走査</strong>: <code>grep -r &quot;/Users/shuya&quot;</code> で絶対パスの露出を確認し、相対パス・プレースホルダに置換する。</li>
+</ol>
+<h3 id="公開前チェックリスト" tabindex="-1">公開前チェックリスト <a class="header-anchor" href="#公開前チェックリスト" aria-hidden="true">#</a></h3>
+<ul>
+<li>[ ] <code>.gitignore</code> を上記方針で設置済み</li>
+<li>[ ] <code>git status --ignored</code> で <code>clab-*/</code> ・バイナリ・ライセンス類が除外リストに乗っている</li>
+<li>[ ] 上記3種のgrep走査を実施し、ヒットをレビュー済み</li>
+<li>[ ] 絶対パス（<code>/Users/shuya/...</code>）を相対パスまたはプレースホルダに置換済み</li>
+<li>[ ] READMEやCLAUDE.mdに含まれる内部限定情報（社内ネットワーク構成の実IP帯など）を確認済み</li>
+</ul>
+<hr>
+<h2 id="b-3-試験切り分け教訓のテンプレ化" tabindex="-1">B-3. 試験・切り分け教訓のテンプレ化 <a class="header-anchor" href="#b-3-試験切り分け教訓のテンプレ化" aria-hidden="true">#</a></h2>
+<h3 id="課題-2" tabindex="-1">課題 <a class="header-anchor" href="#課題-2" aria-hidden="true">#</a></h3>
+<p>障害切り分けは各テーマで都度その場で記録しており、様式が揺れている（例: <code>試験結果_YYYY-MM-DD.md</code> と <code>試験完了記録_YYYY-MM-DD.md</code> の混在、<code>構築ログ_テンプレート.md</code> の有無がテーマにより異なる）。過去の運用教訓（Obsidian <code>Mistakes.md</code>）として蓄積されている以下の5点は、個別テーマの記録に埋もれると再利用されにくい。</p>
+<ol>
+<li>外部リソースは手持ちストレージ網羅検索が先</li>
+<li>ライブ状態（show系コマンド）を設定解析より先に採取</li>
+<li>同一症状に複数独立原因を想定し層別切り分け</li>
+<li>日本語ファイル名はNFC正規化</li>
+<li>iCloudロックは <code>brctl evict</code>/<code>brctl download</code> で回避</li>
+</ol>
+<h3 id="提案-1" tabindex="-1">提案 <a class="header-anchor" href="#提案-1" aria-hidden="true">#</a></h3>
+<ul>
+<li><code>05_試験/切り分けシート.md</code> の雛形（<code>type: troubleshoot</code>）を <a href="%E9%9B%9B%E5%BD%A2/">規約/雛形/</a> に追加し、新規テーマは必ずこの雛形からコピーする。</li>
+<li>雛形の冒頭に上記5教訓を「着手前チェック」として埋め込み、都度Obsidianを参照しなくても切り分け時に自然に思い出せる形にする。</li>
+<li>個別テーマの切り分けシートで新たな教訓が見つかった場合、そのテーマ内に留めず、意味のある区切りでObsidian <code>Mistakes.md</code> へも追記する（グローバル運用ルールに準拠）。テンプレへの反映は四半期棚卸し（B-1）のタイミングでまとめて検討する。</li>
+</ul>
+<hr>
+<h2 id="b-4-進捗aar接続" tabindex="-1">B-4. 進捗・AAR接続 <a class="header-anchor" href="#b-4-進捗aar接続" aria-hidden="true">#</a></h2>
+<h3 id="課題-3" tabindex="-1">課題 <a class="header-anchor" href="#課題-3" aria-hidden="true">#</a></h3>
+<p>進捗の状態は3箇所に分散している。</p>
+<ol>
+<li>各テーマMDの frontmatter <code>status</code>（draft/review/done/superseded）</li>
+<li><a href="../%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97/%E9%80%B2%E6%8D%97%E7%AE%A1%E7%90%86.html">ロードマップ/進捗管理.md</a> の状態凡例（✅/◐/⏹/⚠/⬜）</li>
+<li>Obsidian長期記憶（<code>Daily/</code>・<code>Decisions.md</code>・<code>Mistakes.md</code>）のAAR記録</li>
+</ol>
+<p>これらは現状、更新のタイミングも粒度も独立しており、片方を更新してももう片方が追随しない（例: テーマ22は <code>⏹部分達成で終了</code> だが、フォルダ内の個別MDの <code>status</code> は未統一）。</p>
+<h3 id="提案-双方向リンク運用" tabindex="-1">提案: 双方向リンク運用 <a class="header-anchor" href="#提案-双方向リンク運用" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>更新元</th>
+<th>更新すべき先</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>テーマ内MDの <code>status</code> を <code>done</code> に変更</td>
+<td><a href="../%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97/%E9%80%B2%E6%8D%97%E7%AE%A1%E7%90%86.html">進捗管理.md</a> の該当行の状態記号を更新し、可能なら振り返りファイルへのリンクを追加</td>
+</tr>
+<tr>
+<td><a href="../%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97/%E9%80%B2%E6%8D%97%E7%AE%A1%E7%90%86.html">進捗管理.md</a> の状態を更新</td>
+<td>該当テーマの主要MD（README・基本設計書など）の frontmatter <code>status</code> も揃える</td>
+</tr>
+<tr>
+<td>意味のある区切り／タスク完了</td>
+<td>Obsidian <code>Daily/YYYY-MM-DD.md</code> に該当テーマ名を明記して追記（グローバル運用ルールに準拠、本フォルダ内には書かない）</td>
+</tr>
+<tr>
+<td>AARで「予想と実際のズレ」が学びだった場合</td>
+<td>Obsidian <code>Mistakes.md</code> へ。テーマ固有の切り分けシートにも該当があれば併記</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>3箇所の同期は自動化しない（過剰な仕組み化を避ける）。「テーマの状態が変わったら3箇所を思い出して見る」をセルフ監査チェックリストの項目として明文化するに留める。</li>
+</ul>
+<hr>
+<h2 id="b-5-既存テーマの不整合一覧記録のみ遡及修正しない" tabindex="-1">B-5. 既存テーマの不整合一覧（記録のみ・遡及修正しない） <a class="header-anchor" href="#b-5-既存テーマの不整合一覧記録のみ遡及修正しない" aria-hidden="true">#</a></h2>
+<p>以下は2026-07-03時点で確認した既存テーマ02〜27の不整合。<strong>規約は新規テーマ（28以降）にのみ適用</strong>するため、ここでは是正せず記録に留める。次にそのテーマへ手を入れる機会があれば、規約へ寄せることを推奨する。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>不整合</th>
+<th>該当テーマ</th>
+<th>推奨対応（次回着手時）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>clab.yml</code> 配置がテーマ直下（02〜22）と <code>04_構築/</code>配下（23〜27）で混在</td>
+<td>02〜27全般</td>
+<td><a href="clab%E9%81%8B%E7%94%A8%E8%A6%8F%E7%B4%84.html">clab運用規約.md</a> の配置ルールに合わせて <code>04_構築/</code> 配下へ寄せる</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>deploy.sh</code>（22のみ <code>build_and_deploy.sh</code>）がテーマ毎に非標準</td>
+<td>22（独自名）、23〜27（<code>deploy.sh</code>）</td>
+<td>スクリプト名・引数体系（status/build/deploy/destroy）を統一形に揃える</td>
+</tr>
+<tr>
+<td>3</td>
+<td>構成図の形式がdrawio（22のみ）／テキスト版／mermaid混在</td>
+<td>22（drawio）、他（mermaid or テキスト）</td>
+<td><a href="%E6%A7%8B%E6%88%90%E5%9B%B3%E8%A6%8F%E7%B4%84.html">構成図規約.md</a> のMermaid第一方針に揃え、drawioは非推奨として維持のみ</td>
+</tr>
+<tr>
+<td>4</td>
+<td>テーマ番号「05」が2フォルダで重複（<code>05_cisco_bgp_ospf_redistribute</code> と <code>05_cisco_bgp_route_map_rr</code>）</td>
+<td>05番台</td>
+<td>番号の付け直しは既存リンク破壊のリスクが高いため据え置き。新規テーマでは重複を出さないことを <a href="%E3%83%89%E3%82%AD%E3%83%A5%E3%83%A1%E3%83%B3%E3%83%88%E6%A8%99%E6%BA%96.html">ドキュメント標準.md</a> で担保</td>
+</tr>
+<tr>
+<td>5</td>
+<td>試験結果ファイル名が <code>試験結果_YYYY-MM-DD.md</code> と <code>試験完了記録_YYYY-MM-DD.md</code> で揺れ</td>
+<td>21・22（試験結果）、24（試験完了記録）</td>
+<td>frontmatterスキーマの <code>test-result</code> type に統一し、ファイル名も <code>試験結果_YYYY-MM-DD.md</code> に寄せる</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>構築ログ_テンプレート.md</code> の設置がテーマにより有無が分かれる（24〜27・インターロップにはあるが22以前にはない）</td>
+<td>22以前</td>
+<td>新規着手時に雛形からコピーする運用に統一（本タスクの対象外、雛形自体は既に存在）</td>
+</tr>
+<tr>
+<td>7</td>
+<td>frontmatter未整備の可能性（本規約は2026-07-03制定のため、それ以前に書かれたMDは値辞書に沿っていない場合がある）</td>
+<td>02〜27全般</td>
+<td>各テーマに触る際、対象MDのfrontmatterを <a href="frontmatter%E3%82%B9%E3%82%AD%E3%83%BC%E3%83%9E.html">frontmatterスキーマ.md</a> に合わせて補完</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="棚卸しの位置づけ" tabindex="-1">棚卸しの位置づけ <a class="header-anchor" href="#棚卸しの位置づけ" aria-hidden="true">#</a></h3>
+<ul>
+<li>上表は一括修正のタスクリストではない。<strong>「次にそのテーマを触る理由ができた時」に合わせて是正する</strong>という前提の記録。</li>
+<li>新規で棚卸し項目を見つけた場合は、この表に行を追加する（表自体をこの提案書の唯一の記録先とし、二重管理しない）。</li>
+</ul>
+<hr>
+<h2 id="改訂ルール" tabindex="-1">改訂ルール <a class="header-anchor" href="#改訂ルール" aria-hidden="true">#</a></h2>
+<p>本書の変更は <a href="README.html">README.md</a> の改訂ルールに従う。既存テーマへの遡及修正は行わず、移行推奨として本書に追記する。</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#b-1-vmイメージ再構築性">B-1. VM/イメージ再構築性</a></li>
+<li class="lvl-3"><a href="#課題">課題</a></li>
+<li class="lvl-3"><a href="#提案">提案</a></li>
+<li class="lvl-3"><a href="#運用ルール">運用ルール</a></li>
+<li class="lvl-2"><a href="#b-2-gitgithub公開手順">B-2. Git/GitHub公開手順</a></li>
+<li class="lvl-3"><a href="#課題-1">課題</a></li>
+<li class="lvl-3"><a href="#提案-gitignore-方針">提案: .gitignore 方針</a></li>
+<li class="lvl-3"><a href="#提案-サニタイズ工程公開前の走査手順">提案: サニタイズ工程（公開前の走査手順）</a></li>
+<li class="lvl-3"><a href="#公開前チェックリスト">公開前チェックリスト</a></li>
+<li class="lvl-2"><a href="#b-3-試験切り分け教訓のテンプレ化">B-3. 試験・切り分け教訓のテンプレ化</a></li>
+<li class="lvl-3"><a href="#課題-2">課題</a></li>
+<li class="lvl-3"><a href="#提案-1">提案</a></li>
+<li class="lvl-2"><a href="#b-4-進捗aar接続">B-4. 進捗・AAR接続</a></li>
+<li class="lvl-3"><a href="#課題-3">課題</a></li>
+<li class="lvl-3"><a href="#提案-双方向リンク運用">提案: 双方向リンク運用</a></li>
+<li class="lvl-2"><a href="#b-5-既存テーマの不整合一覧記録のみ遡及修正しない">B-5. 既存テーマの不整合一覧（記録のみ・遡及修正しない）</a></li>
+<li class="lvl-3"><a href="#棚卸しの位置づけ">棚卸しの位置づけ</a></li>
+<li class="lvl-2"><a href="#改訂ルール">改訂ルール</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

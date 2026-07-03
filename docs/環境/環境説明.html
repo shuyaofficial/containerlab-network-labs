@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Containerlab on OrbStack 環境説明</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>環境</span></nav>
+      <h1 class="doc-title">Containerlab on OrbStack 環境説明</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>このファイルは「現在の環境がどうなっているか」を説明するリファレンスです。
+セッションが切れても、これを読めば環境を再理解できます。
+作業の経緯は <code>../log/作業ログ.md</code> を参照。</p>
+</blockquote>
+<p>最終更新: 2026-06-16</p>
+<blockquote>
+<p>⚠ <strong>2026-06-15 追記</strong>: 旧VM「clab」は一度消失していたため、同名・同方式で<strong>新規に作り直した</strong>
+（Ubuntu 24.04 / containerlab 0.76.1 / docker 29.1.3）。<code>~/vrnetlab</code>(v0.21.0) はARM64パッチ適用済みで再用意。</p>
+<p>✅ <strong>2026-06-16 追記</strong>: Google Drive (<code>マイドライブ/Images/Dockerimege/</code>) の13プリビルドイメージを全てロード済み。
+さらにIOL 4イメージ（L2-advipservices-2017, L2-15.2, 15.6.3M3a, 15.7.3M2）を新規ビルド。
+<strong>合計24イメージが使用可能</strong>（§4参照）。
+✅ <strong>2026-06-17 IOLライセンス解決</strong>: Google Drive の <code>IOURC.zip</code> から正規ライセンスを発見。
+<a href="http://entrypoint.sh">entrypoint.sh</a> にライセンス埋め込み＋hostname <code>gns3-iouvm</code> 固定で全IOLイメージを再ビルド済み。
+IOL起動順序も修正（IOL→iouyap順に変更、sock lock解消）。全IOLノードが正常起動確認済み。</p>
+</blockquote>
+<hr>
+<h2 id="1-全体像3層構造" tabindex="-1">1. 全体像（3層構造） <a class="header-anchor" href="#1-全体像3層構造" aria-hidden="true">#</a></h2>
+<pre><code>┌─ macOS (Apple M4 / arm64, macOS 15.6.1) ──────────────────────────┐
+│  ・OrbStack 2.1.3 / Docker 29.4.0                                  │
+│  ・VSCode（Remote-SSH で下のLinuxマシンに接続して操作）            │
+│                                                                    │
+│   ┌─ OrbStack Linux マシン &quot;clab&quot; (Ubuntu noble / arm64) ───────┐  │
+│   │  接続: ターミナルで  ssh clab@orb                            │  │
+│   │  ・Docker 29.5.0                                            │  │
+│   │  ・Containerlab 0.75.0                                      │  │
+│   │  ・Rosetta + qemu-x86_64（x86イメージのエミュレーション）   │  │
+│   │                                                            │  │
+│   │   ┌─ Docker コンテナ（＝ネットワーク機器）──────────────┐  │  │
+│   │   │  clab-ospf3-r1..r4  (Cisco IOS / cisco_iol)         │  │  │
+│   │   │  clab-cisco-lab-r1,r2 (FRR)                         │  │  │
+│   │   └────────────────────────────────────────────────────┘  │  │
+│   └────────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>重要な性質</strong></p>
+<ul>
+<li>OrbStack は Mac のファイルを Linux マシン内に <strong>同じパスでマウント</strong>している。
+例: Mac の <code>/Users/shuya/Downloads/x.bin</code> は <code>clab</code> マシン内でも <code>/Users/shuya/Downloads/x.bin</code> で見える。</li>
+<li>Containerlab は Linux 専用ツール。Mac では直接動かないので、この <code>clab</code> マシンの中で動かす。</li>
+</ul>
+<hr>
+<h2 id="2-cpuアーキテクチャの大前提最重要" tabindex="-1">2. CPUアーキテクチャの大前提（最重要） <a class="header-anchor" href="#2-cpuアーキテクチャの大前提最重要" aria-hidden="true">#</a></h2>
+<ul>
+<li>この Mac は <strong>arm64 (Apple Silicon)</strong>。一方ネットワーク機器イメージはほぼ全て <strong>x86_64 / i386</strong>。</li>
+<li>そのため Cisco などの x86 イメージは <strong>Rosetta / QEMU でエミュレーション</strong>して動かしている。
+<ul>
+<li>結果: <strong>動くが起動が遅い</strong>（IOLで1ノード約2分）。これは arm64 の宿命で、回避不可。</li>
+</ul>
+</li>
+<li>arm64 ネイティブで快適に動くもの: <strong>FRR / Nokia SR Linux / Arista cEOS(arm) / Juniper cRPD</strong>。</li>
+</ul>
+<hr>
+<h2 id="3-アクセス方法まとめ" tabindex="-1">3. アクセス方法まとめ <a class="header-anchor" href="#3-アクセス方法まとめ" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>やりたいこと</th>
+<th>方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Linuxマシンに入る</td>
+<td>Macのターミナルで <code>ssh clab@orb</code></td>
+</tr>
+<tr>
+<td>VSCodeで操作</td>
+<td>Remote-SSH で <code>clab@orb</code> に接続 → 拡張「Containerlab」(srl-labs) を使用</td>
+</tr>
+<tr>
+<td>動いてる機器一覧</td>
+<td><code>sudo docker ps</code>（NAMES列が機器名）</td>
+</tr>
+<tr>
+<td>ラボ一覧</td>
+<td><code>sudo containerlab inspect --all</code></td>
+</tr>
+<tr>
+<td>機器のCLIに入る</td>
+<td><code>sudo docker attach clab-ospf3-r1</code> → Enter → <code>r1#</code>。<strong>抜ける: Ctrl-P → Ctrl-Q</strong></td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>⚠ <code>ssh admin@clab-ospf3-r1</code> は <strong>失敗する</strong>（No route to host）。
+理由: この旧IOLイメージは管理インターフェース/SSHが未設定のため。
+→ 機器へは上記の <strong>コンソール接続（docker attach / VSCodeの右クリック Attach）</strong> で入る。</p>
+</blockquote>
+<hr>
+<h2 id="4-使えるイメージ2026-06-16更新-合計24個" tabindex="-1">4. 使えるイメージ（2026-06-16更新: 合計24個） <a class="header-anchor" href="#4-使えるイメージ2026-06-16更新-合計24個" aria-hidden="true">#</a></h2>
+<p>すべて <code>clab</code> マシンの Docker 内に格納済み。</p>
+<h3 id="41-iolライセンス解決済み" tabindex="-1">4.1 IOLライセンス（解決済み） <a class="header-anchor" href="#41-iolライセンス解決済み" aria-hidden="true">#</a></h3>
+<p>旧形式IOLバイナリ(<code>i86bi_*</code>)は <strong>Cisco iourc ライセンス</strong>が必要。
+Google Drive <code>マイドライブ/Images/IOURC.zip</code> のライセンスファイル（hostname <code>gns3-iouvm</code> 用）を
+<a href="http://entrypoint.sh">entrypoint.sh</a> に埋め込み済み。entrypoint が自動で hostname を <code>gns3-iouvm</code> に設定するため、
+clab.yml 側での追加設定は不要。</p>
+<p><strong>起動順序も修正済み</strong>: IOL→iouyap の順に起動（旧: iouyap→IOL で sock lock エラー発生）。</p>
+<h3 id="l3-ルータkind-cisco_iol" tabindex="-1">L3 ルータ（<code>kind: cisco_iol</code>） <a class="header-anchor" href="#l3-ルータkind-cisco_iol" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>タグ</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vrnetlab/cisco_iol:15.6.3M3a</code></td>
+<td>IOS 15.6(3)M3a。★2026-06-16ビルド</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_iol:15.7.3M2</code></td>
+<td>15.6.3M3aバイナリの代替タグ（正規15.7.3M2素材なし）。★2026-06-16ビルド</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="l2-スイッチkind-cisco_iol--type-l2" tabindex="-1">L2 スイッチ（<code>kind: cisco_iol</code> + <code>type: l2</code>） <a class="header-anchor" href="#l2-スイッチkind-cisco_iol--type-l2" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>タグ</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vrnetlab/cisco_iol:L2-15.2</code></td>
+<td>IOS 15.2 L2。★2026-06-16ビルド</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_iol:L2-advipservices-2017</code></td>
+<td>L2 Advanced IP Services。★2026-06-16ビルド</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="l3-ルータ-vioskind-cisco_vios" tabindex="-1">L3 ルータ vIOS（<code>kind: cisco_vios</code>） <a class="header-anchor" href="#l3-ルータ-vioskind-cisco_vios" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>タグ</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vrnetlab/cisco_vios:159-3.M6</code></td>
+<td>IOSv 15.9(3)M6。★2026-06-16ロード</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="l2-スイッチ-viosl2kind-cisco_vios" tabindex="-1">L2 スイッチ vIOSL2（<code>kind: cisco_vios</code>） <a class="header-anchor" href="#l2-スイッチ-viosl2kind-cisco_vios" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>タグ</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vrnetlab/cisco_vios:L2-20200929</code></td>
+<td>vIOSL2。★2026-06-16ロード</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="cisco-ios-xe--nx-os--asav" tabindex="-1">Cisco IOS-XE / NX-OS / ASAv <a class="header-anchor" href="#cisco-ios-xe--nx-os--asav" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>タグ</th>
+<th>kind</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vrnetlab/cisco_csr1000v:16.12.05</code></td>
+<td><code>cisco_csr1000v</code></td>
+<td>CSR1000v IOS-XE 16.12。1.1GB</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_csr1000v:17.03.05</code></td>
+<td><code>cisco_csr1000v</code></td>
+<td>CSR1000v IOS-XE 17.03。1.2GB</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_c8000v:17.06.03</code></td>
+<td><code>cisco_c8000v</code></td>
+<td>Catalyst 8000v。2.2GB（重い）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_c8000v:controller-17.06.03</code></td>
+<td><code>cisco_c8000v</code></td>
+<td>C8000v コントローラ版。1.7GB</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_c9800cl:17.17.01</code></td>
+<td><code>cisco_c9800cl</code></td>
+<td>C9800-CL WLC。3.5GB（重い）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_nxostitanium:7.3.0.D1.1</code></td>
+<td><code>cisco_nxos</code></td>
+<td>NX-OS Titanium。320MB</td>
+</tr>
+<tr>
+<td><code>vrnetlab/cisco_asav:9-18-1</code></td>
+<td><code>cisco_asav</code></td>
+<td>ASAv 9.18.1。436MB</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="fortigate--その他ベンダー" tabindex="-1">FortiGate / その他ベンダー <a class="header-anchor" href="#fortigate--その他ベンダー" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>タグ</th>
+<th>kind</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vrnetlab/fortinet_fortios:7.4.2.F</code></td>
+<td><code>fortinet_fortigate</code></td>
+<td>FortiOS 7.4.2。★2026-06-16ロード</td>
+</tr>
+<tr>
+<td><code>vrnetlab/vr-fortios:7.4.2.F</code></td>
+<td><code>fortinet_fortigate</code></td>
+<td>↑の別名タグ（Lab22互換用）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/arista_veos:4.29.2F</code></td>
+<td><code>arista_veos</code></td>
+<td>Arista vEOS。645MB</td>
+</tr>
+<tr>
+<td><code>vrnetlab/juniper_vsrx:24.4R1.9</code></td>
+<td><code>juniper_vsrx</code></td>
+<td>Juniper vSRX。949MB（重い:4GB RAM推奨）</td>
+</tr>
+<tr>
+<td><code>vrnetlab/mikrotik_routeros:7.5</code></td>
+<td><code>mikrotik_ros</code></td>
+<td>MikroTik CHR 7.5。最軽量(256MB)</td>
+</tr>
+<tr>
+<td><code>vrnetlab/canonical_ubuntu:jammy</code></td>
+<td><code>linux</code></td>
+<td>Ubuntu 22.04 サーバ</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="ユーティリティ" tabindex="-1">ユーティリティ <a class="header-anchor" href="#ユーティリティ" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>タグ</th>
+<th>kind</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>wbitt/network-multitool</code></td>
+<td><code>linux</code></td>
+<td>エンドポイント用（curl, ping等）</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p><strong>arm64の重要メモ</strong>: 全イメージ AMD64。<code>/dev/kvm</code> が無いため
+QEMU <strong>TCG完全エミュ</strong>で動作（遅いが動く）。Rosetta + qemu-x86_64 が binfmt_misc 登録済み。
+<code>~/vrnetlab/common/vrnetlab.py</code> を改造済み（<code>-cpu host</code>→<code>qemu64</code> 自動フォールバック）。</p>
+</blockquote>
+<hr>
+<h2 id="5-重要なファイルの場所すべて-clab-マシン内" tabindex="-1">5. 重要なファイルの場所（すべて <code>clab</code> マシン内） <a class="header-anchor" href="#5-重要なファイルの場所すべて-clab-マシン内" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>パス</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>~/network-lab/ospf3/</code></td>
+<td>OSPFラボ（<code>ospf3.clab.yml</code> と <code>r1.cfg</code>..<code>r4.cfg</code>）</td>
+</tr>
+<tr>
+<td><code>~/network-lab/cisco-lab/</code></td>
+<td>FRRベースのラボ</td>
+</tr>
+<tr>
+<td><code>~/vrnetlab/cisco/iol/</code></td>
+<td>IOLイメージのビルド土台（カスタム済み）</td>
+</tr>
+<tr>
+<td><code>~/vrnetlab/cisco/iol/docker/Dockerfile</code></td>
+<td>i386ライブラリ+python3追加、<code>--platform=linux/amd64</code>、iouyap直接.debインストール</td>
+</tr>
+<tr>
+<td><code>~/vrnetlab/cisco/iol/docker/entrypoint.sh</code></td>
+<td>IOURC埋め込み済み＋hostname gns3-iouvm固定。IOL→iouyap順で起動</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="6-新しいイメージを追加する手順" tabindex="-1">6. 新しいイメージを追加する手順 <a class="header-anchor" href="#6-新しいイメージを追加する手順" aria-hidden="true">#</a></h2>
+<pre><code class="language-bash">ssh clab@orb
+<span class="hljs-built_in">cd</span> ~/vrnetlab/cisco/iol
+<span class="hljs-built_in">rm</span> -f cisco_iol*.bin                              <span class="hljs-comment"># 前のbinを掃除</span>
+<span class="hljs-built_in">cp</span> /Users/shuya/Downloads/&lt;新イメージ&gt;.bin ./cisco_iol-&lt;タグ名&gt;.bin   <span class="hljs-comment"># L2なら cisco_iol-L2-&lt;名&gt;.bin</span>
+DOCKER_BUILDKIT=1 make docker-image
+docker images | grep cisco_iol                    <span class="hljs-comment"># 出来たタグを確認</span>
+</code></pre>
+<hr>
+<h2 id="7-ラボの起動停止" tabindex="-1">7. ラボの起動・停止 <a class="header-anchor" href="#7-ラボの起動停止" aria-hidden="true">#</a></h2>
+<pre><code class="language-bash">ssh clab@orb
+<span class="hljs-built_in">cd</span> ~/network-lab/ospf3
+<span class="hljs-built_in">sudo</span> containerlab deploy  -t ospf3.clab.yml       <span class="hljs-comment"># 起動（各ノード約2分）</span>
+<span class="hljs-built_in">sudo</span> containerlab destroy -t ospf3.clab.yml       <span class="hljs-comment"># 停止・削除</span>
+</code></pre>
+<p>VSCode なら: Containerlabパネルでラボを右クリック → Deploy / Destroy / Redeploy。</p>
+<hr>
+<h2 id="8-その他動いているもの補助ツール" tabindex="-1">8. その他動いているもの（補助ツール） <a class="header-anchor" href="#8-その他動いているもの補助ツール" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>コンテナ</th>
+<th>役割</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>clab-api-server</code></td>
+<td>Containerlab の REST API サーバ</td>
+</tr>
+<tr>
+<td><code>edgeshark-*</code> / <code>gostwire</code></td>
+<td>パケットキャプチャGUI（Wireshark連携）</td>
+</tr>
+</tbody>
+</table></div>
+<p>これらはラボとは別の常駐ツール。普段は意識しなくてよい。</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-全体像3層構造">1. 全体像（3層構造）</a></li>
+<li class="lvl-2"><a href="#2-cpuアーキテクチャの大前提最重要">2. CPUアーキテクチャの大前提（最重要）</a></li>
+<li class="lvl-2"><a href="#3-アクセス方法まとめ">3. アクセス方法まとめ</a></li>
+<li class="lvl-2"><a href="#4-使えるイメージ2026-06-16更新-合計24個">4. 使えるイメージ（2026-06-16更新: 合計24個）</a></li>
+<li class="lvl-3"><a href="#41-iolライセンス解決済み">4.1 IOLライセンス（解決済み）</a></li>
+<li class="lvl-3"><a href="#l3-ルータkind-cisco_iol">L3 ルータ（kind: cisco_iol）</a></li>
+<li class="lvl-3"><a href="#l2-スイッチkind-cisco_iol--type-l2">L2 スイッチ（kind: cisco_iol + type: l2）</a></li>
+<li class="lvl-3"><a href="#l3-ルータ-vioskind-cisco_vios">L3 ルータ vIOS（kind: cisco_vios）</a></li>
+<li class="lvl-3"><a href="#l2-スイッチ-viosl2kind-cisco_vios">L2 スイッチ vIOSL2（kind: cisco_vios）</a></li>
+<li class="lvl-3"><a href="#cisco-ios-xe--nx-os--asav">Cisco IOS-XE / NX-OS / ASAv</a></li>
+<li class="lvl-3"><a href="#fortigate--その他ベンダー">FortiGate / その他ベンダー</a></li>
+<li class="lvl-3"><a href="#ユーティリティ">ユーティリティ</a></li>
+<li class="lvl-2"><a href="#5-重要なファイルの場所すべて-clab-マシン内">5. 重要なファイルの場所（すべて clab マシン内）</a></li>
+<li class="lvl-2"><a href="#6-新しいイメージを追加する手順">6. 新しいイメージを追加する手順</a></li>
+<li class="lvl-2"><a href="#7-ラボの起動停止">7. ラボの起動・停止</a></li>
+<li class="lvl-2"><a href="#8-その他動いているもの補助ツール">8. その他動いているもの（補助ツール）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+#!/usr/bin/expect -f
+set timeout 10
+spawn ssh -o StrictHostKeyChecking=no admin@172.20.20.3
+expect "Password:"
+send "admin\r"
+expect "sw1#"
+send "show etherchannel summary\r"
+expect "sw1#"
+send "show run int e0/1\r"
+expect "sw1#"
+send "show run int e0/2\r"
+expect "sw1#"
+send "exit\r"

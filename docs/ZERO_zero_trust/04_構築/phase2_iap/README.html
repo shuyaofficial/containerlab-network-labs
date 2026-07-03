@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜Phase 2 NWセキュリティ（IAP）</title>
+  <link rel="stylesheet" href="../../../assets/doc.css">
+  <link rel="stylesheet" href="../../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>04_構築</span>
+<span class="sep">/</span>
+<span>phase2_iap</span></nav>
+      <h1 class="doc-title">テーマZERO｜Phase 2 NWセキュリティ（IAP）</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">phase</span><span class="tag">iap</span><span class="tag">pomerium</span><span class="tag">oauth2-proxy</span></span>
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>今回スコープでは<strong>未デプロイ</strong>（設計値）。このスタブは実装着手時の作業起点。詳細は <a href="../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a> Phase 2。</p>
+</blockquote>
+<h2 id="目的" tabindex="-1">目的 <a class="header-anchor" href="#目的" aria-hidden="true">#</a></h2>
+<p><code>app</code> の手前に関所（IAP）を置き、未認証アクセスを拒否する。認証を Keycloak に委譲し、認可済みリクエストのみ Trust の <code>app</code> へ転送する。ZTNA/IAP の「アプリ手前で毎回検証」を成立させる。</p>
+<h2 id="コンポーネント" tabindex="-1">コンポーネント <a class="header-anchor" href="#コンポーネント" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>役割</th>
+<th>ゾーン</th>
+<th>予定 IP</th>
+<th>待受</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>oauth2-proxy</td>
+<td>IAP 起点（最小の未認証拒否）</td>
+<td>DMZ（Untrust/Trust に足）</td>
+<td>172.30.10.22</td>
+<td>4180/HTTP</td>
+</tr>
+<tr>
+<td>pomerium</td>
+<td>IAP（認可ポリシー適用）</td>
+<td>DMZ（Untrust/Trust に足）</td>
+<td>172.30.10.21</td>
+<td>443/80</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>起点は oauth2-proxy（D-5）。まず「未認証拒否」を最小で示し、Pomerium で認可ポリシーへ高度化する。発展: OpenZiti。</li>
+</ul>
+<h2 id="依存" tabindex="-1">依存 <a class="header-anchor" href="#依存" aria-hidden="true">#</a></h2>
+<ul>
+<li>Phase 1（OIDC トークン取得が前提。IdP 連携先が必要）。</li>
+</ul>
+<h2 id="ゲート条件次へ進む条件" tabindex="-1">ゲート条件（次へ進む条件） <a class="header-anchor" href="#ゲート条件次へ進む条件" aria-hidden="true">#</a></h2>
+<p>未認証で <code>app</code> にアクセスすると拒否され、Keycloak ログイン後のみ <code>app</code> に到達できる。Untrust から Trust への直通は不可（<a href="../../01_%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9/%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9%E6%9B%B8.html">要件定義書</a> AC-2 / 試験 T-2-*）。</p>
+<h2 id="実装時の作業リスト" tabindex="-1">実装時の作業リスト <a class="header-anchor" href="#実装時の作業リスト" aria-hidden="true">#</a></h2>
+<ul>
+<li>[ ] <code>phase2_iap/</code> に clab.yml（IAP ノード、Untrust/DMZ/Trust マルチホーム）と <a href="http://deploy.sh">deploy.sh</a></li>
+<li>[ ] Keycloak を OIDC プロバイダとして設定（client id/secret はシークレット注入）</li>
+<li>[ ] redirect URL を Phase 1 の client 設定と一致させる</li>
+<li>[ ] <code>app</code> への upstream/転送経路（Trust 側の足）を設定</li>
+<li>[ ] 未認証アクセスが拒否/リダイレクトされることを確認（T-2-1）</li>
+<li>[ ] ログイン後に <code>app</code> へ到達できることを確認（T-2-2）</li>
+<li>[ ] Untrust→Trust の直通が不可であることを確認（T-2-3）</li>
+<li>[ ] 認可 allow/deny ログの出力を確認（Phase 3 で集約）</li>
+<li>[ ] <a href="../%E6%A7%8B%E7%AF%89%E3%83%AD%E3%82%B0_%E3%83%86%E3%83%B3%E3%83%97%E3%83%AC%E3%83%BC%E3%83%88.html">構築ログ</a> を複製して記録</li>
+</ul>
+<h2 id="学べること" tabindex="-1">学べること <a class="header-anchor" href="#学べること" aria-hidden="true">#</a></h2>
+<p>IAP/ZTNA の実装、認証委譲、認可の入口を1点に集約する設計、Untrust→Trust 直通禁止の効き方。</p>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E6%AE%B5%E9%9A%8E%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">段階ロードマップ</a></li>
+<li><a href="../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">論理構成設計</a>（認証フロー）</li>
+<li><a href="../phase1_id/README.html">phase1_id</a></li>
+<li><a href="../../05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E8%A8%88%E7%94%BB%E6%9B%B8.html">試験計画書</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#目的">目的</a></li>
+<li class="lvl-2"><a href="#コンポーネント">コンポーネント</a></li>
+<li class="lvl-2"><a href="#依存">依存</a></li>
+<li class="lvl-2"><a href="#ゲート条件次へ進む条件">ゲート条件（次へ進む条件）</a></li>
+<li class="lvl-2"><a href="#実装時の作業リスト">実装時の作業リスト</a></li>
+<li class="lvl-2"><a href="#学べること">学べること</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

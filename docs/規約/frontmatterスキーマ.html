@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>frontmatterスキーマ — 値辞書</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>規約</span></nav>
+      <h1 class="doc-title">frontmatterスキーマ — 値辞書</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-03</span>
+        <span class="tags"><span class="tag">standard</span><span class="tag">frontmatter</span><span class="tag">metadata</span></span>
+      </div>
+      
+      <div class="content">
+<p>全Markdownファイルの先頭に必ずYAML frontmatterを付ける。用途は2つ：
+<strong>grep横断検索</strong>（Obsidian/CLIからテーマ・状態・種別で絞り込む）と <strong>HTMLビルド</strong>（title・パンくず・タグチップ・最終更新・警告バナーの描画）。</p>
+<h2 id="フィールド定義" tabindex="-1">フィールド定義 <a class="header-anchor" href="#フィールド定義" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>フィールド</th>
+<th>必須</th>
+<th>型</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td>✅</td>
+<td>列挙（下表）</td>
+<td>ドキュメント種別</td>
+</tr>
+<tr>
+<td><code>theme</code></td>
+<td>✅</td>
+<td>文字列（引用符付き）</td>
+<td>テーマフォルダ名と完全一致（例: <code>&quot;ZERO_zero_trust&quot;</code>）</td>
+</tr>
+<tr>
+<td><code>phase</code></td>
+<td>フェーズ型のみ</td>
+<td>整数 0-6</td>
+<td>ゼロトラスト等のフェーズ番号</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>✅</td>
+<td>列挙（下表）</td>
+<td>文書の状態</td>
+</tr>
+<tr>
+<td><code>date</code></td>
+<td>✅</td>
+<td>YYYY-MM-DD</td>
+<td>最終更新日（ISO 8601）</td>
+</tr>
+<tr>
+<td><code>tags</code></td>
+<td>✅</td>
+<td>配列</td>
+<td>3〜6個。小文字kebab-case、日本語可</td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td>✅</td>
+<td>文字列</td>
+<td>HTML <code>&lt;title&gt;</code>・TOC・パンくず用の表示名</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="type-の値辞書" tabindex="-1">type の値辞書 <a class="header-anchor" href="#type-の値辞書" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>値</th>
+<th>対象ファイル</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>readme</code></td>
+<td>README_Lab_Challenge.md</td>
+</tr>
+<tr>
+<td><code>login</code></td>
+<td>00_ログイン/ログインコマンド.md</td>
+</tr>
+<tr>
+<td><code>requirements</code></td>
+<td>01_要件定義/要件定義書.md</td>
+</tr>
+<tr>
+<td><code>basic-design</code></td>
+<td>02_基本設計/基本設計書.md・<a href="http://xn--vnuy5oq6i71wjfaw2b.md">論理構成設計.md</a></td>
+</tr>
+<tr>
+<td><code>ip-table</code></td>
+<td>02_基本設計/IPアドレス管理表.md</td>
+</tr>
+<tr>
+<td><code>param-sheet</code></td>
+<td>03_詳細設計/パラメータシート*.md</td>
+</tr>
+<tr>
+<td><code>cli-commands</code></td>
+<td>03_詳細設計/CLI投入コマンド.md</td>
+</tr>
+<tr>
+<td><code>build-log</code></td>
+<td>04_構築/構築ログ*.md</td>
+</tr>
+<tr>
+<td><code>test-plan</code></td>
+<td>05_試験/試験計画書.md</td>
+</tr>
+<tr>
+<td><code>test-result</code></td>
+<td>05_試験/試験結果_YYYY-MM-DD.md</td>
+</tr>
+<tr>
+<td><code>troubleshoot</code></td>
+<td>05_試験/切り分けシート.md</td>
+</tr>
+<tr>
+<td><code>feasibility</code></td>
+<td>実装可能性マトリクス・軽量検証計画/結果</td>
+</tr>
+<tr>
+<td><code>roadmap</code></td>
+<td>段階ロードマップ・ロードマップ/配下</td>
+</tr>
+<tr>
+<td><code>phase-doc</code></td>
+<td>04_構築/phaseN 設計文書</td>
+</tr>
+<tr>
+<td><code>explainer</code></td>
+<td>解説/phaseN_解説.md（なぜこの構成か／触って確認する手順）</td>
+</tr>
+<tr>
+<td><code>runbook</code></td>
+<td>手順書（rebuild_runbook 等）</td>
+</tr>
+<tr>
+<td><code>standard</code></td>
+<td>規約/配下</td>
+</tr>
+<tr>
+<td><code>proposal</code></td>
+<td>改善提案文書</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="status-の値辞書" tabindex="-1">status の値辞書 <a class="header-anchor" href="#status-の値辞書" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>値</th>
+<th>意味</th>
+<th>HTMLビルド時の扱い</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>draft</code></td>
+<td>執筆中</td>
+<td>「下書き」バッジ</td>
+</tr>
+<tr>
+<td><code>review</code></td>
+<td>レビュー待ち</td>
+<td>「レビュー中」バッジ</td>
+</tr>
+<tr>
+<td><code>done</code></td>
+<td>確定</td>
+<td>バッジなし</td>
+</tr>
+<tr>
+<td><code>superseded</code></td>
+<td>新版に置換済み</td>
+<td><strong>警告バナー表示</strong>（誤読防止）</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="記入例" tabindex="-1">記入例 <a class="header-anchor" href="#記入例" aria-hidden="true">#</a></h2>
+<pre><code class="language-yaml"><span class="hljs-meta">---</span>
+<span class="hljs-attr">type:</span> <span class="hljs-string">feasibility</span>
+<span class="hljs-attr">theme:</span> <span class="hljs-string">&quot;ZERO_zero_trust&quot;</span>
+<span class="hljs-attr">phase:</span> <span class="hljs-number">0</span>
+<span class="hljs-attr">status:</span> <span class="hljs-string">review</span>
+<span class="hljs-attr">date:</span> <span class="hljs-number">2026-07-03</span>
+<span class="hljs-attr">tags:</span> [<span class="hljs-string">zero-trust</span>, <span class="hljs-string">arm64</span>, <span class="hljs-string">keycloak</span>, <span class="hljs-string">feasibility</span>]
+<span class="hljs-attr">title:</span> <span class="hljs-string">&quot;ゼロトラスト6観点 実装可能性マトリクス&quot;</span>
+<span class="hljs-meta">---
+</span></code></pre>
+<h2 id="grepレシピ横断検索の定型" tabindex="-1">grepレシピ（横断検索の定型） <a class="header-anchor" href="#grepレシピ横断検索の定型" aria-hidden="true">#</a></h2>
+<pre><code class="language-bash"><span class="hljs-comment"># テーマ横断: あるテーマの全文書</span>
+grep -rl <span class="hljs-string">&#x27;theme: &quot;ZERO_zero_trust&quot;&#x27;</span> Mac仮想環境構築/ --include=<span class="hljs-string">&#x27;*.md&#x27;</span>
+
+<span class="hljs-comment"># 未完文書の棚卸し</span>
+grep -rl <span class="hljs-string">&#x27;status: draft&#x27;</span> Mac仮想環境構築/ --include=<span class="hljs-string">&#x27;*.md&#x27;</span>
+
+<span class="hljs-comment"># 種別で抽出（全テーマの試験計画だけ）</span>
+grep -rl <span class="hljs-string">&#x27;type: test-plan&#x27;</span> Mac仮想環境構築/ --include=<span class="hljs-string">&#x27;*.md&#x27;</span>
+
+<span class="hljs-comment"># タグ検索</span>
+grep -rl <span class="hljs-string">&#x27;zero-trust&#x27;</span> Mac仮想環境構築/ --include=<span class="hljs-string">&#x27;*.md&#x27;</span> -l
+</code></pre>
+<h2 id="規則" tabindex="-1">規則 <a class="header-anchor" href="#規則" aria-hidden="true">#</a></h2>
+<ul>
+<li>frontmatterの直後に空行を1つ置き、その次の行を <code># H1見出し</code> にする（H1は1ファイル1つ）。</li>
+<li><code>date</code> はファイル名の日付（試験結果等）とは独立に「最終更新日」を表す。内容を更新したら必ず更新する。</li>
+<li><code>.tmpl</code> 雛形ファイルにはプレースホルダ入りfrontmatter（<code>{{THEME}}</code> 等）を含め、生成時に置換する。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#フィールド定義">フィールド定義</a></li>
+<li class="lvl-2"><a href="#type-の値辞書">type の値辞書</a></li>
+<li class="lvl-2"><a href="#status-の値辞書">status の値辞書</a></li>
+<li class="lvl-2"><a href="#記入例">記入例</a></li>
+<li class="lvl-2"><a href="#grepレシピ横断検索の定型">grepレシピ（横断検索の定型）</a></li>
+<li class="lvl-2"><a href="#規則">規則</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

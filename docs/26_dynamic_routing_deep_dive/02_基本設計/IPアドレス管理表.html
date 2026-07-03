@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>IPアドレス管理表</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>26_dynamic_routing_deep_dive</span>
+<span class="sep">/</span>
+<span>02_基本設計</span></nav>
+      <h1 class="doc-title">IPアドレス管理表</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="1-loopbackアドレスrouter-id" tabindex="-1">1. Loopbackアドレス（Router ID） <a class="header-anchor" href="#1-loopbackアドレスrouter-id" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>機器名</th>
+<th>Loopback0</th>
+<th>ルーティング上の役割</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>hq-core</td>
+<td>10.26.255.1/32</td>
+<td>OSPF Router ID, 再配信ポイント</td>
+</tr>
+<tr>
+<td>hq-dist</td>
+<td>10.26.255.2/32</td>
+<td>EIGRP Router ID</td>
+</tr>
+<tr>
+<td>hq-dmz</td>
+<td>10.26.255.3/32</td>
+<td>OSPF Router ID</td>
+</tr>
+<tr>
+<td>br-core</td>
+<td>10.26.255.11/32</td>
+<td>OSPF Router ID</td>
+</tr>
+<tr>
+<td>br-edge</td>
+<td>10.26.255.12/32</td>
+<td>BGP Router ID</td>
+</tr>
+<tr>
+<td>hq-edge</td>
+<td>10.26.255.254/32</td>
+<td>BGP Router ID, NAT境界</td>
+</tr>
+<tr>
+<td>isp</td>
+<td>10.26.255.100/32</td>
+<td>BGP Router ID</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="2-機器間接続ポイントツーポイント-30" tabindex="-1">2. 機器間接続（ポイントツーポイント /30） <a class="header-anchor" href="#2-機器間接続ポイントツーポイント-30" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>セグメント</th>
+<th>IPアドレス帯</th>
+<th>機器A (IP)</th>
+<th>機器B (IP)</th>
+<th>プロトコル</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HQ Core - Dist</td>
+<td>10.26.1.0/30</td>
+<td>hq-core (.1)</td>
+<td>hq-dist (.2)</td>
+<td>EIGRP</td>
+</tr>
+<tr>
+<td>HQ Core - Edge</td>
+<td>10.26.1.4/30</td>
+<td>hq-core (.5)</td>
+<td>hq-edge (.6)</td>
+<td>OSPF</td>
+</tr>
+<tr>
+<td>HQ Core - DMZ</td>
+<td>10.26.1.8/30</td>
+<td>hq-core (.9)</td>
+<td>hq-dmz (.10)</td>
+<td>OSPF</td>
+</tr>
+<tr>
+<td>Branch Edge - Core</td>
+<td>10.26.2.0/30</td>
+<td>br-edge (.1)</td>
+<td>br-core (.2)</td>
+<td>OSPF</td>
+</tr>
+<tr>
+<td>HQ Edge - ISP</td>
+<td>198.51.100.0/30</td>
+<td>hq-edge (.1)</td>
+<td>isp (.2)</td>
+<td>eBGP</td>
+</tr>
+<tr>
+<td>ISP - Branch Edge</td>
+<td>198.51.100.4/30</td>
+<td>isp (.5)</td>
+<td>br-edge (.6)</td>
+<td>eBGP</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="3-エンドポイントlan-24" tabindex="-1">3. エンドポイント（LAN /24） <a class="header-anchor" href="#3-エンドポイントlan-24" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ネットワーク</th>
+<th>用途</th>
+<th>デフォルトGW</th>
+<th>クライアントIP</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10.26.10.0/24</td>
+<td>HQ Trust (VLAN 10)</td>
+<td>hq-dist (.1)</td>
+<td>hq-pc (.10)</td>
+</tr>
+<tr>
+<td>10.26.20.0/24</td>
+<td>Branch Trust (VLAN 20)</td>
+<td>br-core (.1)</td>
+<td>br-pc (.10)</td>
+</tr>
+<tr>
+<td>10.26.30.0/24</td>
+<td>DMZ (VLAN 30)</td>
+<td>hq-dmz (.1)</td>
+<td>dmz-srv (.10)</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="4-管理ネットワークoob" tabindex="-1">4. 管理ネットワーク（OOB） <a class="header-anchor" href="#4-管理ネットワークoob" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>用途</th>
+<th>サブネット</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>containerlab 管理</td>
+<td>172.26.26.0/24</td>
+</tr>
+</tbody>
+</table></div>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-loopbackアドレスrouter-id">1. Loopbackアドレス（Router ID）</a></li>
+<li class="lvl-2"><a href="#2-機器間接続ポイントツーポイント-30">2. 機器間接続（ポイントツーポイント /30）</a></li>
+<li class="lvl-2"><a href="#3-エンドポイントlan-24">3. エンドポイント（LAN /24）</a></li>
+<li class="lvl-2"><a href="#4-管理ネットワークoob">4. 管理ネットワーク（OOB）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

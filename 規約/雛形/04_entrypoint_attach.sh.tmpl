@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# IOL使用時のみ必要。IOLをPID1にして docker attach の標準入力をIOSコンソールへ直結する。
+# （ログイン切り分けの教訓: entrypoint内でIOLをバックグラウンド起動しbashがPID1のままだと
+#   docker attachの入力がIOLへ届かない。必ずexecでIOLをPID1にすること）
+
+IOL_PID=${IOL_PID:-513}
+
+hostname {{TOPO_NAME}}-iouvm
+cat > /iol/.iourc <<'IOURC'
+[license]
+{{TOPO_NAME}}-iouvm = 0000000000000000;
+IOURC
+export IOURC=/iol/.iourc
+
+ip addr flush dev eth0 2>/dev/null || true
+ip -6 addr flush dev eth0 2>/dev/null || true
+rm -f "/tmp/netio${IOL_PID}"* "/tmp/iol_lock_${IOL_PID}"
+
+# インターフェース数が安定するまで待つ（containerlabのリンク生成完了待ち）
+previous_count=0
+stable_count=0
+for _ in $(seq 1 30); do
+  current_count=$(find /sys/class/net -maxdepth 1 -name 'eth*' | wc -l)
+  if [ "$current_count" -eq "$previous_count" ] && [ "$current_count" -gt 0 ]; then
+    stable_count=$((stable_count + 1))
+    [ "$stable_count" -ge 3 ] && break
+  else
+    stable_count=0
+  fi
+  previous_count=$current_count
+  sleep 1
+done
+
+max_eth=$(find /sys/class/net -maxdepth 1 -name 'eth*' -printf '%f\n' \
+  | sed 's/^eth//' | sort -n | tail -1)
+num_slots=$(( (${max_eth:-0} + 4) / 4 ))
+
+# IOLをPID1にしてdocker attachの標準入力をIOSへ直結する。
+exec /iol/iol.bin "$IOL_PID" -e "$num_slots" -s 0 -c config.txt -m 1024 -n 1024

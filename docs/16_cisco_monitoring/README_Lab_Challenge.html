@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>監視と運用（Syslog / SNMP / NetFlow）チャレンジ：パラメータシート形式</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>16_cisco_monitoring</span></nav>
+      <h1 class="doc-title">監視と運用（Syslog / SNMP / NetFlow）チャレンジ：パラメータシート形式</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>このドキュメントは、ネットワーク監視における実務の「要件定義（パラメータシート）」を記載したチャレンジ用資料です。
+今回はルーター（R1）から、監視専用のLinuxサーバー（NMS）に対して様々なログや稼働状況を飛ばす設定を行います。</p>
+<hr>
+<h2 id="-トポロジとipアドレス設計" tabindex="-1">🎯 トポロジとIPアドレス設計 <a class="header-anchor" href="#-トポロジとipアドレス設計" aria-hidden="true">#</a></h2>
+<h3 id="ログイン情報" tabindex="-1">ログイン情報 <a class="header-anchor" href="#ログイン情報" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>PC1 (ルーター兼用)</strong>: <code>telnet 172.20.20.4</code> (ユーザー/パス: <code>admin</code> / <code>admin</code>)</li>
+<li><strong>R1</strong>: <code>telnet 172.20.20.3</code> (ユーザー/パス: <code>admin</code> / <code>admin</code>)</li>
+<li><strong>NMS (Linuxサーバー)</strong>: <code>docker exec -it clab-monitoring-nms bash</code> (または <code>ssh 172.20.20.2</code> / パスワードなし)</li>
+</ul>
+<h3 id="インターフェース設計" tabindex="-1">インターフェース設計 <a class="header-anchor" href="#インターフェース設計" aria-hidden="true">#</a></h3>
+<p><strong>【クライアント側】</strong></p>
+<ul>
+<li>PC1 (e0/1): <code>192.168.10.10 /24</code> （GW: <code>192.168.10.254</code>）</li>
+<li>R1 (e0/1): <code>192.168.10.254 /24</code> （PC1側）</li>
+</ul>
+<p><strong>【監視サーバー側】</strong></p>
+<ul>
+<li>R1 (e0/2): <code>10.0.0.254 /24</code> （NMS側）</li>
+<li>NMS (e0/1): <code>10.0.0.100 /24</code> （GW: <code>10.0.0.254</code>）</li>
+</ul>
+<hr>
+<h2 id="-設定パラメータ要件" tabindex="-1">🏗️ 設定パラメータ要件 <a class="header-anchor" href="#-設定パラメータ要件" aria-hidden="true">#</a></h2>
+<h3 id="要件1ipアドレスとルーティングの基礎" tabindex="-1">要件1：IPアドレスとルーティングの基礎 <a class="header-anchor" href="#要件1ipアドレスとルーティングの基礎" aria-hidden="true">#</a></h3>
+<p>各機器に上記のIPを設定し、疎通を確保してください。（PC1には <code>no ip routing</code> とデフォルトゲートウェイを設定。NMSはコンテナデプロイ時に自動でIPが振られるようになっていますが、ルーティングを確認してください）</p>
+<blockquote>
+<p>✅ <strong>【検証1】</strong>
+PC1 から NMS（<code>ping 10.0.0.100</code>）へPingが通ることを確認。</p>
+</blockquote>
+<hr>
+<h3 id="要件2syslogシステムログの転送設定r1にて" tabindex="-1">要件2：Syslog（システムログ）の転送設定（R1にて） <a class="header-anchor" href="#要件2syslogシステムログの転送設定r1にて" aria-hidden="true">#</a></h3>
+<p>R1上で発生したエラーログ（例: インターフェースのDown/Upなど）を、NMS（Linuxサーバー）に自動転送する設定を行います。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>指定パラメータ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ログの送信先 (Host)</td>
+<td>NMSのIPアドレス (<code>10.0.0.100</code>)</td>
+</tr>
+<tr>
+<td>送信するログレベル (Traps)</td>
+<td><strong>informational</strong> (情報レベル以上すべて)</td>
+</tr>
+<tr>
+<td>タイムスタンプ機能</td>
+<td>ログに日時を含める (<code>service timestamps log datetime msec</code>)</td>
+</tr>
+</tbody>
+</table></div>
+<p>💡 <strong>【構造のヒント】</strong></p>
+<pre><code class="language-bash">R1(config)# logging host [NMSのIP]
+R1(config)# logging <span class="hljs-built_in">trap</span> informational
+R1(config)# service timestamps <span class="hljs-built_in">log</span> datetime msec
+</code></pre>
+<hr>
+<h3 id="要件3snmp簡易ネットワーク管理プロトコルの設定r1にて" tabindex="-1">要件3：SNMP（簡易ネットワーク管理プロトコル）の設定（R1にて） <a class="header-anchor" href="#要件3snmp簡易ネットワーク管理プロトコルの設定r1にて" aria-hidden="true">#</a></h3>
+<p>NMSからR1の健康状態（CPU使用率、ポートの状態など）を「監視・ポーリング」できるように、SNMPの受け入れ口（エージェント）を設定します。今回は簡易的な v2c を使います。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>指定パラメータ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>コミュニティ名 (Community)</td>
+<td><strong>public</strong> (パスワードのようなもの)</td>
+</tr>
+<tr>
+<td>権限</td>
+<td><strong>RO</strong> (Read-Only: 読み取り専用)</td>
+</tr>
+<tr>
+<td>SNMPトラップ送信先 (Host)</td>
+<td>NMSのIPアドレス (<code>10.0.0.100</code>)</td>
+</tr>
+<tr>
+<td>有効化するトラップ</td>
+<td>全て (<code>snmp-server enable traps</code>)</td>
+</tr>
+</tbody>
+</table></div>
+<p>💡 <strong>【構造のヒント】</strong></p>
+<pre><code class="language-bash">R1(config)# snmp-server community [コミュニティ名] RO
+R1(config)# snmp-server host [NMS的IP] version 2c [コミュニティ名]
+R1(config)# snmp-server <span class="hljs-built_in">enable</span> traps
+</code></pre>
+<h3 id="-最終検証nms側での確認" tabindex="-1">🏁 最終検証（NMS側での確認） <a class="header-anchor" href="#-最終検証nms側での確認" aria-hidden="true">#</a></h3>
+<p>設定が完了したら、実際に <strong>NMS（Linuxサーバー）</strong> にログインして、R1からのデータを受信・取得できるかテストします。</p>
+<h4>1. LinuxサーバのIP設定</h4>
+<p>Linuxサーバコンテナの <code>eth1</code> にIPアドレスを設定し、R1と通信できるようにします。</p>
+<pre><code class="language-bash">NMS# ip addr add 10.0.0.100/24 dev eth1
+NMS# ip <span class="hljs-built_in">link</span> <span class="hljs-built_in">set</span> eth1 up
+</code></pre>
+<h4>2. Syslogの受信テスト</h4>
+<p>まず、**NMS（Linuxサーバー）**に入り、Syslogの受信ポート（UDP 514番）で待ち受けるプログラム（Netcat）を起動します。</p>
+<pre><code class="language-bash">NMS# nc -ul -p 514
+</code></pre>
+<p>この状態のまま、別のターミナルを開くか、R1のコンソールで意図的にインターフェースを落とします。</p>
+<pre><code class="language-bash">R1(config)# interface e0/1
+R1(config-if)# shutdown
+R1(config-if)# no shutdown
+</code></pre>
+<p>すると、待ち受けているNMSの画面上に <code>Interface Ethernet0/1, changed state to administratively down</code> というログがリアルタイムに飛んでくれば大成功！</p>
+<h4>3. SNMPポーリングテスト</h4>
+<p>**NMS（Linuxサーバー）**から、R1に対して「お前の名前は何だ？」とSNMPで質問（ポーリング）を投げます。</p>
+<pre><code class="language-bash">NMS# snmpwalk -v 2c -c public 10.0.0.254 sysName
+</code></pre>
+<p>→ <code>SNMPv2-MIB::sysName.0 = STRING: R1</code> のように、R1のホスト名が返ってくればSNMPポーリング大成功！
+（※ <code>sysDescr</code> に変えると、Cisco IOSのバージョン情報などがドバーッと取得できます）</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-トポロジとipアドレス設計">🎯 トポロジとIPアドレス設計</a></li>
+<li class="lvl-3"><a href="#ログイン情報">ログイン情報</a></li>
+<li class="lvl-3"><a href="#インターフェース設計">インターフェース設計</a></li>
+<li class="lvl-2"><a href="#-設定パラメータ要件">🏗️ 設定パラメータ要件</a></li>
+<li class="lvl-3"><a href="#要件1ipアドレスとルーティングの基礎">要件1：IPアドレスとルーティングの基礎</a></li>
+<li class="lvl-3"><a href="#要件2syslogシステムログの転送設定r1にて">要件2：Syslog（システムログ）の転送設定（R1にて）</a></li>
+<li class="lvl-3"><a href="#要件3snmp簡易ネットワーク管理プロトコルの設定r1にて">要件3：SNMP（簡易ネットワーク管理プロトコル）の設定（R1にて）</a></li>
+<li class="lvl-3"><a href="#-最終検証nms側での確認">🏁 最終検証（NMS側での確認）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

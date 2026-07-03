@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>トラブルシューティングログ: 全Cisco IOLノードでのL2通信不通（iouyap未起動バグ）</title>
+  <link rel="stylesheet" href="../../../assets/doc.css">
+  <link rel="stylesheet" href="../../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../../index.html">Home</a>
+<span class="sep">/</span>
+<span>22_enterprise_campus_lan</span>
+<span class="sep">/</span>
+<span>04_構築</span>
+<span class="sep">/</span>
+<span>logs</span></nav>
+      <h1 class="doc-title">トラブルシューティングログ: 全Cisco IOLノードでのL2通信不通（iouyap未起動バグ）</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="発生日時" tabindex="-1">発生日時 <a class="header-anchor" href="#発生日時" aria-hidden="true">#</a></h2>
+<p>2026-06-19</p>
+<h2 id="事象" tabindex="-1">事象 <a class="header-anchor" href="#事象" aria-hidden="true">#</a></h2>
+<ul>
+<li><code>clab deploy</code> 後、MSTPやEtherChannelの設定を正しく行っても、全Cisco IOLノード間で以下の症状が発生した。
+<ul>
+<li><code>show cdp neighbors</code> が全機器で 0件になる。</li>
+<li>LACP が <code>suspended</code> となりネゴシエーションに失敗する。</li>
+<li>STP の BPDU が交換されず、各スイッチが自身を Root Bridge だと認識する。</li>
+<li>VLAN 1 (SVI) への Ping が失敗する。</li>
+<li>MACアドレステーブルが空のままになる。</li>
+</ul>
+</li>
+<li>Cisco IOL上のインターフェース自体は <code>UP/UP</code> と表示されており、設定ミスは見当たらない。</li>
+<li><code>show interfaces EtX/X | include packets</code> で確認すると、output（送信パケット）は増加するが、input（受信パケット）が常に 0 という「完全な片方向通信」状態になっていた。</li>
+</ul>
+<h2 id="切り分けプロセス" tabindex="-1">切り分けプロセス <a class="header-anchor" href="#切り分けプロセス" aria-hidden="true">#</a></h2>
+<ol>
+<li><strong>Containerlab のポートマッピングの確認</strong>: <code>eth</code> インターフェースと Cisco IOL の <code>Ethernet</code> インターフェースのマッピングを検証した結果、マッピング自体は正常（eth1=Et0/1, eth5=Et1/1 等）であり、問題の原因ではないと判明。</li>
+<li><strong>Ping / MACアドレス / CDP / LLDP の動作確認</strong>: どの L2/L3 プロトコルも動作していないことを確認。</li>
+<li><strong>veth のパケットカウンター確認</strong>: Linux ホスト側から <code>ip -s link show</code> で仮想ケーブル（veth）のパケットを確認したところ、veth レベルではパケットの送受信が行われていることが判明。</li>
+<li><strong>Cisco IOL コンテナ内のプロセス確認</strong>: これが決定打となった。コンテナ内で <code>ps</code> コマンド等を用いてプロセスを確認したところ、IOL本体 (<code>iol.bin</code>) は起動しているものの、IOLの内部ネットワークとLinuxのvethを橋渡しするデーモンである <strong><code>iouyap</code> プロセスが存在しない</strong> ことが発覚した。</li>
+</ol>
+<h2 id="根本原因" tabindex="-1">根本原因 <a class="header-anchor" href="#根本原因" aria-hidden="true">#</a></h2>
+<p><code>vrnetlab/cisco_iol</code> イメージの起動スクリプト (<code>entrypoint.sh</code>) に欠陥があり、最後に <code>exec /iol/iol.bin ...</code> としてIOL本体を起動しているのみで、<code>iouyap</code> プロセスを起動する処理が抜けていた。
+<code>iouyap</code> が存在しないため、IOLから送出されたパケットはvethへ転送されず、vethから受信したパケットもIOLへ転送されない状態（ブラックホール状態）になっていた。</p>
+<h2 id="解決策" tabindex="-1">解決策 <a class="header-anchor" href="#解決策" aria-hidden="true">#</a></h2>
+<h3 id="暫定対応手動" tabindex="-1">暫定対応（手動） <a class="header-anchor" href="#暫定対応手動" aria-hidden="true">#</a></h3>
+<p>各Cisco IOLコンテナに入り、手動で <code>iouyap</code> プロセスをバックグラウンド起動した。</p>
+<pre><code class="language-bash">docker <span class="hljs-built_in">exec</span> -d clab-campus-&lt;ノード名&gt; /usr/bin/iouyap -q -f /iol/iouyap.ini -n /iol/NETMAP 513
+</code></pre>
+<p>起動直後、約10〜20秒で各プロトコル（CDP, LACP, STP）のパケットが交換され始め、正常にネイバー関係が構築されることを確認した。</p>
+<h3 id="恒久対策" tabindex="-1">恒久対策 <a class="header-anchor" href="#恒久対策" aria-hidden="true">#</a></h3>
+<p>デプロイするたびに毎回手動で起動するのは非現実的であるため、環境構築用のスクリプト (<code>build_and_deploy.sh</code>) を改修した。
+<code>sudo containerlab deploy</code> 実行直後に、Dockerコマンド経由で全Cisco IOLノードに対して自動で <code>iouyap</code> の起動コマンドを発行する処理を <code>deploy()</code> 関数に追加した。</p>
+<pre><code class="language-bash">  <span class="hljs-keyword">for</span> container <span class="hljs-keyword">in</span> $(<span class="hljs-built_in">sudo</span> docker ps --format <span class="hljs-string">&#x27;{{.Names}}&#x27;</span> | grep <span class="hljs-string">&#x27;^clab-campus-&#x27;</span> | grep -v -E <span class="hljs-string">&#x27;fgt-edge|pc-|srv-|br-pc&#x27;</span>); <span class="hljs-keyword">do</span>
+    <span class="hljs-built_in">sudo</span> docker <span class="hljs-built_in">exec</span> -d <span class="hljs-string">&quot;<span class="hljs-variable">$container</span>&quot;</span> /usr/bin/iouyap -q -f /iol/iouyap.ini -n /iol/NETMAP 513 2&gt;/dev/null || <span class="hljs-literal">true</span>
+  <span class="hljs-keyword">done</span>
+</code></pre>
+<p>これにより、次回以降は <code>deploy</code> コマンドを叩くだけで自動的に通信可能な状態が構成されるようになった。</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#発生日時">発生日時</a></li>
+<li class="lvl-2"><a href="#事象">事象</a></li>
+<li class="lvl-2"><a href="#切り分けプロセス">切り分けプロセス</a></li>
+<li class="lvl-2"><a href="#根本原因">根本原因</a></li>
+<li class="lvl-2"><a href="#解決策">解決策</a></li>
+<li class="lvl-3"><a href="#暫定対応手動">暫定対応（手動）</a></li>
+<li class="lvl-3"><a href="#恒久対策">恒久対策</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

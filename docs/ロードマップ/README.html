@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>🗺️ ネットワーク学習ロードマップ ポータル</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>ロードマップ</span></nav>
+      <h1 class="doc-title">🗺️ ネットワーク学習ロードマップ ポータル</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>このフォルダは「<strong>今どこにいて、次何を目指すか</strong>」を示す計画ドキュメント群です。
+ゴールが明確になるよう、学習フェーズを2つに分割しています。</p>
+</blockquote>
+<p>最終更新: 2026-07-02</p>
+<hr>
+<h2 id="-フェーズ1-ネットワーク構築の基礎cisco-iosベース" tabindex="-1">🚩 フェーズ1: ネットワーク構築の基礎（Cisco IOSベース） <a class="header-anchor" href="#-フェーズ1-ネットワーク構築の基礎cisco-iosベース" aria-hidden="true">#</a></h2>
+<p><strong>「企業の社内ネットワークを、要件定義 → 設計 → 構築 → 試験 まで一気通貫でやり切る」</strong></p>
+<p>まずは王道となる「Cisco IOSルーター・スイッチ」を使った構成で、インフラエンジニアとしての基礎を固めます。
+L2/L3の冗長化、OSPF/BGP、基本的なセキュリティとQoSなどを含みます。
+テーマ21〜22の統合演習に続き、テーマ23〜25でCollapsed Core、Routed Access、Multi-Campusを比較。
+テーマ26〜27では動的ルーティングの深堀り（OSPF/EIGRP/BGP使い分け・再配信・NAT）と、QoS/ACL/route-mapの応用を社内LAN模擬環境で実践します。</p>
+<p>👉 <strong><a href="PHASE1_BASICS.html">詳細カリキュラム・進め方はこちら（PHASE1_BASICS.md）</a></strong></p>
+<hr>
+<h2 id="-フェーズ2-モダン構成拡張編セキュリティマルチベンダー" tabindex="-1">🚀 フェーズ2: モダン構成・拡張編（セキュリティ＆マルチベンダー） <a class="header-anchor" href="#-フェーズ2-モダン構成拡張編セキュリティマルチベンダー" aria-hidden="true">#</a></h2>
+<p><strong>「実際の現場で使われるモダンなセキュリティ製品やクラウド管理を導入し、ゼロトラストへ拡張する」</strong></p>
+<p>フェーズ1のテーマ27までを土台とし、テーマ28以降で次世代ファイアウォール（FortiGate）、リモートアクセスVPN、NAC（802.1X）、ロードバランサ、NDR（可視化）などを順次実装・検証していく「シーズン2」です。</p>
+<blockquote>
+<p>⚠️ <strong>フェーズ2はフェーズ1のネットワーク関連テーマを全て完了してから着手します。</strong> サーバー系技術の学習はまだタイミングではなく、まずネットワーク層の基礎を盤石にする方針です。</p>
+</blockquote>
+<p>👉 <strong><a href="PHASE2_MODERN_ENTERPRISE.html">詳細テーマ一覧・拡張計画はこちら（PHASE2_MODERN_ENTERPRISE.md）</a></strong></p>
+<hr>
+<h2 id="-フォルダ構成の案内" tabindex="-1">🗂️ フォルダ構成の案内 <a class="header-anchor" href="#-フォルダ構成の案内" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>フォルダ/ファイル</th>
+<th>役割</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PHASE1_BASICS.md</code></td>
+<td>フェーズ1（テーマ02〜27）のマスター計画書</td>
+</tr>
+<tr>
+<td><code>PHASE2_MODERN_ENTERPRISE.md</code></td>
+<td>フェーズ2（テーマ28以降）のマスター計画書</td>
+</tr>
+<tr>
+<td><code>00_カリキュラム対応表.md</code></td>
+<td>学習する技術カテゴリとテーマの対応表</td>
+</tr>
+<tr>
+<td><code>進捗管理.md</code></td>
+<td>各テーマの完了状況チェックリスト</td>
+</tr>
+<tr>
+<td><code>章別アウトライン/</code></td>
+<td>第1章〜第7章（フェーズ1）の詳細アウトライン</td>
+</tr>
+<tr>
+<td><code>実務案件ログ/</code></td>
+<td>フェーズ2の参考となる実務案件の分析ログ原本</td>
+</tr>
+<tr>
+<td><code>tech_notes/</code></td>
+<td>構築の過程で得られた単発の技術教訓や備忘録</td>
+</tr>
+<tr>
+<td><code>キャプストン/</code></td>
+<td>テーマ21〜22の統合演習で使う要件定義・設計テンプレート</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>※ 実際のハンズオン環境（<code>02_...</code> 等）は、親ディレクトリ（<code>../</code>）にテーマごとに作成しています。</p>
+</blockquote>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-フェーズ1-ネットワーク構築の基礎cisco-iosベース">🚩 フェーズ1: ネットワーク構築の基礎（Cisco IOSベース）</a></li>
+<li class="lvl-2"><a href="#-フェーズ2-モダン構成拡張編セキュリティマルチベンダー">🚀 フェーズ2: モダン構成・拡張編（セキュリティ＆マルチベンダー）</a></li>
+<li class="lvl-2"><a href="#-フォルダ構成の案内">🗂️ フォルダ構成の案内</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>VRRP ラボ 構築チャレンジ要件</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>10_cisco_hsrp_vrrp</span></nav>
+      <h1 class="doc-title">VRRP ラボ 構築チャレンジ要件</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>このラボでは、デフォルトゲートウェイの冗長化を実現するオープン標準プロトコル <strong>VRRP (Virtual Router Redundancy Protocol)</strong> を構築します。
+HSRPとほぼ同じですが、コマンドやデフォルトの挙動（Preemptなど）がわずかに異なります。ご自身の力で設定し、障害時の無瞬断切り替えを体感してみてください！</p>
+<hr>
+<h2 id="-構築チャレンジ要件" tabindex="-1">🎯 構築チャレンジ要件 <a class="header-anchor" href="#-構築チャレンジ要件" aria-hidden="true">#</a></h2>
+<h3 id="1-機器構成トポロジ" tabindex="-1">1. 機器構成（トポロジ） <a class="header-anchor" href="#1-機器構成トポロジ" aria-hidden="true">#</a></h3>
+<p>以下の4台のノードを使用します。</p>
+<ul>
+<li><strong>SW1 (L3 Core/Dist)</strong>
+<ul>
+<li>役割: メインルーター（VRRP Master）</li>
+</ul>
+</li>
+<li><strong>SW2 (L3 Core/Dist)</strong>
+<ul>
+<li>役割: サブルーター（VRRP Backup）</li>
+</ul>
+</li>
+<li><strong>SW3 (L2 Access)</strong>
+<ul>
+<li>役割: PCやルーター群を収容するL2スイッチ</li>
+</ul>
+</li>
+<li><strong>PC1 (End Host)</strong>
+<ul>
+<li>役割: 検証用エンドホスト（疑似PC）</li>
+</ul>
+</li>
+</ul>
+<h3 id="2-ipアドレスとvlanの設計" tabindex="-1">2. IPアドレスとVLANの設計 <a class="header-anchor" href="#2-ipアドレスとvlanの設計" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>使用するVLAN</strong>: <code>VLAN 10</code></li>
+<li><strong>ネットワークアドレス</strong>: <code>10.10.10.0 /24</code></li>
+<li><strong>VRRP Virtual IP (仮想GW)</strong>: <code>10.10.10.254</code></li>
+</ul>
+<p>各機器のIP割り当ては以下の通りです。</p>
+<ul>
+<li><strong>SW1</strong>: <code>10.10.10.252 /24</code> (VLAN10のSVI)</li>
+<li><strong>SW2</strong>: <code>10.10.10.253 /24</code> (VLAN10のSVI)</li>
+<li><strong>PC1</strong>: <code>10.10.10.11 /24</code> (VLAN1上に設定し、仮想IPへデフォルトルートを向ける)</li>
+</ul>
+<h3 id="3-設定要件-要件のみ正解コマンドなし" tabindex="-1">3. 設定要件 (要件のみ・正解コマンドなし) <a class="header-anchor" href="#3-設定要件-要件のみ正解コマンドなし" aria-hidden="true">#</a></h3>
+<p><strong>【SW1 / SW2 の要件 (L3設定)】</strong></p>
+<ol>
+<li><strong>IPルーティングの有効化</strong>: スイッチ上でIPルーティングを有効にしてください。</li>
+<li><strong>VLAN 10 の作成とトランク設定</strong>: SW3と繋がる物理インターフェースをトランクポートとして設定し、VLAN 10 を許可してください。</li>
+<li><strong>SVI の作成</strong>: <code>interface vlan 10</code> を作成し、指定された物理IPアドレスを割り当ててください（<code>no shut</code> をお忘れなく！）。</li>
+<li><strong>VRRP の設定</strong>:
+<ul>
+<li>グループ番号は <code>10</code>、Virtual IP は <code>10.10.10.254</code> を設定してください。</li>
+<li><strong>[SW1のみ]</strong>: 優先度（priority）を <code>110</code> に設定し、確実に Master になるようにしてください（デフォルトは100）。</li>
+<li><strong>[SW2のみ]</strong>: 優先度（priority）を <code>90</code> に設定し、Backup になるようにしてください。</li>
+<li>※ヒント: HSRPの <code>standby</code> コマンドが、VRRPでは <code>vrrp</code> に変わります。また、VRRPはデフォルトでPreempt（自動切り戻し）が有効なため、Preemptのコマンド設定は不要です。</li>
+</ul>
+</li>
+</ol>
+<p><strong>【SW3 の要件 (L2設定)】</strong></p>
+<ol>
+<li><strong>VLAN 10 の作成</strong>: VLAN 10を作成してください。</li>
+<li><strong>トランクポート設定</strong>: SW1 および SW2 と繋がるポートをトランクポートとし、VLAN 10 を許可してください。</li>
+<li><strong>アクセスポート設定</strong>: PC1 と繋がるポートを VLAN 10 のアクセスポートに設定し、<code>spanning-tree portfast</code> を有効にしてください。</li>
+</ol>
+<p><strong>【PC1 の要件】</strong></p>
+<ol>
+<li><strong>IP設定</strong>: 疑似PCのため、<code>interface vlan 1</code> にIPアドレスを設定してください。</li>
+<li><strong>デフォルトゲートウェイ</strong>: VRRP Virtual IP（<code>10.10.10.254</code>）へ向けたデフォルトルートを設定してください（※ <code>no ip routing</code> は不要です）。</li>
+</ol>
+<hr>
+<h2 id="-最終検証のゴール" tabindex="-1">✅ 最終検証のゴール <a class="header-anchor" href="#-最終検証のゴール" aria-hidden="true">#</a></h2>
+<ol>
+<li>各ルーターで VRRP の状態を確認し（<code>show vrrp</code> など）、<strong>SW1がMaster、SW2がBackup</strong>になっていること。</li>
+<li>PC1から Virtual IP (<code>10.10.10.254</code>) へ連続してPingを打つ (<code>ping 10.10.10.254 repeat 100000</code>)。</li>
+<li>そのPingを打ちながら <strong>SW1 の SVI（または物理ポート）を shutdown</strong> する。</li>
+<li>Pingのロスが最小限で済み、通信が瞬時に <strong>SW2 に切り替わって疎通し続けること</strong>を確認する。</li>
+<li><strong>SW1 を no shutdown して復旧</strong>させたとき、Preemptを設定していなくても自動的にSW1が Master に戻ることを確認できれば大成功です！</li>
+</ol>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#-構築チャレンジ要件">🎯 構築チャレンジ要件</a></li>
+<li class="lvl-3"><a href="#1-機器構成トポロジ">1. 機器構成（トポロジ）</a></li>
+<li class="lvl-3"><a href="#2-ipアドレスとvlanの設計">2. IPアドレスとVLANの設計</a></li>
+<li class="lvl-3"><a href="#3-設定要件-要件のみ正解コマンドなし">3. 設定要件 (要件のみ・正解コマンドなし)</a></li>
+<li class="lvl-2"><a href="#-最終検証のゴール">✅ 最終検証のゴール</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

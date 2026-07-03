@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Theme 26: Dynamic Routing Deep Dive (動的ルーティング深堀り)</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>26_dynamic_routing_deep_dive</span></nav>
+      <h1 class="doc-title">Theme 26: Dynamic Routing Deep Dive (動的ルーティング深堀り)</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="概要" tabindex="-1">概要 <a class="header-anchor" href="#概要" aria-hidden="true">#</a></h2>
+<p>このテーマでは、中規模企業ネットワーク（本社・支社・インターネット）を模した構成を用いて、OSPF、EIGRP、BGPの使い分けと、それらを連携させる再配信（Redistribution）、経路制御、NATを実践的に学びます。『ネットワーク・デザインパターン』のゾーン設計（Trust/Untrust/DMZ/WAN）に基づき、「なぜこのプロトコルを使うのか」を要件から導き出して設定を行います。</p>
+<h2 id="ネットワークトポロジ" tabindex="-1">ネットワークトポロジ <a class="header-anchor" href="#ネットワークトポロジ" aria-hidden="true">#</a></h2>
+<pre class="mermaid">flowchart TB
+    subgraph HQ[&quot;本社（HQ）&quot;]
+        direction TB
+        PC1[&quot;hq-pc\nTrust VLAN 10&quot;]
+        SRV[&quot;hq-dmz-srv\nDMZ VLAN 30&quot;]
+        Core[&quot;hq-core\nOSPF Area 0&quot;]
+        Edge[&quot;hq-edge\nAS 65000\nNAT&quot;]
+        Dist[&quot;hq-dist\nEIGRP AS 100&quot;]
+    end
+
+    subgraph BR[&quot;支社（Branch）&quot;]
+        direction TB
+        BPC[&quot;br-pc\nTrust VLAN 20&quot;]
+        BCore[&quot;br-core\nOSPF Area 1&quot;]
+        BEdge[&quot;br-edge\nAS 65001&quot;]
+    end
+
+    ISP[&quot;isp\nISP Router\nAS 65100&quot;]
+
+    PC1 --- Dist
+    SRV --- DMZ_SW[&quot;hq-dmz&quot;]
+    DMZ_SW --- Core
+    Dist ---|&quot;EIGRP↔OSPF再配信&quot;| Core
+    Core --- Edge
+    Edge ---|&quot;eBGP&quot;| ISP
+    ISP ---|&quot;eBGP&quot;| BEdge
+    BEdge --- BCore
+    BCore --- BPC
+</pre>
+<h2 id="ラボ開始手順" tabindex="-1">ラボ開始手順 <a class="header-anchor" href="#ラボ開始手順" aria-hidden="true">#</a></h2>
+<ol>
+<li><strong>環境構築</strong><pre><code class="language-bash"><span class="hljs-built_in">cd</span> 04_構築
+./deploy.sh deploy
+</code></pre>
+</li>
+<li><strong>ログイン</strong>
+機器へのログインコマンドは <a href="00_%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3/%E3%83%AD%E3%82%B0%E3%82%A4%E3%83%B3%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89.html">00_ログイン/ログインコマンド.md</a> を参照してください。</li>
+</ol>
+<h2 id="ミッションmission" tabindex="-1">ミッション（Mission） <a class="header-anchor" href="#ミッションmission" aria-hidden="true">#</a></h2>
+<p>以下のミッションを順番にクリアし、段階的にネットワークを構築してください。</p>
+<h3 id="mission-1-本社ospfマルチエリア構築" tabindex="-1">Mission 1: 本社OSPFマルチエリア構築 <a class="header-anchor" href="#mission-1-本社ospfマルチエリア構築" aria-hidden="true">#</a></h3>
+<p>本社コア（hq-core）、エッジ（hq-edge）、DMZ（hq-dmz）間でOSPF Area 0を構築します。</p>
+<ul>
+<li>Loopback、内部リンク、DMZサブネットをOSPFで広告する</li>
+<li>OSPFのネットワークタイプを確認し、不要なHelloパケットを抑制する（Passive Interface）</li>
+</ul>
+<h3 id="mission-2-本社eigrp化と再配信" tabindex="-1">Mission 2: 本社EIGRP化と再配信 <a class="header-anchor" href="#mission-2-本社eigrp化と再配信" aria-hidden="true">#</a></h3>
+<p>本社ディストリビューション（hq-dist）をEIGRPで構成し、コア（hq-core）でOSPFと双方向に再配信します。</p>
+<ul>
+<li>hq-distにEIGRP AS 100を設定</li>
+<li>hq-coreでroute-mapを用い、不要な経路が再配信されないようにフィルタリング</li>
+<li>再配信のシードメトリックを適切に設定する</li>
+</ul>
+<h3 id="mission-3-isp接続ebgpnatpat" tabindex="-1">Mission 3: ISP接続＋eBGP＋NAT/PAT <a class="header-anchor" href="#mission-3-isp接続ebgpnatpat" aria-hidden="true">#</a></h3>
+<p>本社のインターネット接続口（hq-edge）を設定します。</p>
+<ul>
+<li>hq-edgeとISPルータ間でeBGPを確立し、デフォルトルートを受信する</li>
+<li>hq-edgeでTrust/DMZ向けにNAT inside/outsideを設定し、インターネット通信用のPAT（NAPT）を構成する</li>
+</ul>
+<h3 id="mission-4-支社接続wan経路制御" tabindex="-1">Mission 4: 支社接続＋WAN経路制御 <a class="header-anchor" href="#mission-4-支社接続wan経路制御" aria-hidden="true">#</a></h3>
+<p>支社ネットワークを構築し、WANを経由して本社と通信できるようにします。</p>
+<ul>
+<li>支社内でOSPF Area 1を構築</li>
+<li>br-edgeとISP間でeBGPを確立</li>
+<li>prefix-listを用いて、支社からISPへは支社のプレフィックスのみを広告するよう制御</li>
+</ul>
+<h3 id="mission-5-ecmp負荷分散検証" tabindex="-1">Mission 5: ECMP/負荷分散検証 <a class="header-anchor" href="#mission-5-ecmp負荷分散検証" aria-hidden="true">#</a></h3>
+<ul>
+<li>OSPFの等コストマルチパス（ECMP）を確認</li>
+<li>（オプション）EIGRPの不等コストロードバランシング（variance）の仕組みを確認</li>
+</ul>
+<h3 id="mission-6-総合障害試験" tabindex="-1">Mission 6: 総合障害試験 <a class="header-anchor" href="#mission-6-総合障害試験" aria-hidden="true">#</a></h3>
+<ul>
+<li>コア・エッジ間のリンク障害を発生させ、ルーティングが迂回経路に切り替わるか確認</li>
+<li>再配信におけるルーティングループが発生していないか確認</li>
+</ul>
+<h2 id="禁止事項" tabindex="-1">禁止事項 <a class="header-anchor" href="#禁止事項" aria-hidden="true">#</a></h2>
+<ul>
+<li><code>clab.yml</code> にルーティングプロトコルやIPアドレスの設定（Linux PCのbootstrap以外）を記述すること（すべて手動でCLIから投入して学びます）</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#概要">概要</a></li>
+<li class="lvl-2"><a href="#ネットワークトポロジ">ネットワークトポロジ</a></li>
+<li class="lvl-2"><a href="#ラボ開始手順">ラボ開始手順</a></li>
+<li class="lvl-2"><a href="#ミッションmission">ミッション（Mission）</a></li>
+<li class="lvl-3"><a href="#mission-1-本社ospfマルチエリア構築">Mission 1: 本社OSPFマルチエリア構築</a></li>
+<li class="lvl-3"><a href="#mission-2-本社eigrp化と再配信">Mission 2: 本社EIGRP化と再配信</a></li>
+<li class="lvl-3"><a href="#mission-3-isp接続ebgpnatpat">Mission 3: ISP接続＋eBGP＋NAT/PAT</a></li>
+<li class="lvl-3"><a href="#mission-4-支社接続wan経路制御">Mission 4: 支社接続＋WAN経路制御</a></li>
+<li class="lvl-3"><a href="#mission-5-ecmp負荷分散検証">Mission 5: ECMP/負荷分散検証</a></li>
+<li class="lvl-3"><a href="#mission-6-総合障害試験">Mission 6: 総合障害試験</a></li>
+<li class="lvl-2"><a href="#禁止事項">禁止事項</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

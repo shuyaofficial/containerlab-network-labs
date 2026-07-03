@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>図面作成・プレビュー表示に関する検証ログ</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>21_cisco_capstone</span>
+<span class="sep">/</span>
+<span>02_基本設計</span></nav>
+      <h1 class="doc-title">図面作成・プレビュー表示に関する検証ログ</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>本ドキュメントは、基本設計フェーズにおける「ネットワーク構成図」の最適な表示方法を模索した際の、検証とトラブルシューティングの記録です。</p>
+<h2 id="1-検証の背景" tabindex="-1">1. 検証の背景 <a class="header-anchor" href="#1-検証の背景" aria-hidden="true">#</a></h2>
+<p>VSCode上でネットワーク構成図（物理構成図・論理構成図）を作成し、左右に分割して同時にプレビューしながら設計・構築を進めたいという要件が発生した。</p>
+<h2 id="2-試行したアプローチと結果" tabindex="-1">2. 試行したアプローチと結果 <a class="header-anchor" href="#2-試行したアプローチと結果" aria-hidden="true">#</a></h2>
+<h3 id="アプローチ①markdown標準のmermaidブロックmd" tabindex="-1">アプローチ①：Markdown標準のMermaidブロック（<code>.md</code>） <a class="header-anchor" href="#アプローチ①markdown標準のmermaidブロックmd" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>結果</strong>: ❌（環境依存のレンダリングエラー）</li>
+<li><strong>詳細</strong>: <code>.md</code> ファイル内に <code>```mermaid</code> ブロックを記述。VSCode標準機能の「プレビューのロック」を使えば複数タブ表示が可能になるはずだったが、インストールされている複数のMarkdown/Mermaid拡張機能が干渉し、図面が描画されず真っ黒になる事象が発生。</li>
+</ul>
+<h3 id="アプローチ②専用拡張子mermaid-mermaid-preview拡張機能" tabindex="-1">アプローチ②：専用拡張子（<code>.mermaid</code>）＋ Mermaid Preview拡張機能 <a class="header-anchor" href="#アプローチ②専用拡張子mermaid-mermaid-preview拡張機能" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>結果</strong>: 🔺（表示は最も綺麗だが1画面制限あり）</li>
+<li><strong>詳細</strong>: 拡張子を <code>.mermaid</code> とし、<code>Mermaid Preview</code> 拡張機能を使用。文字色（<code>color:#000;</code>）を調整することでダークテーマでも視認性が良く、最もスタイリッシュな図面（添付のスクリーンショット参照）が出力された。</li>
+<li><strong>課題</strong>: 拡張機能の仕様上、プレビュー画面を1つしか保持できず、物理・論理の2画面同時表示ができない。</li>
+</ul>
+<h3 id="アプローチ③アスキーアートによるテキスト描画md" tabindex="-1">アプローチ③：アスキーアートによるテキスト描画（<code>.md</code>） <a class="header-anchor" href="#アプローチ③アスキーアートによるテキスト描画md" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>結果</strong>: 💡（同時表示用としての代替案）</li>
+<li><strong>詳細</strong>: 拡張機能に依存しないよう、プレーンテキストの罫線で物理・論理構成図を作成。視覚的なリッチさには欠けるが、VSCode環境に依存せず確実に2画面表示ができる。</li>
+</ul>
+<h3 id="アプローチ④python-diagrams-ライブラリによる画像生成png" tabindex="-1">アプローチ④：Python <code>diagrams</code> ライブラリによる画像生成（PNG） <a class="header-anchor" href="#アプローチ④python-diagrams-ライブラリによる画像生成png" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>結果</strong>: 🟢（安定表示可能だが、見た目の好みが分かれる）</li>
+<li><strong>詳細</strong>:
+<ol>
+<li>バックグラウンドで <code>brew install graphviz</code> を実行してシステム要件を満たした。</li>
+<li>仮想環境（<code>venv</code>）を構築し、<code>pip install diagrams</code> でライブラリを導入。</li>
+<li>PythonスクリプトからPNG画像を生成。画像ファイルのため、VSCode上で何枚でも同時に開くことが可能となった。</li>
+</ol>
+</li>
+<li><strong>評価</strong>: 安定性は最も高いが、出力されるアイコンやデザインのテイストが、Mermaidのスッキリしたデザインに比べて好みに合わない場合がある。</li>
+</ul>
+<h2 id="3-結論今後の対応方針" tabindex="-1">3. 結論・今後の対応方針 <a class="header-anchor" href="#3-結論今後の対応方針" aria-hidden="true">#</a></h2>
+<p>現時点でのユーザー（設計者）の個人的な好みとしては、**「アプローチ②（Mermaid Preview）の見た目が一番見やすい」**という結論に至った。
+今後はこの検証結果を踏まえ、状況に応じて「美しさ（Mermaid）」を取るか、「複数画面での並行作業（画像やテキスト）」を取るか、用途に合わせて最適な手法を選択・模索していく方針とする。</p>
+<h2 id="4-vscode操作ナレッジ備忘録" tabindex="-1">4. VSCode操作ナレッジ（備忘録） <a class="header-anchor" href="#4-vscode操作ナレッジ備忘録" aria-hidden="true">#</a></h2>
+<p>本検証の過程で確認・習得したVSCodeの便利な操作方法を以下に記録する。</p>
+<h3 id="①-画面の分割スプリット方法" tabindex="-1">① 画面の分割（スプリット）方法 <a class="header-anchor" href="#①-画面の分割スプリット方法" aria-hidden="true">#</a></h3>
+<p>設計書を見ながらコンフィグを書く際などに必須の機能。</p>
+<ul>
+<li><strong>ドラッグ＆ドロップ</strong>: タブをクリックしたまま画面の右端まで引っ張ってドロップする。</li>
+<li><strong>メニュー操作</strong>: タブを右クリックして「右に分割（Split Right）」を選択、または画面右上の「見開き本アイコン」をクリックする。</li>
+</ul>
+<h3 id="②-mermaidプレビューの開き方mermaidファイル" tabindex="-1">② Mermaidプレビューの開き方（<code>.mermaid</code>ファイル） <a class="header-anchor" href="#②-mermaidプレビューの開き方mermaidファイル" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>コマンドパレット</strong>: <code>Cmd + Shift + P</code> でコマンドパレットを開き、<code>mermaid</code> と入力して <code>Mermaid: Preview</code> を選択する。</li>
+<li><strong>右クリック</strong>: コードが書かれているエディタ画面上で右クリックし、<code>Preview Diagram</code> を選択する。</li>
+</ul>
+<h3 id="③-プレビュー画面の複数表示mdファイル" tabindex="-1">③ プレビュー画面の複数表示（<code>.md</code>ファイル） <a class="header-anchor" href="#③-プレビュー画面の複数表示mdファイル" aria-hidden="true">#</a></h3>
+<p>VSCodeの標準Markdownプレビューは「1つのタブを使い回す（上書きされる）」仕様だが、以下の方法で固定（ロック）できる。</p>
+<ul>
+<li><strong>ダブルクリック</strong>: プレビュータブの名前（<em>斜体</em> になっているもの）をダブルクリックし、通常の真っ直ぐな文字にする。</li>
+<li><strong>ロック機能</strong>: プレビュー画面右上の <code>...</code> から「プレビューをロックする（Lock Preview）」を選択する。
+※これにより、新しい <code>.md</code> ファイルを開いた際に別タブとしてプレビューが追加される。</li>
+</ul>
+<h2 id="5-今後の環境構築におけるベストプラクティス" tabindex="-1">5. 今後の環境構築におけるベストプラクティス <a class="header-anchor" href="#5-今後の環境構築におけるベストプラクティス" aria-hidden="true">#</a></h2>
+<p>本プロジェクトを通じて得られた、**「構成図のデザインからエミュレータ画面の整形まで」**の一連のベストプラクティスを定義する。
+今後の新規ネットワーク環境構築時にも、このフローを適用することで、設計と検証のギャップを無くし、美しく分かりやすい環境を構築できる。</p>
+<h3 id="推奨ワークフロー" tabindex="-1">【推奨ワークフロー】 <a class="header-anchor" href="#推奨ワークフロー" aria-hidden="true">#</a></h3>
+<ol>
+<li><strong>基本設計図面の作成（Mermaid）</strong>
+<ul>
+<li>まず <code>.mermaid</code> ファイルで論理・物理構成図を作成する。</li>
+<li>ノードの階層構造（上下・左右）をここで美しく整理し、設計の全体像を固める。</li>
+</ul>
+</li>
+<li><strong>Containerlabトポロジの作成（<code>.clab.yml</code>）</strong>
+<ul>
+<li>Mermaidで定義した構成に基づいて機器の接続コードを書く。</li>
+</ul>
+</li>
+<li><strong>エミュレータ画面（NeXt UI）の配置整形</strong>
+<ul>
+<li>Containerlab展開後、自動生成されるトポロジ画面はノードが乱雑に配置される（クモの巣状）。</li>
+<li>これを放置せず、<strong>Mermaidの図面構成と全く同じ配置になるよう、座標データを整形する</strong>。</li>
+<li><strong>やり方</strong>:
+<ul>
+<li>マウスでドラッグ＆ドロップして画面右上の <code>💾（Save Layout）</code> を押す。</li>
+<li>または、生成される <code>*.clab.yml.annotations.json</code> ファイルの <code>x</code> <code>y</code> 座標を直接書き換える。</li>
+</ul>
+</li>
+<li><strong>効果</strong>: 設計書（Mermaid）と検証環境（Containerlab）の見た目が完全に一致するため、トラブルシューティング時の思考の切り替えストレスがなくなり、直感的なオペレーションが可能となる。</li>
+</ul>
+</li>
+</ol>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-検証の背景">1. 検証の背景</a></li>
+<li class="lvl-2"><a href="#2-試行したアプローチと結果">2. 試行したアプローチと結果</a></li>
+<li class="lvl-3"><a href="#アプローチ①markdown標準のmermaidブロックmd">アプローチ①：Markdown標準のMermaidブロック（.md）</a></li>
+<li class="lvl-3"><a href="#アプローチ②専用拡張子mermaid-mermaid-preview拡張機能">アプローチ②：専用拡張子（.mermaid）＋ Mermaid Preview拡張機能</a></li>
+<li class="lvl-3"><a href="#アプローチ③アスキーアートによるテキスト描画md">アプローチ③：アスキーアートによるテキスト描画（.md）</a></li>
+<li class="lvl-3"><a href="#アプローチ④python-diagrams-ライブラリによる画像生成png">アプローチ④：Python diagrams ライブラリによる画像生成（PNG）</a></li>
+<li class="lvl-2"><a href="#3-結論今後の対応方針">3. 結論・今後の対応方針</a></li>
+<li class="lvl-2"><a href="#4-vscode操作ナレッジ備忘録">4. VSCode操作ナレッジ（備忘録）</a></li>
+<li class="lvl-3"><a href="#①-画面の分割スプリット方法">① 画面の分割（スプリット）方法</a></li>
+<li class="lvl-3"><a href="#②-mermaidプレビューの開き方mermaidファイル">② Mermaidプレビューの開き方（.mermaidファイル）</a></li>
+<li class="lvl-3"><a href="#③-プレビュー画面の複数表示mdファイル">③ プレビュー画面の複数表示（.mdファイル）</a></li>
+<li class="lvl-2"><a href="#5-今後の環境構築におけるベストプラクティス">5. 今後の環境構築におけるベストプラクティス</a></li>
+<li class="lvl-3"><a href="#推奨ワークフロー">【推奨ワークフロー】</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

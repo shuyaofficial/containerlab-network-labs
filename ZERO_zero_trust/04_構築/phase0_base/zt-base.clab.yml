@@ -1,0 +1,56 @@
+name: zt-base
+
+mgmt:
+  network: zt-base-mgmt
+  ipv4-subnet: 172.30.99.0/24
+
+topology:
+  kinds:
+    linux:
+      image: wbitt/network-multitool:latest
+
+  nodes:
+    # --- Untrust ゾーン (zt-untrust bridge, 172.30.0.0/24) ---
+    # client: 利用者端末。Phase 0 では app への疎通ゲート確認用
+    client:
+      kind: linux
+      mgmt-ipv4: 172.30.99.11
+      exec:
+        - ip link set eth1 up
+        - ip address add 172.30.0.11/24 dev eth1
+        # Phase 0 ゲート確認限定: Trust ゾーンへは zt-untrust の GW（ホスト）経由。
+        # 関所が入る Phase 2 以降はこの経路を関所転送に置き換える。
+        - ip route add 172.30.20.0/24 via 172.30.0.1 dev eth1
+
+    # external: 外部/未管理端末（Phase 4 SWG 検証の外部先。Phase 0 では起動のみ）
+    external:
+      kind: linux
+      mgmt-ipv4: 172.30.99.12
+      exec:
+        - ip link set eth1 up
+        - ip address add 172.30.0.12/24 dev eth1
+
+    # --- Trust ゾーン (zt-trust bridge, 172.30.20.0/24) ---
+    # app: 保護対象サービス。multitool 内蔵 nginx (80/tcp) で応答
+    app:
+      kind: linux
+      mgmt-ipv4: 172.30.99.21
+      exec:
+        - ip link set eth1 up
+        - ip address add 172.30.20.21/24 dev eth1
+        # 戻り経路（client への応答用）。Untrust 全体ではなく client 疎通に必要な範囲のみ。
+        - ip route add 172.30.0.0/24 via 172.30.20.1 dev eth1
+
+    # --- ゾーン分離用 Linux bridge（ホスト側で事前作成、deploy.sh 管理） ---
+    # 論理構成設計の docker bridge 分離を、containerlab の bridge kind で表現する。
+    # Untrust (client, external) と Trust (app) は別 bridge のため、
+    # 関所（Phase 2 以降）が無い限り直接到達できない（Untrust→Trust 直通禁止の土台）。
+    zt-untrust:
+      kind: bridge
+    zt-trust:
+      kind: bridge
+
+  links:
+    - endpoints: ["client:eth1", "zt-untrust:untrust-eth1"]
+    - endpoints: ["external:eth1", "zt-untrust:untrust-eth2"]
+    - endpoints: ["app:eth1", "zt-trust:trust-eth1"]

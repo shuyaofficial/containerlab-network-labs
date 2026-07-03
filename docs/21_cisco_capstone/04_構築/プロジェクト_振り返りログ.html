@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>構築・トラブルシューティング履歴 (2026-06-08)</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>21_cisco_capstone</span>
+<span class="sep">/</span>
+<span>04_構築</span></nav>
+      <h1 class="doc-title">構築・トラブルシューティング履歴 (2026-06-08)</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<p>本ドキュメントは、Capstone プロジェクトにおける構築中の躓き（トラブル）と、その根本原因、解決策の履歴をまとめたものです。今後の運用や同様の環境構築時のナレッジベースとして活用します。</p>
+<hr>
+<h2 id="1-l2スイッチの初期ip割当問題" tabindex="-1">1. L2スイッチの初期IP割当問題 <a class="header-anchor" href="#1-l2スイッチの初期ip割当問題" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>事象</strong>: <code>hq-core1</code> および <code>hq-core2</code> が起動直後、管理用ネットワーク（clab-mgmt）のIPアドレスを持っておらず、SSHでのログインができない状態となった。</li>
+<li><strong>原因</strong>: 対象機器がL2スイッチイメージ (<code>cisco_iol:L2-15.2</code>) であったため、管理用インターフェース (<code>Ethernet0/0</code>) がデフォルトで「スイッチポートモード (L2モード)」として認識され、IPがアサインされなかった。</li>
+<li><strong>解決策</strong>: コンソール（expectスクリプト）経由でログインし、<code>Ethernet0/0</code> に対して <code>no switchport</code> を発行。その後 <code>vrf clab-mgmt</code> の再紐付けとIPアドレス再設定を行うことでSSH疎通が可能になった。</li>
+</ul>
+<h2 id="2-cisco-iol-メモリ不足-mallocfail-問題" tabindex="-1">2. Cisco IOL メモリ不足 (MALLOCFAIL) 問題 <a class="header-anchor" href="#2-cisco-iol-メモリ不足-mallocfail-問題" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>事象</strong>: NATやIPsecの設定を投入していくと、ルーター（特に <code>hq-edge1</code>, <code>br-edge</code>）上で <code>%SYS-2-MALLOCFAIL</code> や <code>%FIB_NAT-2-NOMEM</code> などのエラーが発生し、コマンドが受け付けられなくなったり、機器がクラッシュする事象が発生した。</li>
+<li><strong>原因</strong>: Containerlab上のCisco IOLのデフォルトメモリが小さく（約76MB）、NAT変換テーブルや暗号化の機能に必要なメモリ領域が枯渇した。</li>
+<li><strong>解決策</strong>: <code>capstone.clab.yml</code> ファイル内で各ルーターノードの環境変数 <code>IOL_MEMORY: &quot;1024&quot;</code> を明示的に指定して再デプロイし、十分なメモリ（1GB）を確保することで根本解決した。</li>
+</ul>
+<h2 id="3-ipsec-vpn-vti-設定漏れタイポ" tabindex="-1">3. IPsec VPN (VTI) 設定漏れ・タイポ <a class="header-anchor" href="#3-ipsec-vpn-vti-設定漏れタイポ" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>事象</strong>: IPsecトンネルのステータスが上がらず、OSPFのネイバー関係も構築されない。</li>
+<li><strong>原因</strong>: 以下の複数の設定不備・入力ミスが重なっていた。
+<ol>
+<li><strong>HQ-Edge1</strong>: <code>pre-shared-key</code> にタイポがあった（小文字の <code>k</code> が混入: <code>CiscoSecretkey123!</code>）。</li>
+<li><strong>BR-Edge</strong>: <code>peer</code> の設定内で <code>address 200.0.1.1</code> の指定が漏れており、IKEv2プロファイルが対向IPと結びつかなかった。</li>
+<li><strong>BR-Edge</strong>: NATの設定（Standard ACL）が緩すぎたため、IPsecトンネルを通るべき通信（本社宛）までISP側にNATされてしまっていた。</li>
+</ol>
+</li>
+<li><strong>解決策</strong>:
+<ul>
+<li>NATはExtended ACL (<code>access-list 100</code>) を用い、「本社宛以外の通信だけNATする (NAT Exempt)」よう修正。</li>
+<li>両端の keyring 設定を正しく修正し、Pingを打ってトンネルを起動した。</li>
+</ul>
+</li>
+</ul>
+<h2 id="4-支社lanの経路広報漏れ" tabindex="-1">4. 支社LANの経路広報漏れ <a class="header-anchor" href="#4-支社lanの経路広報漏れ" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>事象</strong>: トンネル（Tunnel0）は開通したものの、支社PC（10.2.40.100）から本社PC（10.1.10.100）へのPingが届かない。</li>
+<li><strong>原因</strong>: <code>BR-Edge</code> において、OSPFプロセス (<code>router ospf 1</code>) 内で、支社側ローカルLAN (<code>10.2.40.0/24</code>) を <code>network</code> コマンドでアドバタイズ（広報）し忘れていたため、本社側が支社LANへの戻り経路を知らなかった。</li>
+<li><strong>解決策</strong>: <code>BR-Edge</code> にて <code>network 10.2.40.0 0.0.0.255 area 0</code> を追加し、通信が開通した。</li>
+</ul>
+<h2 id="5-bgpospf連携によるフェイルオーバーテストecmp" tabindex="-1">5. BGP・OSPF連携によるフェイルオーバーテスト（ECMP） <a class="header-anchor" href="#5-bgpospf連携によるフェイルオーバーテストecmp" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>事象</strong>: HQ-Edge1 の e0/1 をシャットダウンしてフェイルオーバーの動作を確認しようとしたが、Pingが全く途切れることなく（パケットロス0%）成功し続けた。</li>
+<li><strong>原因</strong>: HQ-Edge1 と HQ-Edge2 の両方が、デフォルト設定のまま OSPF に対して <code>default-information originate</code> を発行していたため、Coreスイッチ側からは「両方とも等コスト（ECMP）でインターネットに出られる」と見なされていた。そのためトラフィックが負荷分散されており、たまたまHQ-Edge2を通っていたPingは断の影響を受けなかった。</li>
+<li><strong>解決策</strong>: HQ-Edge1 を完全なメイン回線（Active）として扱うため、HQ-Edge2 の設定に <code>metric 20</code> を付与し、平時はすべてのトラフィックがHQ-Edge1を経由するように修正した。これにより意図した「Active/Standby」構成となった。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-l2スイッチの初期ip割当問題">1. L2スイッチの初期IP割当問題</a></li>
+<li class="lvl-2"><a href="#2-cisco-iol-メモリ不足-mallocfail-問題">2. Cisco IOL メモリ不足 (MALLOCFAIL) 問題</a></li>
+<li class="lvl-2"><a href="#3-ipsec-vpn-vti-設定漏れタイポ">3. IPsec VPN (VTI) 設定漏れ・タイポ</a></li>
+<li class="lvl-2"><a href="#4-支社lanの経路広報漏れ">4. 支社LANの経路広報漏れ</a></li>
+<li class="lvl-2"><a href="#5-bgpospf連携によるフェイルオーバーテストecmp">5. BGP・OSPF連携によるフェイルオーバーテスト（ECMP）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

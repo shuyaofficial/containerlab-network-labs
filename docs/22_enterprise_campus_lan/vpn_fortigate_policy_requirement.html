@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>ネットワーク構築における罠：FortiOSのVPN確立仕様について</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>22_enterprise_campus_lan</span></nav>
+      <h1 class="doc-title">ネットワーク構築における罠：FortiOSのVPN確立仕様について</h1>
+      <div class="meta">
+        
+        
+        
+      </div>
+      
+      <div class="content">
+<h2 id="概要" tabindex="-1">概要 <a class="header-anchor" href="#概要" aria-hidden="true">#</a></h2>
+<p>IKEv2 Route-based VPN（Cisco IOL - FortiGate間）の構築時、IPsecのPhase 1ネゴシエーションが <code>IN-NEG</code> のまま進まない問題が発生した。
+アンダーレイ（Ping）の疎通が取れており、暗号化アルゴリズム（Proposal）も一致しているにもかかわらず、VPNが確立しなかった。</p>
+<h2 id="原因fortiosの仕様" tabindex="-1">原因（FortiOSの仕様） <a class="header-anchor" href="#原因fortiosの仕様" aria-hidden="true">#</a></h2>
+<p>FortiGate（FortiOS）には、**「VPNトンネルインターフェースを参照するファイアウォールポリシー（許可ルール）が存在しない場合、IKEv2のネゴシエーション（SA_INIT）を拒否する」**という仕様（最適化機能）が存在する。</p>
+<p>設計上、通信確認のPingテスト（下回り）が終わってから、通信を許可するファイアウォールポリシー（Policy 2, 3）を投入しようと後回しにしていたことが仇となった。
+FortiGateから見ると「どこへも通信が許可されていないトンネルを作るのはリソースの無駄である」と判断され、ネゴシエーションが強制的に遮断されていた。</p>
+<h2 id="解決策" tabindex="-1">解決策 <a class="header-anchor" href="#解決策" aria-hidden="true">#</a></h2>
+<p>VPNトンネルを通過するトラフィックを許可するファイアウォールポリシー（IPv4 Policy）を投入した。</p>
+<pre><code class="language-text">config firewall policy
+    edit 2
+        set name &quot;VPN_Out&quot;
+        set srcintf &quot;port3&quot; &quot;port4&quot;
+        set dstintf &quot;VPN_to_Branch&quot;
+        set action accept
+        set srcaddr &quot;all&quot;
+        set dstaddr &quot;all&quot;
+        set schedule &quot;always&quot;
+        set service &quot;ALL&quot;
+    next
+    edit 3
+        set name &quot;VPN_In&quot;
+        set srcintf &quot;VPN_to_Branch&quot;
+        set dstintf &quot;port3&quot; &quot;port4&quot;
+        set action accept
+        set srcaddr &quot;all&quot;
+        set dstaddr &quot;all&quot;
+        set schedule &quot;always&quot;
+        set service &quot;ALL&quot;
+    next
+end
+</code></pre>
+<p>上記ポリシーを投入した直後、IPsec VPN（Tunnel-id 2）のステータスが正常に <code>READY</code> へ遷移し、トンネルが開通した。</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#概要">概要</a></li>
+<li class="lvl-2"><a href="#原因fortiosの仕様">原因（FortiOSの仕様）</a></li>
+<li class="lvl-2"><a href="#解決策">解決策</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

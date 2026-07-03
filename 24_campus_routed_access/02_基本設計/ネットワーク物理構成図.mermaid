@@ -1,0 +1,23 @@
+flowchart TB
+    subgraph CORE["Core / Distribution Layer"]
+        C1["core1\nMgmt: 172.24.24.11\nLo0: 10.24.255.1/32"]
+        C2["core2\nMgmt: 172.24.24.12\nLo0: 10.24.255.2/32"]
+    end
+
+    subgraph ACCESS["L3 Access Layer"]
+        A1["access1\nMgmt: 172.24.24.21\nLo0: 10.24.255.11/32"]
+        A2["access2\nMgmt: 172.24.24.22\nLo0: 10.24.255.12/32"]
+    end
+
+    subgraph USERS["Endpoint Layer"]
+        P1["pc-a\nMgmt: 172.24.24.101\nDesign: 10.24.10.10/24"]
+        P2["pc-b\nMgmt: 172.24.24.102\nDesign: 10.24.20.10/24"]
+    end
+
+    C1 ---|"E0/3  10.24.0.16/30  E0/3"| C2
+    C1 ---|"E0/1  10.24.0.0/30  E0/1"| A1
+    C2 ---|"E0/1  10.24.0.4/30  E0/2"| A1
+    C1 ---|"E0/2  10.24.0.8/30  E0/1"| A2
+    C2 ---|"E0/2  10.24.0.12/30  E0/2"| A2
+    A1 ---|"E0/3  10.24.10.0/24  eth1"| P1
+    A2 ---|"E0/3  10.24.20.0/24  eth1"| P2
