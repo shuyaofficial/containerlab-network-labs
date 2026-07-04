@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>NAC の機序 — 802.1X / MAB / CoA / 動的VLAN</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>教材</span></nav>
+      <h1 class="doc-title">NAC の機序 — 802.1X / MAB / CoA / 動的VLAN</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">nac</span><span class="tag">802.1x</span><span class="tag">mab</span><span class="tag">coa</span><span class="tag">dynamic-vlan</span><span class="tag">freeradius</span><span class="tag">radius</span></span>
+      </div>
+      
+      <div class="content">
+<p>NAC（Network Access Control）は「認証されない端末を LAN に参加させない」入口制御で、ゼロトラストの「暗黙の信頼ゾーン排除」をネットワーク層で実装するものである。ギャップ分析で <strong>L7 トラックの最大の欠落</strong>とされた領域で、NW-ZT <strong>N1</strong> の理論的下地になる。この教材は 802.1X / MAB / CoA / 動的VLAN の機序をシーケンスで解剖する。</p>
+<h2 id="1-問題lan-ポートに挿せば誰でも通ってしまう" tabindex="-1">1. 問題：LAN ポートに挿せば誰でも通ってしまう <a class="header-anchor" href="#1-問題lan-ポートに挿せば誰でも通ってしまう" aria-hidden="true">#</a></h2>
+<p>伝統的な LAN は「物理的にポートに挿せた＝信頼」だった。会議室の空きポートに私物 PC を挿せば社内ネットに入れる。<strong>「社内だから安全」という暗黙の信頼</strong>そのものであり、ゼロトラストが最初に排除すべき前提。NAC はスイッチポートを「認証されるまで何も通さない」状態にする。</p>
+<h2 id="2-仕組み4つの機序" tabindex="-1">2. 仕組み：4つの機序 <a class="header-anchor" href="#2-仕組み4つの機序" aria-hidden="true">#</a></h2>
+<h3 id="8021x--eap-による認証" tabindex="-1">802.1X — EAP による認証 <a class="header-anchor" href="#8021x--eap-による認証" aria-hidden="true">#</a></h3>
+<p>ポートに繋いだ端末（<strong>サプリカント</strong>）を、スイッチ（<strong>オーセンティケータ/Authenticator</strong>）が仲介し、<strong>RADIUS サーバ</strong>（認証サーバ）が認証する。認証成功までポートは閉じている。</p>
+<pre class="mermaid">sequenceDiagram
+    participant S as サプリカント&lt;br/&gt;（端末）
+    participant A as オーセンティケータ&lt;br/&gt;（スイッチ）
+    participant R as RADIUS&lt;br/&gt;（FreeRADIUS/ISE）
+    S-&gt;&gt;A: (1) リンクアップ（ポートは未認可）
+    A-&gt;&gt;S: (2) EAP-Request/Identity
+    S-&gt;&gt;A: (3) EAP-Response/Identity
+    A-&gt;&gt;R: (4) RADIUS Access-Request（EAPカプセル化）
+    R-&gt;&gt;S: (5) EAP認証（証明書/パスワード等、スイッチ透過）
+    S-&gt;&gt;R: (6) 資格情報を提示
+    R-&gt;&gt;A: (7) RADIUS Access-Accept + 属性（VLAN等）
+    A-&gt;&gt;A: (8) ポートを認可VLANへ開放
+</pre>
+<p><strong>EAP 種別</strong>（認証方式の中身）:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>EAP 種別</th>
+<th>認証材料</th>
+<th>特徴</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>EAP-TLS</td>
+<td>クライアント証明書</td>
+<td>最も堅牢。相互証明書。</td>
+</tr>
+<tr>
+<td>PEAP / EAP-TTLS</td>
+<td>ユーザー名+パスワード（TLS トンネル内）</td>
+<td>導入容易。AD 連携が多い。</td>
+</tr>
+<tr>
+<td>EAP-MD5</td>
+<td>パスワードハッシュ</td>
+<td>弱い。有線の限定用途。</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="mabmac-authentication-bypass-8021x-非対応端末の救済" tabindex="-1">MAB（MAC Authentication Bypass）— 802.1X 非対応端末の救済 <a class="header-anchor" href="#mabmac-authentication-bypass-8021x-非対応端末の救済" aria-hidden="true">#</a></h3>
+<p>プリンタ・IP 電話・IoT など<strong>サプリカントを持たない端末</strong>は 802.1X で認証できない。MAB は<strong>端末の MAC アドレスを ID として RADIUS に問い合わせ</strong>、登録済みなら通す。セキュリティは弱いが（MAC 詐称可能）、現実の LAN には必須の仕組み。</p>
+<h3 id="動的-vlan--認証結果でセグメントを割り当てる" tabindex="-1">動的 VLAN — 認証結果でセグメントを割り当てる <a class="header-anchor" href="#動的-vlan--認証結果でセグメントを割り当てる" aria-hidden="true">#</a></h3>
+<p>RADIUS が Access-Accept で返す<strong>属性</strong>によって、スイッチは端末を割り当てる VLAN を動的に変える。「社員は業務 VLAN、未認証/失敗は隔離 VLAN、ゲストはゲスト VLAN」を認証結果で自動振り分けする。</p>
+<p><strong>動的 VLAN に必要な RADIUS 属性（3点セット）</strong>:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>属性</th>
+<th>値の例</th>
+<th>意味</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Tunnel-Type</code></td>
+<td><code>13</code>（VLAN）</td>
+<td>トンネル種別＝VLAN</td>
+</tr>
+<tr>
+<td><code>Tunnel-Medium-Type</code></td>
+<td><code>6</code>（802）</td>
+<td>メディア＝IEEE 802</td>
+</tr>
+<tr>
+<td><code>Tunnel-Private-Group-ID</code></td>
+<td><code>100</code></td>
+<td>割り当てる VLAN 番号</td>
+</tr>
+</tbody>
+</table></div>
+<p>3つ揃って初めて動的 VLAN が効く。1つでも欠けるとスイッチは既定 VLAN のままになる（頻出の落とし穴）。</p>
+<h3 id="coachange-of-authorization-稼働中セッションを事後変更" tabindex="-1">CoA（Change of Authorization）— 稼働中セッションを事後変更 <a class="header-anchor" href="#coachange-of-authorization-稼働中セッションを事後変更" aria-hidden="true">#</a></h3>
+<p>一度認証を通した後でも、RADIUS から <strong>CoA</strong> を送ればセッションを<strong>強制的に再認証/切断/VLAN 変更</strong>できる。例：EDR が端末の異常を検知 → RADIUS が CoA を発行 → 該当端末を隔離 VLAN へ即移動。ゼロトラストの「セッション単位・継続的な再評価」をネットワーク層で実現する要。</p>
+<pre class="mermaid">sequenceDiagram
+    participant R as RADIUS
+    participant A as スイッチ
+    participant S as 端末（稼働中）
+    Note over S: 業務VLANで通信中
+    R-&gt;&gt;A: (1) CoA-Request（例: 再認証/隔離VLANへ）
+    A-&gt;&gt;S: (2) 再認証要求 or VLAN変更
+    A-&gt;&gt;R: (3) CoA-ACK
+    Note over S: 隔離VLANへ移動 or 切断
+</pre>
+<h2 id="3-商用製品--本ラボ-oss-の対応" tabindex="-1">3. 商用製品 × 本ラボ OSS の対応 <a class="header-anchor" href="#3-商用製品--本ラボ-oss-の対応" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>機序</th>
+<th>商用（ISE/ClearPass）での実装</th>
+<th>本ラボ OSS</th>
+<th>トラック</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>802.1X 認証</td>
+<td>ISE/ClearPass が RADIUS 中枢</td>
+<td>FreeRADIUS + Cisco IOL L2</td>
+<td>NW-ZT N1</td>
+</tr>
+<tr>
+<td>MAB</td>
+<td>ISE のエンドポイント DB</td>
+<td>FreeRADIUS の MAC ベース認証</td>
+<td>NW-ZT N1</td>
+</tr>
+<tr>
+<td>動的 VLAN</td>
+<td>ISE が VLAN 属性を返却</td>
+<td>FreeRADIUS の users で Tunnel 属性返却</td>
+<td>NW-ZT N1</td>
+</tr>
+<tr>
+<td>CoA</td>
+<td>ISE が CoA でセッション変更</td>
+<td>FreeRADIUS の CoA（radclient 等）</td>
+<td>NW-ZT N1</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>商用 ISE/ClearPass → FreeRADIUS + IOL L2</strong>。ISE/ClearPass は x86 アプライアンスで arm64 非対応のため、認証中枢を FreeRADIUS で、Authenticator を Cisco IOL L2 スイッチで再現する。RADIUS イメージは arm64 取得済み、IOL L2 は実機検証扱い（2026-07-04）。「認証されるまでポートが開かない」「認証結果で VLAN が変わる」「CoA で事後に隔離できる」という NAC の核心動作を手で確認できる。</p>
+<h2 id="実務でこの知識がどこで効くか" tabindex="-1">実務でこの知識がどこで効くか <a class="header-anchor" href="#実務でこの知識がどこで効くか" aria-hidden="true">#</a></h2>
+<p><strong>802.1X/動的VLAN の設計・トラブルシュートは NW セキュリティ案件の頻出タスク</strong>であり、「認証は通るのに VLAN が変わらない」「MAB に落ちてしまう」といった障害は現場で日常的に起きる。この教材の RADIUS 属性3点セットや EAP 種別を理解していれば、<code>show authentication sessions</code> の出力を読んで切り分けられる。特に <strong>CoA</strong> は「感染端末を自動隔離する」ゼロトラスト運用の要で、EDR/NDR と RADIUS を連携させる設計（検知→CoA→隔離VLAN）は ZT 案件の見せ場になる。ISE の実機がなくても、FreeRADIUS + IOL で機序を体で覚えておけば、ISE 案件でも設定の意味が即座に読める——ここが本ラボで N1 を先頭に置く理由である。</p>
+<h2 id="4-簡略化ポイント" tabindex="-1">4. 簡略化ポイント <a class="header-anchor" href="#4-簡略化ポイント" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>ISE 固有機能なし</strong>: プロファイリング（端末種別自動判定）・posture・ゲストポータルは FreeRADIUS では再現しない。認証と動的VLAN・CoA の核だけ。</li>
+<li><strong>IOL は実機検証枠</strong>: L2 スイッチ機能（dot1x/mab/CoA）は IOL の実挙動に依存し、コンテナ OSS のように&quot;確定&quot;ではない。N1 実装時に実機確認する。</li>
+<li><strong>EAP-TLS の PKI 簡略</strong>: 証明書配布・失効の運用は本ラボでは最小限。本番は証明書ライフサイクル管理が重い。</li>
+</ul>
+<h2 id="5-つまずきポイント" tabindex="-1">5. つまずきポイント <a class="header-anchor" href="#5-つまずきポイント" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>動的 VLAN が効かない</strong>: RADIUS 属性3点セット（Tunnel-Type/Medium-Type/Private-Group-ID）の欠落が最頻出。1つでも欠けると既定 VLAN のまま。</li>
+<li><strong>MAB に落ちる</strong>: サプリカント未設定/EAP タイムアウトで 802.1X が失敗し MAB へフォールバックすると、意図せず弱い認証で通ってしまう。まず端末側サプリカント設定を疑う。</li>
+<li><strong>CoA が届かない</strong>: CoA は RADIUS→スイッチへの&quot;逆向き&quot;通信（UDP 1700 等）。この経路の到達性・共有鍵不一致で無反応になる。</li>
+<li><strong>有線と無線で挙動が違う</strong>: 本教材は有線 L2 前提。無線 NAC は SSID/WPA2-Enterprise と絡み、細部が異なる。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="README_%E6%95%99%E6%9D%90%E3%82%AC%E3%82%A4%E3%83%89.html">教材ガイド</a></li>
+<li><a href="05_Cisco_ISE_TrustSec_SecureAccess.html">05 Cisco ISE / TrustSec / Secure Access</a></li>
+<li><a href="07_%E5%95%86%E7%94%A8%E8%A3%BD%E5%93%81_OSS%E5%AF%BE%E5%BF%9C%E8%A1%A8.html">07 商用製品 → OSS 対応表</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT_トラックロードマップ N1（FreeRADIUS + IOL L2）</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-問題lan-ポートに挿せば誰でも通ってしまう">1. 問題：LAN ポートに挿せば誰でも通ってしまう</a></li>
+<li class="lvl-2"><a href="#2-仕組み4つの機序">2. 仕組み：4つの機序</a></li>
+<li class="lvl-3"><a href="#8021x--eap-による認証">802.1X — EAP による認証</a></li>
+<li class="lvl-3"><a href="#mabmac-authentication-bypass-8021x-非対応端末の救済">MAB（MAC Authentication Bypass）— 802.1X 非対応端末の救済</a></li>
+<li class="lvl-3"><a href="#動的-vlan--認証結果でセグメントを割り当てる">動的 VLAN — 認証結果でセグメントを割り当てる</a></li>
+<li class="lvl-3"><a href="#coachange-of-authorization-稼働中セッションを事後変更">CoA（Change of Authorization）— 稼働中セッションを事後変更</a></li>
+<li class="lvl-2"><a href="#3-商用製品--本ラボ-oss-の対応">3. 商用製品 × 本ラボ OSS の対応</a></li>
+<li class="lvl-2"><a href="#実務でこの知識がどこで効くか">実務でこの知識がどこで効くか</a></li>
+<li class="lvl-2"><a href="#4-簡略化ポイント">4. 簡略化ポイント</a></li>
+<li class="lvl-2"><a href="#5-つまずきポイント">5. つまずきポイント</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

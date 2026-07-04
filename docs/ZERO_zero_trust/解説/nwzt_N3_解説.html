@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>N3 解説 — NDR（Zeek/Suricata + goflow2 + ntopng）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>解説</span></nav>
+      <h1 class="doc-title">N3 解説 — NDR（Zeek/Suricata + goflow2 + ntopng）</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">explainer</span><span class="tag">ndr</span><span class="tag">zeek</span><span class="tag">suricata</span><span class="tag">netflow</span></span>
+      </div>
+      
+      <div class="content">
+<h2 id="1-このフェーズで何が実現されるか" tabindex="-1">1. このフェーズで何が実現されるか <a class="header-anchor" href="#1-このフェーズで何が実現されるか" aria-hidden="true">#</a></h2>
+<p>N3 では east-west（横方向）を含む通信を可視化し、フロー統計と DPI 振る舞いから異常を検知して既存 SIEM に集約する。ミラーポート（SPAN）から取り出したトラフィックを Zeek/Suricata が DPI・振る舞い解析し、NetFlow/IPFIX で吐き出したフロー統計を goflow2 が収集して ntopng で可視化する。検知ログとフローは L7 トラックの Loki/Grafana（Phase 3）に集約する。「侵害は起きる前提」で、起きた後に<strong>気づける目</strong>を作るのが N3。</p>
+<ul>
+<li><strong>ビフォー</strong>: 通信の中身は基本ブラックボックス。south-north（外向き）の入口には L7 Phase 4 の Suricata（IDS）があるが、内部の端末同士（east-west）の通信は誰も見ていない。侵害端末が横に広がっても検知できない。</li>
+<li><strong>アフター</strong>: east-west を含むトラフィックがミラーで複製され、Zeek がプロトコルログを、Suricata がシグネチャ検知を出し、NetFlow が「誰が誰と、いつ、どれだけ」通信したかを記録する。スキャン挙動や想定外の east-west が Grafana のダッシュボードに現れる。</li>
+</ul>
+<h2 id="2-なぜこの構成か" tabindex="-1">2. なぜこの構成か <a class="header-anchor" href="#2-なぜこの構成か" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>観点</th>
+<th>商用製品</th>
+<th>本ラボの OSS 選定</th>
+<th>選定理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NDR</td>
+<td>Darktrace, Cisco Secure Network Analytics (Stealthwatch)</td>
+<td><strong>Zeek/Suricata + goflow2 + ntopng</strong>（発展: ElastiFlow）</td>
+<td>収集・検知エンジンを OSS で組み、可視化は既存 Loki/Grafana を再利用。Stealthwatch の「NetFlow ベース挙動分析」と Darktrace の「DPI 振る舞い検知」を 2 系統に分けて追体験できる</td>
+</tr>
+</tbody>
+</table></div>
+<p>なぜ「DPI（Zeek/Suricata）」と「フロー（goflow2/ntopng）」の 2 系統を併存させるか:</p>
+<ul>
+<li><strong>商用 NDR は実は 2 系統の合わせ技</strong>。Cisco Secure Network Analytics（Stealthwatch）は <strong>NetFlow ベース</strong>（フロー統計から挙動異常を出す）、Darktrace は <strong>DPI + 教師なし学習</strong>（パケットの中身と平常時からのズレ）が中心。N3 で goflow2/ntopng（フロー）と Zeek/Suricata（DPI）を両方置くのは、この 2 つのアプローチの違いを手で確認するため。</li>
+<li><strong>既存 SIEM に乗せる（D-3 の延長）</strong>。可視化基盤（Loki/Grafana）は L7 Phase 3 で作ったものをそのまま流用し、N3 では収集・検知エンジンだけを足す。「検知エンジンは差し替え可能、可視化は共通基盤」という実務的なアーキテクチャを体験する。</li>
+</ul>
+<h3 id="north-south-ids-と-east-west-ndr-の違い重要" tabindex="-1">north-south IDS と east-west NDR の違い（重要） <a class="header-anchor" href="#north-south-ids-と-east-west-ndr-の違い重要" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>観点</th>
+<th>L7 Phase 4 の IDS（Suricata）</th>
+<th>N3 の NDR</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>見る方向</td>
+<td><strong>north-south</strong>（内↔外、SWG 経路上）</td>
+<td><strong>east-west</strong>（内部端末同士）＋ north-south</td>
+</tr>
+<tr>
+<td>主目的</td>
+<td>外向き通信の不審検知・侵入検知</td>
+<td>侵害後の<strong>横移動</strong>・内部偵察の検知</td>
+</tr>
+<tr>
+<td>データ源</td>
+<td>プロキシ/ゲートウェイ経路上のトラフィック</td>
+<td>ミラー/SPAN・NetFlow（経路に依存しない複製）</td>
+</tr>
+<tr>
+<td>前提</td>
+<td>「境界で止める」</td>
+<td>「侵害は起きる前提、起きた後に気づく」</td>
+</tr>
+</tbody>
+</table></div>
+<p>同じ Suricata を使っても、<strong>どこにセンサを置き、何を見るか</strong>が違う。Phase 4 は境界の関所で外向きを見る IDS、N3 は内部にミラーを引いて横方向を見る NDR。この配置の差が「侵入検知」と「侵害検知」の違いそのもの。</p>
+<p><strong>実務でこの知識がどこで効くか</strong>: Cisco 実務なら NetFlow（<code>ip flow-export</code> / <code>flow monitor</code>）や SPAN（<code>monitor session</code>）は設定したことがあるはず。N3 はその出力先——NetFlow コレクタや SPAN の受け側——で「集めたフローから何が読めるか」を体験する作業になる。Stealthwatch を提案・設計する案件で「なぜ NetFlow だけで挙動異常が出せるのか」「SPAN と NetFlow をどう使い分けるか」を説明できるようになる。切り分けの現場でも、「内部で変な通信が起きている気がする」という曖昧な相談を、フロー可視化とDPIログという具体的な証拠に落とし込める。</p>
+<h2 id="3-仕組みの核心" tabindex="-1">3. 仕組みの核心 <a class="header-anchor" href="#3-仕組みの核心" aria-hidden="true">#</a></h2>
+<p>ミラー/NetFlow の 2 経路で取り出したトラフィックを、DPI とフローの 2 エンジンで解析し、既存 SIEM に集約する。<a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">NW-ZT_論理構成設計</a> の N3 可視化パイプラインが対応する。</p>
+<pre class="mermaid">graph LR
+    subgraph NET[&quot;監視対象（IOL / OVS）&quot;]
+        SPAN[&quot;ミラー / SPAN&lt;br/&gt;（パケット複製）&quot;]
+        NF[&quot;NetFlow / IPFIX&lt;br/&gt;（フロー統計）&quot;]
+    end
+    SPAN --&gt; ZEEK[&quot;Zeek&lt;br/&gt;プロトコルログ&quot;]
+    SPAN --&gt; SURI[&quot;Suricata&lt;br/&gt;シグネチャ検知&quot;]
+    NF --&gt; GOFLOW[&quot;goflow2&lt;br/&gt;フロー収集&quot;]
+    GOFLOW --&gt; NTOP[&quot;ntopng / ElastiFlow&lt;br/&gt;フロー可視化&quot;]
+    ZEEK --&gt;|&quot;検知/プロトコルログ&quot;| LOKI[&quot;Loki&lt;br/&gt;（Phase3 再利用）&quot;]
+    SURI --&gt;|&quot;アラート&quot;| LOKI
+    NTOP --&gt;|&quot;フロー/アラート&quot;| GRAF[&quot;Grafana&lt;br/&gt;（Phase3 再利用）&quot;]
+    LOKI --&gt; GRAF
+</pre>
+<p>ポイント:</p>
+<ul>
+<li><strong>ミラーは「経路に割り込まない」観測</strong>。SPAN/ミラーはトラフィックを複製するだけで、通信そのものには介入しない（インライン IPS と違い、遅延も切断も起こさない）。だから east-west を広く・安全に観測できる。可視化に徹する N3 の思想と合う。</li>
+<li><strong>Zeek と Suricata は役割が違う</strong>。Suricata は「既知の悪性パターン（シグネチャ）に一致するか」を見る IDS 寄り。Zeek は「何が起きたか」をプロトコル単位で構造化ログにする（conn.log / dns.log / http.log 等）。**Suricata が「これは既知の攻撃」、Zeek が「そもそも何が通ったかの台帳」**という補完関係。</li>
+<li><strong>NetFlow は中身を見ずに「関係」を見る</strong>。ペイロードは見ず、5-tuple（送信元/宛先 IP・ポート・プロトコル）とバイト数・パケット数・時刻だけを記録する。だから暗号化されていても「誰が誰とどれだけ通信したか」は分かる。スキャン（多数宛先への短時間接続）や横移動（普段話さない端末同士の通信）はフローの形で現れる。</li>
+<li><strong>可視化は共通基盤に集約</strong>。検知エンジンが何であれ、出力先は Loki（ログ）と Grafana（ダッシュボード）に統一。エンジンを足しても可視化の作り直しは不要。</li>
+</ul>
+<h2 id="4-自分で触って確認する手順実装後にこの手順で確認" tabindex="-1">4. 自分で触って確認する手順（実装後にこの手順で確認） <a class="header-anchor" href="#4-自分で触って確認する手順実装後にこの手順で確認" aria-hidden="true">#</a></h2>
+<p>N3 は今回スコープでは未デプロイ（設計値）。実装後、以下の手順でゲート条件（ミラー/NetFlow から異常フローを検知し Grafana で可視化）を段階的に確認する想定。IOL 側のミラー設定は概念と主要コマンドに留める。</p>
+<h3 id="手順1-ミラーspanを設定し複製が届くことを確認する" tabindex="-1">手順1: ミラー（SPAN）を設定し、複製が届くことを確認する <a class="header-anchor" href="#手順1-ミラーspanを設定し複製が届くことを確認する" aria-hidden="true">#</a></h3>
+<p>Cisco IOL 側で監視対象ポートを SPAN の送信元に、センサ接続ポートを宛先にする。</p>
+<pre><code class="language-text">! 監視したいポート群を source、Zeek/Suricata が繋がるポートを destination に
+monitor session 1 source interface Ethernet0/1 - 2 both
+monitor session 1 destination interface Ethernet0/3
+</code></pre>
+<p>センサ側で、複製が実際に流れてきているかをまず確認する。</p>
+<pre><code class="language-bash"><span class="hljs-comment"># センサのインターフェースで生パケットが見えるか（検知エンジンより先に配線を確認）</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-sensor tcpdump -ni eth1 -c 20
+</code></pre>
+<p>期待結果: 監視対象の通信がセンサ側 tcpdump に映る。<strong>検知の前に「そもそもミラーが届いているか」を切り離して確認する</strong>のが定石（届いていなければ何も検知できない）。</p>
+<h3 id="手順2-zeek--suricata-を起動し通常トラフィックのログが出ることを確認する" tabindex="-1">手順2: Zeek / Suricata を起動し、通常トラフィックのログが出ることを確認する <a class="header-anchor" href="#手順2-zeek--suricata-を起動し通常トラフィックのログが出ることを確認する" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-comment"># Zeek をミラー受信インターフェースで起動 → conn.log 等が生成される</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-sensor zeek -i eth1
+docker <span class="hljs-built_in">exec</span> clab-nwzt-sensor <span class="hljs-built_in">tail</span> -f /opt/zeek/logs/current/conn.log
+
+<span class="hljs-comment"># Suricata を同インターフェースで起動 → eve.json にイベントが出る</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-sensor suricata -i eth1
+docker <span class="hljs-built_in">exec</span> clab-nwzt-sensor <span class="hljs-built_in">tail</span> -f /var/log/suricata/eve.json
+</code></pre>
+<p>期待結果: 平常時でも <code>conn.log</code>（Zeek）にフロー単位のレコードが、<code>eve.json</code>（Suricata）にプロトコルイベントが書かれる。まず「通った通信が構造化ログになる」ことを確認する。</p>
+<h3 id="手順3-スキャン挙動を意図的に流して検知させる学習の核心" tabindex="-1">手順3: スキャン挙動を意図的に流して検知させる（学習の核心） <a class="header-anchor" href="#手順3-スキャン挙動を意図的に流して検知させる学習の核心" aria-hidden="true">#</a></h3>
+<p>異常を「起こして」検知させる。攻撃者の横移動・偵察を模した通信を投げる。</p>
+<pre><code class="language-bash"><span class="hljs-comment"># ある端末から同一セグメント内を広くポートスキャン（横方向の偵察を模す）</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-client nmap -sS 172.31.10.0/24
+</code></pre>
+<p>期待結果: Suricata が scan 系シグネチャで発報し（<code>eve.json</code> に alert）、Zeek の <code>conn.log</code> に「1 送信元から多数宛先への短時間接続」が並ぶ。<strong>「侵害端末が横に広がる」動きが、フローと DPI の両方でどう見えるか</strong>を対照で確認する。これが east-west 可視化の核心。</p>
+<h3 id="手順4-netflow-を有効化しフローを-goflow2-で収集する" tabindex="-1">手順4: NetFlow を有効化し、フローを goflow2 で収集する <a class="header-anchor" href="#手順4-netflow-を有効化しフローを-goflow2-で収集する" aria-hidden="true">#</a></h3>
+<p>IOL 側で NetFlow/IPFIX エクスポートを設定し、goflow2 のコレクタへ送る。</p>
+<pre><code class="language-text">! フローを定義してコレクタ（goflow2）へエクスポート
+flow record ZT-REC
+ match ipv4 source address
+ match ipv4 destination address
+ match transport source-port
+ match transport destination-port
+flow exporter ZT-EXP
+ destination &lt;goflow2-ip&gt;
+ transport udp 2055
+flow monitor ZT-MON
+ record ZT-REC
+ exporter ZT-EXP
+interface Ethernet0/1
+ ip flow monitor ZT-MON input
+</code></pre>
+<pre><code class="language-bash"><span class="hljs-comment"># goflow2 がフローを受けているか</span>
+docker logs --<span class="hljs-built_in">tail</span> 20 clab-nwzt-goflow2
+</code></pre>
+<p>期待結果: goflow2 がフローレコードを受信しログに出す。手順3 のスキャンが、<strong>ペイロードを見ずとも 5-tuple の形（1 送信元→多数宛先）で</strong> goflow2 に現れることを確認する。</p>
+<h3 id="手順5-grafana-で可視化されることを確認する" tabindex="-1">手順5: Grafana で可視化されることを確認する <a class="header-anchor" href="#手順5-grafana-で可視化されることを確認する" aria-hidden="true">#</a></h3>
+<pre><code class="language-logql"># Loki に集約された Suricata/Zeek のアラートを LogQL で引く
+{container=&quot;clab-nwzt-sensor&quot;} |= &quot;alert&quot; or &quot;scan&quot;
+</code></pre>
+<p>ntopng ダッシュボードでフローのトップトーカー・宛先分布を見て、スキャン元がグラフ上で突出することを確認する。<strong>検知（Loki）とフロー（ntopng/Grafana）の両面で同じ事象が見える</strong>ことが、2 系統併存の意味を体感する箇所。</p>
+<h2 id="5-考えどころ" tabindex="-1">5. 考えどころ <a class="header-anchor" href="#5-考えどころ" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>本番設計ならどうするか</strong>: 本番の Darktrace/Stealthwatch は、平常時のベースラインを機械学習で学習し「その端末にとって異常か」を相対判定する（固定シグネチャに頼らない）。証跡の保全、self-learning、SOAR 連携での自動対応まで持つ。N3 はシグネチャ検知とフロー可視化という「気づく目」の骨格に留める。</li>
+<li><strong>N1 の CoA と繋いだ SOAR 的自動封じ込め（発展案）</strong>: N3 は「検知」まで、N1 は「隔離」まで単体で完結するが、両者を繋ぐと自動封じ込めになる。<strong>Suricata/Zeek の検知 → webhook → FreeRADIUS へ CoA-Request → 該当端末を隔離 VLAN へ</strong>、という API-first の自動応答パイプラインが組める。「検知したら人が対応」から「検知したら数秒で自動隔離」への発展は、SOAR（Security Orchestration, Automation and Response）の最小実装として体験価値が高い。N3 のアラートに送信元 IP → MAC → スイッチポート/RADIUS セッションを逆引きする対応表が要になる。</li>
+<li><strong>このラボの簡略化ポイント</strong>:
+<ul>
+<li><strong>機械学習ベースの異常検知なし</strong>。ベースライン学習は行わず、シグネチャ + 明示的なフロー閾値で検知する。</li>
+<li><strong>フルパケットキャプチャ保全なし</strong>。証跡の長期保存・法的保全は扱わない。</li>
+<li><strong>ミラー帯域の制約</strong>。SPAN は高負荷時にパケットを取りこぼす。本番はタップ（物理分岐）や専用パケットブローカを使う。</li>
+</ul>
+</li>
+</ul>
+<h2 id="6-つまずきポイント" tabindex="-1">6. つまずきポイント <a class="header-anchor" href="#6-つまずきポイント" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>検知エンジンは動いているのにアラートが出ない</strong>: <a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a> の層別で言えば「到達（ミラー配線）」の問題であることが最多。ミラーがセンサに届いていない（<code>monitor session</code> の source/destination 取り違え、センサ側 NIC が promiscuous でない）と、エンジンは正常でも入力がゼロ。<strong>手順1 の tcpdump で配線を先に切り分ける</strong>。</li>
+<li><strong>NetFlow が goflow2 に届かない</strong>: エクスポータの宛先 IP/ポート（UDP 2055 等）とコレクタの待ち受けが不一致、または UDP がセグメント間で落ちている。<code>docker logs goflow2</code> にレコード受信がゼロなら、まず疎通（UDP）を確認する。</li>
+<li><strong>Grafana に出ない</strong>: 検知は出ているが Loki への送信（Promtail 等の集約経路）が繋がっていない。L7 Phase 3 の Loki/Grafana を再利用するため、N3 固有の集約設定（どのログファイルを拾うか）の追加漏れが典型。Loki 側で該当 container のラベルが見えるかを確認する。</li>
+<li>事象は <a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a> を複製して 1 件ずつ記録する。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT_トラックロードマップ</a>（N3 の位置づけ・依存）</li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">NW-ZT_論理構成設計</a>（N3 可視化パイプライン・SOAR 発展）</li>
+<li><a href="../%E6%95%99%E6%9D%90/04_PaloAlto_Prisma_NGFW.html">教材: Palo Alto Prisma/NGFW（Content-ID）</a></li>
+<li><a href="../%E6%95%99%E6%9D%90/05_Cisco_ISE_TrustSec_SecureAccess.html">教材: Cisco ISE/TrustSec/Secure Access</a></li>
+<li><a href="../04_%E6%A7%8B%E7%AF%89/nwzt_track/N3_NDR/">N3 構築スタブ</a></li>
+<li><a href="phase4_%E8%A7%A3%E8%AA%AC.html">phase4_解説（north-south IDS との対比）</a></li>
+<li><a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-このフェーズで何が実現されるか">1. このフェーズで何が実現されるか</a></li>
+<li class="lvl-2"><a href="#2-なぜこの構成か">2. なぜこの構成か</a></li>
+<li class="lvl-3"><a href="#north-south-ids-と-east-west-ndr-の違い重要">north-south IDS と east-west NDR の違い（重要）</a></li>
+<li class="lvl-2"><a href="#3-仕組みの核心">3. 仕組みの核心</a></li>
+<li class="lvl-2"><a href="#4-自分で触って確認する手順実装後にこの手順で確認">4. 自分で触って確認する手順（実装後にこの手順で確認）</a></li>
+<li class="lvl-3"><a href="#手順1-ミラーspanを設定し複製が届くことを確認する">手順1: ミラー（SPAN）を設定し、複製が届くことを確認する</a></li>
+<li class="lvl-3"><a href="#手順2-zeek--suricata-を起動し通常トラフィックのログが出ることを確認する">手順2: Zeek / Suricata を起動し、通常トラフィックのログが出ることを確認する</a></li>
+<li class="lvl-3"><a href="#手順3-スキャン挙動を意図的に流して検知させる学習の核心">手順3: スキャン挙動を意図的に流して検知させる（学習の核心）</a></li>
+<li class="lvl-3"><a href="#手順4-netflow-を有効化しフローを-goflow2-で収集する">手順4: NetFlow を有効化し、フローを goflow2 で収集する</a></li>
+<li class="lvl-3"><a href="#手順5-grafana-で可視化されることを確認する">手順5: Grafana で可視化されることを確認する</a></li>
+<li class="lvl-2"><a href="#5-考えどころ">5. 考えどころ</a></li>
+<li class="lvl-2"><a href="#6-つまずきポイント">6. つまずきポイント</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

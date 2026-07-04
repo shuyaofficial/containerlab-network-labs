@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>N2 解説 — SDP型ZTNA（OpenZiti）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>解説</span></nav>
+      <h1 class="doc-title">N2 解説 — SDP型ZTNA（OpenZiti）</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">explainer</span><span class="tag">ztna</span><span class="tag">sdp</span><span class="tag">openziti</span></span>
+      </div>
+      
+      <div class="content">
+<h2 id="1-このフェーズで何が実現されるか" tabindex="-1">1. このフェーズで何が実現されるか <a class="header-anchor" href="#1-このフェーズで何が実現されるか" aria-hidden="true">#</a></h2>
+<p>N2 では <code>app</code> の内向きポートを一切開けないまま、外向きの張り出し（app-connector）経由でのみ認可済みクライアントを到達させる。OpenZiti の controller / router / tunneler を使い、SDP（Software-Defined Perimeter）型の ZTNA を体験する。未認可のクライアントは <code>app</code> に到達できないどころか、<strong>名前解決すらできない</strong>（存在が隠される＝暗黙拒否）。</p>
+<ul>
+<li><strong>ビフォー</strong>: <code>app</code> は待ち受けポート（例: 80/443）を開けており、経路さえ通ればスキャンで発見でき、接続を試みられる。IAP（L7 トラック Phase 2）を置いても、<code>app</code> のポート自体は開いたまま（IAP がその手前に立つだけ）。</li>
+<li><strong>アフター</strong>: <code>app</code> は内向きポートを閉じ、Ziti router へ外向きに接続を張り出すだけ。攻撃者から見ると <code>app</code> はネットワーク上に「存在しない」。認可された identity を持つクライアントだけが、tunneler と overlay 経由で到達できる。</li>
+</ul>
+<p>これが Zscaler ZPA や Cisco Secure Access が「VPN 代替」「アプリを見えなくする」と謳う仕組みの技術的な中身。N2 で自分の手で組むと、その一文の意味が具体的に分かる。</p>
+<h2 id="2-なぜこの構成か" tabindex="-1">2. なぜこの構成か <a class="header-anchor" href="#2-なぜこの構成か" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>観点</th>
+<th>商用製品</th>
+<th>本ラボの OSS 選定</th>
+<th>選定理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SDP型ZTNA</td>
+<td>Zscaler ZPA, Cisco Secure Access</td>
+<td><strong>OpenZiti</strong>（発展: Headscale / Netbird）</td>
+<td>arm64 対応確定済み（<a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果</a>）。ZPA の broker + app-connector アーキテクチャを、controller + router + tunneler としてほぼ 1:1 で再現できる</td>
+</tr>
+</tbody>
+</table></div>
+<p>なぜ IAP 型（L7 Phase 2 の Pomerium）とは別に SDP 型を組むか:</p>
+<ul>
+<li><strong>IAP 型と SDP 型は「到達性の作り方」が根本的に違う</strong>。IAP はアプリの前にリバースプロキシ（関所）を立てるが、アプリのポートは開いている（関所を回避する経路があれば届く）。SDP はアプリのポートを閉じ、outbound だけで overlay に参加させるため、<strong>そもそも待ち受けが存在しない</strong>。この差を頭でなく手で確認するのが N2 の目的。</li>
+<li><strong>ZPA の営業資料は「アプリを不可視化」「内向きファイアウォール穴を開けない」と書くが、その実装が app-connector（=Ziti router へ張り出す side）</strong>。OpenZiti はこのモデルをそのまま OSS 化しているため、商用 ZPA の設計思想を最も忠実に追体験できる。</li>
+</ul>
+<p><strong>実務でこの知識がどこで効くか</strong>: Cisco 実務なら、リモートアクセスは AnyConnect + ASA/FTD の「VPN でネットワークに入れてから ACL で絞る」モデルが基準のはず。SDP はこれを裏返す——「ネットワークには入れず、アプリ単位の暗号化トンネルで、認可されたときだけ、そのアプリにだけ到達させる」。この違いが分かると、Secure Access や ZPA の PoC で「なぜファイアウォールに inbound 穴を開けなくていいのか」「なぜ社内アプリがインターネットから見えないのか」を説明できる。設計案件で「VPN 集約装置を SDP に置き換える」提案の技術的裏付けにもなる。</p>
+<h2 id="3-仕組みの核心" tabindex="-1">3. 仕組みの核心 <a class="header-anchor" href="#3-仕組みの核心" aria-hidden="true">#</a></h2>
+<p>controller が制御（誰が何に到達してよいか）を、router が実データの中継を担い、<code>app</code> 側は内向き非開放のまま router へ外向き接続する。この非対称性が SDP の核心。</p>
+<pre class="mermaid">sequenceDiagram
+    participant CL as client（tunneler）
+    participant CT as Ziti controller（制御）
+    participant RT as Ziti router（データ中継）
+    participant AC as app-connector（tunneler on app 側）
+    participant AP as app（内向きポート閉）
+    Note over AP,AC: app 側は inbound を開けず、router へ outbound で接続を張る
+    AC-&gt;&gt;RT: (0) app-connector が router へ外向き接続（常時）
+    CL-&gt;&gt;CT: (1) enrollment 済み identity で認証
+    CT--&gt;&gt;CL: (2) 認可された service の情報を配布
+    CL-&gt;&gt;CL: (3) service の名前解決を tunneler が横取り（overlay 内DNS）
+    alt 認可あり
+        CL-&gt;&gt;RT: (4a) overlay 経由で暗号化接続
+        RT-&gt;&gt;AC: (5a) app-connector へ中継
+        AC-&gt;&gt;AP: (6a) ローカルで app に接続（127.0.0.1 相当）
+    else 認可なし
+        CT--&gt;&gt;CL: (4b) service を配布しない → 名前解決すら失敗
+    end
+</pre>
+<p>ポイント:</p>
+<ul>
+<li><strong><code>app</code> は inbound を開けない</strong>。app-connector（app 側の tunneler）が router へ <strong>outbound</strong> で接続を張り、その常時接続を逆流させて到達させる。ファイアウォールの穴あけが不要になるのはこのため。攻撃者は <code>app</code> のポートをスキャンしても何も見つけられない。</li>
+<li><strong>暗黙拒否がデフォルト</strong>。IAP は「アクセスして拒否される（拒否レスポンスが返る）」が、SDP は「認可されない service はそもそも配布されない」ため、<strong>名前解決の段階で失敗する</strong>。存在が見えない＝攻撃対象面（アタックサーフェス）が消える。これが IAP と SDP の最も大きな体験差。</li>
+<li><strong>identity と policy が制御の実体</strong>。各ノードは enrollment で一意の identity（証明書）を受け取り、controller の service-policy が「どの identity がどの service に到達してよいか」を定義する。これが ZPA の「アクセスポリシー」に対応する。</li>
+<li><strong>overlay ネットワーク</strong>。tunneler が OS の名前解決とパケットを横取りし、Ziti の暗号化 overlay に流す。アプリ本体は無改修（Ziti SDK を組み込む埋め込み型もあるが、tunneler 方式ならアプリはそのまま）。</li>
+</ul>
+<h3 id="iap-型pomeriumとの実装差" tabindex="-1">IAP 型（Pomerium）との実装差 <a class="header-anchor" href="#iap-型pomeriumとの実装差" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>観点</th>
+<th>IAP 型（L7 Phase 2 / Pomerium）</th>
+<th>SDP 型（N2 / OpenZiti）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>アプリのポート</td>
+<td>開いている（プロキシが手前に立つ）</td>
+<td><strong>閉じている</strong>（outbound のみ）</td>
+</tr>
+<tr>
+<td>未認可の挙動</td>
+<td>アクセスして拒否/リダイレクト</td>
+<td><strong>名前解決すら失敗</strong>（不可視）</td>
+</tr>
+<tr>
+<td>到達性の作り方</td>
+<td>リバースプロキシ経由</td>
+<td>overlay + app-connector の張り出し</td>
+</tr>
+<tr>
+<td>ファイアウォール</td>
+<td>inbound 許可が必要</td>
+<td>inbound 穴あけ不要</td>
+</tr>
+<tr>
+<td>代表製品</td>
+<td>Google IAP, Pomerium</td>
+<td>Zscaler ZPA, Cisco Secure Access</td>
+</tr>
+</tbody>
+</table></div>
+<p>同じ「ZTNA」でも、この 2 型は攻撃対象面の消し方が根本的に異なる。N2 は SDP 側を、L7 Phase 2 は IAP 側を担当し、両方を手で組むことで「ZTNA とひとことで言っても実装は 2 系統ある」を体験する。</p>
+<h2 id="4-自分で触って確認する手順実装後にこの手順で確認" tabindex="-1">4. 自分で触って確認する手順（実装後にこの手順で確認） <a class="header-anchor" href="#4-自分で触って確認する手順実装後にこの手順で確認" aria-hidden="true">#</a></h2>
+<p>N2 は今回スコープでは未デプロイ（設計値）。実装後、以下の手順でゲート条件（内向き非開放のまま app-connector 経由でのみ到達、未認可は名前解決不可）を段階的に確認する想定。</p>
+<h3 id="手順1-controller--router-を起動し健全性を確認する" tabindex="-1">手順1: controller / router を起動し、健全性を確認する <a class="header-anchor" href="#手順1-controller--router-を起動し健全性を確認する" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-comment"># controller の起動確認</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-ziti-controller ziti edge login localhost:1280 -u admin -p &lt;pw&gt;
+docker <span class="hljs-built_in">exec</span> clab-nwzt-ziti-controller ziti edge list edge-routers
+</code></pre>
+<p>期待結果: controller に管理ログインでき、router が online として一覧に出る。まず制御面が生きていることを確認する。</p>
+<h3 id="手順2-identity-を発行しclient--app-に-enrollment-する" tabindex="-1">手順2: identity を発行し、client / app に enrollment する <a class="header-anchor" href="#手順2-identity-を発行しclient--app-に-enrollment-する" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-comment"># client 用と app-connector 用の identity を作成</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-ziti-controller ziti edge create identity client-id -o client.jwt
+docker <span class="hljs-built_in">exec</span> clab-nwzt-ziti-controller ziti edge create identity app-id -o app.jwt
+
+<span class="hljs-comment"># 各ノードの tunneler に enrollment（jwt を渡すと証明書に交換される）</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-client ziti-edge-tunnel enroll --jwt /path/client.jwt --identity /path/client.json
+</code></pre>
+<p>期待結果: 各ノードが一意の identity 証明書を得る。ここで配布される証明書が、以降の到達可否判断の主体になる。</p>
+<h3 id="手順3-service-と-policy-を定義する到達性の設計" tabindex="-1">手順3: service と policy を定義する（到達性の設計） <a class="header-anchor" href="#手順3-service-と-policy-を定義する到達性の設計" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-comment"># app への service を定義（app 側は 127.0.0.1:80 で待ち受け、inbound は開けない）</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-ziti-controller ziti edge create config app-intercept intercept.v1 \
+  <span class="hljs-string">&#x27;{&quot;protocols&quot;:[&quot;tcp&quot;],&quot;addresses&quot;:[&quot;app.ziti&quot;],&quot;portRanges&quot;:[{&quot;low&quot;:80,&quot;high&quot;:80}]}&#x27;</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-ziti-controller ziti edge create config app-host host.v1 \
+  <span class="hljs-string">&#x27;{&quot;protocol&quot;:&quot;tcp&quot;,&quot;address&quot;:&quot;127.0.0.1&quot;,&quot;port&quot;:80}&#x27;</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-ziti-controller ziti edge create service app-svc \
+  --configs app-intercept,app-host
+
+<span class="hljs-comment"># client-id だけに app-svc への dial を許可、app-id に bind を許可</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-ziti-controller ziti edge create service-policy app-dial Dial \
+  --service-roles <span class="hljs-string">&#x27;@app-svc&#x27;</span> --identity-roles <span class="hljs-string">&#x27;@client-id&#x27;</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-ziti-controller ziti edge create service-policy app-bind Bind \
+  --service-roles <span class="hljs-string">&#x27;@app-svc&#x27;</span> --identity-roles <span class="hljs-string">&#x27;@app-id&#x27;</span>
+</code></pre>
+<p>期待結果: 「client-id は app.ziti に dial（到達）してよい」「app-id が app を bind（張り出す）」というポリシーが定義される。これが ZPA のアクセスポリシーに対応する。</p>
+<h3 id="手順4-app-側の-inbound-が閉じたままclient-からだけ到達できることを確認する学習の核心" tabindex="-1">手順4: app 側の inbound が閉じたまま、client からだけ到達できることを確認する（学習の核心） <a class="header-anchor" href="#手順4-app-側の-inbound-が閉じたままclient-からだけ到達できることを確認する学習の核心" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-comment"># app 側が inbound を開けていないことを確認（外からポートスキャンしても見えない）</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-external nmap -Pn -p 80 &lt;app-ip&gt;   <span class="hljs-comment"># → filtered/closed（応答なし）</span>
+
+<span class="hljs-comment"># 認可済み client は overlay 経由の名前 app.ziti で到達できる</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-client curl -sv http://app.ziti/
+</code></pre>
+<p>期待結果: <code>external</code> からの直接スキャンでは <code>app</code> の 80 番が見えない（inbound 非開放）。一方 <code>client</code> は overlay の名前 <code>app.ziti</code> で応答を得る。**「同じ app なのに、経路と identity 次第で見える/見えないが決まる」**ことを対照で確認する。</p>
+<h3 id="手順5-未認可端末は名前解決すら失敗することを確認するsdp-の核心" tabindex="-1">手順5: 未認可端末は名前解決すら失敗することを確認する（SDP の核心） <a class="header-anchor" href="#手順5-未認可端末は名前解決すら失敗することを確認するsdp-の核心" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-comment"># external は identity を持たない（または dial ポリシー対象外）</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-external nslookup app.ziti   <span class="hljs-comment"># → 解決できない</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-external curl -sv http://app.ziti/   <span class="hljs-comment"># → 名前解決の段階で失敗</span>
+</code></pre>
+<p>期待結果: 未認可端末では <code>app.ziti</code> が <strong>名前解決の段階で失敗</strong>する（拒否レスポンスすら返らない）。IAP 型なら「アクセスして 403」だが、SDP 型は「存在が見えない」。<strong>この差が SDP の本質</strong>であり、L7 Phase 2（IAP）と対照すると体感できる。</p>
+<h2 id="5-考えどころ" tabindex="-1">5. 考えどころ <a class="header-anchor" href="#5-考えどころ" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>本番設計ならどうするか</strong>: 本番の ZPA/Secure Access は、グローバル分散した broker（コネクタクラウド）で遅延最適化し、posture（端末状態）・地理・時間帯を認可条件に組み込み、SIEM 連携やセッション録画まで持つ。N2 は controller/router/tunneler の最小構成で「不可視化と暗黙拒否」の核だけを再現する。</li>
+<li><strong>このラボの簡略化ポイント</strong>:
+<ul>
+<li><strong>posture 連携なし</strong>。端末状態を条件にした dial 制御は N2 では扱わない（L7 Phase 6 の posture claim と概念は共通）。</li>
+<li><strong>HA なし</strong>。controller/router を冗長化しない。本番は controller の HA と router のメッシュが前提。</li>
+<li><strong>発展の選択肢</strong>: メッシュ VPN 型の Headscale / Netbird は「拠点間 overlay」に寄った別アプローチ。SDP の「アプリ単位・不可視化」の核を体験するには OpenZiti が最も素直。</li>
+</ul>
+</li>
+</ul>
+<h2 id="6-つまずきポイント" tabindex="-1">6. つまずきポイント <a class="header-anchor" href="#6-つまずきポイント" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>enrollment は成功したのに到達できない</strong>: <a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a> の層別で言えば「到達 NG・認可 NG」の切り分けが要。identity は発行済みでも service-policy（Dial）の identity-roles に含まれていないケースが多い。<code>ziti edge list service-policies</code> でポリシーの対象を確認する。</li>
+<li><strong>app.ziti が名前解決できない（認可済みのはずなのに）</strong>: tunneler が OS の名前解決を横取りできていない（tunneler 未起動、または intercept.v1 config のアドレス指定ミス）。まず tunneler プロセスが上がっているか、intercept の <code>addresses</code> が問い合わせている名前と一致しているかを確認する。</li>
+<li><strong>app 側の bind が張れない</strong>: app-connector（app 側 tunneler）が host.v1 config の宛先（127.0.0.1:80）に接続できない＝app 本体が上がっていない、またはポート番号のズレ。SDP の失敗は「app 側の張り出しが成立していない」ことが多く、client 側ではなく app 側の tunneler ログを先に見る。</li>
+<li>事象は <a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a> を複製して 1 件ずつ記録する。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT_トラックロードマップ</a>（N2 の位置づけ・依存）</li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">NW-ZT_論理構成設計</a>（N2 概略トポロジ）</li>
+<li><a href="../%E6%95%99%E6%9D%90/02_SASE_SSE_%E3%81%A8_SDP_vs_IAP.html">教材: SASE/SSE と SDP vs IAP</a></li>
+<li><a href="../%E6%95%99%E6%9D%90/03_Zscaler_ZIA_ZPA.html">教材: Zscaler ZIA/ZPA</a></li>
+<li><a href="../04_%E6%A7%8B%E7%AF%89/nwzt_track/N2_SDP_ZTNA/">N2 構築スタブ</a></li>
+<li><a href="phase2_%E8%A7%A3%E8%AA%AC.html">phase2_解説（IAP型との対比）</a></li>
+<li><a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-このフェーズで何が実現されるか">1. このフェーズで何が実現されるか</a></li>
+<li class="lvl-2"><a href="#2-なぜこの構成か">2. なぜこの構成か</a></li>
+<li class="lvl-2"><a href="#3-仕組みの核心">3. 仕組みの核心</a></li>
+<li class="lvl-3"><a href="#iap-型pomeriumとの実装差">IAP 型（Pomerium）との実装差</a></li>
+<li class="lvl-2"><a href="#4-自分で触って確認する手順実装後にこの手順で確認">4. 自分で触って確認する手順（実装後にこの手順で確認）</a></li>
+<li class="lvl-3"><a href="#手順1-controller--router-を起動し健全性を確認する">手順1: controller / router を起動し、健全性を確認する</a></li>
+<li class="lvl-3"><a href="#手順2-identity-を発行しclient--app-に-enrollment-する">手順2: identity を発行し、client / app に enrollment する</a></li>
+<li class="lvl-3"><a href="#手順3-service-と-policy-を定義する到達性の設計">手順3: service と policy を定義する（到達性の設計）</a></li>
+<li class="lvl-3"><a href="#手順4-app-側の-inbound-が閉じたままclient-からだけ到達できることを確認する学習の核心">手順4: app 側の inbound が閉じたまま、client からだけ到達できることを確認する（学習の核心）</a></li>
+<li class="lvl-3"><a href="#手順5-未認可端末は名前解決すら失敗することを確認するsdp-の核心">手順5: 未認可端末は名前解決すら失敗することを確認する（SDP の核心）</a></li>
+<li class="lvl-2"><a href="#5-考えどころ">5. 考えどころ</a></li>
+<li class="lvl-2"><a href="#6-つまずきポイント">6. つまずきポイント</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

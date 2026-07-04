@@ -26,6 +26,9 @@
       <div class="content">
 <p>Phase 1-6 をデプロイせずに、各観点の代替 OSS が <strong>arm64 で動くか</strong> を軽量に確かめる計画。
 判定結果は別タスクT7が <code>03_詳細設計/軽量検証結果_2026-07-04.md</code>（type: feasibility）に記録し、<a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/%E5%AE%9F%E8%A3%85%E5%8F%AF%E8%83%BD%E6%80%A7%E3%83%9E%E3%83%88%E3%83%AA%E3%82%AF%E3%82%B9.html">実装可能性マトリクス</a> の確度列を確定値に更新する。</p>
+<blockquote>
+<p><strong>本計画は L7 トラック（Phase 0-6）の OSS が対象。</strong> NW-ZT トラック（N1-N4: NAC/SDP-ZTNA/NDR/μセグ）の arm64 検証は別計画 <a href="%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB_nwzt.html">軽量検証計画_nwzt</a> に分離している。</p>
+</blockquote>
 <h2 id="検証の目的とスコープ" tabindex="-1">検証の目的とスコープ <a class="header-anchor" href="#検証の目的とスコープ" aria-hidden="true">#</a></h2>
 <ul>
 <li>目的: OSS 各イメージの <strong>arm64 マニフェスト有無</strong> と、要となる機能（起動・SSL bump 等）の<strong>実現見込み</strong>を確認する。</li>

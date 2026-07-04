@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Zscaler ZIA / ZPA の仕組み（クラウドプロキシと SDP）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>教材</span></nav>
+      <h1 class="doc-title">Zscaler ZIA / ZPA の仕組み（クラウドプロキシと SDP）</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">zscaler</span><span class="tag">zia</span><span class="tag">zpa</span><span class="tag">swg</span><span class="tag">sdp</span><span class="tag">ztna</span></span>
+      </div>
+      
+      <div class="content">
+<p>Zscaler は SSE の代表格で、製品が <strong>ZIA</strong> と <strong>ZPA</strong> の2本柱に分かれている。両者は「守る方向」が逆であり、この分け方を理解すると SSE の全体像が具体化する。ベンダー名を離れ、<strong>ZIA＝クラウドプロキシ型 SWG/CASB</strong>、<strong>ZPA＝SDP 型 ZTNA</strong> という技術として読む。</p>
+<h2 id="1-問題出ていく通信と入ってくるアクセスは別物" tabindex="-1">1. 問題：出ていく通信と、入ってくるアクセスは別物 <a class="header-anchor" href="#1-問題出ていく通信と入ってくるアクセスは別物" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>社員が外の Web/SaaS へ出ていく通信</strong>は、検査・フィルタ・DLP したい（マルウェア・情報漏洩対策）。→ <strong>ZIA が担当</strong>。</li>
+<li><strong>社員が社内プライベートアプリへ入っていくアクセス</strong>は、VPN を使わず最小権限で通したい。→ <strong>ZPA が担当</strong>。</li>
+</ul>
+<p>この2方向を1製品に混ぜると設計が濁る。Zscaler は明確に分けている。</p>
+<h2 id="2-ziazscaler-internet-access-クラウドプロキシ型-swgcasb" tabindex="-1">2. ZIA（Zscaler Internet Access）— クラウドプロキシ型 SWG/CASB <a class="header-anchor" href="#2-ziazscaler-internet-access-クラウドプロキシ型-swgcasb" aria-hidden="true">#</a></h2>
+<h3 id="仕組み" tabindex="-1">仕組み <a class="header-anchor" href="#仕組み" aria-hidden="true">#</a></h3>
+<p><strong>全ての外向き通信をいったん Zscaler クラウドへ送り</strong>、そこで TLS を復号して検査し、ポリシー適用してからインターネットへ出す。ユーザーがどこにいても（オフィス・自宅・出張先）通信は必ずクラウドの検査点を通る。</p>
+<pre class="mermaid">sequenceDiagram
+    participant U as ユーザー端末
+    participant Z as ZIA クラウド&lt;br/&gt;（SWG/CASB）
+    participant W as Web / SaaS
+    U-&gt;&gt;Z: (1) 外向き通信を強制的にクラウドへ
+    Z-&gt;&gt;Z: (2) TLS復号 → URL/コンテンツ検査&lt;br/&gt;マルウェア/DLP/CASBポリシー
+    Z--&gt;&gt;U: (3) ブロック or 許可判定
+    Z-&gt;&gt;W: (4) 許可された通信のみ転送
+    W--&gt;&gt;Z: (5) 応答
+    Z--&gt;&gt;U: (6) 検査後に返す
+</pre>
+<p><strong>本ラボ OSS 対応: ZIA → mitmproxy</strong>。mitmproxy は「クライアントの TLS を復号して中身を覗き、ポリシーで通す/止める」という SWG の核心動作を最小構成で再現する。arm64 対応を実測確認済み（2026-07-04）。</p>
+<h2 id="3-zpazscaler-private-access-sdp-型-ztna" tabindex="-1">3. ZPA（Zscaler Private Access）— SDP 型 ZTNA <a class="header-anchor" href="#3-zpazscaler-private-access-sdp-型-ztna" aria-hidden="true">#</a></h2>
+<h3 id="仕組み内向きを一切開けない" tabindex="-1">仕組み（内向きを一切開けない） <a class="header-anchor" href="#仕組み内向きを一切開けない" aria-hidden="true">#</a></h3>
+<p>ZPA の肝は <strong>app-connector が外向きに Zscaler クラウド（broker）へトンネルを張り出す</strong>点。社内アプリ側は<strong>内向きの受信ポートを1つも開けない</strong>。クライアントも Zscaler クラウド経由でしか到達できず、認可されるまでアプリの存在は見えない。</p>
+<pre class="mermaid">sequenceDiagram
+    participant C as クライアント&lt;br/&gt;（Z-Appエージェント）
+    participant B as Zscaler broker&lt;br/&gt;（クラウド仲介）
+    participant AC as app-connector&lt;br/&gt;（社内・外向き接続のみ）
+    participant A as プライベートアプリ&lt;br/&gt;（内向きポート0）
+    AC-&gt;&gt;B: (0) 起動時に外向きでトンネル確立
+    C-&gt;&gt;B: (1) アプリ利用要求 + ID/posture
+    B-&gt;&gt;B: (2) 認可判定（PE/PA）
+    B-&gt;&gt;AC: (3) 認可済セッションを connector 経由で確立
+    AC-&gt;&gt;A: (4) ローカルからアプリへ接続
+    A--&gt;&gt;AC--&gt;&gt;B--&gt;&gt;C: (5) 応答（全て broker 経由）
+</pre>
+<p>ポイント:</p>
+<ul>
+<li><strong>内向きポート0</strong>: アプリも connector も外部から着信を受けない。ポートスキャンに何も映らず、DDoS/直接攻撃の面が消える。</li>
+<li><strong>broker が仲介</strong>: クライアントとアプリは直接つながらず、常にクラウドの broker を介す。ここが PE/PA（判定・指令）の座。</li>
+<li><strong>アプリ単位</strong>: VPN のように「ネットワークに参加」しない。認可されたアプリにだけ、セッション単位で通る。</li>
+</ul>
+<p><strong>本ラボ OSS 対応: ZPA → OpenZiti</strong>。OpenZiti は controller（＝broker）/ router / tunneler の構成で、「内向きポートを開けず、外向きの張り出しでのみ到達」という SDP の本質を再現する。arm64 対応を実測確認済み（2026-07-04）。</p>
+<h2 id="4-商用製品--本ラボ-oss-の対応" tabindex="-1">4. 商用製品 × 本ラボ OSS の対応 <a class="header-anchor" href="#4-商用製品--本ラボ-oss-の対応" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Zscaler 製品</th>
+<th>技術分類</th>
+<th>本ラボ OSS</th>
+<th>トラック</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ZIA</td>
+<td>クラウドプロキシ型 SWG/CASB</td>
+<td>mitmproxy</td>
+<td>ZERO L7 Phase 4（既存）</td>
+</tr>
+<tr>
+<td>ZPA</td>
+<td>SDP 型 ZTNA</td>
+<td>OpenZiti</td>
+<td>NW-ZT N2</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="zia-vs-zpa-の対比方向の違い" tabindex="-1">ZIA vs ZPA の対比（方向の違い） <a class="header-anchor" href="#zia-vs-zpa-の対比方向の違い" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>観点</th>
+<th>ZIA</th>
+<th>ZPA</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>守る方向</td>
+<td>外向き（社員→Web/SaaS）</td>
+<td>内向き（社員→社内アプリ）</td>
+</tr>
+<tr>
+<td>技術</td>
+<td>プロキシ（SWG/CASB）</td>
+<td>SDP 型 ZTNA</td>
+</tr>
+<tr>
+<td>検査対象</td>
+<td>Web コンテンツ・SaaS 利用</td>
+<td>アプリへのアクセス可否</td>
+</tr>
+<tr>
+<td>ポート</td>
+<td>クラウド検査点を経由</td>
+<td>アプリ側は内向き0</td>
+</tr>
+<tr>
+<td>OSS</td>
+<td>mitmproxy</td>
+<td>OpenZiti</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="実務でこの知識がどこで効くか" tabindex="-1">実務でこの知識がどこで効くか <a class="header-anchor" href="#実務でこの知識がどこで効くか" aria-hidden="true">#</a></h2>
+<p>顧客が「Zscaler 入れたい」と言うとき、それが <strong>ZIA（Web 検査したい）なのか ZPA（VPN を廃止したい）なのか</strong>を最初に切り分けられると、設計の議論が噛み合う。両者は課金も経路設計も別物だからだ。<strong>NW エンジニアとして特に効くのは ZPA 側</strong>：「app-connector を社内のどこに置くか」「connector から見えるアプリのセグメント設計」「外向きトンネルが通る FW ルール（インバウンド不要・アウトバウンド許可）」はすべてネットワーク設計であり、Cisco の ACL/ルーティングの知識がそのまま活きる。本ラボで OpenZiti を触れば、「なぜインバウンドを開けなくて済むのか」を FW ルールのレベルで納得できる。</p>
+<h2 id="5-簡略化ポイント" tabindex="-1">5. 簡略化ポイント <a class="header-anchor" href="#5-簡略化ポイント" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>グローバルクラウドなし</strong>: 実際の ZIA/ZPA は世界中の PoP を持つ。本ラボは単一ホスト内で経路を再現するだけ。</li>
+<li><strong>posture 連動が薄い</strong>: ZPA はデバイスコンプライアンスを認可に組み込む。本ラボの OpenZiti は identity 中心（posture はモック）。</li>
+<li><strong>DLP/サンドボックスなし</strong>: mitmproxy は「復号して覗く」まで。ZIA のマルウェアサンドボックスや高度 DLP は範囲外。</li>
+</ul>
+<h2 id="6-つまずきポイント" tabindex="-1">6. つまずきポイント <a class="header-anchor" href="#6-つまずきポイント" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>ZIA と ZPA を混同</strong>: 名前が似ているが役割が真逆。IA=Internet Access（外向き）、PA=Private Access（内向き）と覚える。</li>
+<li><strong>mitmproxy の証明書</strong>: SWG 再現では復号のためにクライアントへ mitmproxy の CA を信頼させる必要がある。ここを忘れると TLS エラーで通信が止まる（本番 ZIA も同じく CA 配布が要る）。</li>
+<li><strong>OpenZiti で「つながらない」</strong>: SDP は&quot;認可されるまで見えない&quot;のが正常動作。疎通しないのを障害と誤認しやすい。まず service/policy と identity の enrollment を確認する。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="README_%E6%95%99%E6%9D%90%E3%82%AC%E3%82%A4%E3%83%89.html">教材ガイド</a></li>
+<li><a href="02_SASE_SSE_%E3%81%A8_SDP_vs_IAP.html">02 SASE/SSE と SDP vs IAP</a></li>
+<li><a href="04_PaloAlto_Prisma_NGFW.html">04 Palo Alto NGFW</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT_トラックロードマップ N2（OpenZiti）</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-問題出ていく通信と入ってくるアクセスは別物">1. 問題：出ていく通信と、入ってくるアクセスは別物</a></li>
+<li class="lvl-2"><a href="#2-ziazscaler-internet-access-クラウドプロキシ型-swgcasb">2. ZIA（Zscaler Internet Access）— クラウドプロキシ型 SWG/CASB</a></li>
+<li class="lvl-3"><a href="#仕組み">仕組み</a></li>
+<li class="lvl-2"><a href="#3-zpazscaler-private-access-sdp-型-ztna">3. ZPA（Zscaler Private Access）— SDP 型 ZTNA</a></li>
+<li class="lvl-3"><a href="#仕組み内向きを一切開けない">仕組み（内向きを一切開けない）</a></li>
+<li class="lvl-2"><a href="#4-商用製品--本ラボ-oss-の対応">4. 商用製品 × 本ラボ OSS の対応</a></li>
+<li class="lvl-3"><a href="#zia-vs-zpa-の対比方向の違い">ZIA vs ZPA の対比（方向の違い）</a></li>
+<li class="lvl-2"><a href="#実務でこの知識がどこで効くか">実務でこの知識がどこで効くか</a></li>
+<li class="lvl-2"><a href="#5-簡略化ポイント">5. 簡略化ポイント</a></li>
+<li class="lvl-2"><a href="#6-つまずきポイント">6. つまずきポイント</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

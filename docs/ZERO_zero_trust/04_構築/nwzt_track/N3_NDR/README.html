@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜N3 NDR 構築スタブ</title>
+  <link rel="stylesheet" href="../../../../assets/doc.css">
+  <link rel="stylesheet" href="../../../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>04_構築</span>
+<span class="sep">/</span>
+<span>nwzt_track</span>
+<span class="sep">/</span>
+<span>N3_NDR</span></nav>
+      <h1 class="doc-title">テーマZERO｜N3 NDR 構築スタブ</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">ndr</span><span class="tag">netflow</span><span class="tag">zeek</span><span class="tag">suricata</span><span class="tag">siem</span></span>
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>今回スコープでは<strong>未デプロイ</strong>（設計値）。このスタブは実装着手時の作業起点。詳細な定義・比較表は <a href="../../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT トラックロードマップ</a> N3 を正とする。</p>
+</blockquote>
+<h2 id="目的" tabindex="-1">目的 <a class="header-anchor" href="#目的" aria-hidden="true">#</a></h2>
+<p>east-west を含む通信を可視化し、フロー統計と DPI（Deep Packet Inspection）振る舞いから異常を検知して SIEM に集約する。「侵害前提（assume breach）」の検知面を成立させる。</p>
+<h2 id="コンポーネント" tabindex="-1">コンポーネント <a class="header-anchor" href="#コンポーネント" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>役割</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Zeek / Suricata</td>
+<td>ミラーからの DPI・振る舞い検知</td>
+</tr>
+<tr>
+<td>goflow2</td>
+<td>NetFlow/IPFIX の収集</td>
+</tr>
+<tr>
+<td>ntopng / ElastiFlow</td>
+<td>フロー可視化</td>
+</tr>
+<tr>
+<td>既存 Loki/Grafana（ZERO Phase 3）</td>
+<td>ログ・メトリクスの集約先ダッシュボード</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="依存" tabindex="-1">依存 <a class="header-anchor" href="#依存" aria-hidden="true">#</a></h2>
+<ul>
+<li>ZERO Phase 3（Loki/Grafana）。フロー/DPI ログの集約先として既存構築を再利用する。</li>
+<li>ミラーポートまたは NetFlow の出力源として IOL または OVS が必要。</li>
+</ul>
+<h2 id="ゲート条件次へ進む条件" tabindex="-1">ゲート条件（次へ進む条件） <a class="header-anchor" href="#ゲート条件次へ進む条件" aria-hidden="true">#</a></h2>
+<ul>
+<li>ミラーポートまたは NetFlow エクスポートから異常フロー（想定外の east-west 通信、スキャン挙動等）を検知できる。</li>
+<li>検知結果を Loki/Grafana のダッシュボードで可視化できる。</li>
+</ul>
+<h2 id="実装先" tabindex="-1">実装先 <a class="header-anchor" href="#実装先" aria-hidden="true">#</a></h2>
+<p><strong>テーマ42（フロー可視化＆NDR）</strong>。<a href="../../../../%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97/PHASE2_MODERN_ENTERPRISE.html">ロードマップPHASE2</a> を入口として参照する。テーマ35（Faucet）がミラー環境の補助として使える場合がある。</p>
+<h2 id="実装時の作業リスト" tabindex="-1">実装時の作業リスト <a class="header-anchor" href="#実装時の作業リスト" aria-hidden="true">#</a></h2>
+<ul>
+<li>[ ] ミラーポートまたは NetFlow/IPFIX エクスポートの設定（IOL または OVS 側）</li>
+<li>[ ] goflow2 のデプロイとフロー収集の疎通確認</li>
+<li>[ ] Zeek/Suricata のデプロイと DPI ルール適用</li>
+<li>[ ] ntopng / ElastiFlow のデプロイとフロー可視化確認</li>
+<li>[ ] 既存 Loki/Grafana（ZERO Phase 3）への連携設定</li>
+<li>[ ] 想定外の east-west 通信を意図的に発生させ検知できることを確認</li>
+<li>[ ] スキャン挙動を模擬し検知できることを確認</li>
+<li>[ ] Grafana ダッシュボードでの可視化確認</li>
+</ul>
+<h2 id="学べること" tabindex="-1">学べること <a class="header-anchor" href="#学べること" aria-hidden="true">#</a></h2>
+<p>フロー可視化と DPI 振る舞い検知の役割分担、SIEM 連携の実務、Palo Alto Content-ID や Darktrace 系 NDR 製品の内部構造理解、NetFlow/IPFIX の実務知識。</p>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT トラックロードマップ</a></li>
+<li><a href="../../../../%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97/PHASE2_MODERN_ENTERPRISE.html">ロードマップPHASE2</a></li>
+<li><a href="../README_nwzt_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF.html">親スタブ</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#目的">目的</a></li>
+<li class="lvl-2"><a href="#コンポーネント">コンポーネント</a></li>
+<li class="lvl-2"><a href="#依存">依存</a></li>
+<li class="lvl-2"><a href="#ゲート条件次へ進む条件">ゲート条件（次へ進む条件）</a></li>
+<li class="lvl-2"><a href="#実装先">実装先</a></li>
+<li class="lvl-2"><a href="#実装時の作業リスト">実装時の作業リスト</a></li>
+<li class="lvl-2"><a href="#学べること">学べること</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

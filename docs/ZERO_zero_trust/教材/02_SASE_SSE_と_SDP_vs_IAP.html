@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>SASE / SSE と、SDP vs IAP（ZTNA の2つの型）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>教材</span></nav>
+      <h1 class="doc-title">SASE / SSE と、SDP vs IAP（ZTNA の2つの型）</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">sase</span><span class="tag">sse</span><span class="tag">sdp</span><span class="tag">iap</span><span class="tag">ztna</span><span class="tag">pomerium</span><span class="tag">openziti</span></span>
+      </div>
+      
+      <div class="content">
+<p>商用 ZT の分類でまず出てくるのが <strong>SASE / SSE</strong> という枠と、その中の <strong>ZTNA</strong> である。そして ZTNA には技術的に大きく異なる2つの型 —— <strong>SDP 型</strong>と <strong>IAP 型</strong> —— がある。この違いを押さえると、Zscaler ZPA と BeyondCorp 系の設計思想の差が一気に見えてくる。</p>
+<h2 id="1-問題機能がバラバラに存在していた" tabindex="-1">1. 問題：機能がバラバラに存在していた <a class="header-anchor" href="#1-問題機能がバラバラに存在していた" aria-hidden="true">#</a></h2>
+<p>かつては SWG（Web プロキシ）、CASB（SaaS 可視化）、FW、リモートアクセス VPN が別々の製品・別々の経路だった。ユーザーはオフィスに VPN で戻ってから社外へ出る（ヘアピン）など、経路が非効率で、ポリシーも製品ごとにバラバラだった。**「境界がクラウドに溶けた世界で、これらを一箇所のクラウドサービスに束ねられないか」**が SASE/SSE の出発点である。</p>
+<h2 id="2-仕組みsase-と-sse-の構成要素" tabindex="-1">2. 仕組み：SASE と SSE の構成要素 <a class="header-anchor" href="#2-仕組みsase-と-sse-の構成要素" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>SASE（Secure Access Service Edge）</strong> = ネットワーク（SD-WAN）+ セキュリティをクラウドエッジで統合する枠組み。</li>
+<li><strong>SSE（Security Service Edge）</strong> = SASE から SD-WAN を除いた<strong>セキュリティ部分だけ</strong>の呼称。実務ではこちらが ZT の議論の中心。</li>
+</ul>
+<p>SSE の主な構成要素は次の4つ。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>構成要素</th>
+<th>役割</th>
+<th>本ラボ OSS 対応</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>SWG</strong>（Secure Web Gateway）</td>
+<td>外向き Web 通信のプロキシ・検査・フィルタ</td>
+<td>mitmproxy（ZERO L7 Phase 4）</td>
+</tr>
+<tr>
+<td><strong>CASB</strong>（Cloud Access Security Broker）</td>
+<td>SaaS 利用の可視化・制御・DLP</td>
+<td>mitmproxy で簡易再現（ZERO L7）</td>
+</tr>
+<tr>
+<td><strong>ZTNA</strong>（Zero Trust Network Access）</td>
+<td>アプリ単位のリモートアクセス（VPN 代替）</td>
+<td>Pomerium(IAP) / OpenZiti(SDP)</td>
+</tr>
+<tr>
+<td><strong>FWaaS</strong>（Firewall as a Service）</td>
+<td>クラウド提供の FW</td>
+<td>本ラボ範囲外（NW-ZT で NGFW 検査を Suricata 代替）</td>
+</tr>
+</tbody>
+</table></div>
+<pre class="mermaid">graph TD
+    user[&quot;ユーザー / デバイス&quot;]
+    subgraph &quot;SSE（クラウドエッジ）&quot;
+      SWG[&quot;SWG&lt;br/&gt;Web検査&quot;]
+      CASB[&quot;CASB&lt;br/&gt;SaaS制御&quot;]
+      ZTNA[&quot;ZTNA&lt;br/&gt;アプリ単位アクセス&quot;]
+      FWaaS[&quot;FWaaS&quot;]
+    end
+    web[&quot;インターネット / Web&quot;]
+    saas[&quot;SaaS&quot;]
+    priv[&quot;社内プライベートアプリ&quot;]
+    user --&gt; SWG --&gt; web
+    user --&gt; CASB --&gt; saas
+    user --&gt; ZTNA --&gt; priv
+</pre>
+<h2 id="3-核心ztna-の2つの型--sdp-vs-iap" tabindex="-1">3. 核心：ZTNA の2つの型 — SDP vs IAP <a class="header-anchor" href="#3-核心ztna-の2つの型--sdp-vs-iap" aria-hidden="true">#</a></h2>
+<p>ZTNA は「VPN の代わりにアプリ単位で最小権限アクセスさせる」技術だが、実装の型が2つある。<strong>この差が本教材で最も重要</strong>。</p>
+<h3 id="iap-型identity-aware-proxy-アプリの前に関所を置く" tabindex="-1">IAP 型（Identity-Aware Proxy）— アプリの前に関所を置く <a class="header-anchor" href="#iap-型identity-aware-proxy-アプリの前に関所を置く" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>仕組み</strong>: 保護対象アプリの前に<strong>リバースプロキシ</strong>を置き、そこで認証・認可してから背後のアプリへ転送する。ユーザーはプロキシの URL にアクセスする。</li>
+<li><strong>代表</strong>: Google BeyondCorp 系、本ラボの <strong>Pomerium</strong>。</li>
+<li><strong>特徴</strong>: アプリはプロキシの背後にいるが、<strong>プロキシ自身は外から到達可能なポートを開けている</strong>（HTTPS 443 など）。関所が&quot;開いた入口&quot;として存在する。</li>
+</ul>
+<h3 id="sdp-型software-defined-perimeter-内向きポートを一切開けない" tabindex="-1">SDP 型（Software-Defined Perimeter）— 内向きポートを一切開けない <a class="header-anchor" href="#sdp-型software-defined-perimeter-内向きポートを一切開けない" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>仕組み</strong>: アプリ側に <strong>connector（コネクタ）</strong> を置き、connector が<strong>外向きに</strong> broker（コントローラ）へトンネルを張り出す。アプリ側は<strong>内向きの受信ポートを1つも開けない</strong>。クライアントも broker 経由でしか到達できず、認可されるまで<strong>アプリの存在自体が見えない</strong>（名前解決もできない、暗黙拒否）。</li>
+<li><strong>代表</strong>: Zscaler ZPA、Cisco Secure Access、本ラボの <strong>OpenZiti</strong>。</li>
+<li><strong>特徴</strong>: 「開いていないものは攻撃できない」。ポートスキャンに何も映らない。</li>
+</ul>
+<pre class="mermaid">graph LR
+    subgraph &quot;IAP型（Pomerium）&quot;
+      c1[&quot;client&quot;] --&gt;|443へアクセス| iap[&quot;IAP&lt;br/&gt;（開いた関所）&quot;]
+      iap --&gt;|認可後転送| a1[&quot;app&quot;]
+    end
+    subgraph &quot;SDP型（OpenZiti / ZPA）&quot;
+      c2[&quot;client&quot;] --&gt;|broker経由のみ| brk[&quot;broker/controller&quot;]
+      conn[&quot;connector&lt;br/&gt;（app側・外向き接続）&quot;] --&gt;|外向きに張り出し| brk
+      conn --&gt; a2[&quot;app&lt;br/&gt;（内向きポート0）&quot;]
+    end
+</pre>
+<h3 id="決定的な違い一覧" tabindex="-1">決定的な違い（一覧） <a class="header-anchor" href="#決定的な違い一覧" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>観点</th>
+<th>IAP 型</th>
+<th>SDP 型</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>アプリ側の受信ポート</td>
+<td>プロキシは開く（443等）</td>
+<td><strong>一切開けない</strong>（外向き接続のみ）</td>
+</tr>
+<tr>
+<td>攻撃面</td>
+<td>プロキシが露出</td>
+<td>ポートスキャンに映らない</td>
+</tr>
+<tr>
+<td>到達経路</td>
+<td>プロキシへ直接</td>
+<td>broker/connector 経由のみ</td>
+</tr>
+<tr>
+<td>未認可時</td>
+<td>認証画面までは見える</td>
+<td><strong>存在自体が見えない</strong></td>
+</tr>
+<tr>
+<td>本ラボ OSS</td>
+<td>Pomerium</td>
+<td>OpenZiti</td>
+</tr>
+<tr>
+<td>主な対象</td>
+<td>Web アプリ（HTTP/S）</td>
+<td>TCP 全般・非 Web も可</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="4-商用製品--本ラボ-oss-の対応" tabindex="-1">4. 商用製品 × 本ラボ OSS の対応 <a class="header-anchor" href="#4-商用製品--本ラボ-oss-の対応" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>技術</th>
+<th>商用代表</th>
+<th>本ラボ OSS</th>
+<th>トラック</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IAP 型 ZTNA</td>
+<td>(BeyondCorp 系)</td>
+<td>Pomerium</td>
+<td>ZERO L7 Phase 2（既存）</td>
+</tr>
+<tr>
+<td>SDP 型 ZTNA</td>
+<td>Zscaler ZPA / Cisco Secure Access</td>
+<td>OpenZiti（発展: Headscale/Netbird）</td>
+<td>NW-ZT N2</td>
+</tr>
+<tr>
+<td>SWG</td>
+<td>Zscaler ZIA / Netskope</td>
+<td>mitmproxy</td>
+<td>ZERO L7 Phase 4（既存）</td>
+</tr>
+<tr>
+<td>CASB</td>
+<td>Netskope / Zscaler</td>
+<td>mitmproxy（簡易）</td>
+<td>ZERO L7（既存）</td>
+</tr>
+</tbody>
+</table></div>
+<p>いずれの OSS も arm64 ネイティブ対応を実測確認済み（pomerium / mitmproxy / openziti、2026-07-04）。</p>
+<h2 id="実務でこの知識がどこで効くか" tabindex="-1">実務でこの知識がどこで効くか <a class="header-anchor" href="#実務でこの知識がどこで効くか" aria-hidden="true">#</a></h2>
+<p>RFP や製品比較で「弊社は真のゼロトラスト（VPN と違いポートを開けません）」という主張を見たとき、それが <strong>SDP 型を指している</strong>と即座に翻訳できる。逆に「既存 Web アプリの前に置くだけ」という製品は <strong>IAP 型</strong>であり、非 Web の TCP アプリには効かないと分かる。<strong>NW エンジニアとして「保護対象が Web か / TCP 全般か」「ポートを開けられる DMZ があるか / 完全に閉じたいか」で型を選ぶ</strong>——この判断軸を持てることが、ZTNA 製品選定の議論に技術者として入るための土台になる。本ラボでは Pomerium と OpenZiti を両方触ることで、この差を&quot;手で&quot;理解できる。</p>
+<h2 id="5-簡略化ポイント" tabindex="-1">5. 簡略化ポイント <a class="header-anchor" href="#5-簡略化ポイント" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>クラウド分散なし</strong>: 商用 SSE はグローバル PoP でユーザー近傍に関所を置く。本ラボは単一ホスト内の再現。</li>
+<li><strong>CASB は簡易</strong>: mitmproxy で「SaaS 通信を覗く」ところまで。本番 CASB の API 連携・DLP・シャドー IT 検出は範囲外。</li>
+<li><strong>SDP の enrollment 簡略</strong>: OpenZiti の identity 発行は最小構成。本番 ZPA のデバイス posture 連動は N2 発展扱い。</li>
+</ul>
+<h2 id="6-つまずきポイント" tabindex="-1">6. つまずきポイント <a class="header-anchor" href="#6-つまずきポイント" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>SASE と SSE を混同</strong>: SASE は SD-WAN を含む、SSE は含まない。ZT の文脈で製品を見るときは SSE で足りることが多い。</li>
+<li><strong>IAP を SDP と誤認</strong>: 「ゼロトラスト＝ポートを開けない」と思い込むと Pomerium(IAP) が ZTNA でないように見えるが、IAP も立派な ZTNA。型が違うだけ。</li>
+<li><strong>ZTNA が VPN の完全上位互換だと思う</strong>: SDP 型でもレイテンシや対応プロトコルの制約がある。用途で使い分ける前提を忘れない。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="README_%E6%95%99%E6%9D%90%E3%82%AC%E3%82%A4%E3%83%89.html">教材ガイド</a></li>
+<li><a href="01_%E3%82%BC%E3%83%AD%E3%83%88%E3%83%A9%E3%82%B9%E3%83%88%E5%8E%9F%E8%AB%96_NIST_SP_800-207.html">01 NIST SP 800-207</a></li>
+<li><a href="03_Zscaler_ZIA_ZPA.html">03 Zscaler ZIA/ZPA</a></li>
+<li><a href="../%E8%A7%A3%E8%AA%AC/phase2_%E8%A7%A3%E8%AA%AC.html">phase2_解説（Pomerium=IAP の実装）</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT_トラックロードマップ N2（OpenZiti=SDP）</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-問題機能がバラバラに存在していた">1. 問題：機能がバラバラに存在していた</a></li>
+<li class="lvl-2"><a href="#2-仕組みsase-と-sse-の構成要素">2. 仕組み：SASE と SSE の構成要素</a></li>
+<li class="lvl-2"><a href="#3-核心ztna-の2つの型--sdp-vs-iap">3. 核心：ZTNA の2つの型 — SDP vs IAP</a></li>
+<li class="lvl-3"><a href="#iap-型identity-aware-proxy-アプリの前に関所を置く">IAP 型（Identity-Aware Proxy）— アプリの前に関所を置く</a></li>
+<li class="lvl-3"><a href="#sdp-型software-defined-perimeter-内向きポートを一切開けない">SDP 型（Software-Defined Perimeter）— 内向きポートを一切開けない</a></li>
+<li class="lvl-3"><a href="#決定的な違い一覧">決定的な違い（一覧）</a></li>
+<li class="lvl-2"><a href="#4-商用製品--本ラボ-oss-の対応">4. 商用製品 × 本ラボ OSS の対応</a></li>
+<li class="lvl-2"><a href="#実務でこの知識がどこで効くか">実務でこの知識がどこで効くか</a></li>
+<li class="lvl-2"><a href="#5-簡略化ポイント">5. 簡略化ポイント</a></li>
+<li class="lvl-2"><a href="#6-つまずきポイント">6. つまずきポイント</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

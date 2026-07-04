@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>N4 解説 — μセグメンテーション（IOL VLAN/ACL + nftables）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>解説</span></nav>
+      <h1 class="doc-title">N4 解説 — μセグメンテーション（IOL VLAN/ACL + nftables）</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">explainer</span><span class="tag">microsegmentation</span><span class="tag">trustsec</span><span class="tag">nftables</span></span>
+      </div>
+      
+      <div class="content">
+<h2 id="1-このフェーズで何が実現されるか" tabindex="-1">1. このフェーズで何が実現されるか <a class="header-anchor" href="#1-このフェーズで何が実現されるか" aria-hidden="true">#</a></h2>
+<p>N4 では同一ゾーン（同一 VLAN・同一サブネット）内の端末同士の east-west 通信を、許可リスト方式で最小権限化する。「業務 VLAN に入れた＝何にでも到達してよい」ではなく、「業務 VLAN 内でも、A と B は話してよいが、A と C は話してはいけない」という粒度まで絞る。侵害端末が同一セグメント内を横に広がる動き（ラテラルムーブメント）を物理的に困難にする。N1 で作った VLAN 基盤の<strong>内側</strong>をさらに細分するのが N4。</p>
+<ul>
+<li><strong>ビフォー</strong>: N1 で認証を通り業務 VLAN（172.31.10.0/24）に入った端末同士は、同一サブネット内なので自由に ping も接続もできる。1 台が侵害されると、そこを踏み台に同 VLAN の全端末へ横移動できてしまう。</li>
+<li><strong>アフター</strong>: 同一 VLAN 内でも、許可リストにない端末間の通信は遮断される。侵害された 1 台から隣の端末への ping が通らず、横移動が「その 1 台の中で止まる」。</li>
+</ul>
+<p>これは N1（入口を締める）を前提に、その<strong>先の内部通信</strong>を締める最後の一手。ゼロトラストの「侵害は起きる前提」を、ネットワークの内側で成立させる。</p>
+<h2 id="2-なぜこの構成か" tabindex="-1">2. なぜこの構成か <a class="header-anchor" href="#2-なぜこの構成か" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>観点</th>
+<th>商用製品</th>
+<th>本ラボの OSS 選定</th>
+<th>選定理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>μセグメンテーション</td>
+<td>Cisco TrustSec/SGT, Illumio</td>
+<td><strong>Cisco IOL VLAN/ACL + ホスト nftables</strong></td>
+<td>ネットワーク層（IOL の VLAN 間 ACL）とホスト層（nftables の分散 FW）の二層で、TrustSec の「タグベース制御」と Illumio の「ホスト側分散適用・中央管理」の両思想を追体験できる</td>
+</tr>
+</tbody>
+</table></div>
+<p>なぜ「ネットワーク層（IOL ACL）」と「ホスト層（nftables）」の二層で組むか:</p>
+<ul>
+<li><strong>商用 μセグは大きく 2 系統</strong>。Cisco TrustSec は <strong>ネットワーク機器側</strong>で SGT（Security Group Tag）を付与し、機器の SGACL で制御する（ネットワーク中心）。Illumio は各 <strong>ホストに常駐エージェント</strong>を入れ、ホスト自身のファイアウォールを中央から一括制御する（ホスト中心・分散適用）。N4 で IOL ACL と nftables を両方置くのは、この 2 つの適用点の違いを手で確認するため。</li>
+<li><strong>VLAN 間と VLAN 内で効かせる層が違う</strong>。VLAN を<strong>またぐ</strong>通信は L3 スイッチ/ルータの ACL で止められるが、<strong>同一 VLAN 内</strong>（L2、同一ブロードキャストドメイン）の端末間通信はルータを経由しないため L3 ACL では止まらない。ここを止めるにはホスト側の nftables（または PVLAN/L2 ACL）が要る。二層構成はこの「VLAN 間は ACL、VLAN 内はホスト FW」という役割分担そのもの。</li>
+</ul>
+<p><strong>実務でこの知識がどこで効くか</strong>: Cisco 実務なら VLAN 間 ACL（<code>ip access-list</code> を SVI に適用）は書いたことがあるはず。だが「同一 VLAN 内の端末同士を止めたい」と言われたとき、L3 ACL では止まらないことに気づけるかが分かれ目。N4 はこの「同一セグメント内の横移動をどう止めるか」を、PVLAN/ホスト FW という具体で体験する。TrustSec を提案する案件で「なぜ IP ベース ACL でなくタグベースなのか（IP が変わっても追随する）」を説明でき、Illumio のような分散 FW 製品の PoC で「エージェント方式の中央管理とは結局ホストの iptables/nftables を一括で書くこと」だと中身から理解できる。ゼロトラスト設計で必ず問われる「ラテラルムーブメントをどこで止めるか」への具体的な答えを持てる。</p>
+<h2 id="3-仕組みの核心" tabindex="-1">3. 仕組みの核心 <a class="header-anchor" href="#3-仕組みの核心" aria-hidden="true">#</a></h2>
+<p>VLAN をまたぐ通信はネットワーク層の ACL で、同一 VLAN 内の通信はホスト層の nftables で止める。この二層の役割分担が N4 の核心。</p>
+<pre class="mermaid">graph TB
+    subgraph BIZ[&quot;業務VLAN 172.31.10.0/24（同一L2セグメント）&quot;]
+        A[&quot;端末A&lt;br/&gt;nftables: Bのみ許可&quot;]
+        B[&quot;端末B&lt;br/&gt;nftables: Aのみ許可&quot;]
+        C[&quot;端末C&lt;br/&gt;nftables: 既定拒否&quot;]
+    end
+    subgraph OTHER[&quot;別VLAN 172.31.20.0/24&quot;]
+        D[&quot;端末D&quot;]
+    end
+    A --&gt;|&quot;許可（許可リストに有）&quot;| B
+    A -.-&gt;|&quot;遮断（ホストnftablesで拒否）&quot;| C
+    A -.-&gt;|&quot;遮断（IOL VLAN間ACLで拒否）&quot;| D
+    classDef blocked stroke-dasharray: 5 5
+</pre>
+<p>二層の役割:</p>
+<ul>
+<li><strong>L2/L3 層（IOL VLAN 間 ACL）= VLAN をまたぐ制御</strong>。SVI（VLAN インターフェース）に ACL を適用し、業務 VLAN → 別 VLAN の到達を許可リストで絞る。ルータ/L3 スイッチを経由する通信だけが対象。TrustSec ならここが SGT/SGACL に置き換わる（IP でなくタグで判定）。</li>
+<li><strong>ホスト層（nftables）= VLAN 内の端末間制御</strong>。同一 VLAN 内の端末同士はルータを経由しない（L2 で直結）ため、L3 ACL では止まらない。各ホストの nftables で「自分が受け入れてよい相手」を許可リスト化する。これが Illumio 的な分散 FW の中央管理思想——制御点を各ホストに分散配置し、ポリシーは中央で一元管理——の実体。</li>
+</ul>
+<p>ポイント:</p>
+<ul>
+<li><strong>「認証を通った」と「何にでも到達してよい」は別</strong>。N1 で業務 VLAN に入れることと、その VLAN 内の全端末に到達してよいことは無関係。N4 はこの区別を通信レベルで強制する。ゼロトラストの「最小権限」を east-west に適用する箇所。</li>
+<li><strong>既定拒否（default deny）が原則</strong>。許可リストに無い通信は落とす。端末 C は「誰からも指定されていない」ので、A からも B からも到達できない。ホワイトリスト方式にすることで、新たな横移動経路が勝手に生えない。</li>
+<li><strong>IP でなく「役割」で書きたい</strong>。IP ベースの許可リストは端末が増減・再割当されると破綻する。TrustSec の SGT はこれを「役割タグ」で解決する（IP が変わってもタグが同じなら同じ扱い）。N4 の nftables は IP ベースで機序を体験し、その限界から「なぜタグベースが要るか」を理解する。</li>
+</ul>
+<h2 id="4-自分で触って確認する手順実装後にこの手順で確認" tabindex="-1">4. 自分で触って確認する手順（実装後にこの手順で確認） <a class="header-anchor" href="#4-自分で触って確認する手順実装後にこの手順で確認" aria-hidden="true">#</a></h2>
+<p>N4 は今回スコープでは未デプロイ（設計値）。N1 の VLAN 基盤が前提。実装後、以下の手順でゲート条件（同一 VLAN 内で許可リスト外の端末間 ping が遮断され、横移動が止まる）を段階的に確認する想定。IOL 側の ACL 設定は概念と主要コマンドに留める。</p>
+<h3 id="手順1-μセグ適用前の素通し状態を先に確認する対照の基準づくり" tabindex="-1">手順1: μセグ適用前の「素通し」状態を先に確認する（対照の基準づくり） <a class="header-anchor" href="#手順1-μセグ適用前の素通し状態を先に確認する対照の基準づくり" aria-hidden="true">#</a></h3>
+<p>まず制御を入れる前に、同一 VLAN 内が自由に通ることを記録しておく。これが「止まった」を証明する対照基準になる。</p>
+<pre><code class="language-bash"><span class="hljs-comment"># 端末A → 端末B（同一VLAN内）</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-hostA ping -c3 &lt;hostB-ip&gt;
+<span class="hljs-comment"># 端末A → 端末C（同一VLAN内）</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-hostA ping -c3 &lt;hostC-ip&gt;
+</code></pre>
+<p>期待結果: この時点では A→B、A→C とも 3/3 応答（同一サブネットなので素通し）。<strong>「制御前は全部通る」を先に記録する</strong>のが、後で「止まった」を明確にするための起点。</p>
+<h3 id="手順2-ホスト-nftables-で許可リスト既定拒否を適用する" tabindex="-1">手順2: ホスト nftables で許可リスト（既定拒否）を適用する <a class="header-anchor" href="#手順2-ホスト-nftables-で許可リスト既定拒否を適用する" aria-hidden="true">#</a></h3>
+<p>各ホストで、受け入れてよい相手だけを許可し、それ以外を落とす。</p>
+<pre><code class="language-bash"><span class="hljs-comment"># 端末B: Aからの通信だけ許可、他は既定拒否（概念）</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-hostB nft add table inet microseg
+docker <span class="hljs-built_in">exec</span> clab-nwzt-hostB nft add chain inet microseg input <span class="hljs-string">&#x27;{ type filter hook input priority 0 ; policy drop ; }&#x27;</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-hostB nft add rule inet microseg input ip saddr &lt;hostA-ip&gt; accept
+docker <span class="hljs-built_in">exec</span> clab-nwzt-hostB nft add rule inet microseg input ct state established,related accept
+</code></pre>
+<p>端末 C にも同様に「既定拒否・A からの明示許可なし」を適用する。<strong>制御点を各ホストに分散配置し、許可リストを書く</strong>のが Illumio 的分散 FW の実体だと確認する。</p>
+<h3 id="手順3-許可リスト外の端末間-ping-が遮断されることを確認する学習の核心" tabindex="-1">手順3: 許可リスト外の端末間 ping が遮断されることを確認する（学習の核心） <a class="header-anchor" href="#手順3-許可リスト外の端末間-ping-が遮断されることを確認する学習の核心" aria-hidden="true">#</a></h3>
+<pre><code class="language-bash"><span class="hljs-comment"># 端末A → 端末B（許可リストに有）→ 通るべき</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-hostA ping -c3 &lt;hostB-ip&gt;
+<span class="hljs-comment"># 端末A → 端末C（許可リストに無）→ 止まるべき</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-hostA ping -c3 &lt;hostC-ip&gt;
+</code></pre>
+<p>期待結果: A→B は通り、<strong>A→C は同一 VLAN 内なのに遮断される</strong>（100% packet loss）。手順1 では両方通っていたのが、C だけ止まる。<strong>「同一セグメント内でも、許可リスト次第で到達可否が変わる」</strong>——ゼロトラストの east-west 最小権限——を対照で体感するのがこの手順の核心。</p>
+<h3 id="手順4-侵害端末からの横移動が止まるシナリオを確認する" tabindex="-1">手順4: 侵害端末からの横移動が止まるシナリオを確認する <a class="header-anchor" href="#手順4-侵害端末からの横移動が止まるシナリオを確認する" aria-hidden="true">#</a></h3>
+<p>端末 A が侵害されたと仮定し、そこから同一 VLAN 内を広くスキャン・接続しようとする動きを再現する。</p>
+<pre><code class="language-bash"><span class="hljs-comment"># 侵害を想定した端末Aから、同一VLAN全体へ横移動を試みる</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-hostA nmap -sn 172.31.10.0/24
+docker <span class="hljs-built_in">exec</span> clab-nwzt-hostA nmap -p 22,80,445 &lt;hostC-ip&gt;
+</code></pre>
+<p>期待結果: A から許可リストに載っている相手（B）以外は応答せず、スキャンが空振りする。<strong>「1 台が侵害されても、そこから隣へ広がれない」</strong>＝横移動の封じ込め。侵害の影響がその 1 台に閉じることを確認する。</p>
+<h3 id="手順5-vlan-間-acliolも併せて確認する二層目" tabindex="-1">手順5: VLAN 間 ACL（IOL）も併せて確認する（二層目） <a class="header-anchor" href="#手順5-vlan-間-acliolも併せて確認する二層目" aria-hidden="true">#</a></h3>
+<p>同一 VLAN 内はホスト nftables で、VLAN をまたぐ通信は IOL の ACL で止まることを確認する。</p>
+<pre><code class="language-text">! 業務VLAN(10)→別VLAN(20)を許可リストで絞る（概念）
+ip access-list extended BIZ-TO-OTHER
+ permit tcp 172.31.10.0 0.0.0.255 host 172.31.20.10 eq 443
+ deny   ip 172.31.10.0 0.0.0.255 172.31.20.0 0.0.0.255
+interface Vlan10
+ ip access-group BIZ-TO-OTHER out
+</code></pre>
+<pre><code class="language-bash"><span class="hljs-comment"># 端末A(VLAN10) → 端末D(VLAN20) の許可外ポート → IOL ACL で遮断</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-hostA curl -sv --connect-timeout 3 http://&lt;hostD-ip&gt;/
+</code></pre>
+<p>期待結果: VLAN をまたぐ通信は IOL の SVI ACL で、VLAN 内は nftables で止まる。<strong>「またぐ制御はネットワーク層、内側の制御はホスト層」という二層の分担</strong>を、遮断される場所の違いで確認する。</p>
+<h2 id="5-考えどころ" tabindex="-1">5. 考えどころ <a class="header-anchor" href="#5-考えどころ" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>本番設計ならどうするか</strong>: 本番の TrustSec は SGT を認証時（N1 の RADIUS）に付与し、機器間で伝播させて SGACL で一元制御する（IP に依存しない役割ベース）。Illumio はホストエージェントを全台に配り、依存関係マップから推奨ポリシーを自動生成し、中央コンソールで一括適用・可視化する。N4 は IP ベースの nftables と ACL で機序を体験し、その手作業感から「なぜ商用はタグ/エージェントで自動化するのか」を逆算する。</li>
+<li><strong>N1 との連携（タグ付与の起点）</strong>: 本来 SGT は N1 の認証時に RADIUS で付与するのが筋。N4 の μセグは N1 の VLAN 基盤に乗るだけでなく、「認証時に役割を決め、その役割で内部到達性を制御する」という TrustSec の全体像を、N1+N4 を繋いで理解できる。</li>
+<li><strong>このラボの簡略化ポイント</strong>:
+<ul>
+<li><strong>タグベースでなく IP ベース</strong>。SGT/SGACL の自動伝播は扱わず、IP 直書きの許可リストで機序を体験する（本番はここが破綻するのでタグ化する）。</li>
+<li><strong>中央管理コンソールなし</strong>。各ホストの nftables を手で書く。Illumio 的な「依存関係マップ→ポリシー自動生成→一括配布」の運用面は再現しない。</li>
+<li><strong>PVLAN は簡略</strong>。同一 VLAN 内分離は本来 Private VLAN（isolated/community port）でも実現できるが、N4 ではホスト nftables を主軸に体験する。</li>
+</ul>
+</li>
+</ul>
+<h2 id="6-つまずきポイント" tabindex="-1">6. つまずきポイント <a class="header-anchor" href="#6-つまずきポイント" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>nftables を入れたのに全通信が止まる/全部通る</strong>: <a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a> の層別で言えば「到達（ホスト FW）」の設定ミス。既定ポリシー（<code>policy drop</code>）を入れたのに <code>ct state established,related accept</code> を書き忘れると戻りパケットが落ちて双方向通信が壊れる。逆に既定を accept のままにすると許可リストが効かない。<strong>まず素の疎通（手順1）を基準に、1 ルールずつ効果を確認する</strong>。</li>
+<li><strong>同一 VLAN 内なのに IOL ACL で止めようとして止まらない</strong>: 最頻の誤解。同一 VLAN 内の通信はルータ/SVI を経由しないため、SVI に当てた L3 ACL は通らない。同一 VLAN 内はホスト nftables か PVLAN で止める、という層の切り分けを最初に確認する。</li>
+<li><strong>VLAN 間 ACL の方向（in/out）が逆</strong>: SVI への <code>ip access-group</code> の in/out を取り違えると、意図と逆方向を絞ってしまう。トラフィックの向きと SVI から見た in/out を図に描いて確認する。</li>
+<li>事象は <a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a> を複製して 1 件ずつ記録する。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT_トラックロードマップ</a>（N4 の位置づけ・N1 依存）</li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">NW-ZT_論理構成設計</a>（N4 概略・アドレス設計）</li>
+<li><a href="../%E6%95%99%E6%9D%90/05_Cisco_ISE_TrustSec_SecureAccess.html">教材: Cisco ISE/TrustSec/Secure Access</a></li>
+<li><a href="../%E6%95%99%E6%9D%90/07_%E5%95%86%E7%94%A8%E8%A3%BD%E5%93%81_OSS%E5%AF%BE%E5%BF%9C%E8%A1%A8.html">教材: 商用製品→OSS 対応表</a></li>
+<li><a href="../04_%E6%A7%8B%E7%AF%89/nwzt_track/N4_microseg/">N4 構築スタブ</a></li>
+<li><a href="nwzt_N1_%E8%A7%A3%E8%AA%AC.html">nwzt_N1_解説（VLAN 基盤の前提）</a></li>
+<li><a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-このフェーズで何が実現されるか">1. このフェーズで何が実現されるか</a></li>
+<li class="lvl-2"><a href="#2-なぜこの構成か">2. なぜこの構成か</a></li>
+<li class="lvl-2"><a href="#3-仕組みの核心">3. 仕組みの核心</a></li>
+<li class="lvl-2"><a href="#4-自分で触って確認する手順実装後にこの手順で確認">4. 自分で触って確認する手順（実装後にこの手順で確認）</a></li>
+<li class="lvl-3"><a href="#手順1-μセグ適用前の素通し状態を先に確認する対照の基準づくり">手順1: μセグ適用前の「素通し」状態を先に確認する（対照の基準づくり）</a></li>
+<li class="lvl-3"><a href="#手順2-ホスト-nftables-で許可リスト既定拒否を適用する">手順2: ホスト nftables で許可リスト（既定拒否）を適用する</a></li>
+<li class="lvl-3"><a href="#手順3-許可リスト外の端末間-ping-が遮断されることを確認する学習の核心">手順3: 許可リスト外の端末間 ping が遮断されることを確認する（学習の核心）</a></li>
+<li class="lvl-3"><a href="#手順4-侵害端末からの横移動が止まるシナリオを確認する">手順4: 侵害端末からの横移動が止まるシナリオを確認する</a></li>
+<li class="lvl-3"><a href="#手順5-vlan-間-acliolも併せて確認する二層目">手順5: VLAN 間 ACL（IOL）も併せて確認する（二層目）</a></li>
+<li class="lvl-2"><a href="#5-考えどころ">5. 考えどころ</a></li>
+<li class="lvl-2"><a href="#6-つまずきポイント">6. つまずきポイント</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

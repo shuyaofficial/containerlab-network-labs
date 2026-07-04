@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜NW-ZT arm64 軽量検証計画</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>03_詳細設計</span></nav>
+      <h1 class="doc-title">テーマZERO｜NW-ZT arm64 軽量検証計画</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">feasibility</span><span class="tag">arm64</span><span class="tag">nac</span><span class="tag">ndr</span><span class="tag">verification</span></span>
+      </div>
+      
+      <div class="content">
+<p>NW-ZT トラック（N1 NAC / N2 SDP-ZTNA / N3 NDR / N4 μセグ）で使う <strong>コンテナ OSS</strong> が arm64 で動く見込みを軽量に確かめる計画。実測は本計画の対象外で、メインセッションが別途実施する。</p>
+<blockquote>
+<p><strong>本計画は NW-ZT トラック（N1-N4）専用。</strong> L7 トラック（Phase 0-6）の OSS 検証は <a href="%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB.html">軽量検証計画</a> に分離している。</p>
+</blockquote>
+<h2 id="検証の目的とスコープ" tabindex="-1">検証の目的とスコープ <a class="header-anchor" href="#検証の目的とスコープ" aria-hidden="true">#</a></h2>
+<ul>
+<li>目的: N1-N4 で使う <strong>コンテナ OSS 各イメージの arm64 manifest 有無</strong>と、起動可否の見込みを確認する。</li>
+<li>スコープ内: manifest 確認（静的判定）＋ 不確実なものの pull/起動の軽量確認。</li>
+<li>スコープ外（<strong>arm64 検証対象外</strong>）:
+<ul>
+<li>Cisco IOL L2 の dot1x/MAB/CoA/動的 VLAN の機能可否 — IOL は x86 エミュレーションで動作し、機能面はコンテナの arm64 manifest 確認では判定できない。<strong>N1 実装時の実機検証</strong>として明確に切り分ける（詳細は後述の「IOL機能検証の切り分け」を参照）。</li>
+<li>tinyproxy 等、本トラックで採用していない OSS。</li>
+<li>Phase 1-6 の本格デプロイ・結合試験。</li>
+</ul>
+</li>
+<li>前提: VM <code>clab</code>（Ubuntu 24.04 / arm64）。</li>
+</ul>
+<h2 id="判定基準" tabindex="-1">判定基準 <a class="header-anchor" href="#判定基準" aria-hidden="true">#</a></h2>
+<p><a href="%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB.html">軽量検証計画</a> の表記を踏襲する。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>判定</th>
+<th>条件</th>
+<th>次のアクション</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>High</strong></td>
+<td>公式 arm64 manifest が有る（<code>docker manifest inspect</code> に <code>arm64</code> が含まれる）</td>
+<td>採用確定。実検証は起動確認のみ</td>
+</tr>
+<tr>
+<td><strong>Med</strong></td>
+<td>manifest は有るが起動/機能に不確実性、または未確認</td>
+<td>pull して起動確認を実検証</td>
+</tr>
+<tr>
+<td><strong>Low</strong></td>
+<td>arm64 manifest が無い or 明示非対応</td>
+<td>代替差し替えルールを適用</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="検証対象イメージ一覧" tabindex="-1">検証対象イメージ一覧 <a class="header-anchor" href="#検証対象イメージ一覧" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>観点(N)</th>
+<th>イメージ</th>
+<th>役割</th>
+<th>arm64見込み</th>
+<th>判定見込み</th>
+<th>検証方法</th>
+<th>代替案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>N1</td>
+<td><code>freeradius/freeradius-server</code></td>
+<td>RADIUS 認証サーバ（Authenticator の裏側）</td>
+<td>有・取得済</td>
+<td>High</td>
+<td>起動確認のみ</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td>N1</td>
+<td>Cisco IOL L2</td>
+<td>認証者（802.1X/MAB/CoA/動的VLAN）</td>
+<td>x86 エミュ・機能は別途判定</td>
+<td>対象外</td>
+<td><strong>N1 実装時に実機検証</strong>（下記参照）</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>N2</td>
+<td><code>openziti/ziti-controller</code></td>
+<td>SDP コントローラ</td>
+<td>有・確定済</td>
+<td>High</td>
+<td>起動確認のみ</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4</td>
+<td>N2</td>
+<td><code>openziti/ziti-router</code></td>
+<td>SDP ルータ（app-connector）</td>
+<td>有・確定済</td>
+<td>High</td>
+<td>起動確認のみ</td>
+<td>—</td>
+</tr>
+<tr>
+<td>5</td>
+<td>N2</td>
+<td><code>netbirdio/netbird</code></td>
+<td>メッシュ VPN 型 ZTNA（発展）</td>
+<td>未確認</td>
+<td>Med</td>
+<td>manifest 確認 + pull 起動確認</td>
+<td>Headscale</td>
+</tr>
+<tr>
+<td>6</td>
+<td>N2</td>
+<td><code>headscale/headscale</code></td>
+<td>メッシュ VPN 型 ZTNA（発展）</td>
+<td>未確認</td>
+<td>Med</td>
+<td>manifest 確認 + pull 起動確認</td>
+<td>Netbird</td>
+</tr>
+<tr>
+<td>7</td>
+<td>N3</td>
+<td><code>zeek/zeek</code></td>
+<td>DPI 振る舞い検知</td>
+<td>未確認</td>
+<td>Med</td>
+<td>manifest 確認 + pull 起動確認</td>
+<td>Suricata 単独</td>
+</tr>
+<tr>
+<td>8</td>
+<td>N3</td>
+<td><code>jasonish/suricata</code></td>
+<td>DPI 振る舞い検知・IDS</td>
+<td>実測済（L7トラックで確定）</td>
+<td>High</td>
+<td><strong>既存結果を流用</strong>（manifest listにamd64/arm64の2platform、そのまま利用可）</td>
+<td>—</td>
+</tr>
+<tr>
+<td>9</td>
+<td>N3</td>
+<td><code>netsampler/goflow2</code></td>
+<td>NetFlow/IPFIX 収集</td>
+<td>未確認</td>
+<td>Med</td>
+<td>manifest 確認 + pull 起動確認</td>
+<td>nfdump 系</td>
+</tr>
+<tr>
+<td>10</td>
+<td>N3</td>
+<td><code>ntop/ntopng</code></td>
+<td>フロー可視化</td>
+<td>未確認</td>
+<td>Med</td>
+<td>manifest 確認 + pull 起動確認</td>
+<td>ElastiFlow / Grafana</td>
+</tr>
+<tr>
+<td>11</td>
+<td>N3</td>
+<td>ElastiFlow</td>
+<td>フロー可視化（発展）</td>
+<td>未確認・重量懸念</td>
+<td>Med/Low寄り</td>
+<td>manifest 確認（重量なら早期に Low 判定）</td>
+<td>ntopng 一本</td>
+</tr>
+<tr>
+<td>12</td>
+<td>N3</td>
+<td><code>faucet/faucet</code> + OVS</td>
+<td>ミラー環境補助（SDN コントローラ）</td>
+<td>未確認</td>
+<td>Med</td>
+<td>manifest 確認 + pull 起動確認</td>
+<td>—</td>
+</tr>
+<tr>
+<td>13</td>
+<td>N1（代替検討）</td>
+<td>PacketFence</td>
+<td>NAC（統合型、当初検討）</td>
+<td>x86 中心</td>
+<td>Low → <strong>確定</strong></td>
+<td>判定確定済（代替へ移行済）</td>
+<td><strong>FreeRADIUS 自作に確定</strong></td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>#8（Suricata）は L7 トラックの軽量検証結果（<a href="%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果_2026-07-04.md</a>）で既に実測済みのため、本計画では再検証せず結果を流用する。
+#13（PacketFence）は arm64 x86 中心のため既に Low 判定が確定しており、N1 は FreeRADIUS 自作構成に決定済み。検証対象としては記録のみで、追加の manifest 確認は不要。</p>
+</blockquote>
+<p><strong>イメージ総数: 13件</strong>（内訳: 検証要 9件 = #1,3,4,5,6,7,9,10,12 / 既存結果流用 1件 = #8 / arm64対象外・実機検証へ切り分け 1件 = #2 / 判定確定済（代替へ移行済） 1件 = #13 / 重量懸念で早期Low寄り 1件 = #11。#11は「検証要」にも重複カウントしうるため、検証実施の実数としては9〜10件目安）</p>
+<h2 id="iol機能検証の切り分け" tabindex="-1">IOL機能検証の切り分け <a class="header-anchor" href="#iol機能検証の切り分け" aria-hidden="true">#</a></h2>
+<p>Cisco IOL L2 の <strong>dot1x / MAB / CoA / 動的VLAN</strong> の対応可否は、本計画（コンテナ OSS の arm64 manifest 確認）では判定できない。IOL は x86 イメージをエミュレーション実行するため、「動くかどうか」はコンテナの arm64 対応可否とは別軸の問題であり、機能検証にはスイッチ設定・RADIUS 連携・実端末（またはサプリカント）を用いた実機確認が必要になる。</p>
+<ul>
+<li><strong>今回（本計画）の範囲</strong>: IOL が VM 上でエミュレーション起動できること自体は前提（既存 clab VM 環境で起動実績あり）。dot1x 等の機能可否は判定しない。</li>
+<li><strong>先送りする検証</strong>: N1 実装着手時に、実機（IOL L2 + FreeRADIUS + client）を組んだ上で以下を確認する。
+<ul>
+<li><code>show dot1x all</code> — 802.1X セッション状態</li>
+<li><code>show authentication sessions</code> — MAB フォールバック含む認証セッション一覧</li>
+<li>RADIUS Access-Accept の VLAN 属性（<code>Tunnel-Private-Group-ID</code> 等）反映によるポートの動的 VLAN 切り替え</li>
+<li>CoA（Change of Authorization）によるセッション強制再認証・切断</li>
+</ul>
+</li>
+<li><strong>切り分けの理由</strong>: arm64 軽量検証はコンテナイメージの可搬性判定が目的であり、IOL のようなネットワーク OS エミュレーションの機能検証は性質が異なる（設定投入・プロトコル動作の確認が主体で、pull/起動確認では代替できない）。</li>
+</ul>
+<h2 id="代替差し替えルール" tabindex="-1">代替差し替えルール <a class="header-anchor" href="#代替差し替えルール" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>対象</th>
+<th>事象</th>
+<th>差し替え</th>
+<th>根拠</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>N1 NAC</td>
+<td>PacketFence が arm64 不可 / x86 中心</td>
+<td><strong>FreeRADIUS 自作</strong>（確定済）</td>
+<td>統合型 NAC より軽量な自作構成が arm64 環境に適する</td>
+</tr>
+<tr>
+<td>N3 可視化</td>
+<td>ntopng が arm64 不可</td>
+<td><strong>ElastiFlow または Grafana</strong> で代替</td>
+<td>フロー可視化の目的（既存 SIEM 連携）を維持</td>
+</tr>
+<tr>
+<td>N3 収集</td>
+<td>goflow2 が arm64 不可</td>
+<td><strong>nfdump 系</strong>へ差し替え</td>
+<td>NetFlow/IPFIX 収集の役割を維持</td>
+</tr>
+<tr>
+<td>N3 DPI</td>
+<td>Zeek が arm64 不可</td>
+<td><strong>Suricata 単独</strong>で代替</td>
+<td>Suricata は実測済み High。DPI 振る舞い検知の役割は維持</td>
+</tr>
+<tr>
+<td>N3 可視化（重量）</td>
+<td>ElastiFlow が重すぎる</td>
+<td><strong>ntopng 一本</strong>に集約</td>
+<td>軽量・単一ツールへ寄せる</td>
+</tr>
+</tbody>
+</table></div>
+<p>差し替えの優先原則（<a href="%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB.html">軽量検証計画</a> と同一の考え方）:</p>
+<ol>
+<li>arm64 で動くことを最優先。動かないものは代替する。</li>
+<li>観点の目的（NAC の入口制御／NDR の可視化＋検知）を維持する。</li>
+<li>軽量・集約を選ぶ（重量級は単一ツールへ寄せる）。</li>
+</ol>
+<h2 id="検証手順" tabindex="-1">検証手順 <a class="header-anchor" href="#検証手順" aria-hidden="true">#</a></h2>
+<ol>
+<li>メインセッションが <code>ssh clab@orb &quot;docker manifest inspect &lt;image&gt;&quot;</code> を対象イメージ（#1, 3-7, 9, 10, 12）に対して実行し、<code>arm64</code> の有無を確認する。</li>
+<li>結果があいまい（Med判定）なものは pull して起動するところまで軽量に実証する。</li>
+<li>#8（Suricata）は既存の軽量検証結果（<a href="%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果_2026-07-04.md</a>）をそのまま流用し、再検証しない。</li>
+<li>#2（IOL 機能）と #13（PacketFence）は本検証の対象外・確定済みとして結果ファイルに明記のみ行う。</li>
+<li>結果を <code>軽量検証結果_nwzt_2026-07-04.md</code>（type: feasibility）に記録する。</li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT_トラックロードマップ</a> の arm64 列を確定値に更新する。</li>
+</ol>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT_トラックロードマップ</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">NW-ZT_論理構成設計</a></li>
+<li><a href="%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB.html">軽量検証計画</a>（L7トラック版）</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#検証の目的とスコープ">検証の目的とスコープ</a></li>
+<li class="lvl-2"><a href="#判定基準">判定基準</a></li>
+<li class="lvl-2"><a href="#検証対象イメージ一覧">検証対象イメージ一覧</a></li>
+<li class="lvl-2"><a href="#iol機能検証の切り分け">IOL機能検証の切り分け</a></li>
+<li class="lvl-2"><a href="#代替差し替えルール">代替差し替えルール</a></li>
+<li class="lvl-2"><a href="#検証手順">検証手順</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

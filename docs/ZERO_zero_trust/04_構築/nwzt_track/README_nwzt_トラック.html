@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜NW-ZTトラック 構築起点（親スタブ）</title>
+  <link rel="stylesheet" href="../../../assets/doc.css">
+  <link rel="stylesheet" href="../../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>04_構築</span>
+<span class="sep">/</span>
+<span>nwzt_track</span></nav>
+      <h1 class="doc-title">テーマZERO｜NW-ZTトラック 構築起点（親スタブ）</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">nwzt</span><span class="tag">roadmap</span><span class="tag">nac</span><span class="tag">ztna</span><span class="tag">ndr</span><span class="tag">microsegmentation</span></span>
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>今回スコープでは<strong>未デプロイ</strong>（設計・教材・arm64検証まで）。実装は番号テーマへ委譲する。このスタブは実装着手時の作業起点であり、ここ自体は構築を持たない。</p>
+</blockquote>
+<h2 id="位置づけ" tabindex="-1">位置づけ <a class="header-anchor" href="#位置づけ" aria-hidden="true">#</a></h2>
+<p>ZERO は NW-ZT トラックの<strong>設計ハブ（司令塔）</strong>。N1-N4 それぞれの目的・依存・ゲート条件をここで定義し、実装の実体は既存の番号テーマ側に置く。詳細な定義・比較表・依存関係図は <a href="../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT トラックロードマップ</a> を正とする。本ファイルは構築フォルダ側から見た「入口」に過ぎない。</p>
+<h2 id="n1-n4-一覧と実装委譲先" tabindex="-1">N1-N4 一覧と実装委譲先 <a class="header-anchor" href="#n1-n4-一覧と実装委譲先" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>N</th>
+<th>観点</th>
+<th>スタブ</th>
+<th>主実装先</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>N1</td>
+<td>NAC / 802.1X</td>
+<td><a href="N1_NAC/README.html">N1_NAC/README.md</a></td>
+<td>テーマ29（RADIUS）＋テーマ31（NAC/802.1X）— <a href="../../../%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97/PHASE2_MODERN_ENTERPRISE.html">ロードマップPHASE2</a> 経由</td>
+</tr>
+<tr>
+<td>N2</td>
+<td>SDP型ZTNA</td>
+<td><a href="N2_SDP_ZTNA/README.html">N2_SDP_ZTNA/README.md</a></td>
+<td>新規（OpenZiti、番号未採番）</td>
+</tr>
+<tr>
+<td>N3</td>
+<td>NDR</td>
+<td><a href="N3_NDR/README.html">N3_NDR/README.md</a></td>
+<td>テーマ42（フロー可視化＆NDR）— <a href="../../../%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97/PHASE2_MODERN_ENTERPRISE.html">ロードマップPHASE2</a> 経由</td>
+</tr>
+<tr>
+<td>N4</td>
+<td>μセグメンテーション</td>
+<td><a href="N4_microseg/README.html">N4_microseg/README.md</a></td>
+<td>テーマ31拡張＋テーマ22参照</td>
+</tr>
+</tbody>
+</table></div>
+<p>番号テーマのフォルダは現状未作成または中身が薄いため、各スタブから番号テーマ MD へは直リンクしない。実在する <a href="../../../%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97/PHASE2_MODERN_ENTERPRISE.html">ロードマップPHASE2</a> を入口として参照する。</p>
+<h2 id="着手順序" tabindex="-1">着手順序 <a class="header-anchor" href="#着手順序" aria-hidden="true">#</a></h2>
+<p>「できそうな順」＝ arm64 確度が高い・依存が少ないものを優先する。</p>
+<ol>
+<li><strong>N1 NAC</strong> — 土台。認証で入口を締め、動的 VLAN でセグメントを割り当てる。N4 はこの VLAN 基盤に乗る。</li>
+<li><strong>N2 SDP-ZTNA</strong> — ZERO Phase 2（IAP）の概念を前提に、その対比として実装。IAP型との実装差を体験する。</li>
+<li><strong>N3 NDR</strong> — 既存 SIEM（ZERO Phase 3）に乗る。フロー/DPI ログの集約先として Loki/Grafana を再利用する。</li>
+<li><strong>N4 μセグ</strong> — 最後。N1 の VLAN 基盤とテーマ22 の既存資産を前提にする。</li>
+</ol>
+<h2 id="共通の前提" tabindex="-1">共通の前提 <a class="header-anchor" href="#共通の前提" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>IOL L2 起動に時間がかかる</strong>。N1・N4 は Cisco IOL L2 を使うため、検証セッションの最初にコールドスタートで起動しておく。</li>
+<li><strong>接続は <code>ssh clab@orb</code></strong>。containerlab ホストへの入口はこの1本に統一する。</li>
+<li><strong>D-7 で IOL 連携を解禁</strong>。NW-ZT トラックは L7 トラック（Phase 0-6、docker 完結、D-1）とは独立した別トラックであり、IOL（実機相当）連携は D-7 から扱う。Phase 番号と N 番号を混同しない。</li>
+</ul>
+<h2 id="依存" tabindex="-1">依存 <a class="header-anchor" href="#依存" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT トラックロードマップ</a>（N1-N4 の定義・ゲート条件・番号テーマ対応表の正）</li>
+<li>ZERO Phase 1（Keycloak、N1 の認証源として任意連携）</li>
+<li>ZERO Phase 2（IAP、N2 の対比先）</li>
+<li>ZERO Phase 3（Loki/Grafana、N3 のログ集約先）</li>
+</ul>
+<h2 id="ゲート条件次へ進む条件" tabindex="-1">ゲート条件（次へ進む条件） <a class="header-anchor" href="#ゲート条件次へ進む条件" aria-hidden="true">#</a></h2>
+<p>本スタブ自体はゲートを持たない。各 N のゲート条件は個別スタブおよび <a href="../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT トラックロードマップ</a> の N ↔ 番号テーマ対応表を参照する。</p>
+<h2 id="実装時の作業リスト" tabindex="-1">実装時の作業リスト <a class="header-anchor" href="#実装時の作業リスト" aria-hidden="true">#</a></h2>
+<ul>
+<li>[ ] IOL L2 のコールドスタート時間を見積もり、検証セッション計画に組み込む</li>
+<li>[ ] <code>ssh clab@orb</code> での接続確認</li>
+<li>[ ] N1 から着手し、動的 VLAN 基盤を先に固める</li>
+<li>[ ] N1 完了後、N2・N3 は並行着手可能（相互依存なし）</li>
+<li>[ ] N4 は N1 完了後・テーマ22 資産確認後に着手</li>
+<li>[ ] 各 N のスタブ内チェックリストを実装先の番号テーマ側で消化</li>
+</ul>
+<h2 id="学べること" tabindex="-1">学べること <a class="header-anchor" href="#学べること" aria-hidden="true">#</a></h2>
+<p>設計ハブと実装テーマを分離する委譲構造そのもの。「司令塔が定義し、実装は既存資産に寄せる」設計の型。NAC→ZTNA→NDR→μセグという防御層の積み上げ順序と依存関係。</p>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT トラックロードマップ</a></li>
+<li><a href="../../../%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97/PHASE2_MODERN_ENTERPRISE.html">ロードマップPHASE2</a></li>
+<li><a href="../../../%E8%A6%8F%E7%B4%84/frontmatter%E3%82%B9%E3%82%AD%E3%83%BC%E3%83%9E.html">frontmatterスキーマ</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#位置づけ">位置づけ</a></li>
+<li class="lvl-2"><a href="#n1-n4-一覧と実装委譲先">N1-N4 一覧と実装委譲先</a></li>
+<li class="lvl-2"><a href="#着手順序">着手順序</a></li>
+<li class="lvl-2"><a href="#共通の前提">共通の前提</a></li>
+<li class="lvl-2"><a href="#依存">依存</a></li>
+<li class="lvl-2"><a href="#ゲート条件次へ進む条件">ゲート条件（次へ進む条件）</a></li>
+<li class="lvl-2"><a href="#実装時の作業リスト">実装時の作業リスト</a></li>
+<li class="lvl-2"><a href="#学べること">学べること</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>N1 解説 — NAC / 802.1X（FreeRADIUS + Cisco IOL L2）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>解説</span></nav>
+      <h1 class="doc-title">N1 解説 — NAC / 802.1X（FreeRADIUS + Cisco IOL L2）</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">explainer</span><span class="tag">nac</span><span class="tag">802-1x</span><span class="tag">freeradius</span><span class="tag">coa</span></span>
+      </div>
+      
+      <div class="content">
+<h2 id="1-このフェーズで何が実現されるか" tabindex="-1">1. このフェーズで何が実現されるか <a class="header-anchor" href="#1-このフェーズで何が実現されるか" aria-hidden="true">#</a></h2>
+<p>N1 では端末を LAN に参加させる前に認証する。Cisco IOL L2 スイッチを認証者（Authenticator）に、FreeRADIUS を認証サーバに置き、802.1X（EAP）または MAB（MAC 認証バイパス）で入口を締める。認証結果に応じて、そのポートを <strong>業務 VLAN</strong> か <strong>隔離 VLAN</strong> に動的に割り当てる。稼働中のセッションは CoA（Change of Authorization）で強制的に再認証・隔離できる。</p>
+<ul>
+<li><strong>ビフォー</strong>: スイッチにケーブルを挿せば誰でも LAN に参加でき、IP を取れてしまう。認証は「アプリに入るとき」に初めて問われる（もう手遅れ）。</li>
+<li><strong>アフター</strong>: ポートにリンクアップした瞬間、認証が済むまで通信できない。未認証・認証失敗の端末は隔離 VLAN に落ち、業務セグメントの IP すら取れない。「ネットワークに参加させるかどうか」を最初の関門にする。</li>
+</ul>
+<p>これは L7 トラック（Phase 0-6）が docker の中で「アプリ層の関所」を作ったのに対し、<strong>物理/L2 の入口そのものを関所にする</strong>という別軸の統制。ゼロトラストの「明示的検証」を、アプリより手前のネットワーク接続点で効かせる。</p>
+<h2 id="2-なぜこの構成か" tabindex="-1">2. なぜこの構成か <a class="header-anchor" href="#2-なぜこの構成か" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>観点</th>
+<th>商用製品</th>
+<th>本ラボの OSS 選定</th>
+<th>選定理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NAC / 802.1X</td>
+<td>Cisco ISE, Aruba ClearPass</td>
+<td><strong>FreeRADIUS + Cisco IOL L2</strong></td>
+<td>RADIUS は arm64 イメージ取得済み。IOL の dot1x/CoA は実機検証対象（<a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB_nwzt.html">軽量検証計画_nwzt</a>）。ISE/ClearPass の中核（RADIUS ポリシーエンジン）を OSS で忠実に追体験できる</td>
+</tr>
+</tbody>
+</table></div>
+<p>なぜ FreeRADIUS + IOL の 2 コンポーネント構成にするか:</p>
+<ul>
+<li><strong>ISE や ClearPass の実体は「RADIUS サーバ + ポリシーエンジン + GUI」</strong>。この中核は RADIUS プロトコルであり、FreeRADIUS の <code>users</code> / <code>clients.conf</code> を書けば ISE の「ポリシーセット」に相当するものを手で組める。GUI やダッシュボードは商用の付加価値だが、認証・認可の判断ロジックそのものは RADIUS で完全に再現できる。</li>
+<li><strong>認証者（スイッチ）は実機の挙動が要</strong>。dot1x・MAB・動的 VLAN・CoA は IOS の機能であり、これは Cisco IOL でしか再現できない。docker コンテナのソフト RADIUS だけでは「スイッチがポートを VLAN に張り替える」という NAC の肝が体験できないため、IOL を解禁する（D-7）。</li>
+</ul>
+<p><strong>実務でこの知識がどこで効くか</strong>: Cisco 実務経験があるなら、<code>aaa new-model</code> と <code>radius server</code> の設定は見慣れているはず。N1 はその「RADIUS の向こう側」——つまり認証サーバが Access-Accept に何を載せて返しているか——を自分の手で開けて見る作業になる。ISE を設計する案件では「認証ポリシー」と「認可プロファイル」を分けて考えるが、FreeRADIUS ではそれぞれ <code>users</code>（認証条件）と返却 VLAN 属性（認可プロファイル）に対応する。この対応が腹落ちすると、ISE の GUI が裏で何をやっているか、CCNP Security の 802.1X 問題が「プロトコルのどの往復の話か」が具体的に見えるようになる。切り分けの現場でも「未認証端末が隔離 VLAN に落ちない」障害を、スイッチ側（dot1x 設定）と RADIUS 側（VLAN 属性）のどちらの問題か層で分けられる。</p>
+<h2 id="3-仕組みの核心" tabindex="-1">3. 仕組みの核心 <a class="header-anchor" href="#3-仕組みの核心" aria-hidden="true">#</a></h2>
+<p>802.1X（EAP）の認証シーケンスと、Access-Accept に載る VLAN 属性の流れが N1 の核心。<a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">NW-ZT_論理構成設計</a> の N1 シーケンスがそのまま対応する。</p>
+<pre class="mermaid">sequenceDiagram
+    participant CL as client（サプリカント）
+    participant SW as Cisco IOL L2（認証者）
+    participant RAD as FreeRADIUS（認証サーバ）
+    participant KC as Keycloak（任意バックエンド）
+    CL-&gt;&gt;SW: (1) リンクアップ → EAPOL-Start
+    SW-&gt;&gt;CL: (2) EAP-Request/Identity
+    CL-&gt;&gt;SW: (3) EAP-Response/Identity
+    Note over SW,CL: 802.1X 非対応なら MAB へフォールバック（MACをIDに）
+    SW-&gt;&gt;RAD: (4) RADIUS Access-Request（EAP 転送）
+    RAD-&gt;&gt;KC: (5) 任意: LDAP/OIDC で資格情報照会
+    KC--&gt;&gt;RAD: (6) 照会結果
+    alt 認証成功
+        RAD--&gt;&gt;SW: (7a) Access-Accept + VLAN属性（Tunnel-*）
+        SW-&gt;&gt;SW: (8a) ポートを業務VLANに動的割当
+    else 認証失敗/未認証
+        RAD--&gt;&gt;SW: (7b) Access-Reject
+        SW-&gt;&gt;SW: (8b) ポートを隔離VLANへ
+    end
+    RAD--&gt;&gt;SW: (9) 運用中: CoA / Disconnect で強制再認証
+</pre>
+<p>ポイント:</p>
+<ul>
+<li><strong>認証は L2 で完結し、IP はその後</strong>。EAPOL は IP を持たない端末とスイッチの間のやりとり。認証が済んで VLAN が決まってから DHCP で IP を取る。だから「IP アドレスに依存しない入口制御」になる。IP ベースの ACL より手前で効く。</li>
+<li><strong>VLAN 割当の実体は RADIUS 属性</strong>。Access-Accept に載る <code>Tunnel-Type=VLAN(13)</code> / <code>Tunnel-Medium-Type=802(6)</code> / <code>Tunnel-Private-Group-ID=&lt;VLAN-ID&gt;</code> の 3 属性の組で、スイッチはポートをその VLAN に張り替える。この 3 属性が「認可プロファイル」の中身。</li>
+<li><strong>MAB はフォールバック</strong>。プリンタや IP 電話のような 802.1X サプリカントを持たない端末は、MAC アドレスを ID 代わりに認証する（MAC Authentication Bypass）。セキュリティは弱いが、現場では必須の逃し弁。</li>
+<li><strong>CoA が動的性の肝</strong>。一度認証して業務 VLAN にいる端末を、運用中に RADIUS 側から「隔離 VLAN に落とせ」と命令できる。これが N3（NDR）の異常検知と繋いだ自動封じ込め（SOAR）の下地になる。</li>
+</ul>
+<h2 id="4-自分で触って確認する手順実装後にこの手順で確認" tabindex="-1">4. 自分で触って確認する手順（実装後にこの手順で確認） <a class="header-anchor" href="#4-自分で触って確認する手順実装後にこの手順で確認" aria-hidden="true">#</a></h2>
+<p>N1 は今回スコープでは未デプロイ（設計値）。実装後、以下の手順でゲート条件（未認証→隔離 VLAN、認証成功→業務 VLAN、CoA で強制再認証）を段階的に確認する想定。IOL 側の詳細設定は概念と主要コマンドに留める（丸写しでなく、意味を理解して打てる粒度）。</p>
+<h3 id="手順1-freeradius-を起動し認証が通ることを-radtest-で確認する" tabindex="-1">手順1: FreeRADIUS を起動し、認証が通ることを radtest で確認する <a class="header-anchor" href="#手順1-freeradius-を起動し認証が通ることを-radtest-で確認する" aria-hidden="true">#</a></h3>
+<p>まず認証サーバ単体を検証する。スイッチを挟む前に「RADIUS が正しく Accept を返すか」を切り離して確認するのが定石。</p>
+<pre><code class="language-bash"><span class="hljs-comment"># FreeRADIUS をデバッグモードで前面起動（要求/応答が全部見える）</span>
+docker <span class="hljs-built_in">exec</span> -it clab-nwzt-freeradius radiusd -X
+
+<span class="hljs-comment"># 別ターミナルから、テストユーザで認証要求を投げる</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-freeradius radtest testuser testpass 127.0.0.1 0 testing123
+</code></pre>
+<p>期待結果: <code>Received Access-Accept</code> が返る。<code>radiusd -X</code> 側のログに、<code>users</code> ファイルのどのエントリにマッチし、どの属性を返したかが行単位で出る。<strong>まずここで「認証が RADIUS の往復として何をしているか」を目で見る</strong>のが理解の起点。</p>
+<h3 id="手順2-返却される-vlan-属性をデコードして見る" tabindex="-1">手順2: 返却される VLAN 属性をデコードして見る <a class="header-anchor" href="#手順2-返却される-vlan-属性をデコードして見る" aria-hidden="true">#</a></h3>
+<p><code>users</code> ファイルで、成功時に VLAN 属性を返すよう設定する（概念）。</p>
+<pre><code class="language-text"># clients は clients.conf、ユーザ/属性は users に書く（概念例）
+testuser  Cleartext-Password := &quot;testpass&quot;
+          Tunnel-Type = VLAN,
+          Tunnel-Medium-Type = IEEE-802,
+          Tunnel-Private-Group-ID = &quot;10&quot;
+</code></pre>
+<p><code>radiusd -X</code> のデバッグ出力で、Access-Accept に上記 3 属性が載っていることを確認する。ここで見えている <code>Tunnel-Private-Group-ID = &quot;10&quot;</code> が、スイッチ側でポートを VLAN 10 に張り替えるトリガそのもの。<strong>「認可プロファイル = この 3 属性の組」だと腹落ちさせる</strong>のがこの手順の狙い。</p>
+<h3 id="手順3-iol-l2-スイッチで-dot1x-を設定する概念--主要コマンド" tabindex="-1">手順3: IOL L2 スイッチで dot1x を設定する（概念 + 主要コマンド） <a class="header-anchor" href="#手順3-iol-l2-スイッチで-dot1x-を設定する概念--主要コマンド" aria-hidden="true">#</a></h3>
+<p>Cisco IOL 側で、AAA と 802.1X、動的 VLAN 割当を有効化する。実務で見慣れた IOS 構文なので、意味を確認しながら投入する。</p>
+<pre><code class="language-text">! AAA と RADIUS サーバ登録
+aaa new-model
+radius server FR
+ address ipv4 &lt;freeradius-ip&gt; auth-port 1812 acct-port 1813
+ key testing123
+aaa authentication dot1x default group radius
+aaa authorization network default group radius
+
+! グローバルで 802.1X と CoA を有効化
+dot1x system-auth-control
+aaa server radius dynamic-author
+ client &lt;freeradius-ip&gt; server-key testing123
+
+! アクセスポート側: 802.1X + MAB フォールバック、動的VLAN、失敗時は隔離VLAN
+interface Ethernet0/1
+ switchport mode access
+ authentication port-control auto
+ authentication event fail action authorize vlan 99
+ mab
+ dot1x pae authenticator
+</code></pre>
+<p>投入後、<code>show dot1x interface Ethernet0/1 details</code> と <code>show authentication sessions</code> で、そのポートの認証状態・割当 VLAN を確認できるようにしておく。</p>
+<h3 id="手順4-未認証隔離-vlan認証成功業務-vlan-を対照確認する学習の核心" tabindex="-1">手順4: 未認証→隔離 VLAN、認証成功→業務 VLAN を対照確認する（学習の核心） <a class="header-anchor" href="#手順4-未認証隔離-vlan認証成功業務-vlan-を対照確認する学習の核心" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">! 認証成功端末を挿したポートで
+show authentication sessions interface Ethernet0/1
+!   → Status: Authorized / Vlan Policy: 10（業務VLAN）を確認
+
+! 認証を通さない端末を挿したポートで
+show authentication sessions interface Ethernet0/2
+!   → Status: Unauthorized または Vlan Policy: 99（隔離VLAN）を確認
+</code></pre>
+<p>期待結果: <strong>同じスイッチ・同じ設定でも、認証結果だけで割り当てられる VLAN が変わる</strong>。認証成功端末は業務 VLAN（172.31.10.0/24）で app に到達でき、未認証端末は隔離 VLAN（172.31.99.0/24）に閉じ込められる。この対照が NAC の本質——「参加させるかどうかを認証で決める」——を体験する箇所。</p>
+<h3 id="手順5-coa-で稼働中セッションを強制再認証する" tabindex="-1">手順5: CoA で稼働中セッションを強制再認証する <a class="header-anchor" href="#手順5-coa-で稼働中セッションを強制再認証する" aria-hidden="true">#</a></h3>
+<p>業務 VLAN で動いている端末を、RADIUS 側から動的に隔離する。</p>
+<pre><code class="language-bash"><span class="hljs-comment"># FreeRADIUS 側から CoA-Request / Disconnect を該当セッションへ送る</span>
+docker <span class="hljs-built_in">exec</span> clab-nwzt-freeradius <span class="hljs-built_in">echo</span> <span class="hljs-string">&quot;User-Name=testuser,NAS-IP-Address=&lt;switch-ip&gt;&quot;</span> | \
+  radclient -x &lt;switch-ip&gt;:3799 disconnect testing123
+</code></pre>
+<p>期待結果: 稼働中の端末が切断・再認証される（設定次第で隔離 VLAN へ）。スイッチ側の <code>show authentication sessions</code> で状態が変わることを確認する。**「一度通した端末を、後から動的に落とせる」**ことが、N3 の検知と繋いだ自動封じ込めの前提だと理解する。</p>
+<h2 id="5-考えどころ" tabindex="-1">5. 考えどころ <a class="header-anchor" href="#5-考えどころ" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>本番設計ならどうするか</strong>: 本番の ISE/ClearPass は、認証ポリシーに端末プロファイリング（デバイス種別の自動判別）、posture チェック（N1 では扱わない端末状態）、ゲスト/BYOD ポータル、TrustSec の SGT 付与までを一体で持つ。N1 は RADIUS の認証・認可の中核だけを切り出す。</li>
+<li><strong>このラボの簡略化ポイント</strong>:
+<ul>
+<li><strong>EAP 方式は最小</strong>。本番は EAP-TLS（証明書ベース）が主流だが、N1 はまず PEAP/パスワード or MAB で機序を体験する。証明書ベースのデバイス認証は L7 トラックの <a href="phase6_%E8%A7%A3%E8%AA%AC.html">phase6_解説</a>（mTLS）で別途扱う。</li>
+<li><strong>プロファイリングなし</strong>。端末種別の自動判別（OUI/DHCP フィンガープリント）は実装しない。</li>
+<li><strong>CoA のトリガは手動</strong>。本番は SIEM/SOAR からの自動発火だが、N1 単体では手動で CoA を投げて機序を確認する。N3 と繋ぐと自動化できる（次項）。</li>
+</ul>
+</li>
+</ul>
+<h2 id="6-つまずきポイント" tabindex="-1">6. つまずきポイント <a class="header-anchor" href="#6-つまずきポイント" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>認証は成功しているのに VLAN が変わらない</strong>: <a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a> の層別（コンテナ→到達→TLS→認証→認可）で言えば「認証 OK・認可 NG」のパターン。RADIUS は Access-Accept を返しているが、VLAN 属性（<code>Tunnel-*</code> の 3 点セット）が欠けている、またはスイッチ側で <code>aaa authorization network</code> が入っていないことが多い。<code>radiusd -X</code> の出力で属性が載っているかを先に確認する。</li>
+<li><strong>radtest は通るのにスイッチからだと弾かれる</strong>: <code>clients.conf</code> にスイッチの IP と共有鍵（key）が正しく登録されていない典型。RADIUS は「クライアント（=スイッチ）」を IP+共有鍵で認証するため、ここがズレると Access-Request 自体が捨てられる。</li>
+<li><strong>MAB 端末が業務 VLAN に入れない</strong>: MAB のユーザ名は MAC アドレス文字列（小文字ハイフン区切り等、フォーマットが機種依存）。<code>users</code> のエントリと MAC の表記が一致していないと認証されない。<code>radiusd -X</code> で実際に飛んできた User-Name を確認して合わせる。</li>
+<li>IOL の dot1x/CoA が実機でどこまで動くかは未確定。動かない機能があれば <a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a> を複製して事象ごとに記録し、<a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB_nwzt.html">軽量検証計画_nwzt</a> の切り分けに従う。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT_トラックロードマップ</a>（N1-N4 の全体像）</li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">NW-ZT_論理構成設計</a>（N1 認証シーケンス・アドレス設計）</li>
+<li><a href="../%E6%95%99%E6%9D%90/06_NAC_802.1X_MAB_CoA_%E5%8B%95%E7%9A%84VLAN.html">教材: NAC/802.1X/MAB/CoA/動的VLAN</a></li>
+<li><a href="../%E6%95%99%E6%9D%90/05_Cisco_ISE_TrustSec_SecureAccess.html">教材: Cisco ISE/TrustSec/Secure Access</a></li>
+<li><a href="../04_%E6%A7%8B%E7%AF%89/nwzt_track/N1_NAC/README.html">N1 構築スタブ</a></li>
+<li><a href="../05_%E8%A9%A6%E9%A8%93/%E5%88%87%E3%82%8A%E5%88%86%E3%81%91%E3%82%B7%E3%83%BC%E3%83%88.html">切り分けシート</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-このフェーズで何が実現されるか">1. このフェーズで何が実現されるか</a></li>
+<li class="lvl-2"><a href="#2-なぜこの構成か">2. なぜこの構成か</a></li>
+<li class="lvl-2"><a href="#3-仕組みの核心">3. 仕組みの核心</a></li>
+<li class="lvl-2"><a href="#4-自分で触って確認する手順実装後にこの手順で確認">4. 自分で触って確認する手順（実装後にこの手順で確認）</a></li>
+<li class="lvl-3"><a href="#手順1-freeradius-を起動し認証が通ることを-radtest-で確認する">手順1: FreeRADIUS を起動し、認証が通ることを radtest で確認する</a></li>
+<li class="lvl-3"><a href="#手順2-返却される-vlan-属性をデコードして見る">手順2: 返却される VLAN 属性をデコードして見る</a></li>
+<li class="lvl-3"><a href="#手順3-iol-l2-スイッチで-dot1x-を設定する概念--主要コマンド">手順3: IOL L2 スイッチで dot1x を設定する（概念 + 主要コマンド）</a></li>
+<li class="lvl-3"><a href="#手順4-未認証隔離-vlan認証成功業務-vlan-を対照確認する学習の核心">手順4: 未認証→隔離 VLAN、認証成功→業務 VLAN を対照確認する（学習の核心）</a></li>
+<li class="lvl-3"><a href="#手順5-coa-で稼働中セッションを強制再認証する">手順5: CoA で稼働中セッションを強制再認証する</a></li>
+<li class="lvl-2"><a href="#5-考えどころ">5. 考えどころ</a></li>
+<li class="lvl-2"><a href="#6-つまずきポイント">6. つまずきポイント</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

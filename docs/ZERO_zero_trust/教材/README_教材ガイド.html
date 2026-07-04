@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>商用ゼロトラスト製品を理解する教材ガイド（読む順・全体像・OSS対応表）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>教材</span></nav>
+      <h1 class="doc-title">商用ゼロトラスト製品を理解する教材ガイド（読む順・全体像・OSS対応表）</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">explainer</span><span class="tag">ztna</span><span class="tag">sase</span><span class="tag">nac</span><span class="tag">ndr</span><span class="tag">oss対応</span></span>
+      </div>
+      
+      <div class="content">
+<p>この教材群は、Zscaler・Palo Alto・Cisco といった<strong>商用ゼロトラスト（ZT）製品の「仕組み」<strong>をベンダー中立・技術軸で解剖し、それぞれを</strong>本ラボの OSS で何に対応させて追体験できるか</strong>を一枚で結ぶための入口である。読者は Cisco 実務経験のある NW エンジニアで、ZT 製品そのものは未経験、という前提で書いている。</p>
+<p><strong>この教材のゴールは、製品名を覚えることではない</strong>。「ZTNA とは技術的に何をしているのか」「SDP と IAP は何が違うのか」「App-ID は Suricata で言うと何なのか」を説明できるようになり、商用製品の営業資料や設計書を読んだときに&quot;中身&quot;が見えるようになることである。</p>
+<h2 id="この教材の位置づけ" tabindex="-1">この教材の位置づけ <a class="header-anchor" href="#この教材の位置づけ" aria-hidden="true">#</a></h2>
+<ul>
+<li>実装トラックそのものではなく、<strong>実装の前に読む理論の下地</strong>。本ラボの2トラック（L7: Phase 0-6 / NW-ZT: N1-N4）で手を動かす際の「なぜこの OSS でこの商用製品を代替するのか」を支える。</li>
+<li>各教材は必ず <strong>商用製品 → 本ラボ OSS の対応</strong>を示す。対応の妥当性は arm64 実測（後述）を根拠にする。</li>
+<li>ギャップ分析・ロードマップは実装計画側の文書。本教材はそこへ <a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%82%AE%E3%83%A3%E3%83%83%E3%83%97%E5%88%86%E6%9E%90.html">../02_基本設計/NW-ZT_ギャップ分析.md</a> / <a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">../02_基本設計/NW-ZT_トラックロードマップ.md</a> からリンクされる。</li>
+</ul>
+<h2 id="読む順" tabindex="-1">読む順 <a class="header-anchor" href="#読む順" aria-hidden="true">#</a></h2>
+<p>概念の広い順（原論 → 分類 → 個別ベンダー → 横断整理）で並べている。上から順に読むのが基本だが、興味のあるベンダーから入っても各教材は自己完結する。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>順</th>
+<th>教材</th>
+<th>何がわかるか</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>このガイド</td>
+<td>全体像・対応表の総覧</td>
+</tr>
+<tr>
+<td>1</td>
+<td><a href="01_%E3%82%BC%E3%83%AD%E3%83%88%E3%83%A9%E3%82%B9%E3%83%88%E5%8E%9F%E8%AB%96_NIST_SP_800-207.html">01_ゼロトラスト原論_NIST_SP_800-207.md</a></td>
+<td>ZT の定義（7 tenets）と PE/PA/PEP という共通言語</td>
+</tr>
+<tr>
+<td>2</td>
+<td><a href="02_SASE_SSE_%E3%81%A8_SDP_vs_IAP.html">02_SASE_SSE_と_SDP_vs_IAP.md</a></td>
+<td>SASE/SSE の構成要素、SDP と IAP の技術差</td>
+</tr>
+<tr>
+<td>3</td>
+<td><a href="03_Zscaler_ZIA_ZPA.html">03_Zscaler_ZIA_ZPA.md</a></td>
+<td>クラウドプロキシ（ZIA）と SDP（ZPA）の仕組み</td>
+</tr>
+<tr>
+<td>4</td>
+<td><a href="04_PaloAlto_Prisma_NGFW.html">04_PaloAlto_Prisma_NGFW.md</a></td>
+<td>NGFW の App-ID / User-ID / Content-ID</td>
+</tr>
+<tr>
+<td>5</td>
+<td><a href="05_Cisco_ISE_TrustSec_SecureAccess.html">05_Cisco_ISE_TrustSec_SecureAccess.md</a></td>
+<td>ISE（RADIUS）・TrustSec/SGT・Secure Access</td>
+</tr>
+<tr>
+<td>6</td>
+<td><a href="06_NAC_802.1X_MAB_CoA_%E5%8B%95%E7%9A%84VLAN.html">06_NAC_802.1X_MAB_CoA_動的VLAN.md</a></td>
+<td>802.1X/MAB/CoA/動的VLAN の機序（N1 の下地）</td>
+</tr>
+<tr>
+<td>7</td>
+<td><a href="07_%E5%95%86%E7%94%A8%E8%A3%BD%E5%93%81_OSS%E5%AF%BE%E5%BF%9C%E8%A1%A8.html">07_商用製品_OSS対応表.md</a></td>
+<td>全商用 → OSS の横断マトリクス</td>
+</tr>
+</tbody>
+</table></div>
+<pre class="mermaid">graph TD
+    G[&quot;README 教材ガイド&lt;br/&gt;（このハブ）&quot;]
+    G --&gt; E1[&quot;01 NIST SP 800-207&lt;br/&gt;原論・共通言語&quot;]
+    E1 --&gt; E2[&quot;02 SASE/SSE&lt;br/&gt;SDP vs IAP&quot;]
+    E2 --&gt; E3[&quot;03 Zscaler ZIA/ZPA&quot;]
+    E2 --&gt; E4[&quot;04 Palo Alto NGFW&quot;]
+    E2 --&gt; E5[&quot;05 Cisco ISE/TrustSec&quot;]
+    E5 --&gt; E6[&quot;06 NAC 802.1X/MAB/CoA&quot;]
+    E3 --&gt; E7[&quot;07 商用→OSS 対応表&quot;]
+    E4 --&gt; E7
+    E6 --&gt; E7
+</pre>
+<h2 id="中核テーブル商用製品--本ラボ-oss-対応総覧" tabindex="-1">中核テーブル：商用製品 → 本ラボ OSS 対応（総覧） <a class="header-anchor" href="#中核テーブル商用製品--本ラボ-oss-対応総覧" aria-hidden="true">#</a></h2>
+<p>このテーブルが教材群の背骨である。各教材はこの表の1行を深掘りするものと考えてよい。詳細な横断整理は <a href="07_%E5%95%86%E7%94%A8%E8%A3%BD%E5%93%81_OSS%E5%AF%BE%E5%BF%9C%E8%A1%A8.html">07_商用製品_OSS対応表.md</a> にある。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>レイヤー</th>
+<th>商用代表</th>
+<th>本ラボOSS</th>
+<th>実装トラック</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IdP/IAM</td>
+<td>Okta/Entra ID</td>
+<td>Keycloak</td>
+<td>ZERO L7（既存）</td>
+</tr>
+<tr>
+<td>IAP型ZTNA</td>
+<td>(BeyondCorp系)</td>
+<td>Pomerium</td>
+<td>ZERO L7（既存）</td>
+</tr>
+<tr>
+<td>SDP型ZTNA</td>
+<td>Zscaler ZPA / Cisco Secure Access</td>
+<td>OpenZiti（発展: Headscale/Netbird）</td>
+<td>NW-ZT N2</td>
+</tr>
+<tr>
+<td>SWG/CASB</td>
+<td>Zscaler ZIA / Netskope</td>
+<td>mitmproxy</td>
+<td>ZERO L7（既存）</td>
+</tr>
+<tr>
+<td>NGFW検査</td>
+<td>Palo App-ID/Content-ID</td>
+<td>Suricata</td>
+<td>NW-ZT N3</td>
+</tr>
+<tr>
+<td>NAC</td>
+<td>Cisco ISE / Aruba ClearPass</td>
+<td>FreeRADIUS + IOL L2</td>
+<td>NW-ZT N1</td>
+</tr>
+<tr>
+<td>μセグ/タグ</td>
+<td>Cisco TrustSec/SGT</td>
+<td>IOL VLAN/ACL + nftables</td>
+<td>NW-ZT N4</td>
+</tr>
+<tr>
+<td>NDR</td>
+<td>Darktrace / Cisco Secure Network Analytics</td>
+<td>Zeek/Suricata + NetFlow(goflow2)→ntopng</td>
+<td>NW-ZT N3</td>
+</tr>
+<tr>
+<td>SIEM</td>
+<td>Splunk/Sentinel</td>
+<td>Loki+Grafana</td>
+<td>ZERO L7（既存）</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="なぜ-oss-で代替できるのかの根拠arm64-実測" tabindex="-1">「なぜ OSS で代替できるのか」の根拠（arm64 実測） <a class="header-anchor" href="#なぜ-oss-で代替できるのかの根拠arm64-実測" aria-hidden="true">#</a></h2>
+<p>このラボは Apple Silicon（arm64）上の Docker で動く。教材で挙げる OSS は<strong>そのまま arm64 で動くことを実測確認済み</strong>のものを選んでいる（2026-07-04 実測）。</p>
+<ul>
+<li><strong>arm64 ネイティブ対応（確定）</strong>: keycloak / pomerium / oauth2-proxy / mitmproxy / suricata / openziti / openldap</li>
+<li><strong>amd64 のみ（本ラボでは代替 or モック扱い）</strong>: osquery（→ posture はモック claim で代替）/ clamav（→ NDR の振る舞い検知で補完）</li>
+</ul>
+<p>商用製品を「軽量な OSS で追体験する」際、動かないイメージを選ぶと学習が止まる。だからこそ<strong>対応表の OSS は&quot;実際に arm64 で起動する&quot;ことを前提に選定している</strong>（詳細: <a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">../03_詳細設計/軽量検証結果_2026-07-04.md</a>）。</p>
+<h2 id="ベンダー中立の立場" tabindex="-1">ベンダー中立の立場 <a class="header-anchor" href="#ベンダー中立の立場" aria-hidden="true">#</a></h2>
+<ul>
+<li>特定商用製品を推奨・比較優劣づけしない。<strong>技術軸（ZTNA / SWG / NDR / NAC …）で理解し、代表製品はその技術の実装例として挙げる</strong>。</li>
+<li>OSS はあくまで「仕組みを最小構成で体験する」ための道具であり、商用製品の機能を全て代替するものではない。各教材の「簡略化ポイント」で、本ラボが省いている本番要件（HA・グローバル分散・細粒度ポリシー等）を明記する。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%82%AE%E3%83%A3%E3%83%83%E3%83%97%E5%88%86%E6%9E%90.html">NW-ZT_ギャップ分析</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT_トラックロードマップ</a></li>
+<li><a href="../%E8%A7%A3%E8%AA%AC/phase2_%E8%A7%A3%E8%AA%AC.html">phase2_解説（L7 トラックの IAP 解説）</a></li>
+<li><a href="../../%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97/PHASE2_MODERN_ENTERPRISE.html">ロードマップ PHASE2（実装委譲先の番号テーマ）</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#この教材の位置づけ">この教材の位置づけ</a></li>
+<li class="lvl-2"><a href="#読む順">読む順</a></li>
+<li class="lvl-2"><a href="#中核テーブル商用製品--本ラボ-oss-対応総覧">中核テーブル：商用製品 → 本ラボ OSS 対応（総覧）</a></li>
+<li class="lvl-2"><a href="#なぜ-oss-で代替できるのかの根拠arm64-実測">「なぜ OSS で代替できるのか」の根拠（arm64 実測）</a></li>
+<li class="lvl-2"><a href="#ベンダー中立の立場">ベンダー中立の立場</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜NW-ZT 論理構成設計（N1/N3 骨子）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>02_基本設計</span></nav>
+      <h1 class="doc-title">テーマZERO｜NW-ZT 論理構成設計（N1/N3 骨子）</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">network</span><span class="tag">nac</span><span class="tag">ndr</span><span class="tag">topology</span><span class="tag">iol</span></span>
+      </div>
+      
+      <div class="content">
+<p>NW-ZT トラックの論理構成を、実装上の要となる N1（NAC）と N3（NDR）を中心に設計する。
+L7 トラックが docker bridge だけで完結したのに対し、NW-ZT トラックは <strong>Cisco IOL（L2/L3）を解禁</strong>する（D-7）。IOL の実機機能（dot1x/CoA 等）の可否は <a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB_nwzt.html">軽量検証計画_nwzt</a> の切り分けに従い、N1 実装時に実機検証する。</p>
+<h2 id="設計の前提" tabindex="-1">設計の前提 <a class="header-anchor" href="#設計の前提" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>実行基盤</strong>: OrbStack VM <code>clab</code>（arm64）。IOL は x86 エミュで1ノード約2分（<a href="../../%E8%A6%8F%E7%B4%84/clab%E9%81%8B%E7%94%A8%E8%A6%8F%E7%B4%84.html">clab運用規約</a>）。</li>
+<li><strong>アドレス</strong>: L7 トラックの <code>172.30.0.0/16</code> とは別に、NW-ZT は <code>172.31.0.0/16</code> を割り当て、両トラックのアドレス衝突を避ける（実 IP は各 N 実装時に <a href="../../%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97/PHASE2_MODERN_ENTERPRISE.html">番号テーマ側</a> の IP 管理表で確定）。</li>
+<li><strong>ログ集約先</strong>: N3 の検知/フローは L7 トラックの可観測ゾーン（Loki/Grafana）を再利用する。</li>
+</ul>
+<h2 id="n1--nac--8021x-の論理構成" tabindex="-1">N1 — NAC / 802.1X の論理構成 <a class="header-anchor" href="#n1--nac--8021x-の論理構成" aria-hidden="true">#</a></h2>
+<p>FreeRADIUS を認証サーバ、Cisco IOL L2 スイッチを認証者（Authenticator）、client をサプリカントに置く。認証結果で動的に VLAN を割り当てる。</p>
+<pre class="mermaid">graph LR
+    CL[&quot;client&lt;br/&gt;サプリカント&quot;] --&gt;|&quot;EAPOL（802.1X）&quot;| SW
+    subgraph SWZONE[&quot;Cisco IOL L2 スイッチ（認証者）&quot;]
+        SW[&quot;cisco_iol L2&lt;br/&gt;dot1x / MAB / 動的VLAN&quot;]
+    end
+    SW --&gt;|&quot;RADIUS Access-Request&quot;| RAD[&quot;FreeRADIUS&lt;br/&gt;認証サーバ&quot;]
+    RAD --&gt;|&quot;Access-Accept + VLAN属性&quot;| SW
+    RAD -.-&gt;|&quot;CoA / Disconnect&quot;| SW
+    SW --&gt;|&quot;認証成功&quot;| BIZ[&quot;業務VLAN&lt;br/&gt;172.31.10.0/24&quot;]
+    SW --&gt;|&quot;認証失敗 / 未認証&quot;| QUAR[&quot;隔離VLAN&lt;br/&gt;172.31.99.0/24&quot;]
+    RAD -.-&gt;|&quot;任意: OIDC/LDAP バックエンド&quot;| KC[&quot;Keycloak&lt;br/&gt;（ZERO Phase1 再利用）&quot;]
+</pre>
+<h3 id="通信フロー認証シーケンス" tabindex="-1">通信フロー（認証シーケンス） <a class="header-anchor" href="#通信フロー認証シーケンス" aria-hidden="true">#</a></h3>
+<ol>
+<li>client がポートにリンクアップ → スイッチが 802.1X（EAPOL）を要求。</li>
+<li>802.1X 未対応端末は MAB（MAC 認証バイパス）へフォールバック。</li>
+<li>スイッチが RADIUS Access-Request を FreeRADIUS に送信。</li>
+<li>FreeRADIUS が認証し、Access-Accept に VLAN 属性（<code>Tunnel-Type</code> / <code>Tunnel-Medium-Type</code> / <code>Tunnel-Private-Group-ID</code>）を載せて返す。</li>
+<li>スイッチがそのポートを業務 VLAN に動的割当。失敗/未認証は隔離 VLAN。</li>
+<li>運用中に CoA（Change of Authorization）でセッションを強制再認証・切断できる。</li>
+</ol>
+<h3 id="設計の要点" tabindex="-1">設計の要点 <a class="header-anchor" href="#設計の要点" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>入口制御は IP 非依存</strong>。認証は L2 で完結し、IP 付与（DHCP）は VLAN 割当後。「ネットワークに参加させるか」を最初に決める。</li>
+<li><strong>FreeRADIUS の users/clients.conf</strong> が認可ポリシーの実体。商用 ISE のポリシーセットに相当。</li>
+<li><strong>CoA</strong> が動的性の肝。侵害端末を稼働中に隔離 VLAN へ落とす＝SOAR 連携（N3 検知→CoA）の下地になる。</li>
+</ul>
+<h2 id="n3--ndr-の論理構成" tabindex="-1">N3 — NDR の論理構成 <a class="header-anchor" href="#n3--ndr-の論理構成" aria-hidden="true">#</a></h2>
+<p>ミラーポート（または NetFlow エクスポート）から通信を取り出し、フロー統計（goflow2→ntopng）と DPI 振る舞い（Zeek/Suricata）で分析して既存 SIEM に集約する。</p>
+<pre class="mermaid">graph LR
+    subgraph NET[&quot;監視対象ネットワーク（IOL / OVS）&quot;]
+        MIRROR[&quot;ミラーポート / SPAN&quot;]
+        NFEXP[&quot;NetFlow / IPFIX エクスポート&quot;]
+    end
+    MIRROR --&gt; ZEEK[&quot;Zeek / Suricata&lt;br/&gt;DPI・振る舞い検知&quot;]
+    NFEXP --&gt; GOFLOW[&quot;goflow2&lt;br/&gt;NetFlow/IPFIX 収集&quot;]
+    GOFLOW --&gt; NTOP[&quot;ntopng / ElastiFlow&lt;br/&gt;フロー可視化&quot;]
+    ZEEK --&gt;|&quot;検知ログ&quot;| LOKI[&quot;Loki&lt;br/&gt;（ZERO Phase3 再利用）&quot;]
+    NTOP --&gt;|&quot;フロー/アラート&quot;| GRAF[&quot;Grafana&lt;br/&gt;（ZERO Phase3 再利用）&quot;]
+    LOKI --&gt; GRAF
+</pre>
+<h3 id="通信フロー可視化パイプライン" tabindex="-1">通信フロー（可視化パイプライン） <a class="header-anchor" href="#通信フロー可視化パイプライン" aria-hidden="true">#</a></h3>
+<ol>
+<li>IOL または OVS のミラー/SPAN で east-west を含むトラフィックを複製、または NetFlow/IPFIX でフロー統計をエクスポート。</li>
+<li>ミラーは Zeek/Suricata が DPI・振る舞い検知（スキャン挙動、想定外 east-west 等）。</li>
+<li>NetFlow は goflow2 が収集し、ntopng/ElastiFlow で可視化。</li>
+<li>検知ログは Loki、フロー/アラートは Grafana に集約。既存の可観測ゾーンをそのまま流用。</li>
+</ol>
+<h3 id="設計の要点-1" tabindex="-1">設計の要点 <a class="header-anchor" href="#設計の要点-1" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>east-west 可視化が主眼</strong>。L7 トラックの Suricata が SWG 経路（north-south）の IDS だったのに対し、N3 は横方向を見る。</li>
+<li><strong>既存 SIEM に乗せる</strong>（D-3 の思想の延長）。追加は収集・検知エンジンのみで、可視化基盤は再利用。</li>
+<li><strong>N1 と連携で SOAR 化</strong>（任意）: N3 が異常検知 → webhook → N1 の CoA で当該端末を隔離 VLAN へ。API-first の自動封じ込めを体験できる。</li>
+</ul>
+<h2 id="n2--n4-の論理構成概略" tabindex="-1">N2 / N4 の論理構成（概略） <a class="header-anchor" href="#n2--n4-の論理構成概略" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>N2（SDP-ZTNA）</strong>: OpenZiti の controller/router を DMZ 相当に、tunneler を client と app に置く。<code>app</code> は内向きポートを開けず、app-connector の外向き接続でのみ到達させる。詳細トポロジは N2 実装時に確定。</li>
+<li><strong>N4（μセグ）</strong>: N1 の VLAN 基盤上で、IOL の VLAN 間 ACL とホスト nftables を組み合わせ、同一セグメント内の端末間通信を許可リスト方式に絞る。テーマ22 の既存 VLAN/ACL 設計を参照。</li>
+</ul>
+<h2 id="アドレス設計nw-zt-トラック" tabindex="-1">アドレス設計（NW-ZT トラック） <a class="header-anchor" href="#アドレス設計nw-zt-トラック" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>セグメント</th>
+<th>サブネット（予定）</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>業務 VLAN</td>
+<td>172.31.10.0/24</td>
+<td>N1 認証成功端末</td>
+</tr>
+<tr>
+<td>隔離 VLAN</td>
+<td>172.31.99.0/24</td>
+<td>N1 未認証/失敗端末</td>
+</tr>
+<tr>
+<td>認証/管理</td>
+<td>172.31.0.0/24</td>
+<td>FreeRADIUS・管理</td>
+</tr>
+<tr>
+<td>監視</td>
+<td>172.31.30.0/24</td>
+<td>N3 収集・可視化（Loki/Grafana は L7 側を再利用）</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>実 IP・インターフェース割当は各 N 実装時に委譲先の番号テーマの IP 管理表で確定する（本書は論理設計の骨子）。</p>
+</blockquote>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT_トラックロードマップ</a></li>
+<li><a href="NW-ZT_%E3%82%AE%E3%83%A3%E3%83%83%E3%83%97%E5%88%86%E6%9E%90.html">NW-ZT_ギャップ分析</a></li>
+<li><a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB_nwzt.html">軽量検証計画_nwzt</a></li>
+<li><a href="%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88%E6%9B%B8.html">基本設計書 D-7</a></li>
+<li><a href="../%E6%95%99%E6%9D%90/06_NAC_802.1X_MAB_CoA_%E5%8B%95%E7%9A%84VLAN.html">教材: NAC/802.1X</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#設計の前提">設計の前提</a></li>
+<li class="lvl-2"><a href="#n1--nac--8021x-の論理構成">N1 — NAC / 802.1X の論理構成</a></li>
+<li class="lvl-3"><a href="#通信フロー認証シーケンス">通信フロー（認証シーケンス）</a></li>
+<li class="lvl-3"><a href="#設計の要点">設計の要点</a></li>
+<li class="lvl-2"><a href="#n3--ndr-の論理構成">N3 — NDR の論理構成</a></li>
+<li class="lvl-3"><a href="#通信フロー可視化パイプライン">通信フロー（可視化パイプライン）</a></li>
+<li class="lvl-3"><a href="#設計の要点-1">設計の要点</a></li>
+<li class="lvl-2"><a href="#n2--n4-の論理構成概略">N2 / N4 の論理構成（概略）</a></li>
+<li class="lvl-2"><a href="#アドレス設計nw-zt-トラック">アドレス設計（NW-ZT トラック）</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜NW-ZT トラックロードマップ（N1-N4）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>02_基本設計</span></nav>
+      <h1 class="doc-title">テーマZERO｜NW-ZT トラックロードマップ（N1-N4）</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">roadmap</span><span class="tag">nac</span><span class="tag">ndr</span><span class="tag">ztna</span><span class="tag">microsegmentation</span></span>
+      </div>
+      
+      <div class="content">
+<p>ネットワーク側ゼロトラストを <strong>N1 NAC → N2 SDP-ZTNA → N3 NDR → N4 μセグ</strong> の4フェーズに分ける。
+本テーマ ZERO は**設計ハブ（司令塔）**として設計・教材・arm64 検証までを持ち、実装の実体は既存の番号テーマへ委譲する（<a href="../../%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97/PHASE2_MODERN_ENTERPRISE.html">ロードマップ PHASE2</a>）。今回スコープは設計・教材・arm64 検証まで。</p>
+<h2 id="トラック方針" tabindex="-1">トラック方針 <a class="header-anchor" href="#トラック方針" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>L7 トラックとの関係</strong>: L7 トラック（Phase 0-6、docker 完結、D-1）とは独立。NW-ZT は IOL 連携を解禁する別トラック（D-7）。Phase 番号と N 番号は混同しない。</li>
+<li><strong>委譲構造</strong>: 「スタブは ZERO 内・実装は番号テーマ・繋ぎはロードマップ経由」の三層。ZERO 内の各 N スタブ（<a href="../04_%E6%A7%8B%E7%AF%89/nwzt_track/README_nwzt_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF.html">04_構築/nwzt_track</a>）が実装着手起点で、実装先の番号テーマを指す。</li>
+<li><strong>学習担保</strong>: 各 N に解説（なぜこの構成か／自分で触る手順）を付け、後からユーザー自身がハンズオンで構築できる形にする（<a href="../%E8%A7%A3%E8%AA%AC/nwzt_N1_%E8%A7%A3%E8%AA%AC.html">解説/nwzt_N1〜N4</a>）。</li>
+</ul>
+<h2 id="n-フェーズ一覧" tabindex="-1">N フェーズ一覧 <a class="header-anchor" href="#n-フェーズ一覧" aria-hidden="true">#</a></h2>
+<p>順序は「できそうな順」＝ arm64 確度が高い・イメージ取得済み・依存が少ないものを優先。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>N</th>
+<th>観点</th>
+<th>主 OSS</th>
+<th>arm64（2026-07-04 実測）</th>
+<th>依存</th>
+<th>ゲート条件</th>
+<th>想定作業量</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>N1</strong></td>
+<td>NAC / 802.1X</td>
+<td>FreeRADIUS + Cisco IOL L2 + client</td>
+<td>FreeRADIUS=<strong>arm64 apt導入で可</strong>（公式イメージはamd64のみ）/ IOL は実機検証</td>
+<td>ZERO Phase 1（Keycloak）任意連携</td>
+<td>未認証端末が隔離VLANへ、認証成功で業務VLANへ動的割当。CoA で強制再認証</td>
+<td>中〜大</td>
+</tr>
+<tr>
+<td><strong>N2</strong></td>
+<td>SDP型ZTNA</td>
+<td>OpenZiti（発展: Headscale / Netbird）</td>
+<td>✅ 実測確定（全て arm64）</td>
+<td>ZERO Phase 2（IAP）概念前提</td>
+<td>内向きポート非開放のまま、app-connector 経由でのみ <code>app</code> に到達</td>
+<td>中</td>
+</tr>
+<tr>
+<td><strong>N3</strong></td>
+<td>NDR</td>
+<td>Zeek/Suricata + goflow2 + ntopng</td>
+<td>Zeek/Suricata/goflow2/Faucet=✅ / ntopng=<strong>arm64 apt導入で可</strong> / ElastiFlow=不要</td>
+<td>ZERO Phase 3（Loki/Grafana）</td>
+<td>ミラー/NetFlow から異常フローを検知し、Loki/Grafana で可視化</td>
+<td>中〜大</td>
+</tr>
+<tr>
+<td><strong>N4</strong></td>
+<td>μセグメンテーション</td>
+<td>IOL VLAN/ACL + ホスト nftables</td>
+<td>nftables ✅ / IOL は実機検証</td>
+<td>N1（VLAN 基盤）、テーマ22 参照</td>
+<td>ゾーン内 east-west 通信をタグ/ACL で最小権限化し、横移動を遮断</td>
+<td>中</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p><strong>arm64 実測（2026-07-04）</strong>: N1-N4 すべて実装見込みが立った（<a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_nwzt_2026-07-04.html">軽量検証結果_nwzt</a>）。要注意は FreeRADIUS・ntopng が公式 Docker イメージ amd64-only のため <strong>arm64 OS ベースの Dockerfile 自作（apt 導入）</strong> で入れる点のみ。前回の osquery/clamav（apt にも無い真の非対応）とは異なり、arm64 パッケージは存在する。</p>
+</blockquote>
+<p>依存関係の骨子:</p>
+<ul>
+<li><strong>N1 が土台</strong>。認証で入口を締め、動的 VLAN でセグメントを割り当てる。N4 の μセグはこの VLAN 基盤に乗る。</li>
+<li><strong>N2 は概念的に ZERO Phase 2（IAP）の発展</strong>。IAP型（アプリ前関所）と SDP型（内向き非開放）の実装差を体験する。</li>
+<li><strong>N3 は既存 SIEM（Phase 3）に乗る</strong>。フロー/DPI ログの集約先として Loki/Grafana を再利用する。</li>
+<li><strong>N4 は最後</strong>。N1 の VLAN 基盤とテーマ22 の既存 VLAN/ACL 資産を前提にする。</li>
+</ul>
+<pre class="mermaid">graph LR
+    N1[&quot;N1 NAC&lt;br/&gt;FreeRADIUS + IOL L2&quot;] --&gt; N4[&quot;N4 μセグ&lt;br/&gt;VLAN/ACL + nftables&quot;]
+    N2[&quot;N2 SDP-ZTNA&lt;br/&gt;OpenZiti&quot;] -.-&gt;|&quot;IAP→SDP の対比&quot;| N1
+    N3[&quot;N3 NDR&lt;br/&gt;Zeek/Suricata + NetFlow&quot;] -.-&gt;|&quot;既存SIEMに乗る&quot;| N4
+    P1[&quot;ZERO Phase1&lt;br/&gt;Keycloak&quot;] -.-&gt;|&quot;認証源&quot;| N1
+    P3[&quot;ZERO Phase3&lt;br/&gt;Loki/Grafana&quot;] -.-&gt;|&quot;ログ集約先&quot;| N3
+</pre>
+<h2 id="n--番号テーマ-対応表委譲構造" tabindex="-1">N ↔ 番号テーマ 対応表（委譲構造） <a class="header-anchor" href="#n--番号テーマ-対応表委譲構造" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>N</th>
+<th>主実装先（番号テーマ）</th>
+<th>補助 / 参照</th>
+<th>委譲方式</th>
+<th>席の状態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>N1 NAC</td>
+<td>テーマ29（RADIUS）＋ テーマ31（NAC/802.1X）</td>
+<td>—</td>
+<td><a href="../../%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97/PHASE2_MODERN_ENTERPRISE.html">ロードマップ PHASE2</a> 経由で参照</td>
+<td>席のみ（薄い）</td>
+</tr>
+<tr>
+<td>N2 SDP-ZTNA</td>
+<td>新規（OpenZiti、番号未採番）</td>
+<td>ZERO Phase 2 発展系と連続</td>
+<td>ZERO 内で設計、実装着手時に採番</td>
+<td>番号なし</td>
+</tr>
+<tr>
+<td>N3 NDR</td>
+<td>テーマ42（フロー可視化＆NDR）</td>
+<td>テーマ35（Faucet）でミラー環境補助可</td>
+<td>ロードマップ PHASE2 経由で参照</td>
+<td>席のみ（薄い）</td>
+</tr>
+<tr>
+<td>N4 μセグ</td>
+<td>テーマ31 拡張</td>
+<td>テーマ22（既存 VLAN/ACL 資産）参照</td>
+<td>テーマ31 拡張＋テーマ22 参照</td>
+<td>席のみ＋既存22</td>
+</tr>
+</tbody>
+</table></div>
+<blockquote>
+<p>番号テーマは現状フォルダ未作成で中身が薄い。ZERO からは番号テーマ MD へ直リンクせず、実在する <a href="../../%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97/PHASE2_MODERN_ENTERPRISE.html">ロードマップ PHASE2</a> を入口に参照する（ビルド検証のリンク切れ回避＋委譲構造の明示）。</p>
+</blockquote>
+<h2 id="n1--nac--8021x" tabindex="-1">N1 — NAC / 802.1X <a class="header-anchor" href="#n1--nac--8021x" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>目的</strong>: 認証されない端末を LAN に参加させない。802.1X/MAB で入口を締め、認証結果に応じて動的に VLAN を割り当てる。</li>
+<li><strong>コンポーネント</strong>: FreeRADIUS（認証サーバ）／ Cisco IOL L2 スイッチ（認証者・Authenticator）／ client（サプリカント）。任意で Keycloak を LDAP/OIDC バックエンドに。</li>
+<li><strong>依存</strong>: なし（単独で成立）。ZERO Phase 1 の Keycloak を認証源に使う発展あり。</li>
+<li><strong>ゲート条件</strong>: 未認証端末が隔離 VLAN に落ち、認証成功端末が業務 VLAN に入る。RADIUS CoA で稼働中セッションを強制再認証できる。</li>
+<li><strong>想定作業量</strong>: 中〜大（IOL L2 の起動に時間、dot1x/MAB/CoA の設定、FreeRADIUS の clients.conf/users）。</li>
+<li><strong>学べること</strong>: 802.1X（EAP）/MAB/CoA/動的VLAN、RADIUS 属性（Tunnel-Private-Group-ID 等）、IP に依存しない入口制御。商用 ISE/ClearPass の中身。</li>
+</ul>
+<h2 id="n2--sdp型ztna" tabindex="-1">N2 — SDP型ZTNA <a class="header-anchor" href="#n2--sdp型ztna" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>目的</strong>: IAP型（アプリ前関所）に対し、SDP型（内向きポートを一切開けず、外向きの張り出しでのみ到達）を体験し、Zscaler ZPA の仕組みを理解する。</li>
+<li><strong>コンポーネント</strong>: OpenZiti（controller / router / tunneler）。発展: Headscale / Netbird（メッシュ VPN 型）。</li>
+<li><strong>依存</strong>: ZERO Phase 2（IAP）の概念を前提に、その対比として実装。</li>
+<li><strong>ゲート条件</strong>: <code>app</code> 側は内向きポートを開けないまま、app-connector（外向き接続）経由でのみ認可済みクライアントが到達できる。未認可は名前解決すらできない（暗黙拒否）。</li>
+<li><strong>想定作業量</strong>: 中（Ziti の enrollment、service/policy 定義、identity 発行）。</li>
+<li><strong>学べること</strong>: SDP vs IAP の実装差、「内向きを開けない」モデル、broker/connector アーキテクチャ、アプリ埋め込み型 ZTNA。</li>
+</ul>
+<h2 id="n3--ndr" tabindex="-1">N3 — NDR <a class="header-anchor" href="#n3--ndr" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>目的</strong>: east-west を含む通信を可視化し、フロー統計と DPI 振る舞いから異常を検知して SIEM に集約する。「侵害前提」を成立させる。</li>
+<li><strong>コンポーネント</strong>: Zeek / Suricata（ミラーからの DPI・振る舞い検知）／ goflow2（NetFlow/IPFIX 収集）／ ntopng / ElastiFlow（フロー可視化）→ 既存 Loki/Grafana。</li>
+<li><strong>依存</strong>: ZERO Phase 3（Loki/Grafana）。ミラー/NetFlow の出力源として IOL または OVS。</li>
+<li><strong>ゲート条件</strong>: ミラーポートまたは NetFlow エクスポートから異常フロー（例: 想定外の east-west、スキャン挙動）を検知し、Loki/Grafana のダッシュボードで可視化できる。</li>
+<li><strong>想定作業量</strong>: 中〜大（対象イメージ数が多く実測依存、ミラー設定、パーサ/ダッシュボード）。</li>
+<li><strong>学べること</strong>: フロー可視化、DPI 振る舞い検知、SIEM 連携、Palo Content-ID / Darktrace 系の中身、NetFlow/IPFIX の実務。</li>
+</ul>
+<h2 id="n4--μセグメンテーション" tabindex="-1">N4 — μセグメンテーション <a class="header-anchor" href="#n4--μセグメンテーション" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>目的</strong>: ゾーン内の east-west 通信を最小権限化し、侵害端末からの横移動（ラテラルムーブメント）を物理的に困難にする。</li>
+<li><strong>コンポーネント</strong>: Cisco IOL の VLAN/ACL（L2/L3 セグメント）＋ ホスト側 nftables（分散 FW の中央管理思想）。</li>
+<li><strong>依存</strong>: N1（VLAN 基盤）、テーマ22（既存の VLAN/ACL/HSRP 資産）を参照。</li>
+<li><strong>ゲート条件</strong>: 同一ゾーン内でも許可しない端末間通信を ACL/タグで遮断し、横移動が止まることを確認できる。</li>
+<li><strong>想定作業量</strong>: 中（VLAN/ACL 設計、nftables ルール、検証シナリオ）。</li>
+<li><strong>学べること</strong>: TrustSec/SGT の思想、east-west 制御、L2/L3 とホストの二層μセグ、Illumio 的な分散FW 中央管理。</li>
+</ul>
+<h2 id="今回スコープと次段階" tabindex="-1">今回スコープと次段階 <a class="header-anchor" href="#今回スコープと次段階" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>今回</strong>: N1-N4 の設計・教材・arm64 軽量検証（コンテナ OSS の見込み確定）まで。</li>
+<li><strong>次段階</strong>: N1 から実機実装（IOL L2 の dot1x/CoA 実機検証を含む）。実装は委譲先の番号テーマで行う。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="NW-ZT_%E3%82%AE%E3%83%A3%E3%83%83%E3%83%97%E5%88%86%E6%9E%90.html">NW-ZT_ギャップ分析</a></li>
+<li><a href="NW-ZT_%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">NW-ZT_論理構成設計</a></li>
+<li><a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB_nwzt.html">軽量検証計画_nwzt</a></li>
+<li><a href="../04_%E6%A7%8B%E7%AF%89/nwzt_track/README_nwzt_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF.html">構築スタブ（nwzt_track）</a></li>
+<li><a href="../%E6%95%99%E6%9D%90/README_%E6%95%99%E6%9D%90%E3%82%AC%E3%82%A4%E3%83%89.html">教材ガイド</a></li>
+<li><a href="%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88%E6%9B%B8.html">基本設計書 D-7</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#トラック方針">トラック方針</a></li>
+<li class="lvl-2"><a href="#n-フェーズ一覧">N フェーズ一覧</a></li>
+<li class="lvl-2"><a href="#n--番号テーマ-対応表委譲構造">N ↔ 番号テーマ 対応表（委譲構造）</a></li>
+<li class="lvl-2"><a href="#n1--nac--8021x">N1 — NAC / 802.1X</a></li>
+<li class="lvl-2"><a href="#n2--sdp型ztna">N2 — SDP型ZTNA</a></li>
+<li class="lvl-2"><a href="#n3--ndr">N3 — NDR</a></li>
+<li class="lvl-2"><a href="#n4--μセグメンテーション">N4 — μセグメンテーション</a></li>
+<li class="lvl-2"><a href="#今回スコープと次段階">今回スコープと次段階</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

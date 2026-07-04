@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜NW-ZT ギャップ分析（ネットワーク側ゼロトラストの被覆度）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>02_基本設計</span></nav>
+      <h1 class="doc-title">テーマZERO｜NW-ZT ギャップ分析（ネットワーク側ゼロトラストの被覆度）</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">gap-analysis</span><span class="tag">nac</span><span class="tag">ndr</span><span class="tag">ztna</span><span class="tag">network</span></span>
+      </div>
+      
+      <div class="content">
+<p>L7 トラック（Phase 0-6、docker 完結）が「クラウド/アプリ寄りのゼロトラスト」をどこまで押さえ、<strong>ネットワーク側のゼロトラスト</strong>（NAC・NDR・SDP型ZTNA・μセグ）に何が欠けているかを、NIST SP 800-207 系の5レイヤーで棚卸しする。埋め方は NW-ZT トラック（N1-N4）へつなぐ。</p>
+<h2 id="分析のスコープと視点" tabindex="-1">分析のスコープと視点 <a class="header-anchor" href="#分析のスコープと視点" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>視点</strong>: NW エンジニアの本業（スイッチ/ルータ/L2-L3/認証基盤）から見て、実務で語れる「ネットワークのゼロトラスト」がラボで扱えるか。</li>
+<li><strong>レイヤー定義</strong>: 貼付の5レイヤー（①ZTNA ②NAC/SDA ③μセグ ④IdP/IAM ⑤EDR/UEM）に、運用面の SIEM/NDR を加えて棚卸しする。ベンダー軸でなく<strong>技術軸</strong>で見る（ZTNA/NDR 等）。</li>
+<li><strong>原則</strong>: 欠落は「欠陥」ではなく L7 トラックの D-1（IOL 非連携）による<strong>スコープの線引き</strong>の結果である。</li>
+</ul>
+<h2 id="被覆度マトリクス5レイヤー--zero-現状--埋め方" tabindex="-1">被覆度マトリクス（5レイヤー × ZERO 現状 × 埋め方） <a class="header-anchor" href="#被覆度マトリクス5レイヤー--zero-現状--埋め方" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>レイヤー</th>
+<th>主な技術</th>
+<th>ZERO L7 トラックの現状</th>
+<th>被覆度</th>
+<th>埋め方（NW-ZT）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>④</td>
+<td>IdP / IAM</td>
+<td>OIDC/SAML SSO、MFA、動的認可</td>
+<td>Phase 1 Keycloak（OIDC IdP）＋ Phase 2 Pomerium（認可ポリシー）</td>
+<td>✅ 充足</td>
+<td>既存を N1/N2 の認証源として再利用</td>
+</tr>
+<tr>
+<td>①</td>
+<td>ZTNA</td>
+<td>SDP、IAP、リバースプロキシ</td>
+<td>Phase 2 は <strong>IAP型</strong>（Pomerium＝アプリ前関所）。<strong>SDP型</strong>（ZPAの broker+connector・内向き非開放）は発展止まり</td>
+<td>🔺 IAP型のみ</td>
+<td><strong>N2</strong>: OpenZiti で SDP 型を体験</td>
+</tr>
+<tr>
+<td>⑤</td>
+<td>EDR / ポスチャ</td>
+<td>振る舞い検知、デバイスコンプライアンス</td>
+<td>Phase 6 step-ca mTLS ＋ posture claim モック（osquery は arm64 非対応で代替）</td>
+<td>🔺 モック</td>
+<td>N3 の NDR で「感染後の振る舞い」を補完。EDR 本体は範囲外（教材で商用を解説）</td>
+</tr>
+<tr>
+<td>③</td>
+<td>μセグメンテーション</td>
+<td>ホスト分散FW、SGT タグ、east-west 制御</td>
+<td>docker bridge 4ゾーン分離のみ。ホスト間分散FW・east-west 制御なし</td>
+<td>🔺 ゾーンのみ</td>
+<td><strong>N4</strong>: IOL VLAN/ACL ＋ ホスト nftables の二層μセグ</td>
+</tr>
+<tr>
+<td>②</td>
+<td>NAC / 802.1X</td>
+<td>802.1X/MAB、動的VLAN、CoA</td>
+<td><strong>未カバー</strong>（L7 トラックは L2 を持たない）</td>
+<td>❌ <strong>最大の欠落</strong></td>
+<td><strong>N1</strong>: FreeRADIUS ＋ Cisco IOL L2</td>
+</tr>
+<tr>
+<td>—</td>
+<td>SIEM</td>
+<td>ログ集約・相関分析</td>
+<td>Phase 3 Loki + Grafana</td>
+<td>✅ 充足</td>
+<td>N3 のフロー/検知ログの集約先に再利用</td>
+</tr>
+<tr>
+<td>—</td>
+<td>NDR</td>
+<td>フロー分析、DPI 振る舞い検知</td>
+<td>Phase 4 Suricata は SWG 経路の IDS のみ。<strong>east-west ミラー/フロー分析なし</strong></td>
+<td>❌ 欠落</td>
+<td><strong>N3</strong>: Zeek/Suricata ＋ NetFlow(goflow2)→Loki/Grafana</td>
+</tr>
+<tr>
+<td>—</td>
+<td>SOAR</td>
+<td>自動封じ込め（プレイブック）</td>
+<td>なし</td>
+<td>❌ 欠落</td>
+<td>任意: Grafana アラート→webhook で Keycloak 無効化/Pomerium ポリシー変更（N2/N3 の発展）</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="ギャップの重大度" tabindex="-1">ギャップの重大度 <a class="header-anchor" href="#ギャップの重大度" aria-hidden="true">#</a></h2>
+<ol>
+<li><strong>② NAC/802.1X = 最優先の欠落</strong>。オンプレ LAN の「社内だから安全」を排除する入口制御で、NW エンジニアの本業ど真ん中。Cisco スキル（スイッチ設定）と直結し、転職市場でも語れる。→ <strong>N1 を先頭に置く</strong>。</li>
+<li><strong>NDR = 二番目の欠落</strong>。「侵害前提」を成立させる可視化。既存 SIEM（Loki/Grafana）に乗るため追加コストは中。→ <strong>N3</strong>。</li>
+<li><strong>① SDP型ZTNA</strong>。IAP型は L7 トラックで実装済みだが、Zscaler ZPA の「内向きを一切開けない」モデルは体験していない。→ <strong>N2</strong>。</li>
+<li><strong>③ μセグ</strong>。ゾーン分離はあるが、TrustSec/SGT 的な east-west 最小権限化は未着手。N1 の VLAN 基盤に依存。→ <strong>N4</strong>。</li>
+</ol>
+<h2 id="埋め方と-nw-zt-トラックの対応" tabindex="-1">埋め方と NW-ZT トラックの対応 <a class="header-anchor" href="#埋め方と-nw-zt-トラックの対応" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ギャップ</th>
+<th>埋める N</th>
+<th>主 OSS</th>
+<th>商用の対応（教材で解説）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NAC/802.1X</td>
+<td>N1</td>
+<td>FreeRADIUS + Cisco IOL L2</td>
+<td>Cisco ISE / Aruba ClearPass</td>
+</tr>
+<tr>
+<td>SDP型ZTNA</td>
+<td>N2</td>
+<td>OpenZiti（発展: Headscale/Netbird）</td>
+<td>Zscaler ZPA / Cisco Secure Access</td>
+</tr>
+<tr>
+<td>NDR</td>
+<td>N3</td>
+<td>Zeek/Suricata + goflow2 + ntopng</td>
+<td>Darktrace / Cisco Secure Network Analytics</td>
+</tr>
+<tr>
+<td>μセグ</td>
+<td>N4</td>
+<td>IOL VLAN/ACL + ホスト nftables</td>
+<td>Cisco TrustSec/SGT / Illumio</td>
+</tr>
+</tbody>
+</table></div>
+<p>詳細なフェーズ設計は <a href="NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT_トラックロードマップ</a>、論理構成は <a href="NW-ZT_%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">NW-ZT_論理構成設計</a>、商用製品の仕組みは <a href="../%E6%95%99%E6%9D%90/README_%E6%95%99%E6%9D%90%E3%82%AC%E3%82%A4%E3%83%89.html">教材</a> を参照。</p>
+<h2 id="結論" tabindex="-1">結論 <a class="header-anchor" href="#結論" aria-hidden="true">#</a></h2>
+<p>L7 トラックは「クラウド/アプリ寄りの ZT」を良く押さえている。NW-ZT トラック（N1-N4）を増設することで、<strong>NW エンジニア本業の「ネットワーク側 ZT」を技術軸で被覆</strong>でき、かつ全て OSS × arm64（IOL 部分を除く）で実装見込みが立つ。実装可能性の実測は <a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB_nwzt.html">軽量検証計画_nwzt</a> で確定する。</p>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88%E6%9B%B8.html">基本設計書</a>（D-7: NW-ZT トラックの IOL 連携解禁）</li>
+<li><a href="NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT_トラックロードマップ</a></li>
+<li><a href="NW-ZT_%E8%AB%96%E7%90%86%E6%A7%8B%E6%88%90%E8%A8%AD%E8%A8%88.html">NW-ZT_論理構成設計</a></li>
+<li><a href="../%E6%95%99%E6%9D%90/README_%E6%95%99%E6%9D%90%E3%82%AC%E3%82%A4%E3%83%89.html">教材ガイド</a></li>
+<li><a href="../../%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97/PHASE2_MODERN_ENTERPRISE.html">ロードマップ PHASE2</a>（実装委譲先の番号テーマ）</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#分析のスコープと視点">分析のスコープと視点</a></li>
+<li class="lvl-2"><a href="#被覆度マトリクス5レイヤー--zero-現状--埋め方">被覆度マトリクス（5レイヤー × ZERO 現状 × 埋め方）</a></li>
+<li class="lvl-2"><a href="#ギャップの重大度">ギャップの重大度</a></li>
+<li class="lvl-2"><a href="#埋め方と-nw-zt-トラックの対応">埋め方と NW-ZT トラックの対応</a></li>
+<li class="lvl-2"><a href="#結論">結論</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

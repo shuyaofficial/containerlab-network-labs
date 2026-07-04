@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>商用製品 → 本ラボ OSS 横断対応表（総覧）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>教材</span></nav>
+      <h1 class="doc-title">商用製品 → 本ラボ OSS 横断対応表（総覧）</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">oss対応</span><span class="tag">mapping</span><span class="tag">ztna</span><span class="tag">nac</span><span class="tag">ndr</span><span class="tag">swg</span></span>
+      </div>
+      
+      <div class="content">
+<p>これまでの教材（01-06）で技術ごとに見てきた「商用 → OSS」の対応を、<strong>一枚の横断マトリクス</strong>に集約する。この表は設計・教材の背骨であり、<a href="README_%E6%95%99%E6%9D%90%E3%82%AC%E3%82%A4%E3%83%89.html">README_教材ガイド.md</a> と <a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%82%AE%E3%83%A3%E3%83%83%E3%83%97%E5%88%86%E6%9E%90.html">../02_基本設計/NW-ZT_ギャップ分析.md</a> の両方から参照される。</p>
+<h2 id="1-中核対応表レイヤー--商用--oss--トラック" tabindex="-1">1. 中核対応表（レイヤー × 商用 × OSS × トラック） <a class="header-anchor" href="#1-中核対応表レイヤー--商用--oss--トラック" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>レイヤー</th>
+<th>商用代表</th>
+<th>本ラボOSS</th>
+<th>実装トラック</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>IdP/IAM</td>
+<td>Okta/Entra ID</td>
+<td>Keycloak</td>
+<td>ZERO L7（既存）</td>
+</tr>
+<tr>
+<td>IAP型ZTNA</td>
+<td>(BeyondCorp系)</td>
+<td>Pomerium</td>
+<td>ZERO L7（既存）</td>
+</tr>
+<tr>
+<td>SDP型ZTNA</td>
+<td>Zscaler ZPA / Cisco Secure Access</td>
+<td>OpenZiti（発展: Headscale/Netbird）</td>
+<td>NW-ZT N2</td>
+</tr>
+<tr>
+<td>SWG/CASB</td>
+<td>Zscaler ZIA / Netskope</td>
+<td>mitmproxy</td>
+<td>ZERO L7（既存）</td>
+</tr>
+<tr>
+<td>NGFW検査</td>
+<td>Palo App-ID/Content-ID</td>
+<td>Suricata</td>
+<td>NW-ZT N3</td>
+</tr>
+<tr>
+<td>NAC</td>
+<td>Cisco ISE / Aruba ClearPass</td>
+<td>FreeRADIUS + IOL L2</td>
+<td>NW-ZT N1</td>
+</tr>
+<tr>
+<td>μセグ/タグ</td>
+<td>Cisco TrustSec/SGT</td>
+<td>IOL VLAN/ACL + nftables</td>
+<td>NW-ZT N4</td>
+</tr>
+<tr>
+<td>NDR</td>
+<td>Darktrace / Cisco Secure Network Analytics</td>
+<td>Zeek/Suricata + NetFlow(goflow2)→ntopng</td>
+<td>NW-ZT N3</td>
+</tr>
+<tr>
+<td>SIEM</td>
+<td>Splunk/Sentinel</td>
+<td>Loki+Grafana</td>
+<td>ZERO L7（既存）</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="2-総覧図どの-oss-がどのトラックのどこに座るか" tabindex="-1">2. 総覧図（どの OSS がどのトラックのどこに座るか） <a class="header-anchor" href="#2-総覧図どの-oss-がどのトラックのどこに座るか" aria-hidden="true">#</a></h2>
+<pre class="mermaid">graph TD
+    subgraph &quot;L7 トラック（Phase 0-6・docker 完結・既存）&quot;
+      KC[&quot;Keycloak&lt;br/&gt;IdP/IAM&quot;]
+      POM[&quot;Pomerium&lt;br/&gt;IAP型ZTNA&quot;]
+      MITM[&quot;mitmproxy&lt;br/&gt;SWG/CASB&quot;]
+      LOKI[&quot;Loki+Grafana&lt;br/&gt;SIEM&quot;]
+    end
+    subgraph &quot;NW-ZT トラック（N1-N4・IOL連携）&quot;
+      RAD[&quot;FreeRADIUS + IOL L2&lt;br/&gt;NAC (N1)&quot;]
+      ZITI[&quot;OpenZiti&lt;br/&gt;SDP型ZTNA (N2)&quot;]
+      NDR[&quot;Zeek/Suricata + goflow2&lt;br/&gt;NDR/NGFW検査 (N3)&quot;]
+      MSEG[&quot;IOL VLAN/ACL + nftables&lt;br/&gt;μセグ (N4)&quot;]
+    end
+    KC -.-&gt;|認証源| RAD
+    KC -.-&gt;|認証源| POM
+    LOKI -.-&gt;|集約先| NDR
+    POM -.-&gt;|IAP→SDP 対比| ZITI
+    RAD --&gt;|VLAN基盤| MSEG
+</pre>
+<h2 id="3-商用製品ごとの分解対応1製品複数-oss" tabindex="-1">3. 商用製品ごとの分解対応（1製品→複数 OSS） <a class="header-anchor" href="#3-商用製品ごとの分解対応1製品複数-oss" aria-hidden="true">#</a></h2>
+<p>商用製品は複数機能の束なので、<strong>1製品を機能ごとにばらして OSS に対応させる</strong>。各教材の詳細はリンク先を参照。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>商用製品</th>
+<th>機能分解</th>
+<th>対応 OSS</th>
+<th>教材</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Zscaler ZIA</strong></td>
+<td>クラウドプロキシ SWG/CASB</td>
+<td>mitmproxy</td>
+<td><a href="03_Zscaler_ZIA_ZPA.html">03</a></td>
+</tr>
+<tr>
+<td><strong>Zscaler ZPA</strong></td>
+<td>SDP 型 ZTNA（内向き非開放）</td>
+<td>OpenZiti</td>
+<td><a href="03_Zscaler_ZIA_ZPA.html">03</a></td>
+</tr>
+<tr>
+<td><strong>Palo Alto NGFW</strong></td>
+<td>App-ID / Content-ID（検査）</td>
+<td>Suricata</td>
+<td><a href="04_PaloAlto_Prisma_NGFW.html">04</a></td>
+</tr>
+<tr>
+<td>&quot;</td>
+<td>User-ID（IP→ユーザー紐付け）</td>
+<td>Keycloak + Pomerium</td>
+<td><a href="04_PaloAlto_Prisma_NGFW.html">04</a></td>
+</tr>
+<tr>
+<td><strong>Cisco ISE</strong></td>
+<td>RADIUS 認証・動的割当</td>
+<td>FreeRADIUS</td>
+<td><a href="05_Cisco_ISE_TrustSec_SecureAccess.html">05</a> / <a href="06_NAC_802.1X_MAB_CoA_%E5%8B%95%E7%9A%84VLAN.html">06</a></td>
+</tr>
+<tr>
+<td><strong>Cisco TrustSec/SGT</strong></td>
+<td>タグベース east-west 制御</td>
+<td>IOL VLAN/ACL + nftables</td>
+<td><a href="05_Cisco_ISE_TrustSec_SecureAccess.html">05</a></td>
+</tr>
+<tr>
+<td><strong>Cisco Secure Access</strong></td>
+<td>クラウド SSE/ZTNA（SDP 型）</td>
+<td>OpenZiti</td>
+<td><a href="05_Cisco_ISE_TrustSec_SecureAccess.html">05</a></td>
+</tr>
+<tr>
+<td><strong>Aruba ClearPass</strong></td>
+<td>NAC（802.1X/MAB/CoA）</td>
+<td>FreeRADIUS + IOL L2</td>
+<td><a href="06_NAC_802.1X_MAB_CoA_%E5%8B%95%E7%9A%84VLAN.html">06</a></td>
+</tr>
+<tr>
+<td><strong>Darktrace / Cisco SNA</strong></td>
+<td>NDR（フロー/振る舞い検知）</td>
+<td>Zeek/Suricata + goflow2 → ntopng</td>
+<td><a href="04_PaloAlto_Prisma_NGFW.html">04</a></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="4-nist-pepapep-へのマッピング横串" tabindex="-1">4. NIST PE/PA/PEP へのマッピング（横串） <a class="header-anchor" href="#4-nist-pepapep-へのマッピング横串" aria-hidden="true">#</a></h2>
+<p>全 OSS を <a href="01_%E3%82%BC%E3%83%AD%E3%83%88%E3%83%A9%E3%82%B9%E3%83%88%E5%8E%9F%E8%AB%96_NIST_SP_800-207.html">01 の PE/PA/PEP</a> の役割で串刺しにすると、ラボ全体が1つの ZT アーキテクチャに見える。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>NIST 役割</th>
+<th>本ラボ OSS</th>
+<th>補足</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PE（判定）</td>
+<td>Pomerium(authorize) / FreeRADIUS(認証判定)</td>
+<td>ID・属性で許可判定</td>
+</tr>
+<tr>
+<td>PA（指令）</td>
+<td>Pomerium(proxy) / FreeRADIUS(Access-Accept, CoA)</td>
+<td>PEP へ通す/隔離を指令</td>
+</tr>
+<tr>
+<td>PEP（強制）</td>
+<td>Pomerium(IAP) / mitmproxy(SWG) / IOL スイッチ(802.1X) / OpenZiti(connector)</td>
+<td>経路上で実際に通す/止める</td>
+</tr>
+<tr>
+<td>シグナル: ID</td>
+<td>Keycloak</td>
+<td>全トラックの認証源</td>
+</tr>
+<tr>
+<td>監視・改善</td>
+<td>Loki+Grafana / Zeek/Suricata</td>
+<td>ログ・フロー・検知</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="5-arm64-実測に基づく-oss-選定の根拠" tabindex="-1">5. arm64 実測に基づく OSS 選定の根拠 <a class="header-anchor" href="#5-arm64-実測に基づく-oss-選定の根拠" aria-hidden="true">#</a></h2>
+<p>対応表の OSS は**「arm64 で実際に動く」ことを前提に選んでいる**（2026-07-04 実測）。動かないイメージを選ぶと学習が止まるため、ここは対応表の信頼性の土台。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>分類</th>
+<th>対象 OSS</th>
+<th>扱い</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>arm64 ネイティブ（確定）</td>
+<td>keycloak / pomerium / oauth2-proxy / mitmproxy / suricata / openziti / openldap</td>
+<td>そのまま採用</td>
+</tr>
+<tr>
+<td>amd64 のみ</td>
+<td>osquery</td>
+<td>posture はモック claim で代替</td>
+</tr>
+<tr>
+<td>amd64 のみ</td>
+<td>clamav</td>
+<td>NDR の振る舞い検知で補完</td>
+</tr>
+<tr>
+<td>実機検証枠</td>
+<td>Cisco IOL L2（802.1X/MAB/CoA）</td>
+<td>コンテナでなく実機挙動に依存。N1/N4 実装時に確認</td>
+</tr>
+</tbody>
+</table></div>
+<p>詳細は <a href="../03_%E8%A9%B3%E7%B4%B0%E8%A8%AD%E8%A8%88/%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">../03_詳細設計/軽量検証結果_2026-07-04.md</a>。</p>
+<h2 id="6-使い方この表の読み方" tabindex="-1">6. 使い方（この表の読み方） <a class="header-anchor" href="#6-使い方この表の読み方" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>商用製品名から入る</strong>: RFP や案件で出た製品名を §3 で引き、どの OSS/教材で仕組みを追体験できるか辿る。</li>
+<li><strong>技術レイヤーから入る</strong>: 「NAC を学びたい」なら §1 のレイヤー行 → 対応教材 → 実装トラック（N1）へ。</li>
+<li><strong>OSS を&quot;商用の一部の再現&quot;と理解する</strong>: OSS は商用機能の核だけを最小構成で再現する。各教材の「簡略化ポイント」で省略範囲を必ず確認する（ベンダー中立・過大評価しない）。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="README_%E6%95%99%E6%9D%90%E3%82%AC%E3%82%A4%E3%83%89.html">教材ガイド</a></li>
+<li><a href="01_%E3%82%BC%E3%83%AD%E3%83%88%E3%83%A9%E3%82%B9%E3%83%88%E5%8E%9F%E8%AB%96_NIST_SP_800-207.html">01 NIST SP 800-207</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%82%AE%E3%83%A3%E3%83%83%E3%83%97%E5%88%86%E6%9E%90.html">NW-ZT_ギャップ分析</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT_トラックロードマップ</a></li>
+<li><a href="../../%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97/PHASE2_MODERN_ENTERPRISE.html">ロードマップ PHASE2</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-中核対応表レイヤー--商用--oss--トラック">1. 中核対応表（レイヤー × 商用 × OSS × トラック）</a></li>
+<li class="lvl-2"><a href="#2-総覧図どの-oss-がどのトラックのどこに座るか">2. 総覧図（どの OSS がどのトラックのどこに座るか）</a></li>
+<li class="lvl-2"><a href="#3-商用製品ごとの分解対応1製品複数-oss">3. 商用製品ごとの分解対応（1製品→複数 OSS）</a></li>
+<li class="lvl-2"><a href="#4-nist-pepapep-へのマッピング横串">4. NIST PE/PA/PEP へのマッピング（横串）</a></li>
+<li class="lvl-2"><a href="#5-arm64-実測に基づく-oss-選定の根拠">5. arm64 実測に基づく OSS 選定の根拠</a></li>
+<li class="lvl-2"><a href="#6-使い方この表の読み方">6. 使い方（この表の読み方）</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

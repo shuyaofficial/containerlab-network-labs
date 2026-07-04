@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Cisco ISE / TrustSec(SGT) / Secure Access</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>教材</span></nav>
+      <h1 class="doc-title">Cisco ISE / TrustSec(SGT) / Secure Access</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">cisco</span><span class="tag">ise</span><span class="tag">trustsec</span><span class="tag">sgt</span><span class="tag">secure-access</span><span class="tag">freeradius</span></span>
+      </div>
+      
+      <div class="content">
+<p>Cisco の ZT は3つの技術で構成される。<strong>ISE（認証・ポリシーの頭脳）</strong>、<strong>TrustSec/SGT（IP でなくタグで制御）</strong>、<strong>Secure Access（クラウド SSE/ZTNA）</strong>。Cisco 実務のある読者にとって最も地続きな教材で、既存のスイッチ知識がそのまま拡張される。</p>
+<h2 id="1-問題ip-アドレスは制御の単位に向かない" tabindex="-1">1. 問題：IP アドレスは制御の単位に向かない <a class="header-anchor" href="#1-問題ip-アドレスは制御の単位に向かない" aria-hidden="true">#</a></h2>
+<p>ACL は送信元/宛先 IP で書く。しかし DHCP・モバイル・仮想化で IP は動的に変わり、「この端末は何者か」を IP から一意に言えない。<strong>ACL を IP で書き続けると、セグメント変更のたびに ACL 改修が発生し、破綻する</strong>。「IP ではなく&quot;役割&quot;で制御したい」がこの3技術の出発点。</p>
+<h2 id="2-仕組み3つの役割" tabindex="-1">2. 仕組み：3つの役割 <a class="header-anchor" href="#2-仕組み3つの役割" aria-hidden="true">#</a></h2>
+<pre class="mermaid">graph TD
+    subgraph &quot;認証・ポリシー&quot;
+      ise[&quot;Cisco ISE&lt;br/&gt;RADIUS認証・ポリシー中枢&lt;br/&gt;（PE/PA に相当）&quot;]
+    end
+    subgraph &quot;オンプレ強制&quot;
+      sw[&quot;Catalyst スイッチ&lt;br/&gt;（PEP）&quot;]
+      sgt[&quot;SGT タグ付与&lt;br/&gt;SGACL で east-west 制御&quot;]
+    end
+    subgraph &quot;クラウド&quot;
+      sa[&quot;Secure Access&lt;br/&gt;SSE/ZTNA&quot;]
+    end
+    endpoint[&quot;端末&quot;] --&gt;|802.1X| sw
+    sw &lt;--&gt;|RADIUS| ise
+    ise --&gt;|認証結果+SGT| sw
+    sw --&gt; sgt
+    endpoint -.-&gt;|リモート| sa
+    sa &lt;--&gt;|ID連携| ise
+</pre>
+<h3 id="iseidentity-services-engine-認証とポリシーの中枢" tabindex="-1">ISE（Identity Services Engine）— 認証とポリシーの中枢 <a class="header-anchor" href="#iseidentity-services-engine-認証とポリシーの中枢" aria-hidden="true">#</a></h3>
+<ul>
+<li><strong>RADIUS サーバ</strong>として 802.1X/MAB の認証を裁く。認証結果に応じて VLAN・SGT・ACL を端末へ動的に割り当てる。</li>
+<li>NIST でいう <strong>PE/PA（判定と指令）</strong> の座。スイッチ（PEP）に「この端末はこの権限」を指令する。</li>
+</ul>
+<h3 id="trustsec--sgt--ip-でなくタグで制御" tabindex="-1">TrustSec / SGT — IP でなくタグで制御 <a class="header-anchor" href="#trustsec--sgt--ip-でなくタグで制御" aria-hidden="true">#</a></h3>
+<ul>
+<li>認証時に端末へ <strong>SGT（Security Group Tag）</strong> という&quot;役割の番号&quot;を付与する。以降の制御は IP でなく <strong>SGT 同士の関係</strong>で書く。</li>
+<li><strong>SGACL（Security Group ACL）</strong> で「SGT=社員 から SGT=サーバ は許可、SGT=ゲスト から SGT=サーバ は拒否」のように、<strong>east-west（横方向）通信を役割ベースで最小権限化</strong>する。IP が変わってもタグが同じなら制御は不変。</li>
+</ul>
+<h3 id="secure-access--クラウド-sseztna" tabindex="-1">Secure Access — クラウド SSE/ZTNA <a class="header-anchor" href="#secure-access--クラウド-sseztna" aria-hidden="true">#</a></h3>
+<ul>
+<li>Cisco のクラウド側 SSE。SWG・ZTNA（SDP 型）・CASB をクラウドで提供。リモートユーザーのアクセスを ISE の ID と連携して制御する。</li>
+<li>技術的には <a href="03_Zscaler_ZIA_ZPA.html">03 Zscaler の ZPA</a> と同じ <strong>SDP 型 ZTNA</strong> の系列。</li>
+</ul>
+<h2 id="3-商用製品--本ラボ-oss-の対応" tabindex="-1">3. 商用製品 × 本ラボ OSS の対応 <a class="header-anchor" href="#3-商用製品--本ラボ-oss-の対応" aria-hidden="true">#</a></h2>
+<p>Cisco の3技術は、本ラボで<strong>別々の OSS/トラックに対応</strong>する。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Cisco 技術</th>
+<th>やっていること</th>
+<th>本ラボ OSS</th>
+<th>トラック</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ISE</strong></td>
+<td>RADIUS 認証・動的割当・ポリシー中枢</td>
+<td>FreeRADIUS</td>
+<td>NW-ZT N1</td>
+</tr>
+<tr>
+<td><strong>TrustSec / SGT</strong></td>
+<td>タグベース east-west 制御</td>
+<td>IOL VLAN/ACL + nftables</td>
+<td>NW-ZT N4</td>
+</tr>
+<tr>
+<td><strong>Secure Access</strong></td>
+<td>クラウド SSE/ZTNA（SDP 型）</td>
+<td>OpenZiti</td>
+<td>NW-ZT N2</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li><strong>ISE → FreeRADIUS</strong>: FreeRADIUS が 802.1X/MAB を裁き、RADIUS 属性（VLAN 割当等）を返す。ISE の&quot;認証中枢&quot;部分を最小再現。RADIUS イメージは arm64 取得済み（2026-07-04）。IOL L2 スイッチが Authenticator を担う。詳細は <a href="06_NAC_802.1X_MAB_CoA_%E5%8B%95%E7%9A%84VLAN.html">06_NAC_802.1X_MAB_CoA_動的VLAN.md</a>。</li>
+<li><strong>SGT → VLAN/nftables</strong>: 本ラボは SGT そのものは使えないが、「IP でなく所属（VLAN/タグ）で east-west を絞る」思想を IOL の VLAN/ACL とホスト nftables の二層で再現する（N4）。SGT の&quot;役割ベース制御&quot;の考え方を体験する。</li>
+<li><strong>Secure Access → OpenZiti</strong>: SDP 型 ZTNA として、<a href="03_Zscaler_ZIA_ZPA.html">03</a> の ZPA と同じ位置づけ。</li>
+</ul>
+<h2 id="実務でこの知識がどこで効くか" tabindex="-1">実務でこの知識がどこで効くか <a class="header-anchor" href="#実務でこの知識がどこで効くか" aria-hidden="true">#</a></h2>
+<p>これは NW エンジニアの本業ど真ん中である。<strong>ISE 連携の 802.1X 設計・SGT による east-west 最小権限化は、Cisco 環境の ZT 案件で必ず問われる</strong>。ISE の実機は arm64 で動かないが（Prisma/ISE は x86 アプライアンス）、<strong>FreeRADIUS で「RADIUS が認証結果として VLAN 属性を返し、スイッチがそれを適用する」仕組みを手で体験しておけば、ISE の設定画面が&quot;何を裏でやっているか&quot;が分かる</strong>。SGT についても、「IP で ACL を書く時代の限界」を実感していれば、TrustSec 提案の価値を自分の言葉で説明できる。転職市場でも「802.1X/動的VLAN/RADIUS 属性を理解している」は NW セキュリティ人材の分かりやすい差別化点になる。</p>
+<h2 id="4-簡略化ポイント" tabindex="-1">4. 簡略化ポイント <a class="header-anchor" href="#4-簡略化ポイント" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>ISE の実機は使わない</strong>: ISE は x86 アプライアンスで arm64 非対応。FreeRADIUS で認証中枢の&quot;核&quot;だけ再現し、ポスチャ・プロファイリング・ゲスト管理等の ISE 固有機能は範囲外。</li>
+<li><strong>SGT は本物でない</strong>: 本ラボは SGT/SXP/SGACL のプロトコルそのものは扱えない。VLAN/ACL/nftables で&quot;役割ベース制御&quot;の思想を近似する。</li>
+<li><strong>Secure Access のクラウド機能なし</strong>: OpenZiti で SDP の核だけ。Cisco クラウドの統合管理・グローバル PoP は範囲外。</li>
+</ul>
+<h2 id="5-つまずきポイント" tabindex="-1">5. つまずきポイント <a class="header-anchor" href="#5-つまずきポイント" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>ISE=RADIUS だけではない</strong>: ISE は RADIUS に加えプロファイリング・posture・ゲストを含む統合基盤。FreeRADIUS はその認証部分のみ。「FreeRADIUS で ISE 全部を再現」とは考えない。</li>
+<li><strong>SGT を VLAN と混同</strong>: VLAN は L2 のブロードキャストドメイン、SGT は役割タグ。似て非なるもの。本ラボは VLAN で SGT の&quot;思想&quot;を近似しているだけと理解する。</li>
+<li><strong>RADIUS 属性の名前</strong>: 動的 VLAN 割当は <code>Tunnel-Type</code> / <code>Tunnel-Medium-Type</code> / <code>Tunnel-Private-Group-ID</code> の3属性が必要。1つ欠けても効かない（詳細は N1 教材）。</li>
+</ul>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="README_%E6%95%99%E6%9D%90%E3%82%AC%E3%82%A4%E3%83%89.html">教材ガイド</a></li>
+<li><a href="04_PaloAlto_Prisma_NGFW.html">04 Palo Alto NGFW</a></li>
+<li><a href="06_NAC_802.1X_MAB_CoA_%E5%8B%95%E7%9A%84VLAN.html">06 NAC 802.1X/MAB/CoA/動的VLAN</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT_トラックロードマップ N1/N2/N4</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#1-問題ip-アドレスは制御の単位に向かない">1. 問題：IP アドレスは制御の単位に向かない</a></li>
+<li class="lvl-2"><a href="#2-仕組み3つの役割">2. 仕組み：3つの役割</a></li>
+<li class="lvl-3"><a href="#iseidentity-services-engine-認証とポリシーの中枢">ISE（Identity Services Engine）— 認証とポリシーの中枢</a></li>
+<li class="lvl-3"><a href="#trustsec--sgt--ip-でなくタグで制御">TrustSec / SGT — IP でなくタグで制御</a></li>
+<li class="lvl-3"><a href="#secure-access--クラウド-sseztna">Secure Access — クラウド SSE/ZTNA</a></li>
+<li class="lvl-2"><a href="#3-商用製品--本ラボ-oss-の対応">3. 商用製品 × 本ラボ OSS の対応</a></li>
+<li class="lvl-2"><a href="#実務でこの知識がどこで効くか">実務でこの知識がどこで効くか</a></li>
+<li class="lvl-2"><a href="#4-簡略化ポイント">4. 簡略化ポイント</a></li>
+<li class="lvl-2"><a href="#5-つまずきポイント">5. つまずきポイント</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

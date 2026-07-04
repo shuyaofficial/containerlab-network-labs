@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜N1 NAC / 802.1X 構築スタブ</title>
+  <link rel="stylesheet" href="../../../../assets/doc.css">
+  <link rel="stylesheet" href="../../../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>04_構築</span>
+<span class="sep">/</span>
+<span>nwzt_track</span>
+<span class="sep">/</span>
+<span>N1_NAC</span></nav>
+      <h1 class="doc-title">テーマZERO｜N1 NAC / 802.1X 構築スタブ</h1>
+      <div class="meta">
+        <span class="badge badge--draft">下書き</span>
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">nac</span><span class="tag">802.1x</span><span class="tag">radius</span><span class="tag">freeradius</span><span class="tag">iol</span></span>
+      </div>
+      
+      <div class="content">
+<blockquote>
+<p>今回スコープでは<strong>未デプロイ</strong>（設計値）。このスタブは実装着手時の作業起点。詳細な定義・比較表は <a href="../../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT トラックロードマップ</a> N1 を正とする。</p>
+</blockquote>
+<h2 id="目的" tabindex="-1">目的 <a class="header-anchor" href="#目的" aria-hidden="true">#</a></h2>
+<p>認証されない端末を LAN に参加させない。802.1X/MAB で入口を締め、認証結果に応じて動的に VLAN を割り当てる。RADIUS CoA で稼働中セッションを強制再認証できるようにする。</p>
+<h2 id="コンポーネント" tabindex="-1">コンポーネント <a class="header-anchor" href="#コンポーネント" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>役割</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FreeRADIUS</td>
+<td>認証サーバ（AAA）。dot1x/MAB のバックエンド</td>
+</tr>
+<tr>
+<td>Cisco IOL L2</td>
+<td>認証者（Authenticator）。ポート単位で 802.1X/MAB を実行するスイッチ</td>
+</tr>
+<tr>
+<td>client</td>
+<td>サプリカント（認証を受ける側の端末）</td>
+</tr>
+</tbody>
+</table></div>
+<p>任意で ZERO Phase 1 の Keycloak を LDAP/OIDC バックエンドとして FreeRADIUS に連携させる発展あり。</p>
+<h2 id="依存" tabindex="-1">依存 <a class="header-anchor" href="#依存" aria-hidden="true">#</a></h2>
+<ul>
+<li>単独で成立（ZERO Phase 1 の Keycloak 連携は任意）。</li>
+<li>N4（μセグ）はこの N1 の VLAN 基盤に乗るため、N1 が先行する。</li>
+</ul>
+<h2 id="ゲート条件次へ進む条件" tabindex="-1">ゲート条件（次へ進む条件） <a class="header-anchor" href="#ゲート条件次へ進む条件" aria-hidden="true">#</a></h2>
+<ul>
+<li>未認証端末が隔離 VLAN に落ちる。</li>
+<li>認証成功端末が業務 VLAN に動的に割り当てられる（RADIUS 属性 Tunnel-Private-Group-ID 等）。</li>
+<li>RADIUS CoA（Change of Authorization）で稼働中セッションを強制再認証できる。</li>
+</ul>
+<h2 id="実装先" tabindex="-1">実装先 <a class="header-anchor" href="#実装先" aria-hidden="true">#</a></h2>
+<p><strong>テーマ29（RADIUS）＋テーマ31（NAC/802.1X）</strong>。<a href="../../../../%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97/PHASE2_MODERN_ENTERPRISE.html">ロードマップPHASE2</a> を入口として参照する。実装フォルダは現状未作成のため、番号テーマ MD への直リンクは張らない。</p>
+<h2 id="実装時の作業リスト" tabindex="-1">実装時の作業リスト <a class="header-anchor" href="#実装時の作業リスト" aria-hidden="true">#</a></h2>
+<ul>
+<li>[ ] Cisco IOL L2 をデプロイ（起動に時間がかかる点を見積もりに含める）</li>
+<li>[ ] FreeRADIUS の設定（clients.conf、users、EAP 設定）</li>
+<li>[ ] スイッチ側 dot1x/MAB の設定投入</li>
+<li>[ ] 動的 VLAN 割当（RADIUS 属性による VLAN 切替）の設定</li>
+<li>[ ] RADIUS CoA によるセッション強制再認証の検証</li>
+<li>[ ] 未認証端末が隔離 VLAN に落ちることの確認</li>
+<li>[ ] 認証成功端末が業務 VLAN に入ることの確認</li>
+<li>[ ] 任意: Keycloak を LDAP/OIDC バックエンドとして連携</li>
+</ul>
+<h2 id="学べること" tabindex="-1">学べること <a class="header-anchor" href="#学べること" aria-hidden="true">#</a></h2>
+<p>802.1X（EAP）/MAB/CoA/動的 VLAN の仕組み、RADIUS 属性（Tunnel-Private-Group-ID 等）による VLAN 制御、IP アドレスに依存しない入口制御。商用 NAC 製品（ISE/ClearPass）の内部構造理解。</p>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../../../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT トラックロードマップ</a></li>
+<li><a href="../../../../%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97/PHASE2_MODERN_ENTERPRISE.html">ロードマップPHASE2</a></li>
+<li><a href="../README_nwzt_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF.html">親スタブ</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#目的">目的</a></li>
+<li class="lvl-2"><a href="#コンポーネント">コンポーネント</a></li>
+<li class="lvl-2"><a href="#依存">依存</a></li>
+<li class="lvl-2"><a href="#ゲート条件次へ進む条件">ゲート条件（次へ進む条件）</a></li>
+<li class="lvl-2"><a href="#実装先">実装先</a></li>
+<li class="lvl-2"><a href="#実装時の作業リスト">実装時の作業リスト</a></li>
+<li class="lvl-2"><a href="#学べること">学べること</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

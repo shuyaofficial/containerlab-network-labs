@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマZERO｜NW-ZT arm64 軽量検証結果（2026-07-04 実測）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>ZERO_zero_trust</span>
+<span class="sep">/</span>
+<span>03_詳細設計</span></nav>
+      <h1 class="doc-title">テーマZERO｜NW-ZT arm64 軽量検証結果（2026-07-04 実測）</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-04</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">feasibility</span><span class="tag">arm64</span><span class="tag">nac</span><span class="tag">ndr</span><span class="tag">verification</span></span>
+      </div>
+      
+      <div class="content">
+<p><a href="%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB_nwzt.html">軽量検証計画_nwzt</a> に基づき、NW-ZT トラック（N1-N4）の OSS イメージが clab VM（arm64）で動く見込みを実測した。</p>
+<h2 id="検証方法" tabindex="-1">検証方法 <a class="header-anchor" href="#検証方法" aria-hidden="true">#</a></h2>
+<p>clab VM（OrbStack Ubuntu 24.04 / arm64、docker）上で <code>docker manifest inspect &lt;image&gt;</code> を実行し <code>linux/arm64</code> エントリを確認。manifest list を返さないイメージは <code>docker pull</code> + <code>docker inspect --format '{{.Architecture}}'</code> で実 arch を確認。公式イメージが amd64 のみのものは、<strong>arm64 ベース OS への apt 導入可否</strong>を <code>docker run --platform linux/arm64 ubuntu:24.04</code> で <code>apt-cache policy</code> を引いて確認した。</p>
+<h2 id="結果表" tabindex="-1">結果表 <a class="header-anchor" href="#結果表" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>N</th>
+<th>イメージ / 手段</th>
+<th>arm64</th>
+<th>判定</th>
+<th>根拠（実測）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>N1</td>
+<td><code>freeradius/freeradius-server:latest</code></td>
+<td>✕（amd64のみ）</td>
+<td><strong>High（apt導入で可）</strong></td>
+<td>公式イメージは pull 実証で <code>amd64</code>。ただし arm64 Ubuntu 24.04 に <code>freeradius</code> パッケージ候補あり（3.2.5）→ <strong>Dockerfile 自作（arm64 OS + apt）で解決</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>N1</td>
+<td>Cisco IOL L2（dot1x/MAB/CoA）</td>
+<td>x86エミュ</td>
+<td><strong>arm64対象外</strong></td>
+<td>機能可否は N1 実装時に実機検証（本検証の対象外）</td>
+</tr>
+<tr>
+<td>3</td>
+<td>N2</td>
+<td><code>openziti/ziti-controller:latest</code></td>
+<td>○</td>
+<td>High</td>
+<td>manifest に arm64</td>
+</tr>
+<tr>
+<td>4</td>
+<td>N2</td>
+<td><code>openziti/ziti-router:latest</code></td>
+<td>○</td>
+<td>High</td>
+<td>manifest に arm64</td>
+</tr>
+<tr>
+<td>5</td>
+<td>N2</td>
+<td><code>netbirdio/netbird:latest</code></td>
+<td>○</td>
+<td>High</td>
+<td>manifest に amd64/arm/arm64</td>
+</tr>
+<tr>
+<td>6</td>
+<td>N2</td>
+<td><code>headscale/headscale:latest</code></td>
+<td>○</td>
+<td>High</td>
+<td>manifest に amd64/arm64</td>
+</tr>
+<tr>
+<td>7</td>
+<td>N3</td>
+<td><code>zeek/zeek:latest</code></td>
+<td>○</td>
+<td>High</td>
+<td>manifest に arm64</td>
+</tr>
+<tr>
+<td>8</td>
+<td>N3</td>
+<td><code>jasonish/suricata:latest</code></td>
+<td>○</td>
+<td>High</td>
+<td>L7 検証で実測済み（amd64/arm64）</td>
+</tr>
+<tr>
+<td>9</td>
+<td>N3</td>
+<td><code>netsampler/goflow2:latest</code></td>
+<td>○</td>
+<td>High</td>
+<td>manifest に arm64</td>
+</tr>
+<tr>
+<td>10</td>
+<td>N3</td>
+<td><code>ntop/ntopng:latest</code></td>
+<td>✕（amd64のみ）</td>
+<td><strong>High（apt導入で可）</strong></td>
+<td>公式イメージは pull 実証で <code>amd64</code>。ただし arm64 Ubuntu 24.04 に <code>ntopng</code> パッケージ候補あり（5.2.1）→ <strong>Dockerfile 自作で解決</strong></td>
+</tr>
+<tr>
+<td>11</td>
+<td>N3</td>
+<td><code>faucet/faucet</code> + <code>faucet/gauge</code></td>
+<td>○</td>
+<td>High</td>
+<td>manifest に arm64（多アーキ）</td>
+</tr>
+<tr>
+<td>12</td>
+<td>N3</td>
+<td><code>elastiflow/flow-collector</code></td>
+<td>不明</td>
+<td>Low</td>
+<td>manifest 取得不可＋重量。<strong>ntopng（apt）で足りるため不要</strong></td>
+</tr>
+<tr>
+<td>13</td>
+<td>N3/N4</td>
+<td>Open vSwitch</td>
+<td>apt</td>
+<td>High</td>
+<td>公式イメージなし。arm64 Ubuntu に <code>openvswitch-switch</code> を apt 導入で補完（Faucet と組む）</td>
+</tr>
+<tr>
+<td>14</td>
+<td>N1</td>
+<td>PacketFence</td>
+<td>✕（x86中心）</td>
+<td>Low → 代替</td>
+<td>計画どおり FreeRADIUS（apt 自作）で代替</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="重要な発見-公式イメージ-amd64-only-の2件は-apt-で解決できる" tabindex="-1">重要な発見: 公式イメージ amd64-only の2件は apt で解決できる <a class="header-anchor" href="#重要な発見-公式イメージ-amd64-only-の2件は-apt-で解決できる" aria-hidden="true">#</a></h2>
+<p>前回 L7 検証の osquery / clamav は「arm64 パッケージが<strong>存在しない</strong>」真の非対応だったが、今回の <strong>FreeRADIUS と ntopng は公式 Docker イメージが amd64 のみなだけで、arm64 の apt パッケージは存在する</strong>。したがって:</p>
+<ul>
+<li><strong>N1 FreeRADIUS</strong>: <code>docker pull freeradius/freeradius-server</code>（amd64）ではなく、<code>ubuntu:24.04</code>（arm64）ベースの Dockerfile に <code>apt-get install freeradius freeradius-utils</code> する自作イメージで arm64 ネイティブ稼働できる。</li>
+<li><strong>N3 ntopng</strong>: 同様に arm64 Ubuntu ベース＋ <code>apt-get install ntopng</code>（ntop の apt リポジトリまたは universe）で対応。重量級の ElastiFlow は不要。</li>
+</ul>
+<p>この「公式イメージ amd64-only → arm64 OS ベースの Dockerfile 自作」は、既存の vrnetlab（IOL の arm64 パッチビルド）と同じ発想であり、実現性は高い。</p>
+<h2 id="zt観点別の実装可能性判定nw-zt" tabindex="-1">ZT観点別の実装可能性判定（NW-ZT） <a class="header-anchor" href="#zt観点別の実装可能性判定nw-zt" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>N</th>
+<th>観点</th>
+<th>判定</th>
+<th>条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>N1</td>
+<td>NAC / 802.1X</td>
+<td><strong>実装可能（High）</strong></td>
+<td>FreeRADIUS は arm64 Dockerfile 自作。IOL L2 の dot1x/CoA は実機検証（N1実装時）</td>
+</tr>
+<tr>
+<td>N2</td>
+<td>SDP型ZTNA</td>
+<td><strong>実装可能（High）</strong></td>
+<td>OpenZiti が arm64 公式対応。Headscale/Netbird も可</td>
+</tr>
+<tr>
+<td>N3</td>
+<td>NDR</td>
+<td><strong>実装可能（High）</strong></td>
+<td>Zeek/Suricata/goflow2/Faucet が arm64 公式。ntopng は apt 自作。ElastiFlow は不要</td>
+</tr>
+<tr>
+<td>N4</td>
+<td>μセグ</td>
+<td><strong>実装可能（High）</strong></td>
+<td>nftables は OS 標準。IOL VLAN/ACL は実機（N1 基盤に依存）</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>結論</strong>: NW-ZT トラック N1-N4 すべて arm64 × OSS で実装見込みが立った。要注意は「FreeRADIUS・ntopng は公式イメージでなく arm64 OS ベースの Dockerfile 自作で入れる」点のみ。IOL L2 の実機機能（dot1x/CoA/動的VLAN）は N1 実装時の実機検証に切り分ける。</p>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E8%A8%88%E7%94%BB_nwzt.html">軽量検証計画_nwzt</a></li>
+<li><a href="../02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT_トラックロードマップ</a></li>
+<li><a href="%E8%BB%BD%E9%87%8F%E6%A4%9C%E8%A8%BC%E7%B5%90%E6%9E%9C_2026-07-04.html">軽量検証結果（L7トラック）</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#検証方法">検証方法</a></li>
+<li class="lvl-2"><a href="#結果表">結果表</a></li>
+<li class="lvl-2"><a href="#重要な発見-公式イメージ-amd64-only-の2件は-apt-で解決できる">重要な発見: 公式イメージ amd64-only の2件は apt で解決できる</a></li>
+<li class="lvl-2"><a href="#zt観点別の実装可能性判定nw-zt">ZT観点別の実装可能性判定（NW-ZT）</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>
