@@ -1,0 +1,19 @@
+#!/usr/bin/expect -f
+set timeout 30
+set node [lindex $argv 0]
+log_file -noappend /Users/shuya/Documents/claude/Mac仮想環境構築/31_nac_dot1x/04_構築/out_final.log
+spawn sudo docker attach --sig-proxy=false $node
+send "\r"
+expect -re {[>#]}
+send "enable\r"
+expect "#"
+send "terminal length 0\r"
+expect "#"
+send "show authentication sessions\r"
+expect "#"
+send "show authentication sessions interface Ethernet0/1 details\r"
+expect "#"
+send "show vlan brief\r"
+expect "#"
+send "\020\021"
+expect eof

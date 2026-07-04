@@ -1,0 +1,43 @@
+#!/usr/bin/expect -f
+# IOL L2 が 802.1X(dot1x) を実装しているかを判定するプローブ
+set timeout 30
+set node [lindex $argv 0]
+spawn sudo docker attach --sig-proxy=false $node
+# 初期プロンプト誘導
+send "\r"
+expect {
+  "initial configuration dialog" { send "no\r"; exp_continue }
+  "Press RETURN" { send "\r"; exp_continue }
+  -re "\[>#]" {}
+  timeout {}
+}
+send "\r"
+expect -re "\[>#]"
+send "enable\r"
+expect -re "\[>#]"
+send "terminal length 0\r"
+expect "#"
+send "configure terminal\r"
+expect -re "\\(config\\)#"
+send "aaa new-model\r"
+expect -re "\[>#]"
+send "dot1x system-auth-control\r"
+expect -re "\[>#]"
+send "interface Ethernet0/1\r"
+expect -re "\[>#]"
+send "switchport mode access\r"
+expect -re "\[>#]"
+send "authentication port-control auto\r"
+expect -re "\[>#]"
+send "dot1x pae authenticator\r"
+expect -re "\[>#]"
+send "mab\r"
+expect -re "\[>#]"
+send "end\r"
+expect "#"
+send "show dot1x all\r"
+expect "#"
+send "show aaa servers\r"
+expect "#"
+send "\r"
+expect "#"

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマ31 NAC/802.1X 試験結果（2026-07-05）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>31_nac_dot1x</span>
+<span class="sep">/</span>
+<span>05_試験</span></nav>
+      <h1 class="doc-title">テーマ31 NAC/802.1X 試験結果（2026-07-05）</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-05</span>
+        <span class="tags"><span class="tag">nac</span><span class="tag">802.1x</span><span class="tag">dot1x</span><span class="tag">freeradius</span><span class="tag">test-result</span></span>
+      </div>
+      
+      <div class="content">
+<p>NW-ZT トラック N1 のゲート条件に対する実機試験結果。</p>
+<h2 id="試験環境" tabindex="-1">試験環境 <a class="header-anchor" href="#試験環境" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ノード</th>
+<th>役割</th>
+<th>実測</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>clab-nac-sw1</td>
+<td>IOL L2-15.2 認証者</td>
+<td>802.1X 実装確認済み</td>
+</tr>
+<tr>
+<td>clab-nac-radius</td>
+<td>FreeRADIUS（arm64/apt）</td>
+<td>動的VLAN属性返却</td>
+</tr>
+<tr>
+<td>clab-nac-pc1</td>
+<td>サプリカント（alice）</td>
+<td>EAP-MD5 成功</td>
+</tr>
+<tr>
+<td>clab-nac-pc2</td>
+<td>未認証端末</td>
+<td>拒否（Unauthorized）</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="結果表" tabindex="-1">結果表 <a class="header-anchor" href="#結果表" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>試験項目</th>
+<th>期待</th>
+<th>実測</th>
+<th>判定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-N1-1</td>
+<td>IOL の 802.1X 対応</td>
+<td>dot1x 各コマンド受理</td>
+<td><code>show dot1x all</code> でポート AUTHENTICATOR、Invalid 無し</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>T-N1-2</td>
+<td>FreeRADIUS 単体認証</td>
+<td>Access-Accept + VLAN属性</td>
+<td>radtest で <code>Tunnel-Private-Group-Id=10</code> 返却</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>T-N1-3</td>
+<td>スイッチ→RADIUS 到達</td>
+<td>認証成功</td>
+<td><code>test aaa</code> = User successfully authenticated（SVI 172.31.0.1 経由）</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>T-N1-4</td>
+<td>802.1X エンドツーエンド</td>
+<td>pc1 が認証成功</td>
+<td>wpa_supplicant <code>CTRL-EVENT-EAP-SUCCESS</code></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>T-N1-5</td>
+<td>認証成功→動的VLAN</td>
+<td>Et0/1 が VLAN10 へ</td>
+<td><code>show authentication sessions</code>: alice / Authorized / <strong>Vlan: 10</strong>、<code>show vlan brief</code>: Et0/1 が BUSINESS</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>T-N1-6</td>
+<td>未認証→拒否</td>
+<td>業務網に入れない</td>
+<td>pc2/Et0/2 は Unauthorized（通信不可）</td>
+<td>✅（拒否成立）</td>
+</tr>
+<tr>
+<td>T-N1-7</td>
+<td>未認証→隔離VLAN99 自動</td>
+<td>Et0/2 が VLAN99 へ</td>
+<td>IBNS タイミング/構文の詰めが必要（残課題）</td>
+<td>◐</td>
+</tr>
+<tr>
+<td>T-N1-8</td>
+<td>CoA 強制再認証</td>
+<td>セッション再認証</td>
+<td>未実施（次段階）</td>
+<td>⬜</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="実測エビデンス要点" tabindex="-1">実測エビデンス（要点） <a class="header-anchor" href="#実測エビデンス要点" aria-hidden="true">#</a></h2>
+<pre><code class="language-text"># FreeRADIUS（スイッチ SVI 経由の認証）
+Received Access-Request Id 2 from 172.31.0.1:1645 to 172.31.0.10:1812
+Sent Access-Accept Id 2 from 172.31.0.10:1812 to 172.31.0.1:1645
+
+# pc1 サプリカント
+eth1: CTRL-EVENT-EAP-METHOD EAP vendor 0 method 4 (MD5) selected
+eth1: CTRL-EVENT-EAP-SUCCESS EAP authentication completed successfully
+
+# スイッチ 認証セッション
+User-Name:  alice
+   Status:  Authorized
+Vlan Group:  Vlan: 10
+
+# VLAN 割当
+10   BUSINESS   active   Et0/1
+</code></pre>
+<h2 id="総括" tabindex="-1">総括 <a class="header-anchor" href="#総括" aria-hidden="true">#</a></h2>
+<p><strong>ゲートの本質（認証を通った端末だけが業務 VLAN に入れる＝NAC）は実証完了。</strong> 802.1X/EAP・RADIUS 動的 VLAN が IOL × OSS（FreeRADIUS arm64）で成立することを実機で確認した。残るは未認証端末の隔離 VLAN 自動割当（T-N1-7）と CoA（T-N1-8）で、いずれも構成の詰めの段階。切り分けの詳細は <a href="../04_%E6%A7%8B%E7%AF%89/%E6%A7%8B%E7%AF%89%E3%83%AD%E3%82%B0_2026-07-05.html">構築ログ</a>。</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#試験環境">試験環境</a></li>
+<li class="lvl-2"><a href="#結果表">結果表</a></li>
+<li class="lvl-2"><a href="#実測エビデンス要点">実測エビデンス（要点）</a></li>
+<li class="lvl-2"><a href="#総括">総括</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

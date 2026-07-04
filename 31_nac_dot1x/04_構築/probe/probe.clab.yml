@@ -1,0 +1,7 @@
+name: nac-probe
+topology:
+  nodes:
+    sw1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-15.2
+      type: l2

@@ -3,6 +3,9 @@ clab-*/
 *.clab.yml.bak
 .tls/
 
+# === expect コンソール出力の一時ログ ===
+out*.log
+
 # === ライセンス素材・機器イメージバイナリ（再配布不可） ===
 *.bin
 *.qcow2

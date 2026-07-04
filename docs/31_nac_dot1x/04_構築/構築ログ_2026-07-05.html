@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマ31 NAC/802.1X 構築ログ（2026-07-05）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>31_nac_dot1x</span>
+<span class="sep">/</span>
+<span>04_構築</span></nav>
+      <h1 class="doc-title">テーマ31 NAC/802.1X 構築ログ（2026-07-05）</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-05</span>
+        <span class="tags"><span class="tag">nac</span><span class="tag">802.1x</span><span class="tag">dot1x</span><span class="tag">freeradius</span><span class="tag">iol</span><span class="tag">iouyap</span></span>
+      </div>
+      
+      <div class="content">
+<p>NW-ZT トラック N1 の実機実装。IOL L2 スイッチ＋FreeRADIUS＋サプリカントで 802.1X 認証と動的 VLAN を成立させた。</p>
+<h2 id="到達点実証済み" tabindex="-1">到達点（実証済み） <a class="header-anchor" href="#到達点実証済み" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>IOL L2-15.2 は 802.1X を実装している</strong>（<code>dot1x system-auth-control</code> / <code>authentication port-control auto</code> / <code>dot1x pae authenticator</code> / <code>mab</code> すべて受理、<code>show dot1x all</code> でポートが AUTHENTICATOR）。</li>
+<li><strong>FreeRADIUS（arm64、apt 導入）が動的 VLAN 属性を返す</strong>（Access-Accept + <code>Tunnel-Private-Group-Id=10</code>）。</li>
+<li><strong>802.1X エンドツーエンド成功</strong>: pc1 の wpa_supplicant（EAP-MD5, alice）→ スイッチ → FreeRADIUS で認証成功し、<strong>Et0/1 が動的に VLAN 10（BUSINESS）へ割当</strong>（<code>show authentication sessions</code> = alice / Authorized / Vlan: 10）。</li>
+</ul>
+<h2 id="詰まりどころと解決重要な教訓" tabindex="-1">詰まりどころと解決（重要な教訓） <a class="header-anchor" href="#詰まりどころと解決重要な教訓" aria-hidden="true">#</a></h2>
+<h3 id="1-最大の落とし穴-iouyap-未起動でデータプレーンが全断" tabindex="-1">1. 最大の落とし穴: iouyap 未起動でデータプレーンが全断 <a class="header-anchor" href="#1-最大の落とし穴-iouyap-未起動でデータプレーンが全断" aria-hidden="true">#</a></h3>
+<ul>
+<li>症状: スイッチ→RADIUS ping 0%、<code>test aaa</code> = User rejected、FreeRADIUS に要求が届かない。IOL の Et0/3 は <strong>入力 0 パケット</strong>（出力はある）。</li>
+<li>切り分け: radius→pc1（linux 同士）は疎通 OK。radius 送信フレームは <strong>sw1 名前空間の veth までは届く</strong>（RX カウンタ +5）が、<strong>IOL の RX に入らない</strong>。</li>
+<li>根本原因: clab の cisco_iol は <strong>iouyap</strong> が IOL の UDP イーサネットセグメントと Linux veth を中継する方式。lab-dir に <code>iouyap.ini</code>/<code>NETMAP</code> があるのに <strong>iouyap プロセスが未起動</strong>だった（<code>containerlab deploy</code> を直接叩き、iouyap を起動する <a href="http://deploy.sh">deploy.sh</a> を使わなかったため）。</li>
+<li>解決: <code>sudo docker exec -d -w /iol clab-nac-sw1 /usr/bin/iouyap 513</code> で起動 → 即疎通（ping 100%、test aaa 成功）。</li>
+<li><strong>恒久対策</strong>: <code>deploy.sh</code> に <code>start_iouyap()</code> を組み込み（テーマ22/26 と同じ思想）。これが N1 再現の必須手順。</li>
+</ul>
+<h3 id="2-radius-到達は管理ifでなくデータポートsviで" tabindex="-1">2. RADIUS 到達は「管理IF」でなく「データポート＋SVI」で <a class="header-anchor" href="#2-radius-到達は管理ifでなくデータポートsviで" aria-hidden="true">#</a></h3>
+<ul>
+<li>IOL L2 の管理 IF（Et0/0）経由での RADIUS 到達は不安定だったため、<strong>RADIUS をデータポート Et0/3（VLAN100）に接続し、SVI <code>interface Vlan100</code>（172.31.0.1）から到達</strong>する構成にした。実機スイッチが RADIUS に到達する標準的なやり方で、教育的にも良い。</li>
+</ul>
+<h3 id="3-コンソール自動化の癖" tabindex="-1">3. コンソール自動化の癖 <a class="header-anchor" href="#3-コンソール自動化の癖" aria-hidden="true">#</a></h3>
+<ul>
+<li>clab cisco_iol のコンソールは「コンテナ主プロセスの stdio」＝ <code>docker attach</code> 方式。スクリプト化は expect で駆動。</li>
+<li>長い設定行（<code>radius-server host ...</code>）は<strong>コンソールの行折返しで化ける</strong> → <code>radius server</code> ブロック形式の短い行に分割して回避。</li>
+<li>attach は多重起動するとコンソール I/O が壊れる。1 セッション完結＋実行後 <code>pkill docker attach</code> で掃除する運用にした。</li>
+</ul>
+<h2 id="再現手順後から自分で構築する場合" tabindex="-1">再現手順（後から自分で構築する場合） <a class="header-anchor" href="#再現手順後から自分で構築する場合" aria-hidden="true">#</a></h2>
+<ol>
+<li><code>04_構築/freeradius/</code> と <code>client/</code> のイメージをビルド（<code>docker build -t nac-freeradius:local</code> / <code>nac-client:local</code>）。</li>
+<li><code>./deploy.sh deploy</code>（clab deploy → iouyap 起動 → オフロード無効化まで自動）。</li>
+<li><code>sudo expect run_nac.exp clab-nac-sw1 sw1_dot1x.cfg</code> でスイッチ設定投入。</li>
+<li>pc1 で <code>wpa_supplicant -i eth1 -D wired -c /etc/wpa_supplicant.conf</code> を起動。</li>
+<li><code>sudo expect verify_final.exp clab-nac-sw1</code> で <code>show authentication sessions</code> を確認（Et0/1 が VLAN 10）。</li>
+<li>片付け: <code>./deploy.sh destroy</code>。</li>
+</ol>
+<h2 id="残課題次段階" tabindex="-1">残課題（次段階） <a class="header-anchor" href="#残課題次段階" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>pc2（未認証）→ 隔離 VLAN 99 の自動割当</strong>: IBNS 1.0 の <code>authentication event no-response/fail action authorize vlan 99</code> のタイミング/構文を 15.2 で詰める（現状 pc1 の認証成功→VLAN10 は確実。未認証ポートは Unauthorized で通信不可＝拒否は成立）。</li>
+<li><strong>CoA（Change of Authorization）</strong>: <code>radclient</code> から Disconnect/CoA を送って稼働セッションの強制再認証を実演。</li>
+<li>Keycloak を LDAP/OIDC バックエンドに連携（発展）。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#到達点実証済み">到達点（実証済み）</a></li>
+<li class="lvl-2"><a href="#詰まりどころと解決重要な教訓">詰まりどころと解決（重要な教訓）</a></li>
+<li class="lvl-3"><a href="#1-最大の落とし穴-iouyap-未起動でデータプレーンが全断">1. 最大の落とし穴: iouyap 未起動でデータプレーンが全断</a></li>
+<li class="lvl-3"><a href="#2-radius-到達は管理ifでなくデータポートsviで">2. RADIUS 到達は「管理IF」でなく「データポート＋SVI」で</a></li>
+<li class="lvl-3"><a href="#3-コンソール自動化の癖">3. コンソール自動化の癖</a></li>
+<li class="lvl-2"><a href="#再現手順後から自分で構築する場合">再現手順（後から自分で構築する場合）</a></li>
+<li class="lvl-2"><a href="#残課題次段階">残課題（次段階）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

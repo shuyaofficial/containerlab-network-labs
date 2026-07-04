@@ -1,0 +1,33 @@
+name: nac
+# N1 NAC / 802.1X ラボ
+# sw1(IOL L2 認証者) + radius(FreeRADIUS) + pc1(サプリカント) / pc2(未認証端末)
+mgmt:
+  network: clab-nac-mgmt
+  ipv4-subnet: 172.20.20.0/24
+
+topology:
+  nodes:
+    sw1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-15.2
+      type: l2
+      mgmt-ipv4: 172.20.20.11
+    radius:
+      kind: linux
+      image: nac-freeradius:local
+      mgmt-ipv4: 172.20.20.10
+      exec:
+        - ip addr add 172.31.0.10/24 dev eth1
+    pc1:
+      kind: linux
+      image: nac-client:local
+      mgmt-ipv4: 172.20.20.21
+    pc2:
+      kind: linux
+      image: nac-client:local
+      mgmt-ipv4: 172.20.20.22
+
+  links:
+    - endpoints: ["sw1:eth1", "pc1:eth1"]
+    - endpoints: ["sw1:eth2", "pc2:eth1"]
+    - endpoints: ["sw1:eth3", "radius:eth1"]

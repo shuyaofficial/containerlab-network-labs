@@ -1,0 +1,17 @@
+# 認可プロファイル（FreeRADIUS の users ファイル相当）
+# 認証成功時に動的 VLAN を返す（Tunnel-* 3属性が VLAN 割当の肝）。
+
+# --- 802.1X ユーザー alice → 業務 VLAN 10 ---
+alice   Cleartext-Password := "alicepass"
+        Tunnel-Type = VLAN,
+        Tunnel-Medium-Type = IEEE-802,
+        Tunnel-Private-Group-Id = "10"
+
+# --- MAB 例: MAC を利用者名として許可する場合（pc1 の MAC を後で追記可）---
+# aabbccddeeff  Cleartext-Password := "aabbccddeeff"
+#        Tunnel-Type = VLAN,
+#        Tunnel-Medium-Type = IEEE-802,
+#        Tunnel-Private-Group-Id = "10"
+
+# それ以外は拒否（明示。既定でも Reject だが学習用に記す）
+DEFAULT Auth-Type := Reject
