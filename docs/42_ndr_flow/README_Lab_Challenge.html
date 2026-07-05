@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマ42 NDR（east-west 可視化）— NW-ZT N3 実装</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>42_ndr_flow</span></nav>
+      <h1 class="doc-title">テーマ42 NDR（east-west 可視化）— NW-ZT N3 実装</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-05</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">ndr</span><span class="tag">suricata</span><span class="tag">netflow</span><span class="tag">east-west</span></span>
+      </div>
+      
+      <div class="content">
+<p>Darktrace / Cisco Secure Network Analytics（Stealthwatch）が担う NDR の核心「<strong>同一セグメントの端末同士（east-west）の通信を経路に割り込まず観測し、横方向の偵察・スキャンを検知してフローで可視化する</strong>」を、OSS の Suricata + Loki/Grafana で再現する。テーマZERO <a href="../ZERO_zero_trust/02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT トラック N3</a> の実装先。仕組みの解説は <a href="../ZERO_zero_trust/%E8%A7%A3%E8%AA%AC/nwzt_N3_%E8%A7%A3%E8%AA%AC.html">解説: N3 NDR</a>。</p>
+<h2 id="構成east-west-監視" tabindex="-1">構成（east-west 監視） <a class="header-anchor" href="#構成east-west-監視" aria-hidden="true">#</a></h2>
+<pre class="mermaid">graph LR
+    subgraph LAN[&quot;ndr-lan 172.40.0.0/24（bridge=ndr-br0）&quot;]
+      ATT[&quot;attacker&lt;br/&gt;172.40.0.21&lt;br/&gt;nmap&quot;]
+      VIC[&quot;victim&lt;br/&gt;172.40.0.22&lt;br/&gt;nginx&quot;]
+      ATT --&gt;|&quot;east-west&lt;br/&gt;SYN scan / HTTP&quot;| VIC
+    end
+    SURI[&quot;suricata（host mode）&lt;br/&gt;-i ndr-br0&lt;br/&gt;DPI + flow&quot;]
+    LAN -.-&gt;|&quot;promiscuous&lt;br/&gt;キャプチャ&quot;| SURI
+    SURI --&gt;|&quot;eve.json&lt;br/&gt;alert + flow&quot;| PT[&quot;promtail&quot;]
+    PT --&gt;|&quot;push&quot;| LOKI[&quot;loki :3100&quot;]
+    LOKI --&gt; GRAF[&quot;grafana :3000&lt;br/&gt;LogQL / datasource&quot;]
+    SURI -. &quot;NetFlow は softflowd(arm64)制限で&lt;br/&gt;Suricata flow に代替&quot; .-&gt; GF[&quot;goflow2 :2055&lt;br/&gt;（受信は可）&quot;]
+</pre>
+<ul>
+<li><strong>attacker / victim は同一サブネット</strong>（L2 隣接）＝ east-west。両者間フレームは bridge <code>ndr-br0</code> を横方向に流れる。</li>
+<li><strong>Suricata は host mode で ndr-br0 を promiscuous 監視</strong>。SPAN 配線なしに east-west を複製なしで直接観測（経路に割り込まない＝遅延・切断なし）。</li>
+<li><strong>eve.json（alert + flow）を Promtail → Loki → Grafana</strong> に集約。Phase 3 の Loki/Grafana 相当を N3 の集約先として再利用する思想。</li>
+</ul>
+<h2 id="前提環境" tabindex="-1">前提環境 <a class="header-anchor" href="#前提環境" aria-hidden="true">#</a></h2>
+<ul>
+<li>OrbStack VM <code>clab</code>（arm64）、<code>ssh clab@orb</code>。docker（compose 不要、<code>docker run</code> オーケストレーション）。</li>
+<li>イメージ（全て arm64 実測済み）: <code>jasonish/suricata:latest</code>（8.0.5）、<code>grafana/loki</code>、<code>grafana/promtail</code>、<code>grafana/grafana</code>（13.1.0）、<code>netsampler/goflow2</code>、<code>wbitt/network-multitool</code>、<code>nginx:alpine</code>。</li>
+</ul>
+<h2 id="手順04_構築" tabindex="-1">手順（04_構築/） <a class="header-anchor" href="#手順04_構築" aria-hidden="true">#</a></h2>
+<ol>
+<li><code>./deploy.sh deploy</code> — ndr-lan 作成＋attacker/victim/suricata 起動（G1）</li>
+<li><code>./deploy.sh scan</code> — attacker→victim へ SYN スキャン（G2 トリガ）</li>
+<li><code>./deploy.sh eve</code> — eve.json の alert / flow を抜粋（G2/G3 確認）</li>
+<li><code>./deploy.sh monitoring</code> — Loki+Promtail+Grafana 起動（G4 集約）</li>
+<li><code>./deploy.sh netflow</code> — goflow2+softflowd で NetFlow を試す（G5 ボーナス、制限あり）</li>
+<li>片付け: <code>./deploy.sh destroy</code></li>
+</ol>
+<p>カスタム検知ルールは <a href="04_%E6%A7%8B%E7%AF%89/suricata/local.rules">suricata/local.rules</a>（sid:1000001 = east-west SYN scan、sid:1000002 = HTTP to victim）。</p>
+<h2 id="到達点" tabindex="-1">到達点 <a class="header-anchor" href="#到達点" aria-hidden="true">#</a></h2>
+<p>east-west 可視化の核心を実証済み（<a href="05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E7%B5%90%E6%9E%9C_2026-07-05.html">試験結果</a>）。SYN スキャンが <strong>DPI（sid:1000001 alert）とフロー（5-tuple flow 300 件超）の両面</strong>で捉えられ、Loki/Grafana で LogQL 抽出できる。詰まりどころ（bridge 名固定、Grafana↔Loki の host mode、softflowd の arm64 制限）は <a href="04_%E6%A7%8B%E7%AF%89/%E6%A7%8B%E7%AF%89%E3%83%AD%E3%82%B0_2026-07-05.html">構築ログ</a>。</p>
+<h2 id="学べること" tabindex="-1">学べること <a class="header-anchor" href="#学べること" aria-hidden="true">#</a></h2>
+<p>east-west と north-south の観測配置の違い、bridge を L2 セグメントとみなす monitoring、Suricata の DPI（シグネチャ）とフロー統計の 2 系統、threshold ルールによる誤爆抑制、eve.json の Loki 集約と LogQL、NetFlow エクスポータ/コレクタの役割分担。商用 NDR（Darktrace/Stealthwatch）の内部構造理解。</p>
+<h2 id="商用製品との対応" tabindex="-1">商用製品との対応 <a class="header-anchor" href="#商用製品との対応" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>商用製品</th>
+<th>アプローチ</th>
+<th>本ラボの OSS 対応</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Darktrace</td>
+<td>DPI + 教師なし学習（平常時からのズレ）</td>
+<td>Suricata の DPI シグネチャ（sid:1000001）＝「既知の悪性パターン」側を追体験。ML ベースライン学習は簡略化（固定閾値 threshold で代替）</td>
+</tr>
+<tr>
+<td>Cisco Secure Network Analytics（Stealthwatch）</td>
+<td>NetFlow ベース挙動分析（5-tuple 統計から異常）</td>
+<td>Suricata の flow イベント（5-tuple/pkts/bytes）＝「関係だけを見る」フロー側を追体験。goflow2 は NetFlow コレクタとして受信能力を確認済み</td>
+</tr>
+</tbody>
+</table></div>
+<p>north-south の IDS（<a href="../ZERO_zero_trust/%E8%A7%A3%E8%AA%AC/nwzt_N4_%E8%A7%A3%E8%AA%AC.html">N4 解説</a> や L7 Phase4 の境界 Suricata）が「境界で外向きを止める」のに対し、N3 は「内部の横移動に気づく」。同じ Suricata でも<strong>どこに置き何を見るか</strong>が侵入検知と侵害検知を分ける。</p>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../ZERO_zero_trust/02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT トラックロードマップ N3</a></li>
+<li><a href="../ZERO_zero_trust/%E8%A7%A3%E8%AA%AC/nwzt_N3_%E8%A7%A3%E8%AA%AC.html">解説: N3 NDR（Zeek/Suricata + goflow2 + ntopng）</a></li>
+<li><a href="04_%E6%A7%8B%E7%AF%89/%E6%A7%8B%E7%AF%89%E3%83%AD%E3%82%B0_2026-07-05.html">構築ログ</a> / <a href="05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E7%B5%90%E6%9E%9C_2026-07-05.html">試験結果</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#構成east-west-監視">構成（east-west 監視）</a></li>
+<li class="lvl-2"><a href="#前提環境">前提環境</a></li>
+<li class="lvl-2"><a href="#手順04_構築">手順（04_構築/）</a></li>
+<li class="lvl-2"><a href="#到達点">到達点</a></li>
+<li class="lvl-2"><a href="#学べること">学べること</a></li>
+<li class="lvl-2"><a href="#商用製品との対応">商用製品との対応</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

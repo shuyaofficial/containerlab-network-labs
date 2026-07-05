@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマ42 NDR（east-west 可視化）試験結果（2026-07-05）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>42_ndr_flow</span>
+<span class="sep">/</span>
+<span>05_試験</span></nav>
+      <h1 class="doc-title">テーマ42 NDR（east-west 可視化）試験結果（2026-07-05）</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-05</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">ndr</span><span class="tag">suricata</span><span class="tag">netflow</span><span class="tag">test-result</span></span>
+      </div>
+      
+      <div class="content">
+<p>NW-ZT トラック N3。NDR の本質「<strong>同一サブネットの端末同士（east-west）の通信を、経路に割り込まず観測し、横方向の偵察・スキャンを検知してフローとして可視化・集約する</strong>」を実機で実証。</p>
+<h2 id="試験環境docker-arm64" tabindex="-1">試験環境（docker, arm64） <a class="header-anchor" href="#試験環境docker-arm64" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>コンテナ</th>
+<th>ネットワーク</th>
+<th>役割</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>attacker</td>
+<td>ndr-lan 172.40.0.21</td>
+<td>wbitt/network-multitool。nmap でスキャンする側</td>
+</tr>
+<tr>
+<td>victim</td>
+<td>ndr-lan 172.40.0.22</td>
+<td>nginx:alpine。狙われる側</td>
+</tr>
+<tr>
+<td>suricata</td>
+<td><strong>host mode（ndr-br0 監視）</strong></td>
+<td>jasonish/suricata 8.0.5。DPI + flow 記録</td>
+</tr>
+<tr>
+<td>loki / promtail / grafana</td>
+<td>host / host / host</td>
+<td>eve.json 集約・可視化（grafana 13.1.0）</td>
+</tr>
+<tr>
+<td>goflow2 / softflowd</td>
+<td>host / host</td>
+<td>NetFlow 受信/エクスポート試行（ボーナス、代替判断あり）</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li><strong>east-west の定義</strong>: attacker と victim は同一サブネット 172.40.0.0/24（L2 隣接）。両者間の通信は docker bridge <code>ndr-br0</code> を横方向に流れる。Suricata はその bridge を promiscuous 監視し、north-south（境界越え）ではなく east-west を捉える。</li>
+</ul>
+<h2 id="結果表" tabindex="-1">結果表 <a class="header-anchor" href="#結果表" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>ゲート</th>
+<th>期待</th>
+<th>実測</th>
+<th>判定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>G1</td>
+<td>起動</td>
+<td>attacker/victim/suricata 起動・サブネット確認</td>
+<td>3 コンテナ Up、subnet=172.40.0.0/24、bridge=ndr-br0 固定、attacker=.21/victim=.22 割当、suricata <code>Engine started</code>（2 rules loaded）</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>G2</td>
+<td><strong>east-west 検知</strong></td>
+<td>SYN スキャンで sid:1000001 alert</td>
+<td><code>signature_id:1000001 &quot;ZT-NDR east-west SYN scan&quot;</code> が 172.40.0.21→172.40.0.22 で発報（in_iface=ndr-br0）</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>G3</td>
+<td>flow 可視化</td>
+<td>east-west flow が eve.json に出る</td>
+<td><code>event_type:flow</code> src=172.40.0.21→dest=172.40.0.22 を 300 件超記録（5-tuple/pkts/bytes/TCP flags 付き）</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>G4</td>
+<td>集約</td>
+<td>Loki に eve が入る・Grafana 起動</td>
+<td>Promtail push 成功（job=suricata）、LogQL で alert/flow 抽出、Grafana health=ok・Loki datasource 自動プロビジョン</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>G5</td>
+<td>NetFlow（ボーナス）</td>
+<td>goflow2 で NetFlow 受信 or 代替判断</td>
+<td>goflow2 は arm64 で NetFlow 待受起動可。softflowd(arm64) は processed=0 でフロー化不可 → <strong>Suricata flow で代替</strong>（判断記録）</td>
+<td>✅（代替）</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="実測エビデンス要点" tabindex="-1">実測エビデンス（要点） <a class="header-anchor" href="#実測エビデンス要点" aria-hidden="true">#</a></h2>
+<h3 id="g2--east-west-syn-scan-alert最重要ゲート" tabindex="-1">G2 — east-west SYN scan alert（最重要ゲート） <a class="header-anchor" href="#g2--east-west-syn-scan-alert最重要ゲート" aria-hidden="true">#</a></h3>
+<pre><code class="language-json"><span class="hljs-punctuation">{</span><span class="hljs-attr">&quot;in_iface&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;ndr-br0&quot;</span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;event_type&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;alert&quot;</span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;src_ip&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;172.40.0.21&quot;</span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;src_port&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-number">56435</span><span class="hljs-punctuation">,</span>
+ <span class="hljs-attr">&quot;dest_ip&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;172.40.0.22&quot;</span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;dest_port&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-number">121</span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;proto&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;TCP&quot;</span><span class="hljs-punctuation">,</span>
+ <span class="hljs-attr">&quot;alert&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-punctuation">{</span><span class="hljs-attr">&quot;signature_id&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-number">1000001</span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;rev&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-number">1</span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;signature&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;ZT-NDR east-west SYN scan&quot;</span><span class="hljs-punctuation">,</span>
+          <span class="hljs-attr">&quot;category&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;Attempted Information Leak&quot;</span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;severity&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-number">2</span><span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;direction&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;to_server&quot;</span><span class="hljs-punctuation">}</span>
+</code></pre>
+<ul>
+<li>threshold（15 回/10 秒で 1 発報）が効き、スキャン全体に対し sid:1000001 は 1 件＝誤爆なし。</li>
+<li>補助ルール sid:1000002（HTTP to victim）も east-west HTTP を台帳として発報。</li>
+</ul>
+<h3 id="g3--east-west-flownetflow-相当の-5-tuple-統計" tabindex="-1">G3 — east-west flow（NetFlow 相当の 5-tuple 統計） <a class="header-anchor" href="#g3--east-west-flownetflow-相当の-5-tuple-統計" aria-hidden="true">#</a></h3>
+<pre><code class="language-json"><span class="hljs-punctuation">{</span><span class="hljs-attr">&quot;in_iface&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;ndr-br0&quot;</span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;event_type&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;flow&quot;</span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;src_ip&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;172.40.0.21&quot;</span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;dest_ip&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;172.40.0.22&quot;</span><span class="hljs-punctuation">,</span>
+ <span class="hljs-attr">&quot;proto&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;TCP&quot;</span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;flow&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-punctuation">{</span><span class="hljs-attr">&quot;pkts_toserver&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-number">1</span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;pkts_toclient&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-number">1</span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;bytes_toserver&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-number">58</span><span class="hljs-punctuation">,</span>
+ <span class="hljs-attr">&quot;bytes_toclient&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-number">54</span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;state&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;closed&quot;</span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;reason&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;timeout&quot;</span><span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+ <span class="hljs-attr">&quot;tcp&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-punctuation">{</span><span class="hljs-attr">&quot;syn&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;rst&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;ack&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-literal"><span class="hljs-keyword">true</span></span><span class="hljs-punctuation">,</span><span class="hljs-attr">&quot;state&quot;</span><span class="hljs-punctuation">:</span><span class="hljs-string">&quot;closed&quot;</span><span class="hljs-punctuation">}</span><span class="hljs-punctuation">}</span>
+</code></pre>
+<ul>
+<li>172.40.0.21 発の flow は 300 件超＝「1 送信元→多数宛先」というスキャンの形が 5-tuple で現れる。</li>
+<li>Suricata capture 統計: <code>kernel_packets=3492 kernel_drops=0</code>（bridge から取りこぼしなくキャプチャ）。</li>
+</ul>
+<h3 id="g4--lokigrafana-集約" tabindex="-1">G4 — Loki/Grafana 集約 <a class="header-anchor" href="#g4--lokigrafana-集約" aria-hidden="true">#</a></h3>
+<pre><code class="language-text"># Promtail が push したラベル
+GET /loki/api/v1/label/job/values        → {&quot;data&quot;:[&quot;suricata&quot;]}
+GET /loki/api/v1/label/event_type/values → {&quot;data&quot;:[&quot;alert&quot;,&quot;fileinfo&quot;,&quot;flow&quot;,&quot;http&quot;,&quot;stats&quot;]}
+
+# LogQL で east-west alert を絞る
+{job=&quot;suricata&quot;,event_type=&quot;alert&quot;}      → 10 行、全て 172.40.0.21-&gt;172.40.0.22
+
+# Grafana
+GET /api/health       → {&quot;database&quot;:&quot;ok&quot;,&quot;version&quot;:&quot;13.1.0&quot;}
+GET /api/datasources  → name=Loki type=loki url=http://localhost:3100 isDefault=True
+</code></pre>
+<h3 id="g5--netflow-代替判断" tabindex="-1">G5 — NetFlow 代替判断 <a class="header-anchor" href="#g5--netflow-代替判断" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">goflow2 :  msg=&quot;starting collection&quot; scheme=netflow port=2055   ← arm64 で受信待受 起動可
+softflowd: Packets received by libpcap: 156                     ← bridge から受信はできる
+           Packets processed: 0 / Flows exported: 0             ← が、フロー化できず未送出
+→ east-west フロー統計は Suricata flow（G3, 300 件超）で代替。goflow2 の受信能力は確認済み。
+</code></pre>
+<h2 id="総括" tabindex="-1">総括 <a class="header-anchor" href="#総括" aria-hidden="true">#</a></h2>
+<p><strong>NDR の核心を OSS（Suricata + Loki/Grafana, arm64）で east-west にフォーカスして実証完了。</strong> docker bridge を L2 セグメントに見立て、Suricata を host mode で bridge に張り付けることで、SPAN 配線なしに east-west フレームを直接監視できた。SYN スキャン（横方向の偵察）が <strong>DPI（sid:1000001 alert）とフロー（5-tuple flow 300 件超）の両面</strong>で捉えられ、それが Loki/Grafana に集約されて LogQL で絞り込める。これは Darktrace（DPI 振る舞い）と Cisco Secure Network Analytics/Stealthwatch（NetFlow ベース挙動分析）の 2 系統を 1 センサで追体験する構成。</p>
+<p>north-south の IDS（境界の関所で外向きを見る）と違い、N3 は<strong>内部端末同士の横方向を見る</strong>点が本質。「侵害は起きる前提、起きた後に横移動に気づく」という NDR の思想を実機で確認した。NetFlow の完全パイプライン（softflowd→goflow2）は arm64 softflowd の制限で Suricata flow に代替したが、フロー統計としての情報（誰が誰とどれだけ）は等価に取得できている。詳細な詰まりどころは <a href="../04_%E6%A7%8B%E7%AF%89/%E6%A7%8B%E7%AF%89%E3%83%AD%E3%82%B0_2026-07-05.html">構築ログ</a>。</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#試験環境docker-arm64">試験環境（docker, arm64）</a></li>
+<li class="lvl-2"><a href="#結果表">結果表</a></li>
+<li class="lvl-2"><a href="#実測エビデンス要点">実測エビデンス（要点）</a></li>
+<li class="lvl-3"><a href="#g2--east-west-syn-scan-alert最重要ゲート">G2 — east-west SYN scan alert（最重要ゲート）</a></li>
+<li class="lvl-3"><a href="#g3--east-west-flownetflow-相当の-5-tuple-統計">G3 — east-west flow（NetFlow 相当の 5-tuple 統計）</a></li>
+<li class="lvl-3"><a href="#g4--lokigrafana-集約">G4 — Loki/Grafana 集約</a></li>
+<li class="lvl-3"><a href="#g5--netflow-代替判断">G5 — NetFlow 代替判断</a></li>
+<li class="lvl-2"><a href="#総括">総括</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

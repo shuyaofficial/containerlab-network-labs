@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマ42 NDR（east-west 可視化）構築ログ（2026-07-05）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>42_ndr_flow</span>
+<span class="sep">/</span>
+<span>04_構築</span></nav>
+      <h1 class="doc-title">テーマ42 NDR（east-west 可視化）構築ログ（2026-07-05）</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-05</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">ndr</span><span class="tag">suricata</span><span class="tag">netflow</span><span class="tag">docker</span></span>
+      </div>
+      
+      <div class="content">
+<p>NW-ZT トラック N3 の実機実装。docker bridge を east-west セグメントに見立て、Suricata を host mode で bridge に張り付けて配下コンテナ間フレームを DPI 監視し、eve.json（alert/flow）を Loki/Promtail/Grafana に集約した。</p>
+<h2 id="設計判断-clab-でなく-docker-で構築" tabindex="-1">設計判断: clab でなく docker で構築 <a class="header-anchor" href="#設計判断-clab-でなく-docker-で構築" aria-hidden="true">#</a></h2>
+<p>N3 の主眼は「同一サブネット（L2 隣接）の端末同士＝east-west をセンサでどう捉えるか」。IOL の SPAN を使う本来構成もあるが、本ラボは <strong>docker network の bridge そのものを監視対象 L2 セグメント</strong>とみなし、Suricata を host mode でその bridge インターフェースに直接張り付ける方式にした。ミラー（SPAN）配線の代わりに <strong>bridge の promiscuous キャプチャ</strong>が east-west フレームを複製なしで直接見られる。N1（IOL の L2）と違い NOS 不要で再現性が高い。</p>
+<h2 id="到達点実証済み" tabindex="-1">到達点（実証済み） <a class="header-anchor" href="#到達点実証済み" aria-hidden="true">#</a></h2>
+<ul>
+<li>全イメージ arm64 対応（suricata 8.0.5 / loki / promtail / grafana 13.1.0 / goflow2、2026-07-05 実測 pull 成功）。</li>
+<li><strong>east-west 検知</strong>: attacker(172.40.0.21)→victim(172.40.0.22) の SYN スキャンで sid:1000001 が発報。</li>
+<li><strong>flow 可視化</strong>: 同 east-west を 5-tuple のフローとして eve.json に記録（172.40.0.21 発 300 件超）。</li>
+<li><strong>集約</strong>: Promtail が eve.json を Loki へ push、LogQL <code>{job=&quot;suricata&quot;,event_type=&quot;alert&quot;}</code> で alert 抽出。Grafana に Loki を自動プロビジョン。</li>
+</ul>
+<h2 id="構成の要点" tabindex="-1">構成の要点 <a class="header-anchor" href="#構成の要点" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>bridge 名を固定</strong>: <code>docker network create --opt com.docker.network.bridge.name=ndr-br0</code> で bridge if 名を <code>ndr-br0</code> に固定。inspect でも <code>bridge=ndr-br0</code> を確認。名前を固定しないと Suricata の <code>-i</code> 指定先が起動ごとに変わる。</li>
+<li><strong>Suricata は host mode + <code>-i ndr-br0</code></strong>: <code>--network host --cap-add NET_ADMIN --cap-add NET_RAW --cap-add SYS_NICE</code>。ホストの他 IF には触れず ndr-br0 のみ監視。</li>
+<li><strong>HOME_NET/ルールはコマンドラインで上書き</strong>: 巨大な suricata.yaml（2362 行）を丸ごと bind せず、<code>-S /rules/local.rules</code>（追加ロード）＋ <code>--set vars.address-groups.HOME_NET=&quot;[172.40.0.0/24]&quot;</code> で最小差分にした。eve-log の alert/flow はデフォルトで有効なので触らない。</li>
+<li><strong>eve.json を Mac 側に bind</strong>: <code>suricata/log/</code> を <code>/var/log/suricata</code> に bind し、Mac から直接 grep 可能に。</li>
+</ul>
+<h2 id="詰まりどころと解決" tabindex="-1">詰まりどころと解決 <a class="header-anchor" href="#詰まりどころと解決" aria-hidden="true">#</a></h2>
+<h3 id="1-suricata-のルールが確実にロードされたかの確認最重要ゲート前チェック" tabindex="-1">1. Suricata のルールが確実にロードされたかの確認（最重要ゲート前チェック） <a class="header-anchor" href="#1-suricata-のルールが確実にロードされたかの確認最重要ゲート前チェック" aria-hidden="true">#</a></h3>
+<ul>
+<li>症状候補: ルール 0 件だと SYN スキャンしても sid:1000001 が出ない。</li>
+<li>確認: <code>suricata.log</code> に <code>2 rules successfully loaded, 0 rules failed</code>、<code>runmodes: ndr-br0: creating 10 threads</code> を確認してから G2 に進んだ。<strong>「検知が出ない」を切り分ける前に、まずルール読込と監視 IF を確認する</strong>のが定石。</li>
+</ul>
+<h3 id="2-grafana-から-host-の-loki3100-に届かない問題" tabindex="-1">2. Grafana から host の Loki(3100) に届かない問題 <a class="header-anchor" href="#2-grafana-から-host-の-loki3100-に届かない問題" aria-hidden="true">#</a></h3>
+<ul>
+<li>症状想定: Grafana を bridge（<code>-p 3000:3000</code>）で起動すると、datasource url=<code>localhost:3100</code> はコンテナ内 localhost を指し Loki に届かない。</li>
+<li>解決: <strong>Grafana も host mode で起動</strong>。Loki は <code>-p 3100:3100</code> で host に publish 済みなので、host mode の Grafana から <code>localhost:3100</code> で確実に届く。datasource は provisioning で自動投入（isDefault=True を API で確認）。</li>
+</ul>
+<h3 id="3-suricata-flow-はタイムアウト後に出る" tabindex="-1">3. Suricata flow はタイムアウト後に出る <a class="header-anchor" href="#3-suricata-flow-はタイムアウト後に出る" aria-hidden="true">#</a></h3>
+<ul>
+<li>症状: スキャン直後は flow イベントがほぼ出ない（alert は即時）。</li>
+<li>原因: Suricata の flow イベントはフローが閉じる/タイムアウトしてから eve.json に書かれる。</li>
+<li>対応: 試験では <code>until grep ...; do sleep 5; done</code> でポーリング待機。数十秒でフローがタイムアウトし 300 件超の east-west flow が出た。</li>
+</ul>
+<h3 id="4-netflow-エクスポータsoftflowdが-arm64bridge-でフロー化できないg5-代替判断" tabindex="-1">4. NetFlow エクスポータ（softflowd）が arm64/bridge でフロー化できない（G5 代替判断） <a class="header-anchor" href="#4-netflow-エクスポータsoftflowdが-arm64bridge-でフロー化できないg5-代替判断" aria-hidden="true">#</a></h3>
+<ul>
+<li>症状: softflowd v1.1.0(alpine/arm64) は <code>Packets received by libpcap: 156</code> と ndr-br0 のパケットを受けるが <code>Packets processed: 0</code>／<code>Flows exported: 0</code>。goflow2 に何も届かない。</li>
+<li>切り分け: goflow2 自体は host mode で <code>netflow://:2055</code> 待受を起動できる（arm64 実証済み）。softflowd 側でフロー化が起きていない（libpcap 受信はできるが処理 0）ため、bridge の DLT 扱いに起因する softflowd 側の問題と判断。BPF フィルタ <code>ip</code> 付与・短命フロー（maxlife=3）でも processed=0 のまま。</li>
+<li><strong>代替判断</strong>: east-west の<strong>フロー統計は Suricata の flow イベントで代替</strong>（5-tuple・バイト/パケット数を持ち NetFlow と等価な情報。G3 で 300 件超を実証済み）。無理に softflowd 深追いはせず、<code>deploy.sh netflow</code> にコメントで制限を明記した。goflow2 の受信能力は確認済みなので、正常に吐くエクスポータ（IOL の <code>flow exporter</code> 等）があればそのまま受けられる。</li>
+</ul>
+<h2 id="再現手順後から自分で構築する場合" tabindex="-1">再現手順（後から自分で構築する場合） <a class="header-anchor" href="#再現手順後から自分で構築する場合" aria-hidden="true">#</a></h2>
+<ol>
+<li><code>./deploy.sh deploy</code>（ndr-lan 作成＋attacker/victim/suricata 起動＝G1）</li>
+<li><code>./deploy.sh scan</code>（attacker→victim へ SYN スキャン＝G2 トリガ）</li>
+<li><code>./deploy.sh eve</code>（eve.json の alert/flow 抜粋＝G2/G3 確認）</li>
+<li><code>./deploy.sh monitoring</code>（Loki+Promtail+Grafana＝G4 集約）</li>
+<li><code>./deploy.sh netflow</code>（goflow2+softflowd＝G5 ボーナス。制限あり）</li>
+<li>片付け: <code>./deploy.sh destroy</code></li>
+</ol>
+<h2 id="残課題次段階" tabindex="-1">残課題（次段階） <a class="header-anchor" href="#残課題次段階" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>NetFlow の完全パイプライン</strong>: softflowd の代替（fprobe / pmacct / IOL の <code>flow exporter</code>）で goflow2 まで通す。goflow2 の受信側は動作確認済み。</li>
+<li><strong>Grafana ダッシュボード自動プロビジョン</strong>: 現状は datasource のみ自動投入。alert 件数・トップトーカーのパネルを JSON でプロビジョン化。</li>
+<li><strong>N1 との SOAR 連携（発展）</strong>: Suricata の sid:1000001 発報 → webhook → FreeRADIUS CoA で attacker 相当端末を隔離 VLAN へ、の自動封じ込め。</li>
+<li><strong>Zeek の併設</strong>: 本ラボは Suricata（シグネチャ＋flow）のみ。Zeek の conn.log による「通信の台帳」を足すと DPI 2 系統の対比ができる。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#設計判断-clab-でなく-docker-で構築">設計判断: clab でなく docker で構築</a></li>
+<li class="lvl-2"><a href="#到達点実証済み">到達点（実証済み）</a></li>
+<li class="lvl-2"><a href="#構成の要点">構成の要点</a></li>
+<li class="lvl-2"><a href="#詰まりどころと解決">詰まりどころと解決</a></li>
+<li class="lvl-3"><a href="#1-suricata-のルールが確実にロードされたかの確認最重要ゲート前チェック">1. Suricata のルールが確実にロードされたかの確認（最重要ゲート前チェック）</a></li>
+<li class="lvl-3"><a href="#2-grafana-から-host-の-loki3100-に届かない問題">2. Grafana から host の Loki(3100) に届かない問題</a></li>
+<li class="lvl-3"><a href="#3-suricata-flow-はタイムアウト後に出る">3. Suricata flow はタイムアウト後に出る</a></li>
+<li class="lvl-3"><a href="#4-netflow-エクスポータsoftflowdが-arm64bridge-でフロー化できないg5-代替判断">4. NetFlow エクスポータ（softflowd）が arm64/bridge でフロー化できない（G5 代替判断）</a></li>
+<li class="lvl-2"><a href="#再現手順後から自分で構築する場合">再現手順（後から自分で構築する場合）</a></li>
+<li class="lvl-2"><a href="#残課題次段階">残課題（次段階）</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>
