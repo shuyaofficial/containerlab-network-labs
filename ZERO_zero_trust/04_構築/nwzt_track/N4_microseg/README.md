@@ -9,7 +9,11 @@ title: "テーマZERO｜N4 μセグメンテーション 構築スタブ"
 
 # テーマZERO｜N4 μセグメンテーション 構築スタブ
 
-> 今回スコープでは**未デプロイ**（設計値）。このスタブは実装着手時の作業起点。詳細な定義・比較表は [NW-ZT トラックロードマップ](../../../02_基本設計/NW-ZT_トラックロードマップ.md) N4 を正とする。
+> **2026-07-05 実装済み（2アプローチ）。** east-west を default-deny 化し横移動を遮断する μセグを、2つの OSS 実装で用意した:
+> - **Cilium/eBPF 版**（実装先: `microseg_cilium/`。検証済み）— L4（標準 NetworkPolicy）と L7（CiliumNetworkPolicy: `GET /` 許可・`/admin` 403）を Hubble verdict まで実証。Identity ベース宣言的ポリシーで「IP 直書き ACL の破綻」を解消（TrustSec/SGT 思想）。
+> - **nftables/IOL VLAN・ACL 版**（実装先: `microseg_nftables/`。当初設計どおりの L2/L3＋ホスト分散 FW 版）。
+>
+> 詳細は Cilium 版 [試験結果](../../../../microseg_cilium/05_試験/試験結果_2026-07-05.md)・[構築ログ](../../../../microseg_cilium/04_構築/構築ログ_2026-07-05.md)。以下は当初の設計スタブ。
 
 ## 目的
 

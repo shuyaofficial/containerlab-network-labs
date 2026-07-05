@@ -1,0 +1,25 @@
+# L3/L4 マイクロセグメンテーション（標準 Kubernetes NetworkPolicy）
+# backend への ingress を default-deny 化し、frontend からの TCP:80 のみ許可。
+# → frontend→backend=許可、other→backend=遮断（east-west default-deny の核心）。
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-allow-frontend
+  namespace: microseg
+spec:
+  # このポリシーの適用対象 = backend Pod
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes:
+    - Ingress
+  ingress:
+    # frontend からの TCP:80 のみ許可。他は暗黙 deny（policyTypes に Ingress を挙げた時点で
+    # 明示許可以外の ingress は全拒否になる = default-deny）。
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend
+      ports:
+        - protocol: TCP
+          port: 80

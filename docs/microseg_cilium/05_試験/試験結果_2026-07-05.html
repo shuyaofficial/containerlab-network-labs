@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマ microseg_cilium マイクロセグメンテーション（Cilium/eBPF）試験結果（2026-07-05）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>microseg_cilium</span>
+<span class="sep">/</span>
+<span>05_試験</span></nav>
+      <h1 class="doc-title">テーマ microseg_cilium マイクロセグメンテーション（Cilium/eBPF）試験結果（2026-07-05）</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-05</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">microsegmentation</span><span class="tag">cilium</span><span class="tag">ebpf</span><span class="tag">test-result</span></span>
+      </div>
+      
+      <div class="content">
+<p>NW-ZT トラック N4。マイクロセグの本質「<strong>同一セグメント（east-west）の通信を default-deny にし、許可した端末・パスだけを通す。侵害端末の横移動を遮断する</strong>」を、Cilium(eBPF) の L3/L4/L7 ポリシーで実機実証。N3（NDR=検知）に対し N4 は enforcement（遮断）。</p>
+<h2 id="試験環境k3d--cilium-arm64" tabindex="-1">試験環境（k3d + Cilium, arm64） <a class="header-anchor" href="#試験環境k3d--cilium-arm64" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>要素</th>
+<th>値</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>クラスタ</td>
+<td>k3d v5.9.0（k3s v1.35.5）、標準 CNI(flannel)/network-policy 無効化</td>
+</tr>
+<tr>
+<td>CNI</td>
+<td>Cilium 1.19.3（eBPF、kubeProxyReplacement=false、l7Proxy=true、Hubble 有効）</td>
+</tr>
+<tr>
+<td>ワークロード（ns=microseg）</td>
+<td>frontend / other（multitool, curl 可）、backend（nginx。<code>/</code> と <code>/admin</code> を持つ）</td>
+</tr>
+<tr>
+<td>ラベル設計</td>
+<td>`app=frontend</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li><strong>east-west の定義</strong>: frontend/other/backend は同一 namespace・同一 Pod ネットワーク（10.0.0.0/24）の横並び。Pod 間通信が east-west。ここを default-deny にするのが N4。</li>
+</ul>
+<h2 id="結果表" tabindex="-1">結果表 <a class="header-anchor" href="#結果表" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>ゲート</th>
+<th>期待</th>
+<th>実測</th>
+<th>判定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>G1</td>
+<td>クラスタ起動</td>
+<td>Cilium Ready・node Ready</td>
+<td>node <code>Ready</code>、Cilium/Operator/Envoy/Hubble Relay すべて OK、Cluster Pods 4/4 managed</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>G2</td>
+<td>素通し疎通</td>
+<td>ポリシー無しで全 200</td>
+<td>frontend→/=200, other→/=200, frontend→/admin=200</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>G3</td>
+<td><strong>L3/L4 東西遮断</strong></td>
+<td>frontend=200 / other=遮断</td>
+<td>frontend→/=<strong>200</strong>, other→/=<strong>000(blocked)</strong></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>G4</td>
+<td><strong>L7 遮断</strong></td>
+<td>GET /=200 / GET /admin=403</td>
+<td>frontend→/=<strong>200</strong>, frontend→/admin=<strong>403</strong>, other→/=000</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>G5</td>
+<td>Hubble verdict</td>
+<td>FORWARDED/DROPPED・L7 パス観測</td>
+<td>L7 <code>http-request DROPPED</code>→403、L4 <code>Policy denied DROPPED (SYN)</code> を観測</td>
+<td>✅</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="実測エビデンス要点" tabindex="-1">実測エビデンス（要点） <a class="header-anchor" href="#実測エビデンス要点" aria-hidden="true">#</a></h2>
+<h3 id="段階別-http-コード同一ワークロードにポリシーを重ねた対照" tabindex="-1">段階別 HTTP コード（同一ワークロードにポリシーを重ねた対照） <a class="header-anchor" href="#段階別-http-コード同一ワークロードにポリシーを重ねた対照" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">段階          frontend→/   other→/          frontend→/admin   適用ポリシー
+G2 素通し      200          200              200               （なし）
+G3 L4          200          000(blocked)     200               NetworkPolicy backend-allow-frontend
+G4 L7          200          000(blocked)     403               CiliumNetworkPolicy backend-l7-allow-root
+</code></pre>
+<ul>
+<li>G2→G3 で <strong>other だけが 200→000</strong> に落ちる＝east-west default-deny（許可リスト外の遮断）。</li>
+<li>G3→G4 で <strong>/admin だけが 200→403</strong> に落ちる＝L7 パス単位の遮断（<code>/</code> は 200 のまま）。</li>
+</ul>
+<h3 id="g5--hubble-verdictl7-と-l4-の遮断点の違い" tabindex="-1">G5 — Hubble verdict（L7 と L4 の遮断点の違い） <a class="header-anchor" href="#g5--hubble-verdictl7-と-l4-の遮断点の違い" aria-hidden="true">#</a></h3>
+<pre><code class="language-text"># L7（HTTP メソッド/パス単位で Envoy が判定）
+frontend -&gt; backend:80 http-request DROPPED   (HTTP/1.1 GET .../admin)
+frontend &lt;- backend:80 http-response FORWARDED (HTTP/1.1 403 (GET .../admin))
+frontend -&gt; backend:80 http-request FORWARDED  (HTTP/1.1 GET .../)
+frontend &lt;- backend:80 http-response FORWARDED (HTTP/1.1 200 (GET .../))
+
+# L4（other は SYN 段階で落ちる。L7 まで到達しない）
+other &lt;&gt; backend:80 Policy denied DROPPED (TCP Flags: SYN)
+</code></pre>
+<ul>
+<li><strong>遮断される「深さ」が違う</strong>: other は許可 Identity でないため <strong>L4(SYN) で DROP</strong>。frontend は L4 は通るが <code>/admin</code> は <strong>L7(HTTP request) で DROP → 403</strong>。マイクロセグの L3/L4 と L7 の役割分担が verdict に現れる。</li>
+</ul>
+<h3 id="cilium-endpointidentity-ベース制御の裏付け" tabindex="-1">Cilium endpoint（Identity ベース制御の裏付け） <a class="header-anchor" href="#cilium-endpointidentity-ベース制御の裏付け" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">ENDPOINT  POLICY(ingress)  IDENTITY  LABELS
+364       Enabled          8991      k8s:app=backend      ← backend のみ ingress enforcement
+93        Disabled          62164    k8s:app=frontend
+742       Disabled          35131    k8s:app=other
+</code></pre>
+<ul>
+<li>backend endpoint のみ ingress Enforcement=Enabled。IP でなく <strong>Identity（app=backend 等の label）</strong> で対象を選んでいる＝Illumio/TrustSec の「役割ベース制御」を Cilium Identity が実体化。</li>
+</ul>
+<h2 id="総括" tabindex="-1">総括 <a class="header-anchor" href="#総括" aria-hidden="true">#</a></h2>
+<p><strong>マイクロセグメンテーションの核心を OSS（Cilium/eBPF, arm64）で L3/L4/L7 の 3 段で実証完了。</strong> 同一 east-west セグメントで、(1) L3/L4 で「許可した端末以外を default-deny」（other 遮断）、(2) L7 で「許可したパス以外を遮断」（/admin=403）を、同一ワークロードにポリシーを重ねる対照で示した。Hubble により <strong>L4 は SYN 段階 DROP、L7 は HTTP request DROP→403</strong> と遮断の深さの違いまで可視化できた。</p>
+<p>Illumio / VMware NSX / Cisco Secure Workload が担う「east-west 最小権限・横移動遮断」を、Cilium の Identity ベース宣言的ポリシーで 1:1 に再現。N4 解説の nftables(IP 直書き) の限界＝TrustSec の SGT が解く「IP が変わると破綻する」問題を、Cilium Identity(label ベース) が構造的に解消している点が最大の学び。詰まりどころ（k3d+Cilium の API サーバ検出、標準 NetworkPolicy と CNP の OR マージ）は <a href="../04_%E6%A7%8B%E7%AF%89/%E6%A7%8B%E7%AF%89%E3%83%AD%E3%82%B0_2026-07-05.html">構築ログ</a>。</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#試験環境k3d--cilium-arm64">試験環境（k3d + Cilium, arm64）</a></li>
+<li class="lvl-2"><a href="#結果表">結果表</a></li>
+<li class="lvl-2"><a href="#実測エビデンス要点">実測エビデンス（要点）</a></li>
+<li class="lvl-3"><a href="#段階別-http-コード同一ワークロードにポリシーを重ねた対照">段階別 HTTP コード（同一ワークロードにポリシーを重ねた対照）</a></li>
+<li class="lvl-3"><a href="#g5--hubble-verdictl7-と-l4-の遮断点の違い">G5 — Hubble verdict（L7 と L4 の遮断点の違い）</a></li>
+<li class="lvl-3"><a href="#cilium-endpointidentity-ベース制御の裏付け">Cilium endpoint（Identity ベース制御の裏付け）</a></li>
+<li class="lvl-2"><a href="#総括">総括</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

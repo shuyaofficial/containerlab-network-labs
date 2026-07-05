@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマ microseg_cilium マイクロセグメンテーション（Cilium/eBPF）— NW-ZT N4 実装</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>microseg_cilium</span></nav>
+      <h1 class="doc-title">テーマ microseg_cilium マイクロセグメンテーション（Cilium/eBPF）— NW-ZT N4 実装</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-05</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">microsegmentation</span><span class="tag">cilium</span><span class="tag">ebpf</span><span class="tag">east-west</span></span>
+      </div>
+      
+      <div class="content">
+<p>Illumio / VMware NSX / Cisco Secure Workload(Tetration) が担うマイクロセグメンテーションの核心「<strong>同一セグメント（east-west）の通信を default-deny にし、許可した端末・パスだけを通して横移動を遮断する</strong>」を、OSS の Cilium/eBPF + Kubernetes NetworkPolicy / CiliumNetworkPolicy で再現する。テーマZERO <a href="../ZERO_zero_trust/02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT トラック N4</a> の実装先。思想の解説は <a href="../ZERO_zero_trust/%E8%A7%A3%E8%AA%AC/nwzt_N4_%E8%A7%A3%E8%AA%AC.html">解説: N4 μセグ</a>。</p>
+<blockquote>
+<p>N4 解説は Cisco IOL VLAN/ACL + ホスト nftables で「二層μセグ」を説明している。本テーマはその<strong>思想を Kubernetes/Cilium で実装した OSS 版</strong>（テーマ42 が N3 NDR 解説の OSS 版だったのと同じ位置づけ）。nftables の IP 直書き許可リストの限界を、Cilium の Identity ベース宣言的ポリシーが解消する点が学びの核心。</p>
+</blockquote>
+<h2 id="構成east-west-3-段遮断" tabindex="-1">構成（east-west 3 段遮断） <a class="header-anchor" href="#構成east-west-3-段遮断" aria-hidden="true">#</a></h2>
+<pre class="mermaid">graph TB
+    subgraph NS[&quot;namespace microseg（同一 Pod ネットワーク＝east-west）&quot;]
+      FE[&quot;frontend&lt;br/&gt;app=frontend&lt;br/&gt;curl クライアント&quot;]
+      BE[&quot;backend&lt;br/&gt;app=backend&lt;br/&gt;nginx / と /admin&quot;]
+      OT[&quot;other&lt;br/&gt;app=other&lt;br/&gt;第三者 Pod&quot;]
+    end
+    FE --&gt;|&quot;GET / : 200（許可）&quot;| BE
+    FE -.-&gt;|&quot;GET /admin : 403（L7 拒否）&quot;| BE
+    OT -.-&gt;|&quot;TCP:80 : DROP（L4 default-deny）&quot;| BE
+    CIL[&quot;Cilium eBPF + Envoy&lt;br/&gt;Identity ベース enforcement&quot;]
+    CIL -.-&gt;|&quot;L3/L4: NetworkPolicy&lt;br/&gt;L7: CiliumNetworkPolicy&quot;| BE
+</pre>
+<ul>
+<li><strong>frontend→backend <code>GET /</code></strong> = 許可（200）。</li>
+<li><strong>frontend→backend <code>GET /admin</code></strong> = L7 で拒否（403、Cilium/Envoy）。</li>
+<li><strong>other→backend</strong> = L3/L4 default-deny で遮断（SYN 段階で DROP）。</li>
+</ul>
+<h2 id="前提環境" tabindex="-1">前提環境 <a class="header-anchor" href="#前提環境" aria-hidden="true">#</a></h2>
+<ul>
+<li>OrbStack VM <code>clab</code>（arm64）、<code>ssh clab@orb</code>。docker（ユーザーは docker グループ所属＝k3d は sudo 不要）。</li>
+<li>ツール（arm64 実測）: kubectl v1.36.2 / k3d v5.9.0 / cilium CLI v0.19.4 / Cilium 1.19.3 / hubble v1.19.4。<code>deploy.sh tools</code> で <code>~/.local/bin</code> に取得。</li>
+<li>イメージ: nginx:alpine、wbitt/network-multitool、<a href="http://quay.io/cilium/*%EF%BC%88arm64%EF%BC%89%E3%80%82">quay.io/cilium/*（arm64）。</a></li>
+</ul>
+<h2 id="手順04_構築" tabindex="-1">手順（04_構築/） <a class="header-anchor" href="#手順04_構築" aria-hidden="true">#</a></h2>
+<ol>
+<li><code>./deploy.sh deploy</code> — tools 取得＋k3d クラスタ（標準 CNI 無効化）＋Cilium 導入（G1）</li>
+<li><code>./deploy.sh workload</code> — microseg ns に frontend/backend/other（G2）</li>
+<li><code>./deploy.sh test</code> — 素通し疎通（全 200）</li>
+<li><code>./deploy.sh policy-l4</code> → <code>./deploy.sh test</code> — L3/L4 default-deny（other 遮断＝G3）</li>
+<li><code>./deploy.sh policy-l7</code> → <code>./deploy.sh test</code> — L7 パス制御（/admin 403＝G4）</li>
+<li><code>./deploy.sh hubble</code> — verdict 観測（G5）</li>
+<li>片付け: <code>./deploy.sh destroy</code></li>
+</ol>
+<p>マニフェスト: <a href="04_%E6%A7%8B%E7%AF%89/manifests/10-workloads.yaml">10-workloads.yaml</a>（ワークロード）、<a href="04_%E6%A7%8B%E7%AF%89/manifests/20-netpol-l4.yaml">20-netpol-l4.yaml</a>（標準 NetworkPolicy）、<a href="04_%E6%A7%8B%E7%AF%89/manifests/30-cnp-l7.yaml">30-cnp-l7.yaml</a>（CiliumNetworkPolicy）。</p>
+<h2 id="到達点" tabindex="-1">到達点 <a class="header-anchor" href="#到達点" aria-hidden="true">#</a></h2>
+<p>L3/L4/L7 の 3 段で east-west default-deny を実証済み（<a href="05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E7%B5%90%E6%9E%9C_2026-07-05.html">試験結果</a>）。同一ワークロードにポリシーを重ね、other だけが 200→000、/admin だけが 200→403 に落ちる対照を示した。Hubble で L4=SYN DROP・L7=HTTP request DROP→403 と遮断の深さの違いまで観測。詰まりどころ（k3d+Cilium の API サーバ検出、標準 NetworkPolicy と CNP の OR マージ）は <a href="04_%E6%A7%8B%E7%AF%89/%E6%A7%8B%E7%AF%89%E3%83%AD%E3%82%B0_2026-07-05.html">構築ログ</a>。</p>
+<h2 id="学べること" tabindex="-1">学べること <a class="header-anchor" href="#学べること" aria-hidden="true">#</a></h2>
+<p>east-west マイクロセグの L3/L4/L7 の役割分担、Kubernetes NetworkPolicy と CiliumNetworkPolicy の違い（L7/HTTP を書けるのは CNP）、Cilium の Identity ベース制御（IP でなく label）、eBPF+Envoy による L7 enforcement、Hubble による verdict 可視化。商用（Illumio/NSX/Secure Workload）の内部構造理解。</p>
+<h2 id="商用製品との対応" tabindex="-1">商用製品との対応 <a class="header-anchor" href="#商用製品との対応" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>商用製品</th>
+<th>アプローチ</th>
+<th>本ラボの OSS 対応</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Illumio</td>
+<td>ホストエージェント分散 FW・中央管理・依存関係マップ</td>
+<td>Cilium が各ノードで eBPF 分散適用、宣言的ポリシーを中央（k8s API）で一元管理。CNP=中央ポリシー、エージェント=cilium-agent</td>
+</tr>
+<tr>
+<td>VMware NSX</td>
+<td>分散ファイアウォール（DFW）・L7 コンテキスト</td>
+<td>NetworkPolicy(L3/L4) + CiliumNetworkPolicy(L7 HTTP) の二段。DFW の L7 App-ID に相当するのが CNP の http rules</td>
+</tr>
+<tr>
+<td>Cisco Secure Workload (Tetration)</td>
+<td>フロー可視化→ポリシー自動生成→enforcement</td>
+<td>Hubble(可視化) + CNP(enforcement)。N3 NDR(検知) と N4(遮断) を繋ぐと Tetration 的な「見える化→絞る」が再現できる</td>
+</tr>
+</tbody>
+</table></div>
+<p>nftables(N4 解説) の IP 直書き許可リストが端末増減で破綻する限界を、Cilium の <strong>Identity（label ベース）</strong> が構造的に解消（IP が変わっても label が同じなら同じ扱い）。これは Cisco TrustSec の SGT が解く問題そのもの。</p>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../ZERO_zero_trust/02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT トラックロードマップ N4</a></li>
+<li><a href="../ZERO_zero_trust/%E8%A7%A3%E8%AA%AC/nwzt_N4_%E8%A7%A3%E8%AA%AC.html">解説: N4 μセグメンテーション</a></li>
+<li><a href="04_%E6%A7%8B%E7%AF%89/%E6%A7%8B%E7%AF%89%E3%83%AD%E3%82%B0_2026-07-05.html">構築ログ</a> / <a href="05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E7%B5%90%E6%9E%9C_2026-07-05.html">試験結果</a></li>
+<li><a href="../42_ndr_flow/README_Lab_Challenge.html">テーマ42 N3 NDR（直前の作業・east-west 検知）</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#構成east-west-3-段遮断">構成（east-west 3 段遮断）</a></li>
+<li class="lvl-2"><a href="#前提環境">前提環境</a></li>
+<li class="lvl-2"><a href="#手順04_構築">手順（04_構築/）</a></li>
+<li class="lvl-2"><a href="#到達点">到達点</a></li>
+<li class="lvl-2"><a href="#学べること">学べること</a></li>
+<li class="lvl-2"><a href="#商用製品との対応">商用製品との対応</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

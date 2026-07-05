@@ -1,0 +1,28 @@
+# L7（HTTP）マイクロセグメンテーション（CiliumNetworkPolicy）
+# frontend→backend の TCP:80 を許可しつつ、HTTP パス単位で絞る:
+#   GET /       → 許可（rules.http に一致）
+#   GET /admin  → 一致しないため Cilium/Envoy が 403 で遮断
+# eBPF + Envoy による L7 enforcement を実証する。
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: backend-l7-allow-root
+  namespace: microseg
+spec:
+  # 適用対象 = backend Pod
+  endpointSelector:
+    matchLabels:
+      app: backend
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app: frontend
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+          rules:
+            http:
+              # GET / のみ許可。ここに列挙されないパス/メソッドは 403。
+              - method: "GET"
+                path: "/"

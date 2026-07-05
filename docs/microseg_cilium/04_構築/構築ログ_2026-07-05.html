@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマ microseg_cilium マイクロセグメンテーション（Cilium/eBPF）構築ログ（2026-07-05）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>microseg_cilium</span>
+<span class="sep">/</span>
+<span>04_構築</span></nav>
+      <h1 class="doc-title">テーマ microseg_cilium マイクロセグメンテーション（Cilium/eBPF）構築ログ（2026-07-05）</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-05</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">microsegmentation</span><span class="tag">cilium</span><span class="tag">ebpf</span><span class="tag">kubernetes</span></span>
+      </div>
+      
+      <div class="content">
+<p>NW-ZT トラック N4 の実機実装。k3d(k3s in docker) 上に Cilium(eBPF) を CNI として導入し、east-west 通信を L3/L4（標準 NetworkPolicy）と L7（CiliumNetworkPolicy）の 2 段で default-deny 化した。N3（NDR＝検知）に対し N4 は enforcement（遮断）。</p>
+<h2 id="設計判断-k3d--cilium--kube-proxy-併用" tabindex="-1">設計判断: k3d + Cilium + kube-proxy 併用 <a class="header-anchor" href="#設計判断-k3d--cilium--kube-proxy-併用" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>k3d を採用</strong>（kind ではなく）。arm64/docker で軽量、標準 CNI(flannel) の無効化が <code>--k3s-arg</code> で完結する。VM は docker グループ所属のため <strong>k3d は sudo 不要</strong>（前テーマ42 の <code>sudo docker</code> とは異なる）。</li>
+<li><strong>Cilium は cilium CLI で導入</strong>（helm 相当を CLI がラップ）。arm64 対応の 1.19.3 が入った。</li>
+<li><strong>kubeProxyReplacement=false（kube-proxy 併用）</strong>。k3s の kube-proxy を残し Cilium は CNI+ポリシー+L7 に専念。フル置換だと k3d の LB/DNS と競合しやすいため保守側に倒した。</li>
+</ul>
+<h2 id="到達点実証済み" tabindex="-1">到達点（実証済み） <a class="header-anchor" href="#到達点実証済み" aria-hidden="true">#</a></h2>
+<ul>
+<li>全要素 arm64: kubectl v1.36.2 / k3d v5.9.0 / cilium CLI v0.19.4 / Cilium 1.19.3 / hubble v1.19.4。</li>
+<li>Cilium Ready（DaemonSet/Operator/Envoy/Hubble Relay すべて OK、Cluster Pods 4/4 managed）。</li>
+<li><strong>L3/L4 east-west default-deny</strong>: frontend→backend=200、other→backend=遮断（000）。</li>
+<li><strong>L7 パス制御</strong>: frontend の <code>GET /</code>=200、<code>GET /admin</code>=403（Cilium/Envoy が遮断）。</li>
+<li><strong>Hubble verdict</strong>: L7 <code>http-request DROPPED</code>→403、L4 <code>Policy denied DROPPED (SYN)</code> を観測。</li>
+</ul>
+<h2 id="詰まりどころと解決" tabindex="-1">詰まりどころと解決 <a class="header-anchor" href="#詰まりどころと解決" aria-hidden="true">#</a></h2>
+<h3 id="1-k3d-を-sudo-で叩くと-k3d-not-foundpath-喪失" tabindex="-1">1. k3d を sudo で叩くと k3d not found（PATH 喪失） <a class="header-anchor" href="#1-k3d-を-sudo-で叩くと-k3d-not-foundpath-喪失" aria-hidden="true">#</a></h3>
+<ul>
+<li>症状: <code>sudo k3d ...</code> が <code>sudo: k3d: command not found</code>。</li>
+<li>原因: k3d は <code>~/.local/bin</code> にあり、sudo は PATH を引き継がない。</li>
+<li>解決: このユーザーは <strong>docker グループ所属で sudo 不要</strong>（<code>docker ps</code> が sudo なしで通る）。k3d を sudo なしで実行するよう変更。<a href="http://deploy.sh">deploy.sh</a> から sudo を除去。</li>
+</ul>
+<h3 id="2-cilium-が-crashloopdial-tcp-0000port-connection-refused-最大の詰まり" tabindex="-1">2. Cilium が CrashLoop（<code>dial tcp 0.0.0.0:PORT connection refused</code>）— 最大の詰まり <a class="header-anchor" href="#2-cilium-が-crashloopdial-tcp-0000port-connection-refused-最大の詰まり" aria-hidden="true">#</a></h3>
+<ul>
+<li>症状: cilium-agent が <code>Unable to contact k8s api-server https://0.0.0.0:40571</code> で Init:Error/CrashLoopBackOff。node は NotReady のまま。</li>
+<li>切り分け: cilium CLI が「kube-proxy has not been installed」と<strong>誤検知</strong>し、<code>k8sServiceHost</code> を空にした → Pod が <code>0.0.0.0</code> へ API 接続を試みて失敗。<code>cilium-config</code> の <code>k8s-service-host</code> が空だった。</li>
+<li>解決: k3d が hostAlias に注入する <strong>server コンテナ名を明示</strong>（<code>--set k8sServiceHost=k3d-microseg-server-0 --set k8sServicePort=6443</code>）。→ 再インストールで全 Pod Ready。</li>
+<li><strong>教訓</strong>: k3d + Cilium では API サーバアドレスの自動検出が効かない。server コンテナ名か k8s Service の ClusterIP を明示する。</li>
+</ul>
+<h3 id="3-cilium-secrets-namespace-が-terminating-で固まる再インストール阻害" tabindex="-1">3. cilium-secrets namespace が Terminating で固まる（再インストール阻害） <a class="header-anchor" href="#3-cilium-secrets-namespace-が-terminating-で固まる再インストール阻害" aria-hidden="true">#</a></h3>
+<ul>
+<li>症状: 再 install が <code>namespace cilium-secrets is being terminated</code> / <code>release name still in use</code> で失敗。</li>
+<li>原因: metrics-server が CNI 未確立で Pending → <code>metrics.k8s.io/v1beta1: stale GroupVersion discovery</code> が namespace 削除の discovery を失敗させ、<code>kubernetes</code> finalizer が外れず Terminating で停止。</li>
+<li>解決: <code>kubectl replace --raw /api/v1/namespaces/cilium-secrets/finalize</code>（finalizers を空にする）で強制削除。ただし本質的には <strong>クラスタごと作り直すのが確実</strong>（<a href="http://deploy.sh">deploy.sh</a> を通しで再実行）だったため、最終的にはクラスタ再作成で回避。</li>
+</ul>
+<h3 id="4-l7-が効かないadmin-が-403-でなく-200-設計の要" tabindex="-1">4. L7 が効かない（<code>/admin</code> が 403 でなく 200）— 設計の要 <a class="header-anchor" href="#4-l7-が効かないadmin-が-403-でなく-200-設計の要" aria-hidden="true">#</a></h3>
+<ul>
+<li>症状: L4 の標準 NetworkPolicy と L7 の CiliumNetworkPolicy を<strong>両方適用</strong>すると、<code>/admin</code> が 200 のまま（L7 が無効化）。</li>
+<li>切り分け: CNP には http rule が正しく入り endpoint は Enforcement=Enabled。だが Pod IP 直アクセスでも 403 にならない。標準 NetworkPolicy を<strong>外すと 403 になった</strong>。</li>
+<li>原因: Cilium は標準 NetworkPolicy と CNP を <strong>OR（和集合）でマージ</strong>する。標準 NetworkPolicy の「L7 指定なしの :80 全許可」が CNP の L7 制限を上書きして全通させていた。</li>
+<li>解決: <strong>L7 段階では CNP に一本化</strong>（標準 NetworkPolicy を撤去）。CNP は <code>fromEndpoints</code> で L3/L4 の default-deny も同時に表現できるため、other→backend の遮断も維持される。<a href="http://deploy.sh">deploy.sh</a> の <code>policy-l7</code> で標準 NetworkPolicy を delete してから CNP を apply するよう修正。</li>
+</ul>
+<h2 id="再現手順後から自分で構築する場合" tabindex="-1">再現手順（後から自分で構築する場合） <a class="header-anchor" href="#再現手順後から自分で構築する場合" aria-hidden="true">#</a></h2>
+<ol>
+<li><code>./deploy.sh deploy</code>（tools 取得→k3d クラスタ→Cilium 導入＝G1）</li>
+<li><code>./deploy.sh workload</code>（microseg ns に frontend/backend/other＝G2）</li>
+<li><code>./deploy.sh test</code>（素通し疎通＝全 200）</li>
+<li><code>./deploy.sh policy-l4</code> → <code>./deploy.sh test</code>（L3/L4 default-deny＝other 遮断＝G3）</li>
+<li><code>./deploy.sh policy-l7</code> → <code>./deploy.sh test</code>（L7 パス制御＝/admin 403＝G4）</li>
+<li><code>./deploy.sh hubble</code>（verdict 観測＝G5）</li>
+<li>片付け: <code>./deploy.sh destroy</code></li>
+</ol>
+<h2 id="残課題次段階" tabindex="-1">残課題（次段階） <a class="header-anchor" href="#残課題次段階" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>kubeProxyReplacement 完全版</strong>: 今回は kube-proxy 併用。フル eBPF 置換（<code>kubeProxyReplacement=true</code>）にすると DSR/直接ルーティング等 eBPF の真価が見える。</li>
+<li><strong>IP でなくラベル/Identity ベースの徹底</strong>: Cilium は既に Identity ベース（labels）で制御しており、N4 解説の nftables(IP 直書き) の限界＝TrustSec の SGT が解く問題を、Cilium Identity が実体として解決している点を対比できる。</li>
+<li><strong>egress 方向の制御</strong>: 本ラボは ingress default-deny のみ。egress default-deny（backend から外部への通信制限）で多層化。</li>
+<li><strong>Hubble UI</strong>: CLI observe まで。UI（Web）は未構築。</li>
+</ul>
+<h2 id="商用oss解説との関係" tabindex="-1">商用/OSS・解説との関係 <a class="header-anchor" href="#商用oss解説との関係" aria-hidden="true">#</a></h2>
+<p>N4 解説（<a href="../ZERO_zero_trust/%E8%A7%A3%E8%AA%AC/nwzt_N4_%E8%A7%A3%E8%AA%AC.html">nwzt_N4_解説</a>）は Cisco IOL VLAN/ACL + ホスト nftables で「二層μセグ」を説明している。本テーマはその<strong>思想を Kubernetes/Cilium で実装</strong>した OSS 版（テーマ42 が N3 解説の OSS 版だったのと同じ位置づけ）。nftables の「IP 直書き許可リスト・中央管理なし」の限界を、Cilium の <strong>Identity ベース・宣言的ポリシー・eBPF enforcement</strong> が解消している点が学びの核心。</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#設計判断-k3d--cilium--kube-proxy-併用">設計判断: k3d + Cilium + kube-proxy 併用</a></li>
+<li class="lvl-2"><a href="#到達点実証済み">到達点（実証済み）</a></li>
+<li class="lvl-2"><a href="#詰まりどころと解決">詰まりどころと解決</a></li>
+<li class="lvl-3"><a href="#1-k3d-を-sudo-で叩くと-k3d-not-foundpath-喪失">1. k3d を sudo で叩くと k3d not found（PATH 喪失）</a></li>
+<li class="lvl-3"><a href="#2-cilium-が-crashloopdial-tcp-0000port-connection-refused-最大の詰まり">2. Cilium が CrashLoop（dial tcp 0.0.0.0:PORT connection refused）— 最大の詰まり</a></li>
+<li class="lvl-3"><a href="#3-cilium-secrets-namespace-が-terminating-で固まる再インストール阻害">3. cilium-secrets namespace が Terminating で固まる（再インストール阻害）</a></li>
+<li class="lvl-3"><a href="#4-l7-が効かないadmin-が-403-でなく-200-設計の要">4. L7 が効かない（/admin が 403 でなく 200）— 設計の要</a></li>
+<li class="lvl-2"><a href="#再現手順後から自分で構築する場合">再現手順（後から自分で構築する場合）</a></li>
+<li class="lvl-2"><a href="#残課題次段階">残課題（次段階）</a></li>
+<li class="lvl-2"><a href="#商用oss解説との関係">商用/OSS・解説との関係</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>
