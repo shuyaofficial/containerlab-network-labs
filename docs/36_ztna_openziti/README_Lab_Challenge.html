@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマ36 SDP型ZTNA（OpenZiti）— NW-ZT N2 実装</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>36_ztna_openziti</span></nav>
+      <h1 class="doc-title">テーマ36 SDP型ZTNA（OpenZiti）— NW-ZT N2 実装</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-05</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">ztna</span><span class="tag">sdp</span><span class="tag">openziti</span><span class="tag">zscaler-zpa</span></span>
+      </div>
+      
+      <div class="content">
+<p>Zscaler ZPA / Cisco Secure Access の「<strong>内向きポートを一切開けず、外向きの張り出しでのみ到達させる</strong>」SDP 型 ZTNA を、OSS の OpenZiti で再現する。テーマZERO <a href="../ZERO_zero_trust/02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT トラック N2</a> の実装先。</p>
+<blockquote>
+<p>本テーマは OSS ZTNA の実装。ロードマップのテーマ36「Cisco Secure Access（クラウド ZTNA・DevNet）」に対応する <strong>OSS 版</strong>として位置づける。仕組みの解説は <a href="../ZERO_zero_trust/%E6%95%99%E6%9D%90/03_Zscaler_ZIA_ZPA.html">教材: Zscaler ZIA/ZPA</a>。</p>
+</blockquote>
+<h2 id="構成ダークサービス" tabindex="-1">構成（ダークサービス） <a class="header-anchor" href="#構成ダークサービス" aria-hidden="true">#</a></h2>
+<pre class="mermaid">graph LR
+    subgraph UNTRUST[&quot;client 側（zn-ziti のみ）&quot;]
+      CL[&quot;clienttun&lt;br/&gt;ziti tunnel proxy&lt;br/&gt;webapp:8080&quot;]
+    end
+    subgraph DMZ[&quot;broker（zn-ziti）&quot;]
+      Z[&quot;ziti&lt;br/&gt;controller + router&quot;]
+    end
+    subgraph TRUST[&quot;app 側&quot;]
+      AT[&quot;apptun&lt;br/&gt;ziti tunnel host&quot;]
+      DW[&quot;darkweb nginx&lt;br/&gt;（zn-app のみ・公開ポート無し）&quot;]
+    end
+    CL --&gt;|&quot;localhost:8080 → overlay&quot;| Z
+    Z --&gt;|&quot;認可済セッション&quot;| AT
+    AT --&gt;|&quot;dial (zn-app)&quot;| DW
+    CL -. &quot;直接は到達不能 (HTTP 000)&quot; .-&gt; DW
+</pre>
+<ul>
+<li><strong>darkweb</strong> は <code>zn-app</code> のみに存在し、ホスト公開ポートを持たない。client の居る <code>zn-ziti</code> からは見えない。</li>
+<li><strong>apptun</strong> だけが <code>zn-app</code> に足を持ち、<code>webapp</code> サービスとして darkweb を overlay に公開（外向き接続のみ）。</li>
+<li><strong>client</strong> は overlay 経由（<code>localhost:8080</code>）でのみ到達。直接 <code>darkweb:80</code> は到達不能。</li>
+</ul>
+<h2 id="前提環境" tabindex="-1">前提環境 <a class="header-anchor" href="#前提環境" aria-hidden="true">#</a></h2>
+<ul>
+<li>OrbStack VM <code>clab</code>（arm64）、<code>ssh clab@orb</code>。docker（compose 不要）。</li>
+<li>イメージ: <code>openziti/ziti-cli:latest</code>（arm64 実測済み）、<code>nginx:alpine</code>。</li>
+</ul>
+<h2 id="手順04_構築" tabindex="-1">手順（04_構築/） <a class="header-anchor" href="#手順04_構築" aria-hidden="true">#</a></h2>
+<ol>
+<li><code>./deploy.sh deploy</code> — ネットワーク作成＋4 コンテナ起動</li>
+<li><code>./deploy.sh setup</code> — サービス/ポリシー/enrollment/tunneler 起動＋実証（<a href="04_%E6%A7%8B%E7%AF%89/setup_ziti.sh">setup_ziti.sh</a>）</li>
+<li>片付け: <code>./deploy.sh destroy</code></li>
+</ol>
+<h2 id="到達点" tabindex="-1">到達点 <a class="header-anchor" href="#到達点" aria-hidden="true">#</a></h2>
+<p>SDP の核心（内向き非開放＋認可済みのみ overlay 到達）を実証済み（<a href="05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E7%B5%90%E6%9E%9C_2026-07-05.html">試験結果</a>）。詰まりどころ（quickstart の home 権限、JWT の chmod）は <a href="04_%E6%A7%8B%E7%AF%89/%E6%A7%8B%E7%AF%89%E3%83%AD%E3%82%B0_2026-07-05.html">構築ログ</a>。</p>
+<h2 id="学べること" tabindex="-1">学べること <a class="header-anchor" href="#学べること" aria-hidden="true">#</a></h2>
+<p>SDP vs IAP の実装差、broker/connector モデル、「なぜインバウンドを開けなくて済むのか」、identity/service/policy による認可、OpenZiti の enrollment。商用 ZPA/Secure Access の内部構造理解。</p>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../ZERO_zero_trust/02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT トラックロードマップ N2</a></li>
+<li><a href="../ZERO_zero_trust/%E6%95%99%E6%9D%90/03_Zscaler_ZIA_ZPA.html">教材: Zscaler ZIA/ZPA</a></li>
+<li><a href="../ZERO_zero_trust/%E6%95%99%E6%9D%90/02_SASE_SSE_%E3%81%A8_SDP_vs_IAP.html">教材: SASE/SSE と SDP vs IAP</a></li>
+<li><a href="../ZERO_zero_trust/%E8%A7%A3%E8%AA%AC/nwzt_N2_%E8%A7%A3%E8%AA%AC.html">解説: N2 SDP型ZTNA</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#構成ダークサービス">構成（ダークサービス）</a></li>
+<li class="lvl-2"><a href="#前提環境">前提環境</a></li>
+<li class="lvl-2"><a href="#手順04_構築">手順（04_構築/）</a></li>
+<li class="lvl-2"><a href="#到達点">到達点</a></li>
+<li class="lvl-2"><a href="#学べること">学べること</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>
