@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマ microseg_nftables マイクロセグメンテーション（IOL VLAN/ACL + ホスト nftables）— NW-ZT N4 実装</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>microseg_nftables</span></nav>
+      <h1 class="doc-title">テーマ microseg_nftables マイクロセグメンテーション（IOL VLAN/ACL + ホスト nftables）— NW-ZT N4 実装</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-05</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">microsegmentation</span><span class="tag">nftables</span><span class="tag">vlan</span><span class="tag">acl</span><span class="tag">iol</span><span class="tag">east-west</span></span>
+      </div>
+      
+      <div class="content">
+<p>Cisco TrustSec/SGT・Illumio が担うマイクロセグメンテーションの核心「<strong>同一セグメント（east-west）の通信を default-deny にし、許可した端末・パスだけを通して横移動を遮断する</strong>」を、Cisco IOL の VLAN + inter-VLAN ACL とホスト nftables の<strong>二層構成</strong>で実機実証する。テーマZERO <a href="../ZERO_zero_trust/02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT トラック N4</a> の実装先。思想の解説は <a href="../ZERO_zero_trust/%E8%A7%A3%E8%AA%AC/nwzt_N4_%E8%A7%A3%E8%AA%AC.html">解説: N4 μセグ</a>。</p>
+<blockquote>
+<p>本テーマは N4 解説が示す「IOL VLAN/ACL + ホスト nftables」の<strong>当初設計どおりの実装版</strong>。姉妹版 <a href="../microseg_cilium/README_Lab_Challenge.html">microseg_cilium</a> は同じ N4 の思想を Kubernetes/Cilium(eBPF) で実装した OSS 版で、Identity ベース制御による nftables の IP 直書きの限界克服を扱う。本テーマはその<strong>手前の「素の姿」</strong>——ネットワーク機器の VLAN/ACL とホストの静的パケットフィルタだけでは何ができて何ができないかを手で確認する。</p>
+</blockquote>
+<h2 id="学びの核心" tabindex="-1">学びの核心 <a class="header-anchor" href="#学びの核心" aria-hidden="true">#</a></h2>
+<p><strong>VLAN/ACL は「セグメント間（inter-VLAN）」しか制御できない。同一セグメント（同一 VLAN・同一サブネット）内の端末間通信は、ルータ/L3スイッチを経由しないため VLAN 間 ACL の対象にならない。</strong> 同一セグメント内の横移動を止めるには、各ホスト自身のパケットフィルタ（nftables）が必要——これが Illumio のような分散FW製品が「ホストエージェント常駐」を選ぶ理由そのもの。</p>
+<h2 id="構成2層の役割分担" tabindex="-1">構成（2層の役割分担） <a class="header-anchor" href="#構成2層の役割分担" aria-hidden="true">#</a></h2>
+<pre class="mermaid">graph TB
+    subgraph V10[&quot;VLAN10 172.50.10.0/24（同一L2セグメント）&quot;]
+        A[&quot;pc10a&lt;br/&gt;172.50.10.11&quot;]
+        B[&quot;pc10b&lt;br/&gt;172.50.10.12&lt;br/&gt;nftables: Aを拒否&quot;]
+    end
+    subgraph V20[&quot;VLAN20 172.50.20.0/24&quot;]
+        S[&quot;srv20&lt;br/&gt;172.50.20.11&lt;br/&gt;http:80 / tcp:22&quot;]
+    end
+    SW[&quot;sw1 (Cisco IOL)&lt;br/&gt;L3 SVI + inter-VLAN ACL(SEG10-OUT)&quot;]
+    A --&gt;|&quot;層1(ACL): tcp/80 許可&quot;| SW --&gt;|&quot;到達&quot;| S
+    A -.-&gt;|&quot;層1(ACL): tcp/22 拒否&quot;| SW -.-&gt;|&quot;遮断&quot;| S
+    A -.-&gt;|&quot;層2(host nftables): pc10bが拒否&quot;| B
+    classDef blocked stroke-dasharray: 5 5
+</pre>
+<ul>
+<li><strong>層1（粗い分離・VLAN間）</strong>: sw1 の SVI（Vlan10）に適用した inter-VLAN ACL <code>SEG10-OUT</code> が、VLAN10→VLAN20 の到達を tcp/80 のみ許可・tcp/22 は拒否。</li>
+<li><strong>層2（細かい分離・VLAN内）</strong>: 同一 VLAN10 内の pc10a→pc10b は sw1 のルーティングを経由しないため ACL が効かない。pc10b 自身の nftables (<code>ip saddr 172.50.10.11 drop</code>) で横移動を遮断。</li>
+</ul>
+<h2 id="前提環境" tabindex="-1">前提環境 <a class="header-anchor" href="#前提環境" aria-hidden="true">#</a></h2>
+<ul>
+<li>OrbStack VM <code>clab</code>（arm64）、<code>ssh clab@orb</code>。containerlab 0.77 / docker 29.1.3。</li>
+<li>イメージ: <code>vrnetlab/cisco_iol:L2-advipservices-2017</code>（L3 SVI + inter-VLAN ACL 対応）、<code>microseg-endpoint:local</code>（ubuntu:24.04 + nftables/iproute2/iputils-ping/curl/ncat/python3、<code>04_構築/endpoint/Dockerfile</code> で自作）。</li>
+<li>コンテナ名は <code>clab-microseg-</code> 接頭辞、mgmt ネットワークは <code>clab-microseg-mgmt</code>（172.20.30.0/24）で、既存稼働中ラボ（<code>clab-dynamic-routing-lab-*</code> 等）と完全分離。</li>
+</ul>
+<h2 id="手順04_構築" tabindex="-1">手順（04_構築/） <a class="header-anchor" href="#手順04_構築" aria-hidden="true">#</a></h2>
+<ol>
+<li><code>./deploy.sh deploy</code> — 端末イメージ build → clab deploy → <strong>iouyap 起動（ポート513、必須）</strong> → データプレーンのオフロード無効化 → 端末 IP/GW/サービス設定（G1）</li>
+<li><code>sudo expect run_microseg.exp clab-microseg-sw1 sw1_microseg.cfg</code>（<code>./deploy.sh config</code> でも可）— sw1 に VLAN/SVI/ip routing/inter-VLAN ACL を投入</li>
+<li><code>./deploy.sh test</code> — G2（pc10a→srv20:80=到達・:22=遮断）と G3 適用前（pc10a→pc10b=到達）を確認</li>
+<li><code>./deploy.sh nft</code> — pc10b にホスト nftables（層2）を投入</li>
+<li><code>./deploy.sh test-g3-after</code> — G3 適用後（pc10a→pc10b=遮断）を確認、適用前後の対照が本ラボの核心</li>
+<li><code>sudo expect verify_microseg.exp clab-microseg-sw1</code> — ACL マッチカウンタを採取</li>
+<li>片付け: <code>./deploy.sh destroy</code>（<strong>検証後は必ず実行</strong>）</li>
+</ol>
+<p>トポロジ: <a href="04_%E6%A7%8B%E7%AF%89/microseg.clab.yml">microseg.clab.yml</a>。スイッチ設定: <a href="04_%E6%A7%8B%E7%AF%89/sw1_microseg.cfg">sw1_microseg.cfg</a>（<code>ip routing</code> + VLAN10/20 + SVI + <code>ip access-list extended SEG10-OUT</code>）。</p>
+<h2 id="到達点" tabindex="-1">到達点 <a class="header-anchor" href="#到達点" aria-hidden="true">#</a></h2>
+<p>層1（inter-VLAN ACL）・層2（ホスト nftables）ともに実機実証済み（<a href="05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E7%B5%90%E6%9E%9C_2026-07-05.html">試験結果</a>）。層1は ACL マッチカウンタ（permit tcp/80=6 matches、deny tcp/22=1 match）、層2は適用前後の対照（3/3到達→0/3到達）とnftドロップカウンタ（0→3 packets）で、それぞれ実測エビデンスを取得した。詰まりどころ（iouyap起動、SVIの表示タイミング、expect並列実行時の競合）は<a href="04_%E6%A7%8B%E7%AF%89/%E6%A7%8B%E7%AF%89%E3%83%AD%E3%82%B0_2026-07-05.html">構築ログ</a>。</p>
+<h2 id="学べること" tabindex="-1">学べること <a class="header-anchor" href="#学べること" aria-hidden="true">#</a></h2>
+<p>VLAN 間 ACL とホスト nftables の適用範囲の違い（inter-VLAN vs intra-VLAN）、Cisco IOL の L3 SVI + 拡張 ACL の実機構文、ACL マッチカウンタによる可視化、ホスト側分散FW（nftables）による east-west 制御の実装方法、Illumio のようなホストエージェント型分散FW製品が「なぜネットワーク機器の ACL だけでは不十分か」の具体的な根拠。</p>
+<h2 id="商用製品との対応" tabindex="-1">商用製品との対応 <a class="header-anchor" href="#商用製品との対応" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>商用製品</th>
+<th>アプローチ</th>
+<th>本ラボの対応</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cisco TrustSec (SGT/SGACL)</td>
+<td>ネットワーク機器側でタグ(SGT)を付与し、機器のSGACLで判定（IPでなくタグ）</td>
+<td>本ラボの層1(IOL inter-VLAN ACL)は IP ベースの素朴な版。TrustSec は同じ「ネットワーク機器で判定」の思想を、IP でなくタグに置き換えて IP変更に強くしたもの</td>
+</tr>
+<tr>
+<td>Illumio</td>
+<td>各ホストにエージェント常駐、ホスト自身のFW(iptables/nftables相当)を中央から一括制御</td>
+<td>本ラボの層2(pc10bのnftables)は「ホスト自身がFWを持つ」思想そのもの。Illumioはこれを多数ホストに対して中央管理で自動配布する</td>
+</tr>
+<tr>
+<td>VMware NSX (DFW)</td>
+<td>ハイパーバイザ層の分散ファイアウォール</td>
+<td>層2のホストnftablesと同じ「トラフィックの発生源に近い場所で判定する」という分散FWの思想</td>
+</tr>
+</tbody>
+</table></div>
+<p>nftables の IP 直書き許可リスト（<code>ip saddr 172.50.10.11 drop</code>）は、pc10a の IP が変わると追随できない構造的な限界を持つ。これを label/Identity ベースで解消するのが Cisco TrustSec の SGT や姉妹版 <a href="../microseg_cilium/README_Lab_Challenge.html">microseg_cilium</a> の Cilium Identity。</p>
+<h2 id="参照" tabindex="-1">参照 <a class="header-anchor" href="#参照" aria-hidden="true">#</a></h2>
+<ul>
+<li><a href="../ZERO_zero_trust/02_%E5%9F%BA%E6%9C%AC%E8%A8%AD%E8%A8%88/NW-ZT_%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%AD%E3%83%BC%E3%83%89%E3%83%9E%E3%83%83%E3%83%97.html">NW-ZT トラックロードマップ N4</a></li>
+<li><a href="../ZERO_zero_trust/%E8%A7%A3%E8%AA%AC/nwzt_N4_%E8%A7%A3%E8%AA%AC.html">解説: N4 μセグメンテーション</a></li>
+<li><a href="04_%E6%A7%8B%E7%AF%89/%E6%A7%8B%E7%AF%89%E3%83%AD%E3%82%B0_2026-07-05.html">構築ログ</a> / <a href="05_%E8%A9%A6%E9%A8%93/%E8%A9%A6%E9%A8%93%E7%B5%90%E6%9E%9C_2026-07-05.html">試験結果</a></li>
+<li><a href="../microseg_cilium/README_Lab_Challenge.html">姉妹版 microseg_cilium（同じ N4 思想の Kubernetes/Cilium 実装）</a></li>
+<li><a href="../31_nac_dot1x/README_Lab_Challenge.html">テーマ31 NAC/802.1X（N1、VLAN基盤・iouyap起動手法の手本）</a></li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#学びの核心">学びの核心</a></li>
+<li class="lvl-2"><a href="#構成2層の役割分担">構成（2層の役割分担）</a></li>
+<li class="lvl-2"><a href="#前提環境">前提環境</a></li>
+<li class="lvl-2"><a href="#手順04_構築">手順（04_構築/）</a></li>
+<li class="lvl-2"><a href="#到達点">到達点</a></li>
+<li class="lvl-2"><a href="#学べること">学べること</a></li>
+<li class="lvl-2"><a href="#商用製品との対応">商用製品との対応</a></li>
+<li class="lvl-2"><a href="#参照">参照</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

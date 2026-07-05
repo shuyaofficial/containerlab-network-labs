@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマ microseg_nftables 構築ログ（2026-07-05）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>microseg_nftables</span>
+<span class="sep">/</span>
+<span>04_構築</span></nav>
+      <h1 class="doc-title">テーマ microseg_nftables 構築ログ（2026-07-05）</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-05</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">microsegmentation</span><span class="tag">nftables</span><span class="tag">vlan</span><span class="tag">acl</span><span class="tag">iol</span><span class="tag">iouyap</span></span>
+      </div>
+      
+      <div class="content">
+<p>NW-ZT トラック N4 の実機実装（nftables/IOL VLAN・ACL 版）。Cisco IOL の VLAN + inter-VLAN ACL（層1）とホスト nftables（層2）で「2層マイクロセグメンテーション」を実機実証した。</p>
+<h2 id="到達点実証済み" tabindex="-1">到達点（実証済み） <a class="header-anchor" href="#到達点実証済み" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>層1（IOL inter-VLAN ACL）</strong>: VLAN10（pc10a/pc10b）→ VLAN20（srv20）の到達を tcp/80 のみ許可、tcp/22 は拒否。ACL マッチカウンタで実測（<code>permit tcp ... eq www</code> = 6 matches、<code>deny tcp ... eq 22</code> = 1 match）。</li>
+<li><strong>層2（ホスト nftables）</strong>: 同一 VLAN10 内の pc10a→pc10b 通信を、pc10b の nftables で <code>ip saddr 172.50.10.11 drop</code>。適用前=3/3到達、適用後=0/3到達（100%損失）、nft カウンタで <code>3 packets drop</code> を実測。</li>
+<li><strong>2層の役割分担を対照実証</strong>: 同一 VLAN 内の横移動は VLAN/ACL では止められない（そもそも L3 ACL は VLAN 間の SVI にしか適用していないため、同一 VLAN 内の pc10a→pc10b はスイッチのルーティングを経由せず ACL の対象にならない）。ホスト側 nftables を入れて初めて止まることを、適用前後の対照で示した。</li>
+</ul>
+<h2 id="詰まりどころと解決" tabindex="-1">詰まりどころと解決 <a class="header-anchor" href="#詰まりどころと解決" aria-hidden="true">#</a></h2>
+<h3 id="1-iouyap-未起動によるデータプレーン全断既知の落とし穴想定どおり回避" tabindex="-1">1. iouyap 未起動によるデータプレーン全断（既知の落とし穴、想定どおり回避） <a class="header-anchor" href="#1-iouyap-未起動によるデータプレーン全断既知の落とし穴想定どおり回避" aria-hidden="true">#</a></h3>
+<ul>
+<li>N1（テーマ31）・テーマ22/23/24/25/26/27 と同じ、clab の cisco_iol は iouyap がデータプレーンを中継する方式。<code>deploy.sh deploy</code> に <code>start_iouyap()</code>（ポート <strong>513</strong>、全テーマ共通実績）を組み込み、<code>containerlab deploy</code> 直後に必ず起動する運用にした。</li>
+<li>確認: <code>sudo docker top clab-microseg-sw1 | grep iouyap</code> で <code>/usr/bin/iouyap /usr/bin/iouyap 513</code> プロセスを確認。1回で疎通成功（iouyap 起動後の追加調査は不要だった）。</li>
+</ul>
+<h3 id="2-svi-の一時的な-down-表示" tabindex="-1">2. SVI の一時的な down 表示 <a class="header-anchor" href="#2-svi-の一時的な-down-表示" aria-hidden="true">#</a></h3>
+<ul>
+<li>スイッチ設定投入直後の <code>show ip interface brief</code> で <code>Vlan10</code>/<code>Vlan20</code> が <code>down/down</code> と表示されたため、SVI が上がっていない疑いで詳細調査した（<code>show vlan brief</code>、<code>show interfaces status</code>、<code>show interfaces Vlan10</code> を追加確認）。</li>
+<li>結果、実際には Et0/1-3 は <code>connected</code>、Vlan10/Vlan20 は <code>up, line protocol is up</code>（<code>show interfaces Vlan10</code> で確認）で、直後の <code>show ip interface brief</code> の表示が反映のタイミング差で古かっただけだった。再度 <code>show ip interface brief</code> を実行すると <code>up/up</code> に変わっていることを確認。実害なし。</li>
+</ul>
+<h3 id="3-expect-の-attach-が別コマンドとの並列実行で失敗" tabindex="-1">3. expect の attach が別コマンドとの並列実行で失敗 <a class="header-anchor" href="#3-expect-の-attach-が別コマンドとの並列実行で失敗" aria-hidden="true">#</a></h3>
+<ul>
+<li>検証中、<code>rm</code> と <code>ssh expect</code> を同一メッセージ内で並列に投げたところ、<code>sudo expect -f verify_microseg.exp ...</code> が spawn 直後に exit 255 で終了し、ログファイルすら生成されなかった。</li>
+<li>原因は複数の <code>ssh clab@orb</code> セッションが同時に走ったことによる <code>docker attach</code> の競合と推測（31_nac_dot1x の教訓どおり、attach の多重化は避けるべき）。</li>
+<li>対策: 以降は <strong>1メッセージ1 attach</strong> の単発実行に限定し、<code>pgrep -f 'docker attach'</code> で残存確認してから次を実行。再実行後は問題なく成功した。</li>
+</ul>
+<h3 id="4-acl-の-eq-80-はコンソール表示上-eq-www-に正規化される" tabindex="-1">4. ACL の <code>eq 80</code> はコンソール表示上 <code>eq www</code> に正規化される <a class="header-anchor" href="#4-acl-の-eq-80-はコンソール表示上-eq-www-に正規化される" aria-hidden="true">#</a></h3>
+<ul>
+<li><code>show ip access-lists</code> で <code>permit tcp ... eq 80</code> は IOS の仕様で well-known port 名 <code>www</code> に自動変換されて表示される（設定自体は問題なく反映）。cfg 投入時のコンソールログで長い行が <code>eq 8$</code> のように途中で折り返されて見えたのも表示上の癖で、実際の ACL 内容は正しく登録されていた（<code>show ip access-lists</code> で確認）。</li>
+</ul>
+<h2 id="再現手順後から自分で構築する場合" tabindex="-1">再現手順（後から自分で構築する場合） <a class="header-anchor" href="#再現手順後から自分で構築する場合" aria-hidden="true">#</a></h2>
+<ol>
+<li><code>04_構築/endpoint/</code> の Dockerfile をビルド（<code>microseg-endpoint:local</code>。<a href="http://deploy.sh">deploy.sh</a> が自動実行）。</li>
+<li><code>./deploy.sh deploy</code>（image build → clab deploy → iouyap 起動 → オフロード無効化 → 端末 IP/サービス設定まで自動）。</li>
+<li><code>sudo expect run_microseg.exp clab-microseg-sw1 sw1_microseg.cfg</code>（<code>./deploy.sh config</code> でも同じ）でスイッチに VLAN/SVI/ACL 設定を投入。</li>
+<li><code>./deploy.sh test</code> で G2（inter-VLAN ACL）と G3 適用前の疎通を確認。</li>
+<li><code>./deploy.sh nft</code> で pc10b にホスト nftables（層2）を投入。</li>
+<li><code>./deploy.sh test-g3-after</code> で G3 適用後の遮断を確認（適用前後の対照）。</li>
+<li><code>sudo expect verify_microseg.exp clab-microseg-sw1</code> で ACL マッチカウンタを採取。</li>
+<li>片付け: <code>./deploy.sh destroy</code>。</li>
+</ol>
+<h2 id="環境情報" tabindex="-1">環境情報 <a class="header-anchor" href="#環境情報" aria-hidden="true">#</a></h2>
+<ul>
+<li>OrbStack VM（arm64）、containerlab 0.77、docker 29.1.3。</li>
+<li>イメージ: <code>vrnetlab/cisco_iol:L2-advipservices-2017</code>（L3 SVI + inter-VLAN ACL に対応、22/23 で実績あり）、<code>microseg-endpoint:local</code>（ubuntu:24.04 + nftables/iproute2/iputils-ping/curl/ncat/python3 を自作）。</li>
+<li>既存稼働中の <code>clab-dynamic-routing-lab-*</code> には無関係（<code>clab-microseg-</code> 接頭辞・専用 mgmt ネットワーク <code>clab-microseg-mgmt</code> 172.20.30.0/24 で完全分離、衝突なしを事前に確認）。</li>
+</ul>
+<h2 id="残課題" tabindex="-1">残課題 <a class="header-anchor" href="#残課題" aria-hidden="true">#</a></h2>
+<ul>
+<li><strong>L2 ACL / PVLAN による同一 VLAN 内制御との比較</strong>: 本ラボはホスト nftables で層2を実現したが、IOL の Private VLAN（PVLAN）や port-based ACL で同一 VLAN 内を制御できるかは未検証（IOL の PVLAN サポート状況次第）。</li>
+<li><strong>複数端末・複数ルールでのスケール検証</strong>: 今回は pc10a→pc10b の1方向・1ルールのみ。実運用の Illumio 的な「多対多の許可リスト管理」の複雑さは未検証。</li>
+<li><strong>nftables ルールの永続化</strong>: 今回は <code>docker exec</code> でランタイムに投入したのみ（コンテナ再起動で消える）。永続化する場合は Dockerfile 側で nftables.conf を焼き込むか、systemd 相当の仕組みが要る（本ラボの検証目的では対象外とした）。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#到達点実証済み">到達点（実証済み）</a></li>
+<li class="lvl-2"><a href="#詰まりどころと解決">詰まりどころと解決</a></li>
+<li class="lvl-3"><a href="#1-iouyap-未起動によるデータプレーン全断既知の落とし穴想定どおり回避">1. iouyap 未起動によるデータプレーン全断（既知の落とし穴、想定どおり回避）</a></li>
+<li class="lvl-3"><a href="#2-svi-の一時的な-down-表示">2. SVI の一時的な down 表示</a></li>
+<li class="lvl-3"><a href="#3-expect-の-attach-が別コマンドとの並列実行で失敗">3. expect の attach が別コマンドとの並列実行で失敗</a></li>
+<li class="lvl-3"><a href="#4-acl-の-eq-80-はコンソール表示上-eq-www-に正規化される">4. ACL の eq 80 はコンソール表示上 eq www に正規化される</a></li>
+<li class="lvl-2"><a href="#再現手順後から自分で構築する場合">再現手順（後から自分で構築する場合）</a></li>
+<li class="lvl-2"><a href="#環境情報">環境情報</a></li>
+<li class="lvl-2"><a href="#残課題">残課題</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+#!/usr/bin/expect -f
+# 1回のattachで設定投入→保存→確認まで完結。全出力を out.log に保存。
+# 31_nac_dot1x/run_nac.exp を手本にした短い行送り方式。
+set timeout 40
+set node [lindex $argv 0]
+set cfg   [lindex $argv 1]
+log_file -noappend /Users/shuya/Documents/claude/Mac仮想環境構築/microseg_nftables/04_構築/out.log
+spawn sudo docker attach --sig-proxy=false $node
+send "\r"
+expect {
+  "initial configuration dialog" { send "no\r"; exp_continue }
+  -re {[>#]} {}
+  timeout {}
+}
+send "\r"
+expect -re {[>#]}
+send "enable\r"
+expect "#"
+send "terminal length 0\r"
+expect "#"
+send "configure terminal\r"
+expect -re {\(config\)}
+set fp [open $cfg r]
+foreach line [split [read $fp] "\n"] {
+    if {[string trim $line] eq ""} { continue }
+    if {[string match "!*" $line]} { continue }
+    send "$line\r"
+    expect -re {[#>]}
+}
+close $fp
+send "\r"
+expect "#"
+send "end\r"
+expect "#"
+send "write memory\r"
+expect "#"
+send "show ip interface brief\r"
+expect "#"
+send "show ip access-lists\r"
+expect "#"
+send "show vlan brief\r"
+expect "#"
+send "\020\021"
+expect eof

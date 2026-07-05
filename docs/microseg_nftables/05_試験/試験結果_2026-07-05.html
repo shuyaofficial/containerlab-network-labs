@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>テーマ microseg_nftables マイクロセグメンテーション（nftables/IOL VLAN・ACL）試験結果（2026-07-05）</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>microseg_nftables</span>
+<span class="sep">/</span>
+<span>05_試験</span></nav>
+      <h1 class="doc-title">テーマ microseg_nftables マイクロセグメンテーション（nftables/IOL VLAN・ACL）試験結果（2026-07-05）</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-05</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">microsegmentation</span><span class="tag">nftables</span><span class="tag">vlan</span><span class="tag">acl</span><span class="tag">test-result</span></span>
+      </div>
+      
+      <div class="content">
+<p>NW-ZT トラック N4。マイクロセグの本質「<strong>同一セグメント（east-west）の通信を default-deny にし、許可した端末・パスだけを通して横移動を遮断する</strong>」を、Cisco IOL の VLAN/inter-VLAN ACL（層1）とホスト nftables（層2）の<strong>二層構成</strong>で実機実証した。</p>
+<h2 id="試験環境clab-arm64" tabindex="-1">試験環境（clab, arm64） <a class="header-anchor" href="#試験環境clab-arm64" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>要素</th>
+<th>値</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>仮想化基盤</td>
+<td>OrbStack VM（arm64）、containerlab 0.77、docker 29.1.3</td>
+</tr>
+<tr>
+<td>スイッチ</td>
+<td><code>sw1</code>（cisco_iol L2-advipservices-2017, L3 SVI + ip routing）</td>
+</tr>
+<tr>
+<td>端末イメージ</td>
+<td><code>microseg-endpoint:local</code>（ubuntu:24.04 + nftables/iproute2/iputils-ping/curl/ncat/python3）</td>
+</tr>
+<tr>
+<td>トポロジ</td>
+<td>pc10a(172.50.10.11)・pc10b(172.50.10.12) = <strong>同一 VLAN10</strong> / srv20(172.50.20.11) = VLAN20（http:80 + tcp:22 疑似サービス）</td>
+</tr>
+<tr>
+<td>コンテナ名接頭辞</td>
+<td><code>clab-microseg-</code>（既存稼働中 <code>clab-dynamic-routing-lab-*</code> とは完全分離）</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li><strong>east-west の定義</strong>: pc10a と pc10b は同一 VLAN10・同一サブネット（172.50.10.0/24）の横並び。この2台間の通信が「同一セグメント内の east-west」。srv20 は別 VLAN20 で、VLAN 間通信は sw1 のルーティング（inter-VLAN）を経由する。</li>
+</ul>
+<h2 id="結果表" tabindex="-1">結果表 <a class="header-anchor" href="#結果表" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>ゲート</th>
+<th>期待</th>
+<th>実測</th>
+<th>判定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>G1</td>
+<td>起動+iouyap</td>
+<td>全ノード起動・iouyap稼働・端末設定完了</td>
+<td>4ノード全て <code>running</code>、<code>docker top sw1</code> で <code>iouyap 513</code> プロセス確認、pc10a/pc10b/srv20 の IP・GW・サービス起動確認</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>G2</td>
+<td><strong>inter-VLAN ACL（層1）</strong></td>
+<td>pc10a→srv20:80=到達 / pc10a→srv20:22=遮断</td>
+<td>pc10a→srv20:80=<strong>HTTP=200</strong>、pc10a→srv20:22=<strong>BLOCKED</strong>（No route to host＝ACL deny）</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>G3</td>
+<td><strong>intra-VLAN10 host nftables（層2・最重要）</strong></td>
+<td>適用前=到達 / 適用後=遮断</td>
+<td>適用前: pc10a→pc10b ping <strong>3/3到達(0%損失)</strong>。適用後: pc10a→pc10b ping <strong>0/3到達(100%損失)</strong></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>G4</td>
+<td>二層の対照まとめ</td>
+<td>VLAN間=ACL、VLAN内=nftables の役割分担を提示</td>
+<td>下記の対照表・実測エビデンス参照</td>
+<td>✅</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="実測エビデンス要点" tabindex="-1">実測エビデンス（要点） <a class="header-anchor" href="#実測エビデンス要点" aria-hidden="true">#</a></h2>
+<h3 id="g2--inter-vlan-acl層1" tabindex="-1">G2 — inter-VLAN ACL（層1） <a class="header-anchor" href="#g2--inter-vlan-acl層1" aria-hidden="true">#</a></h3>
+<pre><code class="language-text">--- pc10a -&gt; srv20:80 (期待: 到達/200) ---
+HTTP=200
+
+--- pc10a -&gt; srv20:22 (期待: 遮断) ---
+bash: connect: No route to host
+BLOCKED
+</code></pre>
+<p>ACL マッチカウンタ（<code>show ip access-lists SEG10-OUT</code>、疎通試験後）:</p>
+<pre><code class="language-text">Extended IP access list SEG10-OUT
+    10 permit tcp 172.50.10.0 0.0.0.255 host 172.50.20.11 eq www (6 matches)
+    20 permit icmp 172.50.10.0 0.0.0.255 172.50.20.0 0.0.0.255
+    30 deny tcp 172.50.10.0 0.0.0.255 host 172.50.20.11 eq 22 (1 match)
+    40 permit ip any any (6 matches)
+</code></pre>
+<ul>
+<li>tcp/80（www）に <strong>6 matches</strong>＝curl の到達が ACL の permit 行を実際に通過したことの実測。</li>
+<li>tcp/22 の deny 行に <strong>1 match</strong>＝22 への到達試行が確実に ACL で拒否されたことの実測（ping 疎通確認等で発生した icmp は別カウンタ line 20 でカウントされておりゼロ、curl/tcp 接続試行のみが deny にヒットした)。</li>
+</ul>
+<p>SVI 状態（設定投入直後の一時的な down 表示を経て、再確認時は up/up）:</p>
+<pre><code class="language-text">Interface              IP-Address      OK? Method Status                Protocol
+Vlan10                 172.50.10.1     YES manual up                    up
+Vlan20                 172.50.20.1     YES manual up                    up
+</code></pre>
+<h3 id="g3--intra-vlan10-host-nftables層2最重要ゲート" tabindex="-1">G3 — intra-VLAN10 host nftables（層2・最重要ゲート） <a class="header-anchor" href="#g3--intra-vlan10-host-nftables層2最重要ゲート" aria-hidden="true">#</a></h3>
+<p><strong>適用前</strong>（pc10a → pc10b、同一 VLAN10 内）:</p>
+<pre><code class="language-text">PING 172.50.10.12 (172.50.10.12) 56(84) bytes of data.
+64 bytes from 172.50.10.12: icmp_seq=1 ttl=64 time=6.86 ms
+64 bytes from 172.50.10.12: icmp_seq=2 ttl=64 time=1.83 ms
+64 bytes from 172.50.10.12: icmp_seq=3 ttl=64 time=1.50 ms
+--- 172.50.10.12 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss
+</code></pre>
+<p>pc10b に nftables 投入（<code>nft add rule inet filter input ip saddr 172.50.10.11 counter drop</code>）:</p>
+<pre><code class="language-text">table inet filter {
+	chain input {
+		type filter hook input priority filter; policy accept;
+		ip saddr 172.50.10.11 counter packets 0 bytes 0 drop
+	}
+}
+</code></pre>
+<p><strong>適用後</strong>（同じ pc10a → pc10b）:</p>
+<pre><code class="language-text">PING 172.50.10.12 (172.50.10.12) 56(84) bytes of data.
+--- 172.50.10.12 ping statistics ---
+3 packets transmitted, 0 received, 100% packet loss
+</code></pre>
+<p>nftables カウンタ（適用後・遮断試験直後）:</p>
+<pre><code class="language-text">table inet filter {
+	chain input {
+		type filter hook input priority filter; policy accept;
+		ip saddr 172.50.10.11 counter packets 3 bytes 252 drop
+	}
+}
+</code></pre>
+<ul>
+<li><strong>適用前後で pc10a→pc10b の到達性が 100%→0% に反転</strong>、かつ nft の drop カウンタが <code>0→3 packets</code> に増加。同一 VLAN 内の端末間通信をホスト nftables が実際に遮断したことを、対照とパケットカウンタの両方で実証。</li>
+</ul>
+<h3 id="g4--二層の役割分担まとめ" tabindex="-1">G4 — 二層の役割分担まとめ <a class="header-anchor" href="#g4--二層の役割分担まとめ" aria-hidden="true">#</a></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>通信</th>
+<th>制御点</th>
+<th>適用前</th>
+<th>適用後/対象外</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pc10a → srv20:80（VLAN間）</td>
+<td>層1: IOL inter-VLAN ACL（SVI Vlan10 の <code>ip access-group SEG10-OUT in</code>）</td>
+<td>—</td>
+<td>ACL: permit tcp eq 80</td>
+<td>到達（200）</td>
+</tr>
+<tr>
+<td>pc10a → srv20:22（VLAN間）</td>
+<td>層1: IOL inter-VLAN ACL</td>
+<td>—</td>
+<td>ACL: deny tcp eq 22</td>
+<td>遮断</td>
+</tr>
+<tr>
+<td>pc10a → pc10b（VLAN内・同一セグメント）</td>
+<td><strong>層1は対象外</strong>（同一VLANのためスイッチのルーティング/ACLを経由しない）</td>
+<td>到達（3/3, 0%損失）</td>
+<td>層2: pc10b の nftables drop</td>
+<td><strong>遮断（0/3, 100%損失）</strong></td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li><strong>VLAN/ACL がセグメント間（inter-VLAN）にしか効かないことの証明</strong>: pc10a→pc10b は同一 VLAN10・同一サブネットのため sw1 の L3 ルーティングを経由しない。実際、SEG10-OUT ACL は Vlan10 SVI 通過トラフィックにしか適用されないため、pc10a→pc10b の直接通信には一切関与しない（ACL 側にこの2台間を制御するルールを書いても効果がない）。</li>
+<li><strong>同一セグメント内の横移動を止めるにはホスト側 nftables が必須</strong>であることを、pc10b 側の nftables 適用前後の対照（100%到達→100%遮断）で直接示した。</li>
+</ul>
+<h2 id="総括" tabindex="-1">総括 <a class="header-anchor" href="#総括" aria-hidden="true">#</a></h2>
+<p><strong>マイクロセグメンテーションの核心「VLAN/ACL はセグメント間、nftables はセグメント内」の役割分担を、Cisco IOL + Linux ホストの実機構成で二層とも実証完了。</strong> 層1（inter-VLAN ACL）は VLAN10→VLAN20 の到達を tcp/80 のみに絞り込み、tcp/22 を確実に拒否した（ACL マッチカウンタで実測）。層2（ホスト nftables）は同一 VLAN10 内の pc10a→pc10b 通信を、適用前(3/3到達)→適用後(0/3到達)の対照とパケットカウンタ(0→3 drop)で確実に遮断したことを示した。</p>
+<p>「VLAN に入れた＝業務VLAN内は自由に到達できる」状態から、「業務VLAN内でも許可されていない端末間は遮断される」状態への変化を、同一トポロジ・同一端末ペアに対するビフォー/アフター比較で提示できたことが最大の成果。詰まりどころ（iouyap起動、SVI表示タイミング、expect並列実行時の競合）は<a href="../04_%E6%A7%8B%E7%AF%89/%E6%A7%8B%E7%AF%89%E3%83%AD%E3%82%B0_2026-07-05.html">構築ログ</a>参照。</p>
+<p>Illumio / Cisco TrustSec が担う「ネットワーク中心 vs ホスト中心のμセグ」の両方の適用点を、IOL ACL（ネットワーク層）と nftables（ホスト層）で1つのラボ内に同居させたことで、両者の適用範囲の違い（VLAN間/VLAN内）を手で確認できた。</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#試験環境clab-arm64">試験環境（clab, arm64）</a></li>
+<li class="lvl-2"><a href="#結果表">結果表</a></li>
+<li class="lvl-2"><a href="#実測エビデンス要点">実測エビデンス（要点）</a></li>
+<li class="lvl-3"><a href="#g2--inter-vlan-acl層1">G2 — inter-VLAN ACL（層1）</a></li>
+<li class="lvl-3"><a href="#g3--intra-vlan10-host-nftables層2最重要ゲート">G3 — intra-VLAN10 host nftables（層2・最重要ゲート）</a></li>
+<li class="lvl-3"><a href="#g4--二層の役割分担まとめ">G4 — 二層の役割分担まとめ</a></li>
+<li class="lvl-2"><a href="#総括">総括</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

@@ -33,3 +33,6 @@ node_modules/
 
 # === NDR(Suricata) 実行時ログ ===
 **/suricata/log/
+
+# === expect/検証の実行時ログ ===
+test*.log

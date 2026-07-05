@@ -1,0 +1,31 @@
+name: microseg
+# N4 マイクロセグメンテーション（nftables/IOL VLAN・ACL 版）
+# sw1(IOL L3 SVI + inter-VLAN ACL) + pc10a/pc10b(同一VLAN10) + srv20(VLAN20)
+mgmt:
+  network: clab-microseg-mgmt
+  ipv4-subnet: 172.20.30.0/24
+
+topology:
+  nodes:
+    sw1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      type: l2
+      mgmt-ipv4: 172.20.30.11
+    pc10a:
+      kind: linux
+      image: microseg-endpoint:local
+      mgmt-ipv4: 172.20.30.21
+    pc10b:
+      kind: linux
+      image: microseg-endpoint:local
+      mgmt-ipv4: 172.20.30.22
+    srv20:
+      kind: linux
+      image: microseg-endpoint:local
+      mgmt-ipv4: 172.20.30.23
+
+  links:
+    - endpoints: ["sw1:eth1", "pc10a:eth1"]
+    - endpoints: ["sw1:eth2", "pc10b:eth1"]
+    - endpoints: ["sw1:eth3", "srv20:eth1"]
