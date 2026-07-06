@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>NW-ZT Console — 統合ゼロトラスト運用コンソール</title>
+  <link rel="stylesheet" href="../assets/doc.css">
+  <link rel="stylesheet" href="../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../index.html">Home</a>
+<span class="sep">/</span>
+<span>nwzt_console</span></nav>
+      <h1 class="doc-title">NW-ZT Console — 統合ゼロトラスト運用コンソール</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-05</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">dashboard</span><span class="tag">console</span><span class="tag">single-pane-of-glass</span></span>
+      </div>
+      
+      <div class="content">
+<p>NW-ZT トラック（N1 NAC / N2 SDP-ZTNA / N3 NDR / N4 μセグ）は全て CLI・設定ファイル駆動で実装した。本コンソールは、それらを <strong>1 画面（single pane of glass）</strong> で見せる運用 UI。Zscaler / Palo Alto / Meraki / Mist の商用 GUI が「使いやすい」理由を OSS ラボに移植する試み。</p>
+<blockquote>
+<p><strong>デザイン基準</strong>: ライト運用コンソール。既存 <code>規約/ビルド/doc.css</code> の紙系トークン（--cisco 青・ゾーン色）を継承。<strong>外部依存ゼロ</strong>の静的 HTML で、GitHub Pages が配信。</p>
+</blockquote>
+<h2 id="商用-gui-の使いやすさを移植した-5-原則" tabindex="-1">商用 GUI の「使いやすさ」を移植した 5 原則 <a class="header-anchor" href="#商用-gui-の使いやすさを移植した-5-原則" aria-hidden="true">#</a></h2>
+<ol>
+<li><strong>単一画面</strong>: 4 観点を 1 コンソールに（ポイント製品を行き来しない）</li>
+<li><strong>CLI レス</strong>: 設定ファイルの複雑さを表に出さず、状態と意図を見せる</li>
+<li><strong>状態が先</strong>: トップは「ヘルス」（KPI ＋ ゾーンマップ）。詳細は各セクションへ</li>
+<li><strong>ポリシー = 意図（誰 → 何）</strong>: NAC は user→VLAN、ZTNA は identity→service</li>
+<li><strong>プロアクティブな可視化</strong>: NDR の east-west アラート、μセグの allow/deny を前面に</li>
+</ol>
+<h2 id="構成" tabindex="-1">構成 <a class="header-anchor" href="#構成" aria-hidden="true">#</a></h2>
+<pre><code>nwzt_console/
+├── src/index.html     シェル（サイドバー + ヘルス行 + セクション）
+├── src/styles.css     デザインシステム（doc.css 紙系トークン継承）
+├── src/app.js         描画（vanilla JS・ゾーンマップ SVG 自前描画・外部依存ゼロ）
+├── src/data.js        実データ（実機検証ラボからの採取値）
+├── capture/           稼働中ラボ → data 再生成（ライブ更新）
+└── build/publish.sh   src/ → docs/console/ 公開コピー
+</code></pre>
+<h2 id="実データの出所" tabindex="-1">実データの出所 <a class="header-anchor" href="#実データの出所" aria-hidden="true">#</a></h2>
+<p><code>src/data.js</code> の値は、各ラボの実機検証で採取した本物：</p>
+<ul>
+<li>NAC: <code>show authentication sessions</code>（alice / VLAN 10 / Authorized）</li>
+<li>ZTNA: <code>ziti edge list</code> ＋ 実測（overlay HTTP 200 / direct HTTP 000）</li>
+<li>NDR: Suricata eve.json（sid:1000001 east-west SYN scan、flow 300+）</li>
+<li>μセグ: IOL ACL カウンタ（www=6 / deny22=1）・nft ドロップ（3）・Cilium L7（200 / 403）</li>
+</ul>
+<h2 id="使い方" tabindex="-1">使い方 <a class="header-anchor" href="#使い方" aria-hidden="true">#</a></h2>
+<pre><code class="language-bash"><span class="hljs-comment"># 公開（GitHub Pages 配信）</span>
+./build/publish.sh              <span class="hljs-comment"># src/ → docs/console/</span>
+
+<span class="hljs-comment"># ローカル閲覧</span>
+python3 -m http.server 8791 --directory src   <span class="hljs-comment"># → http://localhost:8791</span>
+
+<span class="hljs-comment"># 稼働中ラボから最新化（ライブ更新）</span>
+./capture/refresh.sh            <span class="hljs-comment"># 各ラボ export → data.js 再生成</span>
+</code></pre>
+<p>公開 URL: <code>https://shuyaofficial.github.io/containerlab-network-labs/console/</code></p>
+<h2 id="次段階" tabindex="-1">次段階 <a class="header-anchor" href="#次段階" aria-hidden="true">#</a></h2>
+<p>Faucet SDN（テーマ 35）実装 ＋ Meraki/Mist 風 SDN 管理ダッシュボード（トポロジ + ポートグリッド + クライアント一覧）。ライブ操作 GUI 化。</p>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#商用-gui-の使いやすさを移植した-5-原則">商用 GUI の「使いやすさ」を移植した 5 原則</a></li>
+<li class="lvl-2"><a href="#構成">構成</a></li>
+<li class="lvl-2"><a href="#実データの出所">実データの出所</a></li>
+<li class="lvl-2"><a href="#使い方">使い方</a></li>
+<li class="lvl-2"><a href="#次段階">次段階</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

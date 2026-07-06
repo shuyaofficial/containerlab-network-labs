@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>NW-ZT Console ライブ更新（capture/）— 稼働中ラボから data.js を再生成する仕組み</title>
+  <link rel="stylesheet" href="../../assets/doc.css">
+  <link rel="stylesheet" href="../../assets/highlight.css">
+</head>
+<body>
+  <div class="layout">
+    <article class="doc">
+      <nav class="breadcrumb" aria-label="パンくずリスト"><a href="../../index.html">Home</a>
+<span class="sep">/</span>
+<span>nwzt_console</span>
+<span class="sep">/</span>
+<span>capture</span></nav>
+      <h1 class="doc-title">NW-ZT Console ライブ更新（capture/）— 稼働中ラボから data.js を再生成する仕組み</h1>
+      <div class="meta">
+        
+        <span class="dot"></span><span class="date">2026-07-05</span>
+        <span class="tags"><span class="tag">zero-trust</span><span class="tag">dashboard</span><span class="tag">console</span><span class="tag">capture</span><span class="tag">live-update</span></span>
+      </div>
+      
+      <div class="content">
+<p><code>nwzt_console/src/data.js</code> は静的な実データ（各ラボの実機検証で採取した本物の値）を持つ。
+<code>capture/</code> はそれを<strong>稼働中のラボから再採取して更新する</strong>ための仕組み。書き込みは
+<code>nwzt_console/capture/</code> 配下のみに限定し、既存ラボ本体・コンソール本体（<code>src/</code>）・
+他テーマには一切書き込まない。</p>
+<h2 id="仕組み" tabindex="-1">仕組み <a class="header-anchor" href="#仕組み" aria-hidden="true">#</a></h2>
+<pre><code>capture/
+├── export_nac.sh        N1 31_nac_dot1x の採取（stopped or JSON）
+├── export_ztna.sh       N2 36_ztna_openziti の採取（stopped or JSON）
+├── export_ndr.sh        N3 42_ndr_flow の採取（stopped or JSON）
+├── export_microseg.sh   N4 microseg_nftables + microseg_cilium の採取（stopped or JSON）
+├── refresh.sh           上記4本を呼び、結果から src/data.js を再生成
+├── _regen.js            data.js 再生成の本体（Node、refresh.sh から呼ばれる）
+├── out/                 各 export の採取結果 JSON（実行のたび上書き、監査・デバッグ用）
+└── README_capture.md    このファイル
+</code></pre>
+<h3 id="設計方針-稼働中なら採取停止中なら既存値を保持壊さない" tabindex="-1">設計方針: 「稼働中なら採取、停止中なら既存値を保持（壊さない）」 <a class="header-anchor" href="#設計方針-稼働中なら採取停止中なら既存値を保持壊さない" aria-hidden="true">#</a></h3>
+<ul>
+<li>各 <code>export_*.sh</code> は Mac 側から <code>ssh clab@orb</code> で OrbStack VM (arm64) に接続し、
+対象ラボのコンテナ（や k3d クラスタ）が<strong>稼働中かどうかをまず判定</strong>する。
+<ul>
+<li>稼働中 → 実機から値を採取し、<code>data.js</code> の該当セクション（nac/ztna/ndr/microseg）と
+同じキー構造の JSON を <strong>stdout</strong> に出す（先頭に <code>&quot;status&quot;:&quot;running&quot;</code>）。</li>
+<li>停止中 / 採取失敗 → <code>{&quot;status&quot;:&quot;stopped&quot;}</code> を stdout に出して終了する（exit 0）。
+以降の処理でエラーにはしない。</li>
+</ul>
+</li>
+<li><code>refresh.sh</code> は4本の export を順に呼び、結果を <code>capture/out/&lt;name&gt;.json</code> に保存した上で
+<code>_regen.js</code>（Node）に渡す。<code>_regen.js</code> は既存の <code>src/data.js</code> を読み込み、
+<strong><code>status:&quot;stopped&quot;</code> のセクションは既存値のまま</strong>、採取できたセクションだけを
+差し替えて書き戻す。<code>meta.capturedAt</code> は実行日に更新する。</li>
+<li><strong>安全弁</strong>: <code>_regen.js</code> は再生成後に <code>meta/nac/ztna/ndr/microseg</code> の5キーが
+すべて存在し空でないことを確認してから書き込む。1つでも欠けたら
+例外を投げて <strong><code>data.js</code> を書き換えずに中断</strong>する（壊れた状態で上書きしない）。</li>
+<li>出力フォーマットは <code>window.NWZT_DATA = {...};</code> を厳守し、<code>file://</code> でそのまま開ける
+静的 HTML の前提を壊さない（<code>build/publish.sh</code> や既存の <code>src/index.html</code> は無改変）。</li>
+</ul>
+<h2 id="使い方" tabindex="-1">使い方 <a class="header-anchor" href="#使い方" aria-hidden="true">#</a></h2>
+<pre><code class="language-bash"><span class="hljs-comment"># 稼働中ラボから最新化（ライブ更新）。個別 export の失敗は他ラボに影響しない。</span>
+<span class="hljs-built_in">cd</span> nwzt_console
+./capture/refresh.sh
+
+<span class="hljs-comment"># 個別に採取結果だけ見たい場合</span>
+./capture/export_ndr.sh | jq .
+
+<span class="hljs-comment"># 再生成後の健全性チェック（壊れていないか・5セクション揃っているか）</span>
+node -e <span class="hljs-string">&quot;global.window={};require(&#x27;./src/data.js&#x27;);console.log(Object.keys(window.NWZT_DATA))&quot;</span>
+</code></pre>
+<h2 id="各ラボの採取コマンド対応表" tabindex="-1">各ラボの採取コマンド対応表 <a class="header-anchor" href="#各ラボの採取コマンド対応表" aria-hidden="true">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>セクション</th>
+<th>ラボ</th>
+<th>稼働判定</th>
+<th>採取コマンド</th>
+<th>data.js キー</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>nac</td>
+<td>31_nac_dot1x</td>
+<td><code>docker ps</code> に <code>clab-nac-*</code> が存在</td>
+<td>expect で <code>clab-nac-sw1</code> に attach → <code>show authentication sessions</code> / <code>show vlan brief</code></td>
+<td><code>nac.summary</code> / <code>nac.sessions</code> / <code>nac.policy</code></td>
+</tr>
+<tr>
+<td>ztna</td>
+<td>36_ztna_openziti</td>
+<td><code>docker ps</code> に <code>ziti</code>/<code>darkweb</code>/<code>apptun</code>/<code>clienttun</code> が全て存在</td>
+<td><code>ziti edge list services/identities/service-policies</code>（件数）＋ <code>clienttun</code> から <code>curl localhost:8080</code>（overlay）/ <code>curl darkweb:80</code>（direct）を実測</td>
+<td><code>ztna.summary</code> / <code>ztna.proof</code></td>
+</tr>
+<tr>
+<td>ndr</td>
+<td>42_ndr_flow</td>
+<td><code>docker ps</code> に <code>attacker</code>/<code>victim</code>/<code>suricata</code> が全て存在</td>
+<td><code>suricata/log/eve.json</code> を採取し <code>event_type==&quot;alert&quot;</code> / <code>event_type==&quot;flow&quot; and ip_v==4 and proto==&quot;TCP&quot;</code> を jq で集計（IPv6 ICMP/MLD 等のノイズは east-west 対象外として除外）</td>
+<td><code>ndr.summary</code> / <code>ndr.alerts</code> / <code>ndr.topTalkers</code></td>
+</tr>
+<tr>
+<td>microseg (nftables)</td>
+<td>microseg_nftables</td>
+<td><code>docker ps</code> に <code>clab-microseg-*</code> が存在</td>
+<td>expect で <code>clab-microseg-sw1</code> に attach → <code>show ip access-lists</code>（ACL カウンタ）＋ <code>clab-microseg-pc10b</code> で <code>nft list ruleset</code>（drop カウンタ）</td>
+<td><code>microseg.approaches[id=nftables]</code></td>
+</tr>
+<tr>
+<td>microseg (cilium)</td>
+<td>microseg_cilium</td>
+<td>VM 上で <code>k3d cluster list</code> に <code>microseg</code> クラスタが存在</td>
+<td><code>kubectl -n microseg get networkpolicy,ciliumnetworkpolicy</code> ＋ <code>microseg_cilium/04_構築/test.sh</code> を実行し frontend/other→backend の HTTP コード（L4/L7 の allow/deny）を実測</td>
+<td><code>microseg.approaches[id=cilium]</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>nftables 版・Cilium 版はそれぞれ独立に判定する。<code>_regen.js</code> の <code>mergeMicroseg()</code> は
+<code>microseg.approaches</code> 配列を <strong>id（&quot;nftables&quot; / &quot;cilium&quot;）単位でマージ</strong>するため、
+片方だけ稼働中でももう片方の approach が消えることはない
+（例: nftables だけ稼働中 → <code>approaches</code> は [採取した nftables, 既存の cilium] の
+2件のまま維持される）。両方停止中の場合のみ <code>microseg</code> セクション全体を
+既存値のまま保持する。</p>
+<h2 id="既知の制限" tabindex="-1">既知の制限 <a class="header-anchor" href="#既知の制限" aria-hidden="true">#</a></h2>
+<ul>
+<li><code>export_nac.sh</code> / <code>export_microseg.sh</code>（nftables 側）は IOL の CLI 出力を
+正規表現でパースしている。IOS の表示崩れ・改行位置によっては数値が拾えず
+デフォルト値（試験結果 doc の実測値）にフォールバックすることがある。</li>
+<li><code>export_ztna.sh</code> の services/identities/policies 件数は <code>ziti edge list</code> の
+出力行数から数える簡易実装。OpenZiti CLI の出力フォーマット変更に弱い。</li>
+<li><code>export_microseg.sh</code> の Cilium 側は <code>test.sh</code> の標準出力を<strong>固定4行の順序</strong>で
+読む実装（同じパス <code>/</code> が L4/L7 双方で出力され文字列一致では区別できないため）。
+<code>test.sh</code> の出力順序を変えると壊れる。</li>
+<li>どの export も SSH 接続失敗・コマンドタイムアウト時は <code>set -euo pipefail</code> の
+範囲外で <code>|| true</code> により停止扱いへフォールバックする設計。ただし SSH 自体が
+長時間ハングする場合の明示的なタイムアウトは未設定（次段階の改善候補）。</li>
+<li>全 export・refresh は <strong>capture/ 配下にのみ書き込む</strong>。<code>ssh clab@orb</code> 経由で
+各ラボの deploy/destroy を呼ぶことはなく、あくまで「稼働中なら状態を読むだけ」。</li>
+</ul>
+
+      </div>
+      <footer class="doc-footer">
+        <span class="no-print">このHTMLは <code>規約/ビルド/build.mjs</code> による自動生成ビューです。ソースはMarkdown（手編集禁止）。</span>
+      </footer>
+    </article>
+    <aside class="toc" aria-label="目次">
+      <p class="toc-title">目次</p>
+      <ul>
+<li class="lvl-2"><a href="#仕組み">仕組み</a></li>
+<li class="lvl-3"><a href="#設計方針-稼働中なら採取停止中なら既存値を保持壊さない">設計方針: 「稼働中なら採取、停止中なら既存値を保持（壊さない）」</a></li>
+<li class="lvl-2"><a href="#使い方">使い方</a></li>
+<li class="lvl-2"><a href="#各ラボの採取コマンド対応表">各ラボの採取コマンド対応表</a></li>
+<li class="lvl-2"><a href="#既知の制限">既知の制限</a></li>
+</ul>
+    </aside>
+  </div>
+  <script src="../../assets/mermaid.min.js"></script>
+  <script>
+    (function () {
+      if (window.mermaid) {
+        window.mermaid.initialize({
+          startOnLoad: true,
+          theme: "base",
+          fontFamily: '"Hiragino Sans","Noto Sans JP",sans-serif',
+          themeVariables: {
+            primaryColor: "#e8f4f7",
+            primaryBorderColor: "#087da8",
+            primaryTextColor: "#17232d",
+            lineColor: "#5c6b75",
+            fontSize: "14px"
+          }
+        });
+      }
+      // TOC アクティブ連動（IntersectionObserver / モーション最小）
+      var links = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+      if (!links.length || !("IntersectionObserver" in window)) return;
+      var map = {};
+      links.forEach(function (a) {
+        var id = decodeURIComponent(a.getAttribute("href").slice(1));
+        map[id] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) visible.add(e.target.id);
+          else visible.delete(e.target.id);
+        });
+        var active = null;
+        var heads = document.querySelectorAll(".content h2[id], .content h3[id]");
+        for (var i = 0; i < heads.length; i++) {
+          if (visible.has(heads[i].id)) { active = heads[i].id; break; }
+        }
+        links.forEach(function (a) { a.classList.remove("is-active"); });
+        if (active && map[active]) map[active].classList.add("is-active");
+      }, { rootMargin: "0px 0px -70% 0px", threshold: 0 });
+      document.querySelectorAll(".content h2[id], .content h3[id]").forEach(function (h) { io.observe(h); });
+    })();
+  </script>
+</body>
+</html>

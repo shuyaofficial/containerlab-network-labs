@@ -36,3 +36,6 @@ node_modules/
 
 # === expect/検証の実行時ログ ===
 test*.log
+
+# === コンソールcapture実行時証跡 ===
+nwzt_console/capture/out/

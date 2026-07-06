@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NW-ZT Console — ネットワーク中心ゼロトラスト 運用コンソール</title>
+<meta name="color-scheme" content="light">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <!-- サイドバー（single pane of glass の入口） -->
+  <aside class="nav">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"></div>
+      <div>
+        <div class="brand-name">NW-ZT Console</div>
+        <div class="brand-sub" id="brandSub"></div>
+      </div>
+    </div>
+    <div class="nav-label">運用</div>
+    <a data-view="overview" class="active"><span class="dot"></span>概要 / ヘルス</a>
+    <div class="nav-label">ゼロトラスト観点</div>
+    <a data-view="nac"><span class="dot z-dmz"></span>アクセス制御 (NAC)</a>
+    <a data-view="ztna"><span class="dot z-trust"></span>ゼロトラストアクセス</a>
+    <a data-view="ndr"><span class="dot z-untrust"></span>脅威・フロー (NDR)</a>
+    <a data-view="microseg"><span class="dot z-obs"></span>セグメンテーション</a>
+    <div class="nav-foot">
+      実データ: 実機検証ラボからの採取値<br>
+      <code id="repoLink"></code>
+    </div>
+  </aside>
+
+  <!-- メイン -->
+  <div class="main">
+    <header class="topbar">
+      <div>
+        <h1 id="viewTitle">概要 / ヘルス</h1>
+        <div class="crumb" id="viewCrumb"></div>
+      </div>
+      <div class="topbar-right">
+        <div class="capture">
+          <div>採取 <b id="capAt"></b></div>
+          <div id="capSrc"></div>
+        </div>
+        <span class="posture"><span class="pulse"></span><span id="postureLabel"></span></span>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <section class="view on" data-view="overview" id="v-overview"></section>
+      <section class="view" data-view="nac" id="v-nac"></section>
+      <section class="view" data-view="ztna" id="v-ztna"></section>
+      <section class="view" data-view="ndr" id="v-ndr"></section>
+      <section class="view" data-view="microseg" id="v-microseg"></section>
+    </div>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
