@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ゼロトラスト完全版｜試験計画書 | ゼロトラスト完全版</title>
+<meta name="description" content="ゼロトラスト完全版｜試験計画書 — ゼロトラスト完全版レポート">
+<style>
+:root{
+  --surface:#FFFFFF; --surface-2:#F7F7F8; --surface-3:#F0F0F2;
+  --ink:#1A1A1A; --ink-2:#6B7280; --ink-3:#9AA0AA;
+  --brand:#E60012; --brand-ink:#FFFFFF; --border:#E7E7EA; --border-2:#EDEDF0;
+  --ok:#0E9F6E; --warn:#B45309; --info:#2563EB;
+  --r-sm:6px; --r-md:10px; --r-lg:16px;
+  --shadow-1:0 1px 2px rgba(17,17,26,.05),0 1px 3px rgba(17,17,26,.05);
+  --shadow-2:0 10px 40px rgba(17,17,26,.10);
+  --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",system-ui,-apple-system,sans-serif;
+  --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  --maxw:1180px; --ease:cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto} *{animation:none!important;transition:none!important}}
+body{font-family:var(--sans);color:var(--ink);background:var(--surface);line-height:1.8;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-feature-settings:"palt" 1}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--info);outline-offset:2px;border-radius:3px}
+.skip{position:absolute;left:-999px;top:0;background:var(--ink);color:#fff;padding:8px 14px;z-index:100;border-radius:0 0 8px 0}
+.skip:focus{left:0}
+
+/* topbar */
+.topbar{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.82);backdrop-filter:saturate(180%) blur(14px);
+  border-bottom:1px solid var(--border)}
+.bar{display:flex;align-items:center;justify-content:space-between;height:60px;gap:24px}
+.brand{display:flex;align-items:center;gap:11px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
+.brand-mark{width:14px;height:14px;border-radius:4px;background:var(--brand);box-shadow:0 0 0 4px rgba(230,0,18,.10)}
+.brand-name{font-size:15px;color:var(--ink)} .brand-name b{color:var(--brand);font-weight:700}
+.stagenav{display:flex;gap:4px;overflow:auto}
+.stagenav a{font-size:13px;color:var(--ink-2);padding:7px 12px;border-radius:999px;transition:color .2s,background .2s;white-space:nowrap}
+.stagenav a:hover{color:var(--ink);background:var(--surface-3)}
+.stagenav a.active{color:var(--brand);background:rgba(230,0,18,.06);font-weight:600}
+
+/* hero strip */
+.hero-strip{background:var(--surface);border-bottom:1px solid var(--border);padding:44px 0 30px}
+.crumbs{font-size:12.5px;color:var(--ink-3);letter-spacing:.02em;margin-bottom:14px}
+.crumbs a:hover{color:var(--brand)} .crumbs span{margin:0 6px;color:var(--border)}
+.doc-title{font-size:clamp(28px,4vw,42px);line-height:1.18;letter-spacing:-.02em;font-weight:800;color:#0F0F12;max-width:24ch}
+.metarow{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;align-items:center}
+.chip{font-size:12px;padding:4px 11px;border-radius:999px;border:1px solid var(--border);color:var(--ink-2);background:var(--surface);letter-spacing:.02em}
+.chip.type{border-color:transparent;background:var(--ink);color:#fff;font-weight:600}
+.chip.date{color:var(--ink-3)}
+.chip.status{font-weight:600;border:none}
+.s-draft{background:#FEF3C7;color:#92400E} .s-review{background:#DBEAFE;color:#1E40AF} .s-done{background:#D1FAE5;color:#065F46}
+.tag{font-size:11.5px;padding:3px 9px;border-radius:6px;background:var(--surface-3);color:var(--ink-2)}
+
+/* layout */
+.layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:48px;padding-top:40px;padding-bottom:80px;align-items:start}
+.side{position:sticky;top:84px}
+.side-h{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:12px}
+.toc{display:flex;flex-direction:column;border-left:1px solid var(--border)}
+.toc a{font-size:13px;color:var(--ink-2);padding:6px 0 6px 16px;margin-left:-1px;border-left:2px solid transparent;transition:color .2s,border-color .2s}
+.toc a:hover{color:var(--ink)}
+.toc a.cur{color:var(--brand);border-left-color:var(--brand);font-weight:600}
+.toc-3{padding-left:28px;font-size:12.5px} .toc-empty{color:var(--ink-3);font-size:13px}
+
+/* document typography */
+.doc{min-width:0;font-size:15.5px;color:#26262B}
+.doc h2{font-size:25px;letter-spacing:-.01em;font-weight:750;color:#0F0F12;margin:52px 0 16px;padding-top:10px}
+.doc h2:first-child{margin-top:0}
+.doc h2::before{content:"";display:block;width:34px;height:3px;background:var(--brand);border-radius:2px;margin-bottom:16px}
+.doc h3{font-size:18.5px;font-weight:700;color:#1A1A1F;margin:34px 0 12px}
+.doc h4{font-size:15.5px;font-weight:700;color:var(--ink-2);margin:24px 0 8px}
+.doc p{margin:14px 0}
+.doc a{color:var(--brand);text-decoration:none;border-bottom:1px solid rgba(230,0,18,.28);transition:border-color .2s}
+.doc a:hover{border-bottom-color:var(--brand)}
+.doc strong{font-weight:700;color:#0F0F12}
+.doc ul,.doc ol{margin:14px 0 14px 4px;padding-left:22px}
+.doc li{margin:7px 0}
+.doc ul li::marker{color:var(--brand)}
+.doc hr{border:none;border-top:1px solid var(--border);margin:40px 0}
+.doc code{font-family:var(--mono);font-size:.88em;background:var(--surface-3);padding:2px 6px;border-radius:5px;color:#B4142B}
+
+/* table */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r-md);margin:22px 0;box-shadow:var(--shadow-1)}
+table{border-collapse:collapse;width:100%;font-size:13.8px}
+thead th{background:var(--surface-2);text-align:left;font-weight:700;color:var(--ink);padding:12px 14px;border-bottom:1px solid var(--border);white-space:nowrap}
+tbody td{padding:11px 14px;border-bottom:1px solid var(--border-2);vertical-align:top;color:#33333A}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--surface-2)}
+tbody td code{font-size:.85em}
+
+/* code block */
+.code{position:relative;margin:22px 0;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface-2);overflow:hidden}
+.code-lang{position:absolute;top:0;right:0;font-family:var(--mono);font-size:11px;color:var(--ink-3);background:var(--surface-3);padding:3px 10px;border-radius:0 var(--r-md) 0 var(--r-md);letter-spacing:.04em}
+.code pre{overflow-x:auto;padding:18px 16px;padding-top:22px}
+.code code{font-family:var(--mono);font-size:13px;color:#2A2A31;line-height:1.7;background:none;padding:0}
+
+/* diagram (mermaid source, tasteful panel) */
+.diagram{margin:24px 0;border:1px dashed var(--border);border-radius:var(--r-md);background:var(--surface-2);padding:8px 8px 14px}
+.diagram figcaption{font-size:11.5px;font-weight:700;letter-spacing:.1em;color:var(--ink-3);text-transform:uppercase;padding:8px 8px 6px}
+.diagram .mmd{font-family:var(--mono);font-size:12px;color:var(--ink-2);line-height:1.6;overflow-x:auto;padding:6px 8px;white-space:pre}
+
+/* blockquote / callout */
+blockquote{margin:22px 0;padding:14px 18px;background:var(--surface-2);border-left:3px solid var(--brand);border-radius:0 var(--r-sm) var(--r-sm) 0;color:var(--ink-2);font-size:14.5px}
+blockquote strong{color:var(--ink)}
+
+/* status inline badges */
+.st{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;font-size:11px;font-weight:800;line-height:1;vertical-align:middle}
+.st-ok{background:var(--ok);color:#fff} .st-plan{background:#E5E7EB;color:#6B7280}
+
+/* footer */
+.doc-foot{margin-top:64px;padding-top:24px;border-top:1px solid var(--border);font-size:13px;color:var(--ink-3)}
+.doc-foot .muted{margin-top:6px;font-size:12.5px}
+
+@media (max-width:900px){
+  .layout{grid-template-columns:1fr;gap:0}
+  .side{display:none}
+  .hero-strip{padding:32px 0 22px}
+  .doc h2{font-size:22px;margin-top:40px}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">本文へスキップ</a>
+<header class="topbar">
+  <div class="wrap bar">
+    <a class="brand" href="../index.html"><span class="brand-mark"></span><span class="brand-name">Zero&nbsp;Trust <b>完全版</b></span></a>
+    <nav class="stagenav" aria-label="ステージ"><a href="../README_Lab_Challenge.html">概要</a><a href="../00_ログイン/ログインコマンド.html">00</a><a href="../01_要件定義/要件定義書.html">01</a><a href="../02_基本設計/統合アーキテクチャマップ.html">02</a><a href="../03_詳細設計/コンポーネント詳細設計.html">03</a><a href="../04_構築/実装計画.html">04</a><a href="../05_試験/統合検証結果.html">05</a></nav>
+  </div>
+</header>
+<div class="hero-strip"><div class="wrap">
+  <div class="crumbs"><a href="../index.html">ホーム</a> <span>›</span> <span>05 試験</span></div>
+  <h1 class="doc-title">ゼロトラスト完全版｜試験計画書</h1>
+  <div class="metarow">
+    <span class="chip type">試験計画</span>
+    <span class="chip status s-draft">下書き</span>
+    <span class="chip date">更新 2026-07-08</span>
+    <span class="tag">zero-trust</span><span class="tag">test-plan</span><span class="tag">gate</span><span class="tag">integration</span><span class="tag">virtual-company</span>
+  </div>
+</div></div>
+<div class="wrap layout">
+  <aside class="side" aria-label="目次">
+    <div class="side-inner">
+      <p class="side-h">目次</p>
+      <nav class="toc"><a class="toc-2" href="#試験方針">試験方針</a><a class="toc-2" href="#部品ゲート">部品ゲート</a><a class="toc-2" href="#統合ゲートig-i1ig-i8">統合ゲート（IG-I1〜IG-I8）</a><a class="toc-2" href="#e2eゲートig-faig-fe">E2Eゲート（IG-FA〜IG-FE）</a><a class="toc-2" href="#合格基準">合格基準</a><a class="toc-2" href="#参照">参照</a></nav>
+    </div>
+  </aside>
+  <main id="main" class="doc">
+    <p>各部品・統合ポイント・E2Eフローのゲート条件をマトリクス化する。<strong>手順概要のみを示し、実configの答えは書かない</strong>（実施手順の詳細は各実装テーマの試験計画書を参照）。</p>
+<h2 id="試験方針">試験方針</h2>
+<ul><li><strong>3階層ゲート</strong>: 本フォルダのゲートは「部品ゲート」「統合ゲート（IG-I<em>）」「E2Eゲート（IG-F</em>）」の3階層で構成する。部品ゲートは各実装テーマのゲート条件をそのまま採番したもの、統合ゲートは <a href="../02_基本設計/統合アーキテクチャマップ.html">統合アーキテクチャマップ</a> の統合ポイントI-1〜I-8、E2Eゲートは同マップのE2EフローF-A〜F-Eに対応する。</li><li><strong>実機検証済と設計のみを分離</strong>: 実施済みのものは判定欄に結果を記録し、未実施（設計のみ）は「未実施」と明示する。ノード（部品）の状態と接続（統合ポイント/E2Eフロー）の状態は必ず別々に扱う。</li><li><strong>根拠は個別テーマ試験結果</strong>: 詳細な実施ログ・エビデンスは各テーマの <code>05_試験/試験結果_*.md</code> を正とする。</li></ul>
+<h2 id="部品ゲート">部品ゲート</h2>
+<p>各実装テーマのゲート条件をそのまま採番したもの。<strong>ID・判定・検証日は各テーマの試験結果に基づく確定値であり、本表では改変しない</strong>。</p>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>対象層</th><th>項目</th><th>手順概要</th><th>期待結果</th><th>判定</th></tr></thead><tbody><tr><td>IG-L7-0</td><td>L7 Phase0</td><td>土台疎通</td><td><code>client</code>から<code>app</code>へping/curl</td><td>疎通成功、規約ビルドpass</td><td><span class="st st-ok" aria-label="合格">✓</span>合格(2026-07-04)</td></tr><tr><td>IG-L7-1</td><td>L7 Phase1</td><td>ID統制（Keycloak）</td><td>OIDCトークン取得</td><td>tokenが返る</td><td>未実施（設計のみ）</td></tr><tr><td>IG-L7-2</td><td>L7 Phase2</td><td>IAP（未認証拒否）</td><td>未認証で<code>app</code>アクセス→拒否、認証後到達</td><td>未認証拒否・認証後到達</td><td>未実施（設計のみ）</td></tr><tr><td>IG-L7-3</td><td>L7 Phase3</td><td>SIEM可視化</td><td>Phase1/2ログのGrafana表示確認</td><td>ダッシュボードに表示</td><td>未実施（設計のみ）</td></tr><tr><td>IG-L7-4</td><td>L7 Phase4</td><td>SWG強制経由</td><td>client外向き通信のproxy経由確認、IDS発報</td><td>proxy経由・IDS発報がLokiに到達</td><td>未実施（設計のみ）</td></tr><tr><td>IG-L7-5</td><td>L7 Phase5</td><td>DLP検知</td><td>機密キーワード含むアップロード試行</td><td>検知・ブロック・SIEM記録</td><td>未実施（設計のみ）</td></tr><tr><td>IG-L7-6</td><td>L7 Phase6</td><td>デバイス統制</td><td>証明書なし端末のアクセス試行</td><td>拒否、posture claimで条件分岐</td><td>未実施（設計のみ）</td></tr><tr><td>IG-N1</td><td>N1 NAC</td><td>動的VLAN割当</td><td>認証成功端末・未認証端末それぞれの通信可否確認</td><td>認証成功→業務VLAN、未認証→通信不可</td><td><span class="st st-ok" aria-label="合格">✓</span>合格(2026-07-05)</td></tr><tr><td>IG-N2</td><td>N2 SDP-ZTNA</td><td>内向き非開放到達</td><td>オーバーレイ経由アクセスと直接アクセスの両方を試行</td><td>オーバーレイ経由のみ到達、直接到達は失敗</td><td><span class="st st-ok" aria-label="合格">✓</span>合格(2026-07-05)</td></tr><tr><td>IG-N3</td><td>N3 NDR</td><td>east-west検知・可視化</td><td>east-westスキャンを発生させ検知確認</td><td>アラート発報＋Loki/Grafana可視化</td><td><span class="st st-ok" aria-label="合格">✓</span>合格(2026-07-05)</td></tr><tr><td>IG-N3-補助</td><td>N3補助（Faucet）</td><td>ミラー/統計供給</td><td>非参加ノードでの複製受信、gauge統計取得</td><td>東西複製パケット観測、ポート別統計取得</td><td><span class="st st-ok" aria-label="合格">✓</span>合格(2026-07-07)</td></tr><tr><td>IG-N4-cilium</td><td>N4 μセグ（Cilium系）</td><td>east-west default-deny</td><td>許可/非許可ワークロード間の到達性確認（L3/L4/L7）</td><td>許可のみ到達、非許可は遮断</td><td><span class="st st-ok" aria-label="合格">✓</span>合格(2026-07-05)</td></tr><tr><td>IG-N4-nftables</td><td>N4 μセグ（nftables系）</td><td>VLAN間ACL・VLAN内nftables</td><td>VLAN間/VLAN内それぞれの到達性確認</td><td>VLAN間はACLで制御、VLAN内はnftablesで遮断</td><td><span class="st st-ok" aria-label="合格">✓</span>合格(2026-07-05)</td></tr></tbody></table></div>
+<h2 id="統合ゲートig-i1ig-i8">統合ゲート（IG-I1〜IG-I8）</h2>
+<p><a href="../02_基本設計/統合アーキテクチャマップ.html">統合アーキテクチャマップ</a> の統合ポイントI-1〜I-8に対応する。<strong>旧IG-F1→IG-I2、旧IG-F2→IG-I7 に改番</strong>（内容は据え置き、統合ポイントIDに合わせて再整理）。</p>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>対応統合ポイント</th><th>手順概要</th><th>期待結果</th><th>判定</th></tr></thead><tbody><tr><td>IG-I1</td><td>I-1 ID統一</td><td>keycloakとFreeRADIUSのバックエンド連携（LDAP/OIDC等）を構成し疎通確認</td><td>keycloakのIDでRADIUS認証が成立する</td><td>未実施（設計のみ、連携方式選定未着手）</td></tr><tr><td>IG-I2（旧IG-F1）</td><td>I-2 認証→セグメント</td><td>動的VLAN割当端末に対しcore-sw ACL・μセグポリシーが同時適用されるか確認</td><td>VLAN動的割当端末がACL/μセグの適用対象になる</td><td>未実施（N1/N4は個別実装済、接続部分は未確認）</td></tr><tr><td>IG-I3</td><td>I-3 常時監視</td><td>全社セグメントのミラー/SPANがsuricataに到達するか確認</td><td>各VLANのeast-westトラフィックがsuricataで観測される</td><td>未実施（部品(35/42)は実証済、全社適用は未実施）</td></tr><tr><td>IG-I4</td><td>I-4 検知→対応（本丸）</td><td>suricata検知→soar-lite webhook→radius CoA→floor-swポートVLAN変更の一連疎通確認</td><td>検知から隔離VLAN99切替までが自動で完了する</td><td>未実施（検知(42)は実証済、CoA(T-N1-8)・soar-liteは未実装）</td></tr><tr><td>IG-I5</td><td>I-5 サーバ非公開化</td><td>srv-app1へのinbound直接到達不可・overlay経由のみ到達を全社構成で確認</td><td>VLAN50への直接到達が拒否されoverlay経由のみ成立</td><td>未実施（部品(36)は実証済、全社適用は未実施）</td></tr><tr><td>IG-I6</td><td>I-6 Webアプリ認可</td><td>pomerium IAP(OIDC SSO=keycloak)＋step-ca mTLSでsrv-app到達確認</td><td>未認証拒否・認証＋mTLS済みのみ到達</td><td>未実施（設計のみ）</td></tr><tr><td>IG-I7（旧IG-F2）</td><td>I-7 統合可観測</td><td>radius/suricata/pomerium/faucet等の各種ログがloki/grafanaに集約されるか確認</td><td>全ログソースがgrafanaで横断的に可視化される</td><td>未実施（42のeve→Loki実証はあるが全社統合は未実施）</td></tr><tr><td>IG-I8</td><td>I-8 宣言型アクセス層（発展）</td><td>faucetによるVLAN/ACL宣言のアクセス層全体適用確認</td><td>アクセス層全体がYAML宣言で制御される</td><td>未実施（発展課題、部品(35)は実証済）</td></tr></tbody></table></div>
+<h2 id="e2eゲートig-faig-fe">E2Eゲート（IG-FA〜IG-FE）</h2>
+<p><a href="../02_基本設計/統合アーキテクチャマップ.html">統合アーキテクチャマップ</a> のE2EフローF-A〜F-Eに対応する。根拠列はフロー内の<span class="st st-ok" aria-label="合格">✓</span>実証済ステップを列挙する。</p>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>フロー</th><th>到達条件</th><th>判定</th><th>根拠（ステップ内<span class="st st-ok" aria-label="合格">✓</span>部品）</th></tr></thead><tbody><tr><td>IG-FA</td><td>F-A 社員PC入場</td><td>802.1X認証成功端末が動的VLAN経由で業務アプリにHTTP到達すること</td><td>未実施</td><td>①EAPOL・②RADIUS要求・③動的VLAN割当は<span class="st st-ok" aria-label="合格">✓</span>実証(31_nac_dot1x)。④ACL通過・⑤アプリ到達は<span class="st st-plan" aria-label="設計のみ">◐</span></td></tr><tr><td>IG-FB</td><td>F-B 未認証端末</td><td>未認証端末が拒否され隔離VLAN99へ自動移行すること</td><td>未実施</td><td>①認証拒否は<span class="st st-ok" aria-label="合格">✓</span>実証(31_nac_dot1x)。②隔離VLAN自動割当はT-N1-7残課題</td></tr><tr><td>IG-FC</td><td>F-C 感染端末の検知→自動隔離</td><td>east-westスキャン検知からVLAN99隔離までが自動完結すること</td><td>未実施</td><td>②SPAN複製(35)・③DPI検知(42)・④ログ集約(42)は<span class="st st-ok" aria-label="合格">✓</span>実証。⑤soar-lite・⑥CoA(T-N1-8)・⑦隔離は未実施</td></tr><tr><td>IG-FD</td><td>F-D リモート社員のZTNA到達</td><td>リモート社員がVPNなしでoverlay経由のみsrv-app1へ到達すること</td><td>未実施</td><td>①tunneler接続・②オーバーレイ到達は<span class="st st-ok" aria-label="合格">✓</span>実証(36_ztna_openziti)。③全社配置は未実施</td></tr><tr><td>IG-FE</td><td>F-E サーバ間東西のμセグ+L7認可</td><td>VLAN50内east-westがdefault-denyかつL7認可(/admin=403)で制御されること</td><td>未実施</td><td>①default-deny・②L7認可は<span class="st st-ok" aria-label="合格">✓</span>実証(microseg_cilium)。③全社適用は未実施</td></tr></tbody></table></div>
+<h2 id="合格基準">合格基準</h2>
+<ul><li><strong>部品ゲート</strong>: IG-L7-0・IG-N1・IG-N2・IG-N3・IG-N3-補助・IG-N4-cilium・IG-N4-nftablesは合格済（2026-07-07時点）。IG-L7-1〜6は実装着手後に本表を更新し、合否を記録する。</li><li><strong>統合ゲート（IG-I1〜IG-I8）</strong>: 全て未実施（設計のみ）。実装が進み次第、実機確認に切り替える。</li><li><strong>E2Eゲート（IG-FA〜IG-FE）</strong>: 全て未実施。個別ステップの一部（部品）は<span class="st st-ok" aria-label="合格">✓</span>実証済だが、フロー全体の接続は未実施。</li><li><strong>総括</strong>: 部品ゲートは合格済（2026-07-07時点）／統合・E2Eゲートは全て未実施＝完全版は「部品実証済・接続は設計」の状態である。誇張せずこの境界を明示することが本計画書の誠実性の根拠である。</li><li>不合格・未実施項目がある場合、統合検証結果としては「一部設計のみ」の状態であることを <a href="統合検証結果.html">統合検証結果.md</a> に明記する（誇張しない）。</li></ul>
+<h2 id="参照">参照</h2>
+<ul><li><a href="統合検証結果.html">統合検証結果.md</a></li><li><a href="../02_基本設計/統合アーキテクチャマップ.html">../02_基本設計/統合アーキテクチャマップ.md</a></li><li><a href="../03_詳細設計/コンポーネント詳細設計.html">../03_詳細設計/コンポーネント詳細設計.md</a></li><li><a href="../../ZERO_zero_trust/05_試験/試験計画書.md">../../ZERO_zero_trust/05_試験/試験計画書.md</a></li><li><a href="../../31_nac_dot1x/05_試験/試験結果_2026-07-05.md">../../31_nac_dot1x/05_試験/試験結果_2026-07-05.md</a></li><li><a href="../../36_ztna_openziti/05_試験/試験結果_2026-07-05.md">../../36_ztna_openziti/05_試験/試験結果_2026-07-05.md</a></li><li><a href="../../42_ndr_flow/05_試験/試験結果_2026-07-05.md">../../42_ndr_flow/05_試験/試験結果_2026-07-05.md</a></li><li><a href="../../35_faucet_sdn/05_試験/試験結果_2026-07-07.md">../../35_faucet_sdn/05_試験/試験結果_2026-07-07.md</a></li><li><a href="../../microseg_cilium/05_試験/試験結果_2026-07-05.md">../../microseg_cilium/05_試験/試験結果_2026-07-05.md</a></li><li><a href="../../microseg_nftables/05_試験/試験結果_2026-07-05.md">../../microseg_nftables/05_試験/試験結果_2026-07-05.md</a></li></ul>
+    <footer class="doc-foot">
+      <p>ゼロトラスト完全版レポート — Markdownをソースに <code>_assets/build_reports.mjs</code> で自動生成（外部依存ゼロ）。</p>
+      <p class="muted">実検証済(P0 / N1-N4) と 設計のみ(L7 P1-P6) を峻別して記載しています。</p>
+    </footer>
+  </main>
+</div>
+<script>
+// スクロールで目次の現在地をハイライト（transform/opacityのみ・軽量）
+(function(){
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var map={}; links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a;});
+  var heads=[].slice.call(document.querySelectorAll('main h2, main h3'));
+  if(!('IntersectionObserver' in window)||!heads.length) return;
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ links.forEach(function(l){l.classList.remove('cur');}); var a=map[e.target.id]; if(a)a.classList.add('cur'); }});
+  },{rootMargin:'-10% 0px -80% 0px'});
+  heads.forEach(function(h){io.observe(h);});
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ゼロトラスト完全版｜ログインコマンド | ゼロトラスト完全版</title>
+<meta name="description" content="ゼロトラスト完全版｜ログインコマンド — ゼロトラスト完全版レポート">
+<style>
+:root{
+  --surface:#FFFFFF; --surface-2:#F7F7F8; --surface-3:#F0F0F2;
+  --ink:#1A1A1A; --ink-2:#6B7280; --ink-3:#9AA0AA;
+  --brand:#E60012; --brand-ink:#FFFFFF; --border:#E7E7EA; --border-2:#EDEDF0;
+  --ok:#0E9F6E; --warn:#B45309; --info:#2563EB;
+  --r-sm:6px; --r-md:10px; --r-lg:16px;
+  --shadow-1:0 1px 2px rgba(17,17,26,.05),0 1px 3px rgba(17,17,26,.05);
+  --shadow-2:0 10px 40px rgba(17,17,26,.10);
+  --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",system-ui,-apple-system,sans-serif;
+  --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  --maxw:1180px; --ease:cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto} *{animation:none!important;transition:none!important}}
+body{font-family:var(--sans);color:var(--ink);background:var(--surface);line-height:1.8;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-feature-settings:"palt" 1}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--info);outline-offset:2px;border-radius:3px}
+.skip{position:absolute;left:-999px;top:0;background:var(--ink);color:#fff;padding:8px 14px;z-index:100;border-radius:0 0 8px 0}
+.skip:focus{left:0}
+
+/* topbar */
+.topbar{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.82);backdrop-filter:saturate(180%) blur(14px);
+  border-bottom:1px solid var(--border)}
+.bar{display:flex;align-items:center;justify-content:space-between;height:60px;gap:24px}
+.brand{display:flex;align-items:center;gap:11px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
+.brand-mark{width:14px;height:14px;border-radius:4px;background:var(--brand);box-shadow:0 0 0 4px rgba(230,0,18,.10)}
+.brand-name{font-size:15px;color:var(--ink)} .brand-name b{color:var(--brand);font-weight:700}
+.stagenav{display:flex;gap:4px;overflow:auto}
+.stagenav a{font-size:13px;color:var(--ink-2);padding:7px 12px;border-radius:999px;transition:color .2s,background .2s;white-space:nowrap}
+.stagenav a:hover{color:var(--ink);background:var(--surface-3)}
+.stagenav a.active{color:var(--brand);background:rgba(230,0,18,.06);font-weight:600}
+
+/* hero strip */
+.hero-strip{background:var(--surface);border-bottom:1px solid var(--border);padding:44px 0 30px}
+.crumbs{font-size:12.5px;color:var(--ink-3);letter-spacing:.02em;margin-bottom:14px}
+.crumbs a:hover{color:var(--brand)} .crumbs span{margin:0 6px;color:var(--border)}
+.doc-title{font-size:clamp(28px,4vw,42px);line-height:1.18;letter-spacing:-.02em;font-weight:800;color:#0F0F12;max-width:24ch}
+.metarow{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;align-items:center}
+.chip{font-size:12px;padding:4px 11px;border-radius:999px;border:1px solid var(--border);color:var(--ink-2);background:var(--surface);letter-spacing:.02em}
+.chip.type{border-color:transparent;background:var(--ink);color:#fff;font-weight:600}
+.chip.date{color:var(--ink-3)}
+.chip.status{font-weight:600;border:none}
+.s-draft{background:#FEF3C7;color:#92400E} .s-review{background:#DBEAFE;color:#1E40AF} .s-done{background:#D1FAE5;color:#065F46}
+.tag{font-size:11.5px;padding:3px 9px;border-radius:6px;background:var(--surface-3);color:var(--ink-2)}
+
+/* layout */
+.layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:48px;padding-top:40px;padding-bottom:80px;align-items:start}
+.side{position:sticky;top:84px}
+.side-h{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:12px}
+.toc{display:flex;flex-direction:column;border-left:1px solid var(--border)}
+.toc a{font-size:13px;color:var(--ink-2);padding:6px 0 6px 16px;margin-left:-1px;border-left:2px solid transparent;transition:color .2s,border-color .2s}
+.toc a:hover{color:var(--ink)}
+.toc a.cur{color:var(--brand);border-left-color:var(--brand);font-weight:600}
+.toc-3{padding-left:28px;font-size:12.5px} .toc-empty{color:var(--ink-3);font-size:13px}
+
+/* document typography */
+.doc{min-width:0;font-size:15.5px;color:#26262B}
+.doc h2{font-size:25px;letter-spacing:-.01em;font-weight:750;color:#0F0F12;margin:52px 0 16px;padding-top:10px}
+.doc h2:first-child{margin-top:0}
+.doc h2::before{content:"";display:block;width:34px;height:3px;background:var(--brand);border-radius:2px;margin-bottom:16px}
+.doc h3{font-size:18.5px;font-weight:700;color:#1A1A1F;margin:34px 0 12px}
+.doc h4{font-size:15.5px;font-weight:700;color:var(--ink-2);margin:24px 0 8px}
+.doc p{margin:14px 0}
+.doc a{color:var(--brand);text-decoration:none;border-bottom:1px solid rgba(230,0,18,.28);transition:border-color .2s}
+.doc a:hover{border-bottom-color:var(--brand)}
+.doc strong{font-weight:700;color:#0F0F12}
+.doc ul,.doc ol{margin:14px 0 14px 4px;padding-left:22px}
+.doc li{margin:7px 0}
+.doc ul li::marker{color:var(--brand)}
+.doc hr{border:none;border-top:1px solid var(--border);margin:40px 0}
+.doc code{font-family:var(--mono);font-size:.88em;background:var(--surface-3);padding:2px 6px;border-radius:5px;color:#B4142B}
+
+/* table */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r-md);margin:22px 0;box-shadow:var(--shadow-1)}
+table{border-collapse:collapse;width:100%;font-size:13.8px}
+thead th{background:var(--surface-2);text-align:left;font-weight:700;color:var(--ink);padding:12px 14px;border-bottom:1px solid var(--border);white-space:nowrap}
+tbody td{padding:11px 14px;border-bottom:1px solid var(--border-2);vertical-align:top;color:#33333A}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--surface-2)}
+tbody td code{font-size:.85em}
+
+/* code block */
+.code{position:relative;margin:22px 0;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface-2);overflow:hidden}
+.code-lang{position:absolute;top:0;right:0;font-family:var(--mono);font-size:11px;color:var(--ink-3);background:var(--surface-3);padding:3px 10px;border-radius:0 var(--r-md) 0 var(--r-md);letter-spacing:.04em}
+.code pre{overflow-x:auto;padding:18px 16px;padding-top:22px}
+.code code{font-family:var(--mono);font-size:13px;color:#2A2A31;line-height:1.7;background:none;padding:0}
+
+/* diagram (mermaid source, tasteful panel) */
+.diagram{margin:24px 0;border:1px dashed var(--border);border-radius:var(--r-md);background:var(--surface-2);padding:8px 8px 14px}
+.diagram figcaption{font-size:11.5px;font-weight:700;letter-spacing:.1em;color:var(--ink-3);text-transform:uppercase;padding:8px 8px 6px}
+.diagram .mmd{font-family:var(--mono);font-size:12px;color:var(--ink-2);line-height:1.6;overflow-x:auto;padding:6px 8px;white-space:pre}
+
+/* blockquote / callout */
+blockquote{margin:22px 0;padding:14px 18px;background:var(--surface-2);border-left:3px solid var(--brand);border-radius:0 var(--r-sm) var(--r-sm) 0;color:var(--ink-2);font-size:14.5px}
+blockquote strong{color:var(--ink)}
+
+/* status inline badges */
+.st{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;font-size:11px;font-weight:800;line-height:1;vertical-align:middle}
+.st-ok{background:var(--ok);color:#fff} .st-plan{background:#E5E7EB;color:#6B7280}
+
+/* footer */
+.doc-foot{margin-top:64px;padding-top:24px;border-top:1px solid var(--border);font-size:13px;color:var(--ink-3)}
+.doc-foot .muted{margin-top:6px;font-size:12.5px}
+
+@media (max-width:900px){
+  .layout{grid-template-columns:1fr;gap:0}
+  .side{display:none}
+  .hero-strip{padding:32px 0 22px}
+  .doc h2{font-size:22px;margin-top:40px}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">本文へスキップ</a>
+<header class="topbar">
+  <div class="wrap bar">
+    <a class="brand" href="../index.html"><span class="brand-mark"></span><span class="brand-name">Zero&nbsp;Trust <b>完全版</b></span></a>
+    <nav class="stagenav" aria-label="ステージ"><a href="../README_Lab_Challenge.html">概要</a><a href="../00_ログイン/ログインコマンド.html" aria-current="page" class="active">00</a><a href="../01_要件定義/要件定義書.html">01</a><a href="../02_基本設計/統合アーキテクチャマップ.html">02</a><a href="../03_詳細設計/コンポーネント詳細設計.html">03</a><a href="../04_構築/実装計画.html">04</a><a href="../05_試験/統合検証結果.html">05</a></nav>
+  </div>
+</header>
+<div class="hero-strip"><div class="wrap">
+  <div class="crumbs"><a href="../index.html">ホーム</a> <span>›</span> <span>00 ログイン</span></div>
+  <h1 class="doc-title">ゼロトラスト完全版｜ログインコマンド</h1>
+  <div class="metarow">
+    <span class="chip type">ログイン</span>
+    <span class="chip status s-draft">下書き</span>
+    <span class="chip date">更新 2026-07-08</span>
+    <span class="tag">zero-trust</span><span class="tag">login</span><span class="tag">orbstack</span><span class="tag">docker</span><span class="tag">ssh</span>
+  </div>
+</div></div>
+<div class="wrap layout">
+  <aside class="side" aria-label="目次">
+    <div class="side-inner">
+      <p class="side-h">目次</p>
+      <nav class="toc"><a class="toc-2" href="#vm-接続">VM 接続</a><a class="toc-2" href="#e2eフロー-出自テーマ-該当セクション対応表">E2Eフロー ↔ 出自テーマ ↔ 該当セクション対応表</a><a class="toc-2" href="#実装出自テーマ別の入口テーマ横断の代表例">実装出自テーマ別の入口（テーマ横断の代表例）</a><a class="toc-3" href="#p0-p6zerozerotrustphase-0-実装済">P0-P6（ZERO_zero_trust、Phase 0 実装済）</a><a class="toc-3" href="#n1-nac31nacdot1x">N1 NAC（31_nac_dot1x）</a><a class="toc-3" href="#n2-sdp-ztna36ztnaopenziti">N2 SDP-ZTNA（36_ztna_openziti）</a><a class="toc-3" href="#n3-ndr42ndrflow補助-35faucetsdn">N3 NDR（42_ndr_flow、補助: 35_faucet_sdn）</a><a class="toc-3" href="#n4-μセグmicrosegciliummicrosegnftables">N4 μセグ（microseg_cilium／microseg_nftables）</a><a class="toc-2" href="#確認済み日付">確認済み日付</a></nav>
+    </div>
+  </aside>
+  <main id="main" class="doc">
+    <p>本ドキュメントは統合ショーケースとしての<strong>入口の束</strong>であり、各層固有のログイン手順は実装テーマ側の <code>00_ログイン/ログインコマンド.md</code> が正とする。ここでは代表例のみを示す（実設定・認証情報は書かない）。</p>
+<h2 id="vm-接続">VM 接続</h2>
+<div class="code"><span class="code-lang">bash</span><pre><code># OrbStack VM clab へ SSH
+ssh clab@orb
+
+# 接続確認
+docker --version
+containerlab version</code></pre></div>
+<h2 id="e2eフロー-出自テーマ-該当セクション対応表">E2Eフロー ↔ 出自テーマ ↔ 該当セクション対応表</h2>
+<p><a href="../02_基本設計/統合アーキテクチャマップ.html">統合アーキテクチャマップ</a> のE2EフローF-A〜F-Eが、本ページのどの入口に対応するかの索引。</p>
+<div class="table-wrap"><table><thead><tr><th>フロー</th><th>出自テーマ</th><th>該当セクション（本ページ内）</th></tr></thead><tbody><tr><td>F-A 社員PC入場</td><td>31_nac_dot1x</td><td>N1 NAC（31_nac_dot1x）</td></tr><tr><td>F-B 未認証端末</td><td>31_nac_dot1x</td><td>N1 NAC（31_nac_dot1x）</td></tr><tr><td>F-C 感染端末の検知→自動隔離</td><td>42_ndr_flow／35_faucet_sdn／31_nac_dot1x</td><td>N3 NDR（42_ndr_flow、補助: 35_faucet_sdn）</td></tr><tr><td>F-D リモート社員のZTNA到達</td><td>36_ztna_openziti</td><td>N2 SDP-ZTNA（36_ztna_openziti）</td></tr><tr><td>F-E サーバ間東西のμセグ+L7認可</td><td>microseg_cilium／microseg_nftables</td><td>N4 μセグ（microseg_cilium／microseg_nftables）</td></tr></tbody></table></div>
+<h2 id="実装出自テーマ別の入口テーマ横断の代表例">実装出自テーマ別の入口（テーマ横断の代表例）</h2>
+<p>コンテナ名は containerlab の命名規約により <code>clab-&amp;lt;lab名&amp;gt;-&amp;lt;node名&amp;gt;</code> になる（実際の名前は各テーマの <code>docker ps</code> で確認する）。</p>
+<h3 id="p0-p6zerozerotrustphase-0-実装済">P0-P6（ZERO_zero_trust、Phase 0 実装済）</h3>
+<div class="code"><span class="code-lang">bash</span><pre><code># Phase 0 ノード（client / app / external）へのアクセス
+docker exec -it clab-zero-client bash
+docker exec -it clab-zero-app bash</code></pre></div>
+<p>詳細は <a href="../../ZERO_zero_trust/00_ログイン/ログインコマンド.md">ZERO_zero_trust/00_ログイン/ログインコマンド.md</a> を参照。Phase 1-6 は設計のみのため未確定。</p>
+<h3 id="n1-nac31nacdot1x">N1 NAC（31_nac_dot1x）</h3>
+<div class="code"><span class="code-lang">bash</span><pre><code># IOL スイッチへの attach（テーマ側 entrypoint 経由）
+docker exec -it clab-nac-sw1 bash
+docker exec -it clab-nac-radius bash</code></pre></div>
+<p>詳細は <a href="../../31_nac_dot1x/README_Lab_Challenge.md">31_nac_dot1x/README_Lab_Challenge.md</a> を参照（テーマ側に専用ログインドキュメントはなく、README内のアクセス方法・構築ログを参照する）。</p>
+<h3 id="n2-sdp-ztna36ztnaopenziti">N2 SDP-ZTNA（36_ztna_openziti）</h3>
+<div class="code"><span class="code-lang">bash</span><pre><code># controller/router 一体コンテナへのアクセス
+docker exec -it ziti bash</code></pre></div>
+<p>詳細は <a href="../../36_ztna_openziti/README_Lab_Challenge.md">36_ztna_openziti/README_Lab_Challenge.md</a> を参照（テーマ側に専用ログインドキュメントはなく、README内のアクセス方法を参照する）。</p>
+<h3 id="n3-ndr42ndrflow補助-35faucetsdn">N3 NDR（42_ndr_flow、補助: 35_faucet_sdn）</h3>
+<div class="code"><span class="code-lang">bash</span><pre><code># Suricata センサーへのアクセス（host mode）
+docker exec -it suricata bash
+
+# Faucet補助（テーマ35, mirror/gauge 連携）
+docker exec -it clab-faucet-sdn-ovs1 bash</code></pre></div>
+<p>詳細は <a href="../../42_ndr_flow/README_Lab_Challenge.md">42_ndr_flow/README_Lab_Challenge.md</a>（テーマ側に専用ログインドキュメントはなく、README内のアクセス方法を参照する）・<a href="../../35_faucet_sdn/00_ログイン/ログインコマンド.md">35_faucet_sdn/00_ログイン/ログインコマンド.md</a> を参照。</p>
+<h3 id="n4-μセグmicrosegciliummicrosegnftables">N4 μセグ（microseg_cilium／microseg_nftables）</h3>
+<div class="code"><span class="code-lang">bash</span><pre><code># Cilium系（k3d クラスタ経由）
+kubectl -n microseg exec -it deploy/frontend -- sh
+
+# nftables系（IOL + Linux ホスト）
+docker exec -it clab-microseg-pc10a bash</code></pre></div>
+<p>詳細は <a href="../../microseg_cilium/README_Lab_Challenge.md">microseg_cilium/README_Lab_Challenge.md</a>・<a href="../../microseg_nftables/README_Lab_Challenge.md">microseg_nftables/README_Lab_Challenge.md</a> を参照（両テーマとも専用ログインドキュメントはなく、README内の手順を参照する）。</p>
+<h2 id="確認済み日付">確認済み日付</h2>
+<ul><li>VM 接続方法（<code>ssh clab@orb</code>）: 全テーマ共通、2026-07-07 時点で有効。</li><li>L7 Phase 0 ノードアクセス: 2026-07-04 実装済・確認済（Phase 1-6 は未確定）。</li><li>N1-N4 ノードアクセス: 2026-07-05 実機検証済（N3 補助のテーマ35は2026-07-07）。</li></ul>
+    <footer class="doc-foot">
+      <p>ゼロトラスト完全版レポート — Markdownをソースに <code>_assets/build_reports.mjs</code> で自動生成（外部依存ゼロ）。</p>
+      <p class="muted">実検証済(P0 / N1-N4) と 設計のみ(L7 P1-P6) を峻別して記載しています。</p>
+    </footer>
+  </main>
+</div>
+<script>
+// スクロールで目次の現在地をハイライト（transform/opacityのみ・軽量）
+(function(){
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var map={}; links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a;});
+  var heads=[].slice.call(document.querySelectorAll('main h2, main h3'));
+  if(!('IntersectionObserver' in window)||!heads.length) return;
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ links.forEach(function(l){l.classList.remove('cur');}); var a=map[e.target.id]; if(a)a.classList.add('cur'); }});
+  },{rootMargin:'-10% 0px -80% 0px'});
+  heads.forEach(function(h){io.observe(h);});
+})();
+</script>
+</body>
+</html>

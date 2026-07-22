@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ゼロトラスト完全版｜コンポーネント詳細設計 | ゼロトラスト完全版</title>
+<meta name="description" content="ゼロトラスト完全版｜コンポーネント詳細設計 — ゼロトラスト完全版レポート">
+<style>
+:root{
+  --surface:#FFFFFF; --surface-2:#F7F7F8; --surface-3:#F0F0F2;
+  --ink:#1A1A1A; --ink-2:#6B7280; --ink-3:#9AA0AA;
+  --brand:#E60012; --brand-ink:#FFFFFF; --border:#E7E7EA; --border-2:#EDEDF0;
+  --ok:#0E9F6E; --warn:#B45309; --info:#2563EB;
+  --r-sm:6px; --r-md:10px; --r-lg:16px;
+  --shadow-1:0 1px 2px rgba(17,17,26,.05),0 1px 3px rgba(17,17,26,.05);
+  --shadow-2:0 10px 40px rgba(17,17,26,.10);
+  --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",system-ui,-apple-system,sans-serif;
+  --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  --maxw:1180px; --ease:cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto} *{animation:none!important;transition:none!important}}
+body{font-family:var(--sans);color:var(--ink);background:var(--surface);line-height:1.8;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-feature-settings:"palt" 1}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--info);outline-offset:2px;border-radius:3px}
+.skip{position:absolute;left:-999px;top:0;background:var(--ink);color:#fff;padding:8px 14px;z-index:100;border-radius:0 0 8px 0}
+.skip:focus{left:0}
+
+/* topbar */
+.topbar{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.82);backdrop-filter:saturate(180%) blur(14px);
+  border-bottom:1px solid var(--border)}
+.bar{display:flex;align-items:center;justify-content:space-between;height:60px;gap:24px}
+.brand{display:flex;align-items:center;gap:11px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
+.brand-mark{width:14px;height:14px;border-radius:4px;background:var(--brand);box-shadow:0 0 0 4px rgba(230,0,18,.10)}
+.brand-name{font-size:15px;color:var(--ink)} .brand-name b{color:var(--brand);font-weight:700}
+.stagenav{display:flex;gap:4px;overflow:auto}
+.stagenav a{font-size:13px;color:var(--ink-2);padding:7px 12px;border-radius:999px;transition:color .2s,background .2s;white-space:nowrap}
+.stagenav a:hover{color:var(--ink);background:var(--surface-3)}
+.stagenav a.active{color:var(--brand);background:rgba(230,0,18,.06);font-weight:600}
+
+/* hero strip */
+.hero-strip{background:var(--surface);border-bottom:1px solid var(--border);padding:44px 0 30px}
+.crumbs{font-size:12.5px;color:var(--ink-3);letter-spacing:.02em;margin-bottom:14px}
+.crumbs a:hover{color:var(--brand)} .crumbs span{margin:0 6px;color:var(--border)}
+.doc-title{font-size:clamp(28px,4vw,42px);line-height:1.18;letter-spacing:-.02em;font-weight:800;color:#0F0F12;max-width:24ch}
+.metarow{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;align-items:center}
+.chip{font-size:12px;padding:4px 11px;border-radius:999px;border:1px solid var(--border);color:var(--ink-2);background:var(--surface);letter-spacing:.02em}
+.chip.type{border-color:transparent;background:var(--ink);color:#fff;font-weight:600}
+.chip.date{color:var(--ink-3)}
+.chip.status{font-weight:600;border:none}
+.s-draft{background:#FEF3C7;color:#92400E} .s-review{background:#DBEAFE;color:#1E40AF} .s-done{background:#D1FAE5;color:#065F46}
+.tag{font-size:11.5px;padding:3px 9px;border-radius:6px;background:var(--surface-3);color:var(--ink-2)}
+
+/* layout */
+.layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:48px;padding-top:40px;padding-bottom:80px;align-items:start}
+.side{position:sticky;top:84px}
+.side-h{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:12px}
+.toc{display:flex;flex-direction:column;border-left:1px solid var(--border)}
+.toc a{font-size:13px;color:var(--ink-2);padding:6px 0 6px 16px;margin-left:-1px;border-left:2px solid transparent;transition:color .2s,border-color .2s}
+.toc a:hover{color:var(--ink)}
+.toc a.cur{color:var(--brand);border-left-color:var(--brand);font-weight:600}
+.toc-3{padding-left:28px;font-size:12.5px} .toc-empty{color:var(--ink-3);font-size:13px}
+
+/* document typography */
+.doc{min-width:0;font-size:15.5px;color:#26262B}
+.doc h2{font-size:25px;letter-spacing:-.01em;font-weight:750;color:#0F0F12;margin:52px 0 16px;padding-top:10px}
+.doc h2:first-child{margin-top:0}
+.doc h2::before{content:"";display:block;width:34px;height:3px;background:var(--brand);border-radius:2px;margin-bottom:16px}
+.doc h3{font-size:18.5px;font-weight:700;color:#1A1A1F;margin:34px 0 12px}
+.doc h4{font-size:15.5px;font-weight:700;color:var(--ink-2);margin:24px 0 8px}
+.doc p{margin:14px 0}
+.doc a{color:var(--brand);text-decoration:none;border-bottom:1px solid rgba(230,0,18,.28);transition:border-color .2s}
+.doc a:hover{border-bottom-color:var(--brand)}
+.doc strong{font-weight:700;color:#0F0F12}
+.doc ul,.doc ol{margin:14px 0 14px 4px;padding-left:22px}
+.doc li{margin:7px 0}
+.doc ul li::marker{color:var(--brand)}
+.doc hr{border:none;border-top:1px solid var(--border);margin:40px 0}
+.doc code{font-family:var(--mono);font-size:.88em;background:var(--surface-3);padding:2px 6px;border-radius:5px;color:#B4142B}
+
+/* table */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r-md);margin:22px 0;box-shadow:var(--shadow-1)}
+table{border-collapse:collapse;width:100%;font-size:13.8px}
+thead th{background:var(--surface-2);text-align:left;font-weight:700;color:var(--ink);padding:12px 14px;border-bottom:1px solid var(--border);white-space:nowrap}
+tbody td{padding:11px 14px;border-bottom:1px solid var(--border-2);vertical-align:top;color:#33333A}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--surface-2)}
+tbody td code{font-size:.85em}
+
+/* code block */
+.code{position:relative;margin:22px 0;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface-2);overflow:hidden}
+.code-lang{position:absolute;top:0;right:0;font-family:var(--mono);font-size:11px;color:var(--ink-3);background:var(--surface-3);padding:3px 10px;border-radius:0 var(--r-md) 0 var(--r-md);letter-spacing:.04em}
+.code pre{overflow-x:auto;padding:18px 16px;padding-top:22px}
+.code code{font-family:var(--mono);font-size:13px;color:#2A2A31;line-height:1.7;background:none;padding:0}
+
+/* diagram (mermaid source, tasteful panel) */
+.diagram{margin:24px 0;border:1px dashed var(--border);border-radius:var(--r-md);background:var(--surface-2);padding:8px 8px 14px}
+.diagram figcaption{font-size:11.5px;font-weight:700;letter-spacing:.1em;color:var(--ink-3);text-transform:uppercase;padding:8px 8px 6px}
+.diagram .mmd{font-family:var(--mono);font-size:12px;color:var(--ink-2);line-height:1.6;overflow-x:auto;padding:6px 8px;white-space:pre}
+
+/* blockquote / callout */
+blockquote{margin:22px 0;padding:14px 18px;background:var(--surface-2);border-left:3px solid var(--brand);border-radius:0 var(--r-sm) var(--r-sm) 0;color:var(--ink-2);font-size:14.5px}
+blockquote strong{color:var(--ink)}
+
+/* status inline badges */
+.st{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;font-size:11px;font-weight:800;line-height:1;vertical-align:middle}
+.st-ok{background:var(--ok);color:#fff} .st-plan{background:#E5E7EB;color:#6B7280}
+
+/* footer */
+.doc-foot{margin-top:64px;padding-top:24px;border-top:1px solid var(--border);font-size:13px;color:var(--ink-3)}
+.doc-foot .muted{margin-top:6px;font-size:12.5px}
+
+@media (max-width:900px){
+  .layout{grid-template-columns:1fr;gap:0}
+  .side{display:none}
+  .hero-strip{padding:32px 0 22px}
+  .doc h2{font-size:22px;margin-top:40px}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">本文へスキップ</a>
+<header class="topbar">
+  <div class="wrap bar">
+    <a class="brand" href="../index.html"><span class="brand-mark"></span><span class="brand-name">Zero&nbsp;Trust <b>完全版</b></span></a>
+    <nav class="stagenav" aria-label="ステージ"><a href="../README_Lab_Challenge.html">概要</a><a href="../00_ログイン/ログインコマンド.html">00</a><a href="../01_要件定義/要件定義書.html">01</a><a href="../02_基本設計/統合アーキテクチャマップ.html">02</a><a href="../03_詳細設計/コンポーネント詳細設計.html" aria-current="page" class="active">03</a><a href="../04_構築/実装計画.html">04</a><a href="../05_試験/統合検証結果.html">05</a></nav>
+  </div>
+</header>
+<div class="hero-strip"><div class="wrap">
+  <div class="crumbs"><a href="../index.html">ホーム</a> <span>›</span> <span>03 詳細設計</span></div>
+  <h1 class="doc-title">ゼロトラスト完全版｜コンポーネント詳細設計</h1>
+  <div class="metarow">
+    <span class="chip type">詳細設計</span>
+    <span class="chip status s-draft">下書き</span>
+    <span class="chip date">更新 2026-07-08</span>
+    <span class="tag">zero-trust</span><span class="tag">component</span><span class="tag">dataflow</span><span class="tag">param-sheet</span><span class="tag">virtual-company</span>
+  </div>
+</div></div>
+<div class="wrap layout">
+  <aside class="side" aria-label="目次">
+    <div class="side-inner">
+      <p class="side-h">目次</p>
+      <nav class="toc"><a class="toc-2" href="#1-アクセス層floor-swcore-sw端末">1. アクセス層（floor-sw／core-sw／端末）</a><a class="toc-2" href="#2-dmz認可層vlan60">2. DMZ認可層（VLAN60）</a><a class="toc-2" href="#3-サーバ室vlan50">3. サーバ室（VLAN50）</a><a class="toc-2" href="#4-監視管理vlan90">4. 監視管理（VLAN90）</a><a class="toc-2" href="#5-リモート外部">5. リモート・外部</a><a class="toc-2" href="#6-エンドポイント統制">6. エンドポイント統制</a><a class="toc-2" href="#統合ポイント-if仕様表i-1i-8">統合ポイント IF仕様表（I-1〜I-8）</a><a class="toc-2" href="#e2eフロー-f-af-e要約">E2Eフロー F-A〜F-E（要約）</a><a class="toc-2" href="#参照">参照</a></nav>
+    </div>
+  </aside>
+  <main id="main" class="doc">
+    <p>仮想企業（1拠点・約100名）の社内LANを構成するコンポーネントを、セグメント別に役割・主OSS・待受ポート/プロトコル・データフロー・商用対応・状態・実装出自の観点で整理する。<strong>設計レベルに留め、実configの値（RADIUS属性・faucet.yaml・nftablesルール・Suricataルール本文等）は書かない</strong>。詳細は各実装テーマの <code>03_詳細設計/パラメータシート.md</code> を参照。セグメント・IPの正は <a href="../02_基本設計/IPアドレス管理表.html">IPアドレス管理表</a>。</p>
+<h2 id="1-アクセス層floor-swcore-sw端末">1. アクセス層（floor-sw／core-sw／端末）</h2>
+<div class="table-wrap"><table><thead><tr><th>コンポーネント</th><th>役割</th><th>主OSS</th><th>待受ポート/プロトコル</th><th>データフロー</th><th>商用対応</th><th>状態</th><th>出自</th></tr></thead><tbody><tr><td>floor-sw1</td><td>認証者（Authenticator）・アクセス層L2スイッチ</td><td>Cisco IOL L2</td><td>EAPOL（L2）・RADIUS中継</td><td>端末→floor-sw1→radius</td><td>Cisco ISE + スイッチ</td><td><span class="st st-ok" aria-label="合格">✓</span>実装済・実機検証済(2026-07-05)</td><td>31_nac_dot1x</td></tr><tr><td>radius</td><td>RADIUSサーバ</td><td>FreeRADIUS</td><td>RADIUS/UDP(1812)・CoA/UDP(3799、未実装)</td><td>floor-sw1↔radius間でAccess-Request/Accept</td><td>Cisco ISE・Aruba ClearPass</td><td><span class="st st-ok" aria-label="合格">✓</span>実装済・実機検証済(2026-07-05)</td><td>31_nac_dot1x</td></tr><tr><td>core-sw</td><td>コアL3スイッチ・VLAN間ACL/μセグ前提</td><td>Cisco IOL（SVI + ACL）</td><td>L3 ACL</td><td>VLAN間通信→core-sw ACL判定</td><td>Cisco TrustSec/SGACL</td><td><span class="st st-ok" aria-label="合格">✓</span>（VLAN100 SVIのみ実証）／<span class="st st-plan" aria-label="設計のみ">◐</span>（他VLAN）</td><td>31_nac_dot1x（VLAN100 SVI）／microseg_nftables（SVI+ACLパターン）</td></tr><tr><td>pc-sales1</td><td>営業端末（802.1X認証成功端末）</td><td>wpa_supplicant</td><td>EAPOL</td><td>端末→floor-sw1</td><td>一般端末</td><td><span class="st st-ok" aria-label="合格">✓</span>実装済・実機検証済(2026-07-05)</td><td>31_nac_dot1x（pc1/alice）</td></tr><tr><td>pc-dev1</td><td>開発端末</td><td>wpa_supplicant等</td><td>EAPOL</td><td>端末→floor-sw1</td><td>一般端末</td><td><span class="st st-plan" aria-label="設計のみ">◐</span>設計のみ</td><td>新設</td></tr><tr><td>guest-pc1</td><td>ゲスト端末</td><td>wpa_supplicant等</td><td>EAPOL</td><td>端末→floor-sw1</td><td>一般端末</td><td><span class="st st-plan" aria-label="設計のみ">◐</span>設計のみ</td><td>新設</td></tr></tbody></table></div>
+<h2 id="2-dmz認可層vlan60">2. DMZ認可層（VLAN60）</h2>
+<div class="table-wrap"><table><thead><tr><th>コンポーネント</th><th>役割</th><th>主OSS</th><th>待受ポート/プロトコル</th><th>データフロー</th><th>商用対応</th><th>状態</th><th>出自</th></tr></thead><tbody><tr><td>keycloak</td><td>ID統制（OIDC IdP）</td><td>Keycloak</td><td>HTTP/HTTPS（トークンエンドポイント）</td><td>IAPからOIDC委譲を受ける</td><td>Azure AD / Okta</td><td><span class="st st-plan" aria-label="設計のみ">◐</span>設計のみ</td><td>新設（ZERO Phase1着想）</td></tr><tr><td>pomerium / oauth2-proxy</td><td>IAP（未認証拒否・認可済み転送）</td><td>oauth2-proxy → Pomerium</td><td>HTTP/HTTPS</td><td>remote-pc/端末→IAP→(keycloak認証)→srv-app1</td><td>Cisco Duo/Zscaler ZIA・Google BeyondCorp</td><td><span class="st st-plan" aria-label="設計のみ">◐</span>設計のみ</td><td>新設（ZERO Phase2着想）</td></tr><tr><td>ziti-ctrl / ziti-router</td><td>SDP-ZTNAブローカー/オーバーレイ中継</td><td>OpenZiti</td><td>制御チャネル（ブローカー）</td><td>remote-pc tunneler↔ziti-router↔srv-app1 tunneler</td><td>Zscaler ZPA・Cloudflare Access</td><td><span class="st st-ok" aria-label="合格">✓</span>実装済・実機検証済(2026-07-05)</td><td>36_ztna_openziti</td></tr><tr><td>mitmproxy</td><td>SWG(4)+DLP(5)兼務</td><td>mitmproxy / Squid+Suricata</td><td>HTTP(S) proxy・IDS</td><td>端末→SWG(検査)→外部、発報→SIEM</td><td>Zscaler ZIA・Palo Prisma Access</td><td><span class="st st-plan" aria-label="設計のみ">◐</span>設計のみ</td><td>新設（ZERO Phase4/5着想）</td></tr><tr><td>step-ca</td><td>デバイス統制（mTLS/posture）</td><td>step-ca</td><td>ACME/HTTPS</td><td>端末→CA(証明書発行)→IAPへposture提示</td><td>Cisco ISE(証明書)・Jamf</td><td><span class="st st-plan" aria-label="設計のみ">◐</span>設計のみ</td><td>新設（ZERO Phase6着想）</td></tr></tbody></table></div>
+<h2 id="3-サーバ室vlan50">3. サーバ室（VLAN50）</h2>
+<div class="table-wrap"><table><thead><tr><th>コンポーネント</th><th>役割</th><th>主OSS</th><th>待受ポート/プロトコル</th><th>データフロー</th><th>商用対応</th><th>状態</th><th>出自</th></tr></thead><tbody><tr><td>srv-app1</td><td>保護対象サービス（overlay/IAP経由のみ到達、inbound deny）</td><td>wbitt/network-multitool相当</td><td>HTTP</td><td>ziti-router/pomerium経由でのみ到達</td><td>業務アプリ一般</td><td><span class="st st-ok" aria-label="合格">✓</span>実装済（overlay到達実証）</td><td>36_ztna_openziti（dark service）／ZERO_zero_trust（app）</td></tr><tr><td>k8s-cilium</td><td>CNI/ポリシーエンジン</td><td>Cilium（eBPF）</td><td>eBPF（カーネル内）</td><td>Pod間通信→Cilium判定→Forward/Drop</td><td>Illumio・Cisco Secure Workload</td><td><span class="st st-ok" aria-label="合格">✓</span>実装済・実機検証済(2026-07-05)</td><td>microseg_cilium</td></tr><tr><td>Hubble</td><td>可視化</td><td>Hubble</td><td>gRPC/HTTP</td><td>Cilium判定→Hubble Relay→UI</td><td>Illumio可視化</td><td><span class="st st-ok" aria-label="合格">✓</span>実装済・実機検証済(2026-07-05)</td><td>microseg_cilium</td></tr></tbody></table></div>
+<h2 id="4-監視管理vlan90">4. 監視管理（VLAN90）</h2>
+<div class="table-wrap"><table><thead><tr><th>コンポーネント</th><th>役割</th><th>主OSS</th><th>待受ポート/プロトコル</th><th>データフロー</th><th>商用対応</th><th>状態</th><th>出自</th></tr></thead><tbody><tr><td>faucet</td><td>SDN宣言型アクセス層コントローラ</td><td>Faucet + gauge</td><td>OpenFlow(TCP/6653)・Prometheus(:9303)</td><td>OVSミラー→suricata、gauge→Prometheus</td><td>Cisco ERSPAN・SNA</td><td><span class="st st-ok" aria-label="合格">✓</span>実装済・実機検証済(2026-07-07)</td><td>35_faucet_sdn</td></tr><tr><td>suricata</td><td>NDRセンサー</td><td>Suricata（host mode）</td><td>プロミスキャス監視</td><td>bridge→Suricata→eve.json</td><td>Darktrace・Cisco Stealthwatch</td><td><span class="st st-ok" aria-label="合格">✓</span>実装済・実機検証済(2026-07-05)</td><td>42_ndr_flow</td></tr><tr><td>loki/promtail/grafana</td><td>ログ集約/可視化</td><td>Loki + Promtail + Grafana</td><td>HTTP（Loki API・Grafana UI）</td><td>各セグメントログ→Promtail→Loki→Grafana</td><td>Splunk・Elastic</td><td><span class="st st-ok" aria-label="合格">✓</span>実装済（42のeve→Loki実証）／<span class="st st-plan" aria-label="設計のみ">◐</span>（全社統合）</td><td>42_ndr_flow</td></tr><tr><td>soar-lite</td><td>検知→対応の自動化</td><td>soar-lite（新設）</td><td>webhook(HTTP)・CoA(UDP/3799)</td><td>suricata→soar-lite→radius</td><td>Splunk SOAR・Cortex XSOAR</td><td><span class="st st-plan" aria-label="設計のみ">◐</span>設計のみ（発展課題）</td><td>新設</td></tr></tbody></table></div>
+<h2 id="5-リモート外部">5. リモート・外部</h2>
+<div class="table-wrap"><table><thead><tr><th>コンポーネント</th><th>役割</th><th>主OSS</th><th>待受ポート/プロトコル</th><th>データフロー</th><th>商用対応</th><th>状態</th><th>出自</th></tr></thead><tbody><tr><td>remote-pc</td><td>リモート社員端末（ziti tunneler内蔵）</td><td>OpenZiti tunneler</td><td>アウトバウンドのみ</td><td>remote-pc→localhost射影→ziti-router→srv-app1</td><td>Zscaler Client Connector</td><td><span class="st st-ok" aria-label="合格">✓</span>実装済・実機検証済(2026-07-05)</td><td>ZERO_zero_trust（client）／36_ztna_openziti（clienttun）</td></tr><tr><td>attacker</td><td>攻撃者/脅威モデル（参考）</td><td>wbitt/network-multitool</td><td>—</td><td>参考シナリオのみ（全社構成には配置しない）</td><td>—</td><td>参考</td><td>42_ndr_flow（attacker）／ZERO_zero_trust（external）</td></tr></tbody></table></div>
+<h2 id="6-エンドポイント統制">6. エンドポイント統制</h2>
+<div class="table-wrap"><table><thead><tr><th>コンポーネント</th><th>役割</th><th>主OSS</th><th>待受ポート/プロトコル</th><th>データフロー</th><th>商用対応</th><th>状態</th><th>出自</th></tr></thead><tbody><tr><td>サプリカント（alice等）</td><td>端末側802.1X認証エージェント</td><td>wpa_supplicant</td><td>EAPOL</td><td>端末→floor-sw1</td><td>各種802.1Xクライアント</td><td><span class="st st-ok" aria-label="合格">✓</span>実装済・実機検証済(2026-07-05)</td><td>31_nac_dot1x（pc1/alice）</td></tr><tr><td>mTLSクライアント証明書</td><td>端末証明書によるposture提示</td><td>step-ca発行証明書</td><td>mTLS(TLS/443)</td><td>端末→step-ca(発行)→IAPへ提示</td><td>Intune・CrowdStrike</td><td><span class="st st-plan" aria-label="設計のみ">◐</span>設計のみ</td><td>新設（ZERO Phase6着想）</td></tr><tr><td>ziti tunneler（client側）</td><td>ZTNAクライアント側射影</td><td>OpenZiti tunneler</td><td>localhost射影</td><td>remote-pc→localhost→ziti-router</td><td>Zscaler App/Client Connector</td><td><span class="st st-ok" aria-label="合格">✓</span>実装済・実機検証済(2026-07-05)</td><td>36_ztna_openziti</td></tr></tbody></table></div>
+<h2 id="統合ポイント-if仕様表i-1i-8">統合ポイント IF仕様表（I-1〜I-8）</h2>
+<p>各行は「何と何が・どのプロトコルで・何を渡すか」の1行要約。設定値・状態は <a href="../02_基本設計/統合アーキテクチャマップ.html">統合アーキテクチャマップ</a> の統合ポイント節を参照。</p>
+<div class="table-wrap"><table><thead><tr><th>ID</th><th>起点</th><th>終点</th><th>プロトコル</th><th>渡すもの</th></tr></thead><tbody><tr><td>I-1</td><td>keycloak</td><td>radius</td><td>LDAP等(TCP/389、選定未着手)</td><td>IDのバックエンド連携（有線802.1XとWeb SSOを同一IDに統一）</td></tr><tr><td>I-2</td><td>radius</td><td>floor-sw→core-sw</td><td>RADIUS(UDP/1812)</td><td>動的VLAN属性（Tunnel-Private-Group-Id）</td></tr><tr><td>I-3</td><td>floor-sw/core-sw</td><td>suricata</td><td>ミラーポート複製(SPAN)</td><td>east-westトラフィックの複製</td></tr><tr><td>I-4</td><td>suricata</td><td>soar-lite→radius→floor-sw</td><td>webhook・CoA(UDP/3799)</td><td>検知イベント→隔離VLAN切替指示</td></tr><tr><td>I-5</td><td>srv-app1</td><td>ziti overlay</td><td>overlay(outboundのみ)</td><td>サーバの非公開化（inbound deny・outbound接続のみ）</td></tr><tr><td>I-6</td><td>端末/remote-pc</td><td>pomerium→srv-app1</td><td>HTTPS/OIDC/mTLS</td><td>認可済みリクエストとmTLSクライアント証明書</td></tr><tr><td>I-7</td><td>radius/suricata/pomerium/faucet等</td><td>loki</td><td>Loki HTTP API等</td><td>各種ログ・イベント</td></tr><tr><td>I-8</td><td>faucet</td><td>アクセスSW</td><td>OpenFlow(TCP/6653)・Prometheus(:9303)</td><td>VLAN/ACL宣言とポート統計</td></tr></tbody></table></div>
+<p>旧F→新Iの対応: 旧F1(N1→N4)→I-2、旧F2(L7 P3→N3)→I-7、旧F3(N3→N1 CoA)→I-4、旧F4(L7 P2↔N2)→I-5/I-6、旧F5(L7 P1→N1)→I-1。</p>
+<h2 id="e2eフロー-f-af-e要約">E2Eフロー F-A〜F-E（要約）</h2>
+<p>ステップ分解の詳細は <a href="../02_基本設計/統合アーキテクチャマップ.html">統合アーキテクチャマップ</a> の該当節を参照。</p>
+<div class="table-wrap"><table><thead><tr><th>フロー</th><th>概要</th><th>対応ゲート</th></tr></thead><tbody><tr><td>F-A</td><td>社員PC入場（802.1X→動的VLAN→ACL→アプリ到達）</td><td>IG-FA</td></tr><tr><td>F-B</td><td>未認証端末の拒否→隔離VLAN</td><td>IG-FB</td></tr><tr><td>F-C</td><td>感染端末の検知→自動隔離（NDR→SOAR→CoA）</td><td>IG-FC</td></tr><tr><td>F-D</td><td>リモート社員のZTNA到達（VPNレス）</td><td>IG-FD</td></tr><tr><td>F-E</td><td>サーバ間東西のμセグ+L7認可</td><td>IG-FE</td></tr></tbody></table></div>
+<h2 id="参照">参照</h2>
+<ul><li><a href="../02_基本設計/統合アーキテクチャマップ.html">../02_基本設計/統合アーキテクチャマップ.md</a></li><li><a href="../02_基本設計/基本設計書.html">../02_基本設計/基本設計書.md</a></li><li><a href="../02_基本設計/IPアドレス管理表.html">../02_基本設計/IPアドレス管理表.md</a></li><li><a href="../../ZERO_zero_trust/02_基本設計/NW-ZT_トラックロードマップ.md">../../ZERO_zero_trust/02_基本設計/NW-ZT_トラックロードマップ.md</a></li><li><a href="../../31_nac_dot1x/05_試験/試験結果_2026-07-05.md">../../31_nac_dot1x/05_試験/試験結果_2026-07-05.md</a></li><li><a href="../../36_ztna_openziti/05_試験/試験結果_2026-07-05.md">../../36_ztna_openziti/05_試験/試験結果_2026-07-05.md</a></li><li><a href="../../42_ndr_flow/05_試験/試験結果_2026-07-05.md">../../42_ndr_flow/05_試験/試験結果_2026-07-05.md</a></li><li><a href="../../35_faucet_sdn/05_試験/試験結果_2026-07-07.md">../../35_faucet_sdn/05_試験/試験結果_2026-07-07.md</a></li><li><a href="../../microseg_cilium/05_試験/試験結果_2026-07-05.md">../../microseg_cilium/05_試験/試験結果_2026-07-05.md</a></li><li><a href="../../microseg_nftables/05_試験/試験結果_2026-07-05.md">../../microseg_nftables/05_試験/試験結果_2026-07-05.md</a></li></ul>
+    <footer class="doc-foot">
+      <p>ゼロトラスト完全版レポート — Markdownをソースに <code>_assets/build_reports.mjs</code> で自動生成（外部依存ゼロ）。</p>
+      <p class="muted">実検証済(P0 / N1-N4) と 設計のみ(L7 P1-P6) を峻別して記載しています。</p>
+    </footer>
+  </main>
+</div>
+<script>
+// スクロールで目次の現在地をハイライト（transform/opacityのみ・軽量）
+(function(){
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var map={}; links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a;});
+  var heads=[].slice.call(document.querySelectorAll('main h2, main h3'));
+  if(!('IntersectionObserver' in window)||!heads.length) return;
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ links.forEach(function(l){l.classList.remove('cur');}); var a=map[e.target.id]; if(a)a.classList.add('cur'); }});
+  },{rootMargin:'-10% 0px -80% 0px'});
+  heads.forEach(function(h){io.observe(h);});
+})();
+</script>
+</body>
+</html>

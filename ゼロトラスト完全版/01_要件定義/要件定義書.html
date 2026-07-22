@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ゼロトラスト完全版｜要件定義書 | ゼロトラスト完全版</title>
+<meta name="description" content="ゼロトラスト完全版｜要件定義書 — ゼロトラスト完全版レポート">
+<style>
+:root{
+  --surface:#FFFFFF; --surface-2:#F7F7F8; --surface-3:#F0F0F2;
+  --ink:#1A1A1A; --ink-2:#6B7280; --ink-3:#9AA0AA;
+  --brand:#E60012; --brand-ink:#FFFFFF; --border:#E7E7EA; --border-2:#EDEDF0;
+  --ok:#0E9F6E; --warn:#B45309; --info:#2563EB;
+  --r-sm:6px; --r-md:10px; --r-lg:16px;
+  --shadow-1:0 1px 2px rgba(17,17,26,.05),0 1px 3px rgba(17,17,26,.05);
+  --shadow-2:0 10px 40px rgba(17,17,26,.10);
+  --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",system-ui,-apple-system,sans-serif;
+  --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  --maxw:1180px; --ease:cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto} *{animation:none!important;transition:none!important}}
+body{font-family:var(--sans);color:var(--ink);background:var(--surface);line-height:1.8;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-feature-settings:"palt" 1}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--info);outline-offset:2px;border-radius:3px}
+.skip{position:absolute;left:-999px;top:0;background:var(--ink);color:#fff;padding:8px 14px;z-index:100;border-radius:0 0 8px 0}
+.skip:focus{left:0}
+
+/* topbar */
+.topbar{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.82);backdrop-filter:saturate(180%) blur(14px);
+  border-bottom:1px solid var(--border)}
+.bar{display:flex;align-items:center;justify-content:space-between;height:60px;gap:24px}
+.brand{display:flex;align-items:center;gap:11px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
+.brand-mark{width:14px;height:14px;border-radius:4px;background:var(--brand);box-shadow:0 0 0 4px rgba(230,0,18,.10)}
+.brand-name{font-size:15px;color:var(--ink)} .brand-name b{color:var(--brand);font-weight:700}
+.stagenav{display:flex;gap:4px;overflow:auto}
+.stagenav a{font-size:13px;color:var(--ink-2);padding:7px 12px;border-radius:999px;transition:color .2s,background .2s;white-space:nowrap}
+.stagenav a:hover{color:var(--ink);background:var(--surface-3)}
+.stagenav a.active{color:var(--brand);background:rgba(230,0,18,.06);font-weight:600}
+
+/* hero strip */
+.hero-strip{background:var(--surface);border-bottom:1px solid var(--border);padding:44px 0 30px}
+.crumbs{font-size:12.5px;color:var(--ink-3);letter-spacing:.02em;margin-bottom:14px}
+.crumbs a:hover{color:var(--brand)} .crumbs span{margin:0 6px;color:var(--border)}
+.doc-title{font-size:clamp(28px,4vw,42px);line-height:1.18;letter-spacing:-.02em;font-weight:800;color:#0F0F12;max-width:24ch}
+.metarow{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;align-items:center}
+.chip{font-size:12px;padding:4px 11px;border-radius:999px;border:1px solid var(--border);color:var(--ink-2);background:var(--surface);letter-spacing:.02em}
+.chip.type{border-color:transparent;background:var(--ink);color:#fff;font-weight:600}
+.chip.date{color:var(--ink-3)}
+.chip.status{font-weight:600;border:none}
+.s-draft{background:#FEF3C7;color:#92400E} .s-review{background:#DBEAFE;color:#1E40AF} .s-done{background:#D1FAE5;color:#065F46}
+.tag{font-size:11.5px;padding:3px 9px;border-radius:6px;background:var(--surface-3);color:var(--ink-2)}
+
+/* layout */
+.layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:48px;padding-top:40px;padding-bottom:80px;align-items:start}
+.side{position:sticky;top:84px}
+.side-h{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:12px}
+.toc{display:flex;flex-direction:column;border-left:1px solid var(--border)}
+.toc a{font-size:13px;color:var(--ink-2);padding:6px 0 6px 16px;margin-left:-1px;border-left:2px solid transparent;transition:color .2s,border-color .2s}
+.toc a:hover{color:var(--ink)}
+.toc a.cur{color:var(--brand);border-left-color:var(--brand);font-weight:600}
+.toc-3{padding-left:28px;font-size:12.5px} .toc-empty{color:var(--ink-3);font-size:13px}
+
+/* document typography */
+.doc{min-width:0;font-size:15.5px;color:#26262B}
+.doc h2{font-size:25px;letter-spacing:-.01em;font-weight:750;color:#0F0F12;margin:52px 0 16px;padding-top:10px}
+.doc h2:first-child{margin-top:0}
+.doc h2::before{content:"";display:block;width:34px;height:3px;background:var(--brand);border-radius:2px;margin-bottom:16px}
+.doc h3{font-size:18.5px;font-weight:700;color:#1A1A1F;margin:34px 0 12px}
+.doc h4{font-size:15.5px;font-weight:700;color:var(--ink-2);margin:24px 0 8px}
+.doc p{margin:14px 0}
+.doc a{color:var(--brand);text-decoration:none;border-bottom:1px solid rgba(230,0,18,.28);transition:border-color .2s}
+.doc a:hover{border-bottom-color:var(--brand)}
+.doc strong{font-weight:700;color:#0F0F12}
+.doc ul,.doc ol{margin:14px 0 14px 4px;padding-left:22px}
+.doc li{margin:7px 0}
+.doc ul li::marker{color:var(--brand)}
+.doc hr{border:none;border-top:1px solid var(--border);margin:40px 0}
+.doc code{font-family:var(--mono);font-size:.88em;background:var(--surface-3);padding:2px 6px;border-radius:5px;color:#B4142B}
+
+/* table */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r-md);margin:22px 0;box-shadow:var(--shadow-1)}
+table{border-collapse:collapse;width:100%;font-size:13.8px}
+thead th{background:var(--surface-2);text-align:left;font-weight:700;color:var(--ink);padding:12px 14px;border-bottom:1px solid var(--border);white-space:nowrap}
+tbody td{padding:11px 14px;border-bottom:1px solid var(--border-2);vertical-align:top;color:#33333A}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--surface-2)}
+tbody td code{font-size:.85em}
+
+/* code block */
+.code{position:relative;margin:22px 0;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface-2);overflow:hidden}
+.code-lang{position:absolute;top:0;right:0;font-family:var(--mono);font-size:11px;color:var(--ink-3);background:var(--surface-3);padding:3px 10px;border-radius:0 var(--r-md) 0 var(--r-md);letter-spacing:.04em}
+.code pre{overflow-x:auto;padding:18px 16px;padding-top:22px}
+.code code{font-family:var(--mono);font-size:13px;color:#2A2A31;line-height:1.7;background:none;padding:0}
+
+/* diagram (mermaid source, tasteful panel) */
+.diagram{margin:24px 0;border:1px dashed var(--border);border-radius:var(--r-md);background:var(--surface-2);padding:8px 8px 14px}
+.diagram figcaption{font-size:11.5px;font-weight:700;letter-spacing:.1em;color:var(--ink-3);text-transform:uppercase;padding:8px 8px 6px}
+.diagram .mmd{font-family:var(--mono);font-size:12px;color:var(--ink-2);line-height:1.6;overflow-x:auto;padding:6px 8px;white-space:pre}
+
+/* blockquote / callout */
+blockquote{margin:22px 0;padding:14px 18px;background:var(--surface-2);border-left:3px solid var(--brand);border-radius:0 var(--r-sm) var(--r-sm) 0;color:var(--ink-2);font-size:14.5px}
+blockquote strong{color:var(--ink)}
+
+/* status inline badges */
+.st{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;font-size:11px;font-weight:800;line-height:1;vertical-align:middle}
+.st-ok{background:var(--ok);color:#fff} .st-plan{background:#E5E7EB;color:#6B7280}
+
+/* footer */
+.doc-foot{margin-top:64px;padding-top:24px;border-top:1px solid var(--border);font-size:13px;color:var(--ink-3)}
+.doc-foot .muted{margin-top:6px;font-size:12.5px}
+
+@media (max-width:900px){
+  .layout{grid-template-columns:1fr;gap:0}
+  .side{display:none}
+  .hero-strip{padding:32px 0 22px}
+  .doc h2{font-size:22px;margin-top:40px}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">本文へスキップ</a>
+<header class="topbar">
+  <div class="wrap bar">
+    <a class="brand" href="../index.html"><span class="brand-mark"></span><span class="brand-name">Zero&nbsp;Trust <b>完全版</b></span></a>
+    <nav class="stagenav" aria-label="ステージ"><a href="../README_Lab_Challenge.html">概要</a><a href="../00_ログイン/ログインコマンド.html">00</a><a href="../01_要件定義/要件定義書.html" aria-current="page" class="active">01</a><a href="../02_基本設計/統合アーキテクチャマップ.html">02</a><a href="../03_詳細設計/コンポーネント詳細設計.html">03</a><a href="../04_構築/実装計画.html">04</a><a href="../05_試験/統合検証結果.html">05</a></nav>
+  </div>
+</header>
+<div class="hero-strip"><div class="wrap">
+  <div class="crumbs"><a href="../index.html">ホーム</a> <span>›</span> <span>01 要件定義</span></div>
+  <h1 class="doc-title">ゼロトラスト完全版｜要件定義書</h1>
+  <div class="metarow">
+    <span class="chip type">要件定義</span>
+    <span class="chip status s-draft">下書き</span>
+    <span class="chip date">更新 2026-07-08</span>
+    <span class="tag">zero-trust</span><span class="tag">requirements</span><span class="tag">showcase</span><span class="tag">virtual-company</span><span class="tag">unified-architecture</span>
+  </div>
+</div></div>
+<div class="wrap layout">
+  <aside class="side" aria-label="目次">
+    <div class="side-inner">
+      <p class="side-h">目次</p>
+      <nav class="toc"><a class="toc-2" href="#背景目的">背景・目的</a><a class="toc-2" href="#対象範囲">対象範囲</a><a class="toc-3" href="#仮想企業モデル">仮想企業モデル</a><a class="toc-3" href="#zt観点統合ポイント対応表">ZT観点×統合ポイント対応表</a><a class="toc-2" href="#機能要件">機能要件</a><a class="toc-2" href="#非機能要件">非機能要件</a><a class="toc-2" href="#ゾーン設計方針">ゾーン設計方針</a><a class="toc-2" href="#制約">制約</a><a class="toc-2" href="#受け入れ基準">受け入れ基準</a><a class="toc-2" href="#参照">参照</a></nav>
+    </div>
+  </aside>
+  <main id="main" class="doc">
+    <h2 id="背景目的">背景・目的</h2>
+<p>これまでの検証（<a href="../../ZERO_zero_trust/README_Lab_Challenge.md">ZERO_zero_trust</a> の Phase0-6、および <a href="../../31_nac_dot1x/README_Lab_Challenge.md">31_nac_dot1x</a>・<a href="../../35_faucet_sdn/README_Lab_Challenge.md">35_faucet_sdn</a>・<a href="../../36_ztna_openziti/README_Lab_Challenge.md">36_ztna_openziti</a>・<a href="../../42_ndr_flow/README_Lab_Challenge.md">42_ndr_flow</a>・microseg_cilium／microseg_nftables の N1-N4）は、それぞれ独立したテーマフォルダで実装・検証された「部品」であり、ゼロトラストの全体像を1点から俯瞰する資料はあっても、<strong>それらを1つの社内LANへ実装したらどうなるか</strong>を示す資料は存在しなかった。</p>
+<p>本フォルダ <code>ゼロトラスト完全版/</code> は、各ラボで実機検証済の部品を、仮想企業（1拠点・従業員約100名）の1つの社内LANへ統合し、<strong>ZTNA・NDR・L7ゼロトラストを組み込んだ全社統合アーキテクチャ</strong>として設計し直す <strong>ショーケース主・実務従</strong> の設計資料である。個々の実装テーマが持つ学習（Mission）や設定の"答え"を奪わず、根拠リンクで誘導しながら、統合設計としての一貫性・接続点（統合ポイント）・実装状態（<span class="st st-ok" aria-label="合格">✓</span>部品として実証済／<span class="st st-plan" aria-label="設計のみ">◐</span>設計のみ）を明示する。</p>
+<blockquote><strong>Phase番号（P0-P6）・N番号（N1-N4）・トラック区分は、各部品の出自ラボにおける管理単位として存続する。本書はそれらの到達点を1つの仮想企業LANへ再配置した設計であり、出自ラボ側のドキュメント（<a href="../../ZERO_zero_trust/README_Lab_Challenge.md">ZERO_zero_trust</a> 等）そのものは変更しない。</strong></blockquote>
+<h2 id="対象範囲">対象範囲</h2>
+<h3 id="仮想企業モデル">仮想企業モデル</h3>
+<p>1拠点・従業員約100名の仮想企業を想定する。社内LANは <code>172.31.0.0/16</code> に統一し、<strong>第3オクテット＝VLAN ID</strong>とする。セグメント構成・ノードのIP設計は <a href="../02_基本設計/IPアドレス管理表.html">IPアドレス管理表</a> を正とする。</p>
+<h3 id="zt観点統合ポイント対応表">ZT観点×統合ポイント対応表</h3>
+<p>ゼロトラストの6観点（ID統制・デバイス統制・NWセキュリティ・WEBセキュリティ・DLP・SIEM）を、<a href="../02_基本設計/統合アーキテクチャマップ.html">統合アーキテクチャマップ</a> で定義する統合ポイント I-1〜I-8 に対応づける。</p>
+<div class="table-wrap"><table><thead><tr><th>ZT観点</th><th>対応する統合ポイント</th><th>主な部品（出自）</th></tr></thead><tbody><tr><td>ID統制</td><td>I-1 ID統一・I-2 認証→セグメント</td><td>keycloak（新設）→radius（31実証）→動的VLAN</td></tr><tr><td>デバイス統制</td><td>I-6 Webアプリ認可（mTLSクライアント証明書部分）</td><td>step-ca（新設）</td></tr><tr><td>NWセキュリティ</td><td>I-2 認証→セグメント・I-3 常時監視・I-5 サーバ非公開化・I-8 宣言型アクセス層</td><td>動的VLAN(31)・SPAN(35/42)・ziti overlay(36)・faucet(35)</td></tr><tr><td>WEBセキュリティ</td><td>I-6 Webアプリ認可</td><td>pomerium/oauth2-proxy（新設）→srv-app1</td></tr><tr><td>DLP</td><td>専用の統合ポイントは未定義（I-6のSWG機能にmitmproxyアドオンとして同居予定、<span class="st st-plan" aria-label="設計のみ">◐</span>発展課題）</td><td>mitmproxy（新設）</td></tr><tr><td>SIEM</td><td>I-4 検知→対応（本丸）・I-7 統合可観測</td><td>suricata(42)・faucet/gauge(35)・soar-lite（新設）・loki/grafana</td></tr></tbody></table></div>
+<p>対象外（本フォルダでは扱わない）:</p>
+<ul><li>実設定ファイルの記載（<code>faucet.yaml</code>・RADIUS <code>clients.conf</code>・nftables ルール・Suricata シグネチャ等の"答え"）。各実装テーマの Mission・ハンズオンを保全するため、設計・データフロー・ゲート条件・検証エビデンスの要点に留める。</li><li>新規の実装・デプロイ作業（本フォルダは設計ドキュメントのみで、コンテナや clab トポロジは持たない）。</li><li><code>任天堂UIデザイン案/</code> を含む、本テーマと無関係な既存資産への変更。</li></ul>
+<h2 id="機能要件">機能要件</h2>
+<ul><li>検証済の各部品（P0/N1-N4）を、1つの仮想企業LAN上のセグメント配置として俯瞰できること。</li><li>各部品・各統合ポイントについて、実装状態（<span class="st st-ok" aria-label="合格">✓</span>部品として出自ラボで実機実証済／<span class="st st-plan" aria-label="設計のみ">◐</span>設計のみ）を明示的に区別して提示できること。ノード（部品）の状態と接続（統合ポイント）の状態は必ず別々に表記すること。</li><li>統合ポイント I-1〜I-8（ID統一・認証→セグメント・常時監視・検知→対応・サーバ非公開化・Webアプリ認可・統合可観測・宣言型アクセス層）を1つの表と全社構成図で示せること。</li><li>代表的なE2Eフロー F-A〜F-E（社員PC入場／未認証端末／感染端末の検知→自動隔離／リモート社員のZTNA到達／サーバ間東西のμセグ+L7認可）をステップ分解で示せること。</li><li>各実装テーマ（31/35/36/42/microseg_cilium/microseg_nftables、ZERO_zero_trust）への根拠リンクを保持し、詳細検証内容へ迷わず遷移できること。</li><li>OSS実装と商用製品（Okta/EntraID/ISE、Zscaler、Splunk/Sentinel、Cisco ISE 等）の対応関係を一覧できること。</li></ul>
+<h2 id="非機能要件">非機能要件</h2>
+<ul><li>全ドキュメントは Markdown をソース・オブ・トゥルースとし、絶対パスを含まない（GitHub 移植性・<code>規約/ドキュメント標準.md</code> 準拠）。</li><li>frontmatter・章立て・命名は <code>規約/frontmatterスキーマ.md</code>・<code>規約/ドキュメント標準.md</code> に準拠し、既存の <code>build.mjs --check</code> の回帰を壊さないこと。</li><li>実検証済の記載は、参照先の試験結果ドキュメントの記述と矛盾しないこと（誇張しない・誠実さを優先する）。</li><li>HTML化は本フォルダのMarkdown作成後に別工程（<code>_assets/build_reports.mjs</code>）で行い、本ドキュメント群はその前提として自己完結した内容を持つこと。</li></ul>
+<h2 id="ゾーン設計方針">ゾーン設計方針</h2>
+<p>社内LANは VLAN100（コア・認証管理）を中核に、営業(VLAN10)・開発(VLAN20)・ゲスト(VLAN30)・サーバ室(VLAN50)・DMZ認可層(VLAN60)・監視管理SOC(VLAN90)・隔離(VLAN99)へセグメントを分離する。セグメント間の通信は関所（802.1X認証・IAP・SDP overlay）を必ず経由させ、<strong>default-deny</strong> を基本方針とする。DMZ認可層(VLAN60)を経由しない限りサーバ室(VLAN50)へは到達させず、監視管理SOC(VLAN90)は全セグメントを横断的に監視する。詳細は <a href="../02_基本設計/基本設計書.html">基本設計書</a> と <a href="../02_基本設計/IPアドレス管理表.html">IPアドレス管理表</a> を参照。</p>
+<h2 id="制約">制約</h2>
+<ul><li><strong>arm64 制約</strong>: 実行基盤は OrbStack VM <code>clab</code>（Ubuntu 24.04 arm64）。FreeRADIUS・ntopng 等は公式イメージが amd64 のみのため arm64 apt 自作で対応し、ClamAV・osquery は arm64 非対応のため代替方式（mitmproxy アドオン・posture claim モック）を採る。</li><li><strong>出自ラボの実行基盤は個別に閉じている</strong>: 各部品はそれぞれの出自ラボの実行基盤（docker完結／IOL連携等）で個別に実証されたものであり、実行基盤そのものの統合・単一クラスタ化は本書のスコープ外。docker完結かIOL連携かの判断根拠は出自ラボの決定として継承する（詳細は<a href="../02_基本設計/基本設計書.html">基本設計書</a>の設計判断 D-C1〜D-C4を参照）。</li><li><strong>mentor 規約</strong>: 学習テーマ（31/35/36/42/microseg_*・ZERO の各 Phase）の実設定コマンドの"答え"は本フォルダに書かない。ヒントおよび根拠リンクに留める。</li><li><strong>本フォルダは新規実装を持たない</strong>: 記載する実装状態（<span class="st st-ok" aria-label="合格">✓</span>/<span class="st st-plan" aria-label="設計のみ">◐</span>）は各実装テーマ側の検証結果を根拠とし、本フォルダ自体では検証を行わない。</li></ul>
+<h2 id="受け入れ基準">受け入れ基準</h2>
+<ul><li><code>01_要件定義/要件定義書.md</code>・<code>02_基本設計/基本設計書.md</code>・<code>02_基本設計/IPアドレス管理表.md</code>・<code>02_基本設計/統合アーキテクチャマップ.md</code>・<code>03_詳細設計/コンポーネント詳細設計.md</code> の5ファイルが frontmatter・章立て規約（<code>規約/ドキュメント標準.md</code>・<code>規約/frontmatterスキーマ.md</code>）に準拠していること。</li><li>各ファイルの相対リンクが実在するファイルに解決すること（<code>../ZERO_zero_trust/…</code>・<code>../31_nac_dot1x/…</code> 等）。</li><li>統合ポイント I-1〜I-8・E2Eフロー F-A〜F-E が <code>02_基本設計/</code>〜<code>05_試験/</code> の各ドキュメントで一貫したIDで参照されていること。</li><li>実設定の"答え"（RADIUS/faucet.yaml/nftables/Suricata ルール等の具体値）が本フォルダのいずれのファイルにも含まれないこと。</li><li>実検証済（<span class="st st-ok" aria-label="合格">✓</span>）と設計のみ（<span class="st st-plan" aria-label="設計のみ">◐</span>）の記載が、各実装テーマの試験結果・READMEの記述と整合していること。ノード（部品）の状態と接続（統合ポイント）の状態を混同しないこと。</li><li>絶対パス（<code>/Users/…</code>）が本フォルダのいずれのファイルにも含まれないこと。</li></ul>
+<h2 id="参照">参照</h2>
+<ul><li><a href="../02_基本設計/基本設計書.html">基本設計書</a></li><li><a href="../02_基本設計/IPアドレス管理表.html">IPアドレス管理表</a></li><li><a href="../02_基本設計/統合アーキテクチャマップ.html">統合アーキテクチャマップ</a></li><li><a href="../03_詳細設計/コンポーネント詳細設計.html">コンポーネント詳細設計</a></li><li><a href="../../ZERO_zero_trust/README_Lab_Challenge.md">ZERO_zero_trust README</a></li><li><a href="../../ZERO_zero_trust/02_基本設計/ゼロトラスト統合マップ.md">ゼロトラスト統合マップ</a></li></ul>
+    <footer class="doc-foot">
+      <p>ゼロトラスト完全版レポート — Markdownをソースに <code>_assets/build_reports.mjs</code> で自動生成（外部依存ゼロ）。</p>
+      <p class="muted">実検証済(P0 / N1-N4) と 設計のみ(L7 P1-P6) を峻別して記載しています。</p>
+    </footer>
+  </main>
+</div>
+<script>
+// スクロールで目次の現在地をハイライト（transform/opacityのみ・軽量）
+(function(){
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var map={}; links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a;});
+  var heads=[].slice.call(document.querySelectorAll('main h2, main h3'));
+  if(!('IntersectionObserver' in window)||!heads.length) return;
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ links.forEach(function(l){l.classList.remove('cur');}); var a=map[e.target.id]; if(a)a.classList.add('cur'); }});
+  },{rootMargin:'-10% 0px -80% 0px'});
+  heads.forEach(function(h){io.observe(h);});
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ゼロトラスト完全版 | 統合ショーケース</title>
+<meta name="description" content="検証済み部品を仮想企業（1拠点・約100名）の1つの社内LANへ統合した全社ゼロトラスト設計。統合ポイントI-1〜I-8・E2EフローF-A〜F-Eで接続状態を可視化するショーケース。">
+<style>
+:root{
+  --surface:#FFFFFF; --surface-2:#F7F7F8; --surface-3:#F0F0F2;
+  --ink:#0F0F12; --ink-1:#1A1A1A; --ink-2:#6B7280; --ink-3:#9AA0AA;
+  --brand:#E60012; --brand-ink:#FFFFFF; --border:#E7E7EA; --border-2:#EDEDF0;
+  --ok:#0E9F6E; --warn:#B45309; --info:#2563EB;
+  --r-sm:8px; --r-md:12px; --r-lg:18px; --r-xl:26px;
+  --shadow-1:0 1px 2px rgba(17,17,26,.05),0 1px 3px rgba(17,17,26,.05);
+  --shadow-2:0 12px 44px rgba(17,17,26,.10);
+  --shadow-3:0 24px 70px rgba(17,17,26,.14);
+  --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",system-ui,-apple-system,sans-serif;
+  --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  --maxw:1180px; --ease:cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto} *{animation:none!important;transition:none!important}}
+body{font-family:var(--sans);color:var(--ink-1);background:var(--surface);line-height:1.8;-webkit-font-smoothing:antialiased;font-feature-settings:"palt" 1}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--info);outline-offset:3px;border-radius:4px}
+
+/* topbar */
+.topbar{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.82);backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid var(--border)}
+.bar{display:flex;align-items:center;justify-content:space-between;height:62px;gap:20px}
+.brand{display:flex;align-items:center;gap:11px;font-weight:600;letter-spacing:.02em}
+.brand-mark{width:15px;height:15px;border-radius:5px;background:var(--brand);box-shadow:0 0 0 5px rgba(230,0,18,.10)}
+.brand-name{font-size:15px} .brand-name b{color:var(--brand);font-weight:800}
+.topnav{display:flex;gap:2px;overflow:auto}
+.topnav a{font-size:13px;color:var(--ink-2);padding:8px 13px;border-radius:999px;transition:.2s;white-space:nowrap}
+.topnav a:hover{color:var(--ink);background:var(--surface-3)}
+
+/* hero */
+.hero{padding:72px 0 40px;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(1100px 380px at 78% -8%,rgba(230,0,18,.06),transparent 60%);pointer-events:none}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;letter-spacing:.08em;color:var(--brand);background:rgba(230,0,18,.06);padding:6px 13px;border-radius:999px;margin-bottom:22px}
+.eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--brand)}
+h1.title{font-size:clamp(38px,6vw,68px);line-height:1.08;letter-spacing:-.03em;font-weight:850;color:var(--ink);max-width:16ch}
+.lead{margin-top:22px;font-size:clamp(16px,2vw,19px);color:var(--ink-2);max-width:60ch;line-height:1.8}
+.cta{margin-top:32px;display:flex;gap:12px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;font-size:14.5px;font-weight:600;padding:13px 22px;border-radius:999px;transition:transform .2s var(--ease),box-shadow .2s,background .2s;border:1px solid transparent}
+.btn-primary{background:var(--brand);color:#fff;box-shadow:0 6px 18px rgba(230,0,18,.24)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(230,0,18,.32)}
+.btn-ghost{background:var(--surface);color:var(--ink);border-color:var(--border);box-shadow:var(--shadow-1)}
+.btn-ghost:hover{transform:translateY(-2px);border-color:var(--ink-3)}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:56px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:22px 22px;box-shadow:var(--shadow-1)}
+.stat .n{font-size:34px;font-weight:850;letter-spacing:-.02em;color:var(--ink)}
+.stat .n small{font-size:16px;color:var(--ink-3);font-weight:700;margin-left:2px}
+.stat .l{margin-top:4px;font-size:13px;color:var(--ink-2)}
+.stat .accent{color:var(--brand)} .stat .green{color:var(--ok)}
+
+/* section */
+section.blk{padding:64px 0}
+.sec-head{margin-bottom:30px}
+.sec-k{font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.sec-t{font-size:clamp(24px,3.4vw,34px);font-weight:800;letter-spacing:-.02em;color:var(--ink);margin-top:8px}
+.sec-d{margin-top:12px;color:var(--ink-2);max-width:62ch}
+
+/* architecture svg card */
+.archcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:26px;box-shadow:var(--shadow-2)}
+.archcard svg{width:100%;height:auto;display:block}
+.legend{display:flex;gap:20px;flex-wrap:wrap;margin-top:18px;font-size:12.5px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.lg-dot{width:10px;height:10px;border-radius:50%}
+
+/* track cards */
+.tracks{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.track{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:26px;box-shadow:var(--shadow-1);transition:transform .25s var(--ease),box-shadow .25s}
+.track:hover{transform:translateY(-3px);box-shadow:var(--shadow-2)}
+.track h3{font-size:19px;font-weight:800;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+.track .tag{font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--surface-3);color:var(--ink-2)}
+.track p.sub{color:var(--ink-2);font-size:14px;margin-top:8px}
+.rows{margin-top:18px;display:flex;flex-direction:column;gap:2px}
+.row{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;transition:background .2s}
+.row:hover{background:var(--surface-2)}
+.row .code{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--brand);min-width:30px}
+.row .nm{font-weight:600;font-size:14px;flex:1;min-width:0}
+.row .os{font-size:12px;color:var(--ink-3)}
+.pill{font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.p-ok{background:#D6F3E6;color:#066b47} .p-plan{background:#EEEEF0;color:#7A7A85}
+
+/* gate matrix */
+.matrix{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-1)}
+.matrix table{border-collapse:collapse;width:100%;font-size:13.6px}
+.matrix th{background:var(--surface-2);text-align:left;padding:13px 16px;font-weight:700;border-bottom:1px solid var(--border);white-space:nowrap}
+.matrix td{padding:12px 16px;border-bottom:1px solid var(--border-2);color:#33333A;vertical-align:middle}
+.matrix tr:last-child td{border-bottom:none}
+.matrix tbody tr:hover{background:var(--surface-2)}
+.dotok{color:var(--ok);font-weight:800} .dotplan{color:var(--ink-3);font-weight:800}
+
+/* doc grid */
+.docs{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.dcard{display:block;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:22px;box-shadow:var(--shadow-1);transition:transform .22s var(--ease),box-shadow .22s,border-color .22s}
+.dcard:hover{transform:translateY(-3px);box-shadow:var(--shadow-2);border-color:#DADADE}
+.dcard .st{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ink-3);letter-spacing:.06em}
+.dcard h4{font-size:16.5px;font-weight:750;margin-top:8px;color:var(--ink)}
+.dcard p{font-size:13px;color:var(--ink-2);margin-top:7px;line-height:1.7}
+.dcard .go{margin-top:14px;font-size:13px;font-weight:700;color:var(--brand)}
+
+/* footer */
+footer.site{border-top:1px solid var(--border);padding:44px 0 60px;margin-top:24px;color:var(--ink-3);font-size:13px}
+.frow{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+footer.site a:hover{color:var(--brand)}
+.muted{color:var(--ink-3)} .note{margin-top:10px;font-size:12.5px;max-width:70ch}
+
+@media (max-width:900px){
+  .stats{grid-template-columns:1fr 1fr}
+  .tracks{grid-template-columns:1fr}
+  .docs{grid-template-columns:1fr}
+  .hero{padding:52px 0 28px}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main" style="position:absolute;left:-999px">本文へ</a>
+<header class="topbar"><div class="wrap bar">
+  <a class="brand" href="index.html"><span class="brand-mark"></span><span class="brand-name">Zero&nbsp;Trust <b>完全版</b></span></a>
+  <nav class="topnav" aria-label="主要導線">
+    <a href="#arch">統合アーキ</a>
+    <a href="#tracks">実装出自</a>
+    <a href="#matrix">検証状況</a>
+    <a href="#docs">ドキュメント</a>
+    <a href="README_Lab_Challenge.html">README</a>
+  </nav>
+</div></header>
+
+<main id="main">
+<section class="hero"><div class="wrap">
+  <span class="eyebrow"><span class="dot"></span>OSS × arm64 — 全社統合ゼロトラスト</span>
+  <h1 class="title">ゼロトラスト、<br>全実装の到達点。</h1>
+  <p class="lead">ネットワーク部品（NAC・SDP・NDR・マイクロセグ）とアプリ/認可部品（ID統制・IAP・SWG/DLP・SIEM・デバイス統制）という検証済みの部品を、仮想企業（1拠点・約100名）の1つの社内LANへ統合した全社ゼロトラスト設計。<strong>部品として実機検証済みの中核</strong>と<strong>統合設計として確定した接続・拡張</strong>を、誠実に一枚で見渡す。</p>
+  <div class="cta">
+    <a class="btn btn-primary" href="02_基本設計/統合アーキテクチャマップ.html">統合アーキテクチャを見る →</a>
+    <a class="btn btn-ghost" href="05_試験/統合検証結果.html">検証エビデンス</a>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="n">1<small>LAN</small></div><div class="l">社内LAN（1拠点・100名規模）</div></div>
+    <div class="stat"><div class="n">8<small>点</small></div><div class="l">統合ポイント（I-1〜I-8）</div></div>
+    <div class="stat"><div class="n green">6<small>件</small></div><div class="l" style="color:var(--ok)">部品ゲート合格（P0・N1〜N4・N3+）</div></div>
+    <div class="stat"><div class="n">5<small>本</small></div><div class="l">E2Eフロー（F-A〜F-E）</div></div>
+  </div>
+</div></section>
+
+<section class="blk" id="arch"><div class="wrap">
+  <div class="sec-head">
+    <div class="sec-k">Integrated Architecture</div>
+    <h2 class="sec-t">検証済み部品が1つの社内LANに合流する</h2>
+    <p class="sec-d">外部（remote-pc）→ DMZ認可層(VLAN60) → 社内LAN（VLAN10/20/30/99） → サーバ室(VLAN50)、下段に監視管理SOC(VLAN90+100)を配した仮想企業（1拠点・約100名）の断面図。緑は部品として出自ラボで実機検証済み、灰は設計のみ。①〜⑧は統合ポイント I-1〜I-8 の接続線で、そのほとんどは未実施（設計のみ）にとどまる。</p>
+  </div>
+  <div class="archcard">
+    <svg viewBox="0 0 960 515" role="img" aria-label="ゼロトラスト完全版 全社統合アーキテクチャ断面図（外部→DMZ→社内LAN→サーバ室、下段に監視管理SOC）">
+      <defs>
+        <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#B8B8C0"/></marker>
+        <marker id="arR" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#E60012"/></marker>
+      </defs>
+
+      <!-- column headers -->
+      <g font-size="11" font-weight="800" fill="#9AA0AA" letter-spacing="1">
+        <text x="20" y="20">外部</text>
+        <text x="150" y="20">エッジ</text>
+        <text x="270" y="20">DMZ認可層 VLAN60</text>
+        <text x="450" y="20">社内LAN</text>
+        <text x="800" y="20">サーバ室 VLAN50</text>
+      </g>
+
+      <!-- external: remote-pc -->
+      <g text-anchor="middle">
+        <rect x="20" y="150" width="110" height="56" rx="12" fill="#F3FBF7" stroke="#BFE9D6"/>
+        <circle cx="36" cy="166" r="4" fill="#0E9F6E"/>
+        <text x="75" y="174" font-size="13" font-weight="700" fill="#1A1A1A">remote-pc</text>
+        <text x="75" y="192" font-size="10.5" fill="#5b8a76">リモート社員（ziti tunneler）</text>
+      </g>
+
+      <!-- edge: FW -->
+      <g text-anchor="middle">
+        <rect x="150" y="150" width="90" height="56" rx="12" fill="#F7F7F8" stroke="#E7E7EA"/>
+        <circle cx="166" cy="166" r="4" fill="#9AA0AA"/>
+        <text x="195" y="174" font-size="13" font-weight="700" fill="#1A1A1A">FW/エッジ</text>
+        <text x="195" y="192" font-size="10.5" fill="#9AA0AA">境界（設計）</text>
+      </g>
+
+      <!-- DMZ VLAN60 container -->
+      <rect x="270" y="58" width="170" height="250" rx="14" fill="#FBFBFC" stroke="#E7E7EA" stroke-dasharray="4 4"/>
+      <text x="284" y="76" font-size="12" font-weight="800" fill="#6B7280">VLAN60 DMZ認可層</text>
+      <g text-anchor="middle">
+        <rect x="286" y="88" width="140" height="40" rx="10" fill="#F7F7F8" stroke="#E7E7EA"/>
+        <circle cx="300" cy="100" r="3.5" fill="#9AA0AA"/><text x="356" y="104" font-size="12.5" font-weight="700" fill="#1A1A1A">keycloak</text><text x="356" y="120" font-size="9.5" fill="#9AA0AA">ID統制(P1)</text>
+        <rect x="286" y="132" width="140" height="40" rx="10" fill="#F7F7F8" stroke="#E7E7EA"/>
+        <circle cx="300" cy="144" r="3.5" fill="#9AA0AA"/><text x="356" y="148" font-size="12.5" font-weight="700" fill="#1A1A1A">pomerium</text><text x="356" y="164" font-size="9.5" fill="#9AA0AA">IAP(P2)</text>
+        <rect x="286" y="176" width="140" height="40" rx="10" fill="#F7F7F8" stroke="#E7E7EA"/>
+        <circle cx="300" cy="188" r="3.5" fill="#9AA0AA"/><text x="356" y="192" font-size="12.5" font-weight="700" fill="#1A1A1A">step-ca</text><text x="356" y="208" font-size="9.5" fill="#9AA0AA">デバイス統制(P6)</text>
+        <rect x="286" y="220" width="140" height="40" rx="10" fill="#F3FBF7" stroke="#BFE9D6"/>
+        <circle cx="300" cy="232" r="3.5" fill="#0E9F6E"/><text x="356" y="236" font-size="12.5" font-weight="700" fill="#1A1A1A">ziti-ctrl/router</text><text x="356" y="252" font-size="9.5" fill="#5b8a76">SDP-ZTNA(N2)</text>
+      </g>
+
+      <!-- 社内LAN: VLAN chips + core-sw + access layer -->
+      <g text-anchor="middle">
+        <rect x="450" y="88" width="155" height="40" rx="10" fill="#F3FBF7" stroke="#BFE9D6"/>
+        <circle cx="464" cy="100" r="3.5" fill="#0E9F6E"/><text x="527" y="104" font-size="12.5" font-weight="700" fill="#1A1A1A">VLAN10 営業</text><text x="527" y="120" font-size="9.5" fill="#5b8a76">pc-sales1(N1動的割当)</text>
+        <rect x="615" y="88" width="155" height="40" rx="10" fill="#F7F7F8" stroke="#E7E7EA"/>
+        <circle cx="629" cy="100" r="3.5" fill="#9AA0AA"/><text x="692" y="104" font-size="12.5" font-weight="700" fill="#1A1A1A">VLAN20 開発</text><text x="692" y="120" font-size="9.5" fill="#9AA0AA">新設（設計のみ）</text>
+        <rect x="450" y="132" width="155" height="40" rx="10" fill="#F7F7F8" stroke="#E7E7EA"/>
+        <circle cx="464" cy="144" r="3.5" fill="#9AA0AA"/><text x="527" y="148" font-size="12.5" font-weight="700" fill="#1A1A1A">VLAN30 ゲスト</text><text x="527" y="164" font-size="9.5" fill="#9AA0AA">新設（設計のみ）</text>
+        <rect x="615" y="132" width="155" height="40" rx="10" fill="#F7F7F8" stroke="#E7E7EA"/>
+        <circle cx="629" cy="144" r="3.5" fill="#9AA0AA"/><text x="692" y="148" font-size="12.5" font-weight="700" fill="#1A1A1A">VLAN99 隔離</text><text x="692" y="164" font-size="9.5" fill="#9AA0AA">T-N1-7残課題</text>
+
+        <rect x="450" y="176" width="320" height="50" rx="12" fill="#F3FBF7" stroke="#BFE9D6"/>
+        <circle cx="466" cy="192" r="4" fill="#0E9F6E"/><text x="620" y="198" font-size="13" font-weight="700" fill="#1A1A1A">core-sw</text><text x="620" y="215" font-size="10" fill="#5b8a76">VLAN100 コア認証管理（SVI＋ACL/μセグ前提）</text>
+
+        <rect x="450" y="230" width="320" height="58" rx="12" fill="#F3FBF7" stroke="#BFE9D6"/>
+        <circle cx="466" cy="248" r="4" fill="#0E9F6E"/><text x="620" y="254" font-size="13" font-weight="700" fill="#1A1A1A">アクセス層 802.1X</text><text x="620" y="271" font-size="10" fill="#5b8a76">floor-sw1（動的VLAN割当・実証済）</text>
+      </g>
+
+      <!-- サーバ室 VLAN50 container -->
+      <rect x="800" y="58" width="140" height="250" rx="14" fill="#FBFBFC" stroke="#E7E7EA" stroke-dasharray="4 4"/>
+      <text x="814" y="76" font-size="12" font-weight="800" fill="#6B7280">VLAN50 サーバ室</text>
+      <g text-anchor="middle">
+        <rect x="814" y="90" width="112" height="44" rx="10" fill="#F3FBF7" stroke="#BFE9D6"/>
+        <circle cx="828" cy="104" r="3.5" fill="#0E9F6E"/><text x="870" y="108" font-size="12" font-weight="700" fill="#1A1A1A">srv-app1</text><text x="870" y="123" font-size="9" fill="#5b8a76">保護対象(36 dark service)</text>
+        <rect x="814" y="146" width="112" height="44" rx="10" fill="#F3FBF7" stroke="#BFE9D6"/>
+        <circle cx="828" cy="160" r="3.5" fill="#0E9F6E"/><text x="870" y="164" font-size="12" font-weight="700" fill="#1A1A1A">k8s-cilium</text><text x="870" y="179" font-size="9" fill="#5b8a76">μセグ対象(N4)</text>
+      </g>
+      <text x="870" y="228" text-anchor="middle" font-size="10.5" font-weight="700" fill="#6B7280">inbound deny</text>
+      <text x="870" y="244" text-anchor="middle" font-size="9.5" fill="#9AA0AA">（overlay/IAP経由のみ到達）</text>
+
+      <!-- 統合ポイント I-1〜I-3, I-8: 上段から SOC 帯への接続 -->
+      <line x1="356" y1="308" x2="100" y2="350" stroke="#B8B8C0" stroke-width="1.5" marker-end="url(#ar)"/>
+      <text x="205" y="330" font-size="14" font-weight="800" fill="#6B7280">①</text>
+      <text x="217" y="333" font-size="9.5" fill="#6B7280">ID統一</text>
+
+      <line x1="550" y1="288" x2="160" y2="350" stroke="#B8B8C0" stroke-width="1.5" marker-end="url(#ar)"/>
+      <text x="335" y="322" font-size="14" font-weight="800" fill="#6B7280">②</text>
+      <text x="347" y="325" font-size="9.5" fill="#6B7280">認証→セグメント</text>
+
+      <line x1="700" y1="288" x2="340" y2="350" stroke="#B8B8C0" stroke-width="1.5" marker-end="url(#ar)"/>
+      <text x="512" y="322" font-size="14" font-weight="800" fill="#6B7280">③</text>
+      <text x="524" y="325" font-size="9.5" fill="#6B7280">常時監視</text>
+
+      <text x="862" y="380" font-size="9" fill="#9AA0AA">faucet(35)起点</text>
+      <line x1="860" y1="386" x2="760" y2="288" stroke="#B8B8C0" stroke-width="1.5" marker-end="url(#ar)"/>
+      <text x="795" y="335" font-size="14" font-weight="800" fill="#6B7280">⑧</text>
+      <text x="807" y="338" font-size="9.5" fill="#6B7280">宣言型アクセス層(発展)</text>
+
+      <!-- I-5, I-6: DMZ → サーバ室（上部回り込み） -->
+      <path d="M 426 240 L 426 36 L 850 36 L 850 90" fill="none" stroke="#B8B8C0" stroke-width="1.5" marker-end="url(#ar)"/>
+      <text x="592" y="30" font-size="14" font-weight="800" fill="#6B7280">⑤</text>
+      <text x="604" y="33" font-size="9.5" fill="#6B7280">サーバ非公開化(overlay)</text>
+
+      <path d="M 426 188 L 410 188 L 410 46 L 880 46 L 880 90" fill="none" stroke="#B8B8C0" stroke-width="1.5" marker-end="url(#ar)"/>
+      <text x="692" y="40" font-size="14" font-weight="800" fill="#6B7280">⑥</text>
+      <text x="704" y="43" font-size="9.5" fill="#6B7280">Webアプリ認可</text>
+
+      <!-- 監視管理SOC VLAN90+100 帯 -->
+      <rect x="20" y="350" width="920" height="145" rx="14" fill="#FBFBFC" stroke="#E7E7EA" stroke-dasharray="4 4"/>
+      <text x="34" y="368" font-size="12" font-weight="800" fill="#6B7280">監視管理SOC VLAN90+100</text>
+      <g text-anchor="middle">
+        <rect x="40" y="390" width="180" height="44" rx="10" fill="#F3FBF7" stroke="#BFE9D6"/>
+        <circle cx="56" cy="404" r="3.5" fill="#0E9F6E"/><text x="130" y="408" font-size="12.5" font-weight="700" fill="#1A1A1A">radius</text><text x="130" y="424" font-size="9.5" fill="#5b8a76">FreeRADIUS（N1認証源）</text>
+        <rect x="250" y="390" width="180" height="44" rx="10" fill="#F3FBF7" stroke="#BFE9D6"/>
+        <circle cx="266" cy="404" r="3.5" fill="#0E9F6E"/><text x="340" y="408" font-size="12.5" font-weight="700" fill="#1A1A1A">suricata</text><text x="340" y="424" font-size="9.5" fill="#5b8a76">NDR(N3)</text>
+        <rect x="460" y="390" width="220" height="44" rx="10" fill="#F3FBF7" stroke="#BFE9D6"/>
+        <circle cx="476" cy="404" r="3.5" fill="#0E9F6E"/><text x="570" y="408" font-size="12.5" font-weight="700" fill="#1A1A1A">loki / grafana</text><text x="570" y="424" font-size="9.5" fill="#5b8a76">SIEM可視化(N3部品/◐全社統合)</text>
+        <rect x="710" y="390" width="190" height="44" rx="10" fill="#F7F7F8" stroke="#E7E7EA"/>
+        <circle cx="726" cy="404" r="3.5" fill="#9AA0AA"/><text x="805" y="408" font-size="12.5" font-weight="700" fill="#1A1A1A">soar-lite</text><text x="805" y="424" font-size="9.5" fill="#9AA0AA">検知→対応自動化(発展)</text>
+      </g>
+
+      <!-- I-4（検知→対応、赤／直交セグメントのみ・矢印は各区間の進行方向に片側のみ） -->
+      <!-- suricata → soar-lite -->
+      <path d="M 340 434 L 340 462 L 830 462 L 830 434" fill="none" stroke="#E60012" stroke-width="1.5" marker-end="url(#arR)"/>
+      <!-- soar-lite → radius（CoA） -->
+      <path d="M 760 434 L 760 470 L 180 470 L 180 434" fill="none" stroke="#E60012" stroke-width="1.5" marker-end="url(#arR)"/>
+      <text x="440" y="466" font-size="14" font-weight="800" fill="#E60012">④</text>
+      <text x="452" y="466" font-size="9.5" font-weight="700" fill="#E60012">検知→CoA発行</text>
+      <!-- radius → VLAN99隔離（core-sw/アクセス層を迂回し右外周を経由） -->
+      <path d="M 100 434 L 100 478 L 445 478 L 445 350 L 785 350 L 785 152 L 770 152" fill="none" stroke="#E60012" stroke-width="1.5" marker-end="url(#arR)"/>
+
+      <!-- I-7（統合可観測、破線） -->
+      <path d="M 340 434 L 340 445 L 570 445 L 570 434" fill="none" stroke="#B8B8C0" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+      <path d="M 130 434 L 130 452 L 570 452 L 570 434" fill="none" stroke="#B8B8C0" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+      <text x="243" y="450" font-size="14" font-weight="800" fill="#6B7280">⑦</text>
+      <text x="255" y="453" font-size="9.5" fill="#6B7280">統合可観測</text>
+    </svg>
+    <div class="legend">
+      <span><span class="lg-dot" style="background:#0E9F6E"></span>緑＝部品として出自ラボで実機検証済</span>
+      <span><span class="lg-dot" style="background:#9AA0AA"></span>灰＝設計のみ</span>
+      <span><span class="lg-dot" style="background:#E60012"></span>赤＝検知→CoA自動隔離（発展・I-4）</span>
+    </div>
+  </div>
+</div></section>
+
+<section class="blk" id="tracks" style="background:var(--surface-2)"><div class="wrap">
+  <div class="sec-head">
+    <div class="sec-k">Implementation Origin</div>
+    <h2 class="sec-t">実装出自インデックス</h2>
+    <p class="sec-d">全社設計の各部品がどの実装テーマ（出自ラボ）に由来するかを一覧する。P0とN系はすべて出自ラボで実機検証済み、L7 P1–P6は設計部品としてVLAN60 DMZ認可層に配置される。</p>
+  </div>
+  <div class="tracks">
+    <div class="track">
+      <h3>ネットワーク部品 <span class="tag">NW-ZT出自 / IOL連携</span></h3>
+      <p class="sub">全社設計のVLAN・アクセス層・監視管理SOCへ配置される、実機検証済みのネットワーク部品群。</p>
+      <div class="rows">
+        <a class="row" href="../31_nac_dot1x/README_Lab_Challenge.md"><span class="code">N1</span><span class="nm">NAC / 802.1X <span class="os">FreeRADIUS·IOL</span></span><span class="pill p-ok">検証済</span></a>
+        <a class="row" href="../36_ztna_openziti/README_Lab_Challenge.md"><span class="code">N2</span><span class="nm">SDP-ZTNA <span class="os">OpenZiti</span></span><span class="pill p-ok">検証済</span></a>
+        <a class="row" href="../42_ndr_flow/README_Lab_Challenge.md"><span class="code">N3</span><span class="nm">NDR <span class="os">Suricata·Loki/Grafana</span></span><span class="pill p-ok">検証済</span></a>
+        <a class="row" href="../35_faucet_sdn/README_Lab_Challenge.md"><span class="code">N3補助</span><span class="nm">SDN / mirror <span class="os">Faucet·OVS mirror/gauge</span></span><span class="pill p-ok">検証済</span></a>
+        <a class="row" href="../microseg_cilium/README_Lab_Challenge.md"><span class="code">N4</span><span class="nm">μセグ <span class="os">Cilium / nftables</span></span><span class="pill p-ok">検証済</span></a>
+      </div>
+    </div>
+    <div class="track">
+      <h3>アプリ/認可部品 <span class="tag">L7出自 / docker完結</span></h3>
+      <p class="sub">VLAN60 DMZ認可層に配置される、認可を軸としたアプリ側の部品群。P0のみ実機検証済み。</p>
+      <div class="rows">
+        <a class="row" href="../ZERO_zero_trust/README_Lab_Challenge.md"><span class="code">P0</span><span class="nm">土台（network + multitool）</span><span class="pill p-ok">検証済</span></a>
+        <a class="row" href="../ZERO_zero_trust/README_Lab_Challenge.md"><span class="code">P1</span><span class="nm">ID統制 <span class="os">Keycloak</span></span><span class="pill p-plan">設計のみ</span></a>
+        <a class="row" href="../ZERO_zero_trust/README_Lab_Challenge.md"><span class="code">P2</span><span class="nm">IAP <span class="os">Pomerium</span></span><span class="pill p-plan">設計のみ</span></a>
+        <a class="row" href="../ZERO_zero_trust/README_Lab_Challenge.md"><span class="code">P3</span><span class="nm">SIEM <span class="os">Loki/Grafana</span></span><span class="pill p-plan">設計のみ</span></a>
+        <a class="row" href="../ZERO_zero_trust/README_Lab_Challenge.md"><span class="code">P4</span><span class="nm">SWG <span class="os">mitmproxy/Suricata</span></span><span class="pill p-plan">設計のみ</span></a>
+        <a class="row" href="../ZERO_zero_trust/README_Lab_Challenge.md"><span class="code">P5</span><span class="nm">DLP <span class="os">mitmproxyアドオン</span></span><span class="pill p-plan">設計のみ</span></a>
+        <a class="row" href="../ZERO_zero_trust/README_Lab_Challenge.md"><span class="code">P6</span><span class="nm">デバイス統制 <span class="os">step-ca mTLS</span></span><span class="pill p-plan">設計のみ</span></a>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<section class="blk" id="matrix"><div class="wrap">
+  <div class="sec-head">
+    <div class="sec-k">Verification</div>
+    <h2 class="sec-t">実機で確かめた中核</h2>
+    <p class="sec-d">誇張のない現在地。検証済みの領域は根拠（各テーマの試験結果）に辿れる。</p>
+  </div>
+  <div style="font-size:13px;font-weight:800;color:var(--ink-2);margin-bottom:10px">部品ゲート</div>
+  <div class="matrix"><table>
+    <thead><tr><th>領域</th><th>ゲート条件</th><th>状態</th><th>検証日</th><th>根拠</th></tr></thead>
+    <tbody>
+      <tr><td>P0 土台</td><td>client → app 疎通・規約ビルド成功</td><td><span class="dotok">● 合格</span></td><td>2026-07-04</td><td><a href="../ZERO_zero_trust/05_試験/試験結果_2026-07-04.md">ZERO 試験結果</a></td></tr>
+      <tr><td>N1 NAC</td><td>認証→業務VLAN動的割当・未認証→通信不可</td><td><span class="dotok">● 合格</span></td><td>2026-07-05</td><td><a href="../31_nac_dot1x/README_Lab_Challenge.md">テーマ31</a></td></tr>
+      <tr><td>N2 SDP-ZTNA</td><td>内向き非開放のまま connector 経由でのみ到達</td><td><span class="dotok">● 合格</span></td><td>2026-07-05</td><td><a href="../36_ztna_openziti/README_Lab_Challenge.md">テーマ36</a></td></tr>
+      <tr><td>N3 NDR</td><td>east-west スキャンを検知→Loki/Grafana可視化</td><td><span class="dotok">● 合格</span></td><td>2026-07-05</td><td><a href="../42_ndr_flow/README_Lab_Challenge.md">テーマ42</a></td></tr>
+      <tr><td>N3+ Faucet</td><td>OVS↔Faucet接続・mirror複製受信・gauge統計公開</td><td><span class="dotok">● 合格</span></td><td>2026-07-07</td><td><a href="../35_faucet_sdn/05_試験/試験結果_2026-07-07.md">テーマ35 試験結果</a></td></tr>
+      <tr><td>N4 μセグ</td><td>east-west default-deny・許可パスのみ疎通</td><td><span class="dotok">● 合格</span></td><td>2026-07-05</td><td><a href="../microseg_cilium/README_Lab_Challenge.md">microseg</a></td></tr>
+      <tr><td>L7 P1–P6</td><td>各Phaseゲート（ID/IAP/SIEM/SWG/DLP/デバイス）</td><td><span class="dotplan">◐ 設計確定</span></td><td>—</td><td><a href="../ZERO_zero_trust/02_基本設計/ゼロトラスト統合マップ.md">ZERO 統合マップ</a></td></tr>
+    </tbody>
+  </table></div>
+  <p class="sec-d" style="margin-top:16px">統合ゲート <strong>IG-I1〜IG-I8</strong>・E2Eゲート <strong>IG-FA〜IG-FE</strong> = <span class="dotplan">◐ 未実施</span>（設計のみ）。部品ゲートの束としての詳細は<a href="05_試験/試験計画書.html">試験計画書</a>を参照。</p>
+</div></section>
+
+<section class="blk" id="docs" style="background:var(--surface-2)"><div class="wrap">
+  <div class="sec-head">
+    <div class="sec-k">Documents</div>
+    <h2 class="sec-t">00–05 ドキュメント</h2>
+    <p class="sec-d">設計統合と検証エビデンスを軸にした一式。各ページは同じ意匠の HTML レポートとして読める。</p>
+  </div>
+  <div class="docs">
+    <a class="dcard" href="README_Lab_Challenge.html"><div class="st">OVERVIEW</div><h4>README / ラボ概要</h4><p>完全版の全体像・統合トポロジ・開始手順・統合ゲート。</p><div class="go">開く →</div></a>
+    <a class="dcard" href="01_要件定義/要件定義書.html"><div class="st">01 要件定義</div><h4>要件定義書</h4><p>仮想企業のセグメント設計方針・機能/非機能要件・受け入れ基準。</p><div class="go">開く →</div></a>
+    <a class="dcard" href="02_基本設計/基本設計書.html"><div class="st">02 基本設計</div><h4>基本設計書</h4><p>3原則・仮想企業モデル・3プレーン構造・統合ポイントI-1〜I-8。</p><div class="go">開く →</div></a>
+    <a class="dcard" href="02_基本設計/統合アーキテクチャマップ.html"><div class="st">02 基本設計 · 中核</div><h4>統合アーキテクチャマップ</h4><p>レイヤ×セグメント×主OSS×商用対応と、統合ポイントI-1〜I-8・E2EフローF-A〜F-Eの全体図。</p><div class="go">開く →</div></a>
+    <a class="dcard" href="02_基本設計/IPアドレス管理表.html"><div class="st">02 基本設計</div><h4>IPアドレス管理表</h4><p>仮想企業LAN 172.31.0.0/16（第3オクテット=VLAN ID）のセグメント・ノード一覧。</p><div class="go">開く →</div></a>
+    <a class="dcard" href="02_基本設計/構成図.html"><div class="st">02 基本設計 · 図</div><h4>構成図（物理 / 論理）</h4><p>実行基盤の実体とゾーン・VLAN・フローをタブで切替。</p><div class="go">開く →</div></a>
+    <a class="dcard" href="03_詳細設計/コンポーネント詳細設計.html"><div class="st">03 詳細設計</div><h4>コンポーネント詳細設計</h4><p>層別コンポーネント・ポート・データフロー・商用対応。</p><div class="go">開く →</div></a>
+    <a class="dcard" href="04_構築/実装計画.html"><div class="st">04 構築</div><h4>実装計画</h4><p>依存順・環境前提・進め方（実装は各テーマへ）。</p><div class="go">開く →</div></a>
+    <a class="dcard" href="05_試験/統合検証結果.html"><div class="st">05 試験</div><h4>統合検証結果</h4><p>実検証済(P0/N1-4)のエビデンス集約と根拠リンク。</p><div class="go">開く →</div></a>
+    <a class="dcard" href="05_試験/試験計画書.html"><div class="st">05 試験</div><h4>試験計画書</h4><p>統合ゲートマトリクスと合格基準。</p><div class="go">開く →</div></a>
+    <a class="dcard" href="00_ログイン/ログインコマンド.html"><div class="st">00 ログイン</div><h4>ログインコマンド</h4><p>VM接続と各層ノードへのアクセス入口。</p><div class="go">開く →</div></a>
+  </div>
+</div></section>
+</main>
+
+<footer class="site"><div class="wrap">
+  <div class="frow">
+    <div>
+      <div class="brand"><span class="brand-mark"></span><span class="brand-name">Zero&nbsp;Trust <b>完全版</b></span></div>
+      <p class="note">OSS × arm64 によるゼロトラスト統合の到達点。部品実証済（P0・N1〜N4・N3+）と統合設計（I-1〜I-8）を峻別して記載。設計ハブは <a href="../ZERO_zero_trust/README_Lab_Challenge.md">ZERO_zero_trust</a>。</p>
+    </div>
+    <div style="text-align:right">
+      <a href="../ZERO_zero_trust/02_基本設計/ゼロトラスト統合マップ.md">ゼロトラスト統合マップ</a><br>
+      <span class="muted">Generated report · 外部依存ゼロ</span>
+    </div>
+  </div>
+</div></footer>
+</body>
+</html>

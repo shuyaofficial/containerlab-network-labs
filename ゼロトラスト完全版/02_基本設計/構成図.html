@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>構成図（物理/論理） | ゼロトラスト完全版</title>
+<meta name="description" content="ゼロトラスト完全版の物理構成図・論理構成図（タブ切替）。仮想企業（1拠点・約100名）の社内LANへ全部品を統合した全社設計。手描きインラインSVG・外部依存ゼロ。">
+<style>
+:root{
+  --surface:#FFFFFF; --surface-2:#F7F7F8; --surface-3:#F0F0F2;
+  --ink:#0F0F12; --ink-1:#1A1A1A; --ink-2:#6B7280; --ink-3:#9AA0AA;
+  --brand:#E60012; --border:#E7E7EA; --border-2:#EDEDF0;
+  --ok:#0E9F6E; --info:#2563EB;
+  --r-sm:8px; --r-md:12px; --r-lg:18px; --r-xl:26px;
+  --shadow-1:0 1px 2px rgba(17,17,26,.05),0 1px 3px rgba(17,17,26,.05);
+  --shadow-2:0 12px 44px rgba(17,17,26,.10);
+  --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",system-ui,-apple-system,sans-serif;
+  --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  --maxw:1180px; --ease:cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto} *{animation:none!important;transition:none!important}}
+body{font-family:var(--sans);color:var(--ink-1);background:var(--surface);line-height:1.8;-webkit-font-smoothing:antialiased;font-feature-settings:"palt" 1}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--info);outline-offset:3px;border-radius:4px}
+
+/* topbar（レポート共通意匠） */
+.topbar{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.82);backdrop-filter:saturate(180%) blur(14px);border-bottom:1px solid var(--border)}
+.bar{display:flex;align-items:center;justify-content:space-between;height:60px;gap:20px}
+.brand{display:flex;align-items:center;gap:11px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
+.brand-mark{width:14px;height:14px;border-radius:4px;background:var(--brand);box-shadow:0 0 0 4px rgba(230,0,18,.10)}
+.brand-name{font-size:15px} .brand-name b{color:var(--brand);font-weight:700}
+.topnav{display:flex;gap:4px;overflow:auto}
+.topnav a{font-size:13px;color:var(--ink-2);padding:7px 12px;border-radius:999px;transition:.2s;white-space:nowrap}
+.topnav a:hover{color:var(--ink);background:var(--surface-3)}
+
+/* hero */
+.hero-strip{border-bottom:1px solid var(--border);padding:44px 0 26px}
+.crumbs{font-size:12.5px;color:var(--ink-3);margin-bottom:14px}
+.crumbs a:hover{color:var(--brand)} .crumbs span{margin:0 6px;color:var(--border)}
+.doc-title{font-size:clamp(28px,4vw,40px);line-height:1.18;letter-spacing:-.02em;font-weight:800;color:var(--ink)}
+.doc-sub{margin-top:12px;color:var(--ink-2);font-size:15px;max-width:66ch}
+
+/* tabs — Apple風セグメンテッドコントロール */
+.tabrow{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:34px 0 22px}
+.tabs{display:inline-flex;background:var(--surface-3);border-radius:999px;padding:4px;gap:2px}
+.tab{border:none;background:transparent;font:600 14.5px var(--sans);color:var(--ink-2);padding:10px 26px;border-radius:999px;cursor:pointer;transition:color .2s,background .2s,box-shadow .2s;letter-spacing:.01em}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(17,17,26,.12),0 4px 14px rgba(17,17,26,.07)}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:12px;height:12px;border-radius:4px;border:1px solid transparent}
+.sw-ok{background:#F3FBF7;border-color:#BFE9D6} .sw-plan{background:#F7F7F8;border-color:#D7D7DC}
+.sw-red{width:16px;height:0;border-top:2px dashed var(--brand);border-radius:0}
+.sw-dash{width:16px;height:0;border-top:2px dashed #B8B8C0;border-radius:0}
+
+/* diagram panels */
+.view{display:none}
+.view.active{display:block;animation:fade .35s var(--ease)}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.figcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--shadow-2);padding:26px;margin-bottom:26px}
+.figwrap{overflow-x:auto}
+.figwrap svg{display:block;min-width:880px;width:100%;height:auto}
+.fignote{margin-top:14px;font-size:12.5px;color:var(--ink-3)}
+
+/* mini table（レポート共通意匠） */
+h2.sec{font-size:22px;font-weight:750;letter-spacing:-.01em;color:var(--ink);margin:38px 0 6px}
+h2.sec::before{content:"";display:block;width:34px;height:3px;background:var(--brand);border-radius:2px;margin-bottom:14px}
+p.secd{color:var(--ink-2);font-size:14px;margin-bottom:16px}
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-1);margin-bottom:60px}
+table{border-collapse:collapse;width:100%;font-size:13.6px}
+thead th{background:var(--surface-2);text-align:left;font-weight:700;padding:12px 14px;border-bottom:1px solid var(--border);white-space:nowrap}
+tbody td{padding:11px 14px;border-bottom:1px solid var(--border-2);vertical-align:top;color:#33333A}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--surface-2)}
+td code,.mono{font-family:var(--mono);font-size:.9em;background:var(--surface-3);padding:2px 6px;border-radius:5px;color:#B4142B}
+.st{display:inline-flex;align-items:center;min-height:18px;padding:1px 9px;border-radius:999px;font-size:11px;font-weight:800;white-space:nowrap}
+.st-ok{background:#D6F3E6;color:#066b47} .st-plan{background:#EEEEF0;color:#7A7A85} .st-dev{background:#FDE8E8;color:#B4142B}
+
+footer.site{border-top:1px solid var(--border);padding:28px 0 44px;color:var(--ink-3);font-size:12.5px}
+@media (max-width:768px){
+  .hero-strip{padding:32px 0 20px}
+  .figcard{padding:16px;border-radius:var(--r-lg)}
+}
+</style>
+</head>
+<body>
+<header class="topbar"><div class="wrap bar">
+  <a class="brand" href="../index.html"><span class="brand-mark"></span><span class="brand-name">Zero&nbsp;Trust <b>完全版</b></span></a>
+  <nav class="topnav" aria-label="関連ページ">
+    <a href="../index.html">ホーム</a>
+    <a href="../README_Lab_Challenge.html">README</a>
+    <a href="基本設計書.html">基本設計書</a>
+    <a href="IPアドレス管理表.html">IP管理表</a>
+    <a href="統合アーキテクチャマップ.html">統合アーキ</a>
+  </nav>
+</div></header>
+
+<div class="hero-strip"><div class="wrap">
+  <div class="crumbs"><a href="../index.html">ホーム</a> <span>›</span> <span>02 基本設計</span> <span>›</span> <span>構成図</span></div>
+  <h1 class="doc-title">構成図</h1>
+  <p class="doc-sub"><strong>仮想企業（1拠点・約100名）の社内LANへ全部品を統合した設計</strong>を、二つの視点で描く。<strong>物理構成図</strong>は「どこに・何の上で在るか」（全社トポロジと結線）、<strong>論理構成図</strong>は「どう繋がり・何が流れるか」（3プレーンとE2Eフロー）。各部品は出自ラボで実機検証済だが、それらを繋ぐ統合ポイント（I-1〜I-8）はほぼ設計のみ。</p>
+</div></div>
+
+<main class="wrap" id="main">
+  <div class="tabrow">
+    <div class="tabs" role="tablist" aria-label="構成図の切替">
+      <button class="tab" id="tab-phys" role="tab" aria-selected="true" aria-controls="view-phys">物理構成図</button>
+      <button class="tab" id="tab-logi" role="tab" aria-selected="false" aria-controls="view-logi" tabindex="-1">論理構成図</button>
+    </div>
+    <div class="legend" aria-hidden="true">
+      <span><span class="sw sw-ok"></span>緑＝部品として出自ラボで実機検証済 ✅</span>
+      <span><span class="sw sw-plan"></span>灰＝設計のみ ◐</span>
+      <span><span class="sw sw-red"></span>赤＝検知→CoA自動隔離ループ（発展・I-4）</span>
+    </div>
+  </div>
+
+  <!-- ============================ 物理構成図 ============================ -->
+  <section class="view active" id="view-phys" role="tabpanel" aria-labelledby="tab-phys">
+    <div class="figcard">
+      <div class="figwrap">
+      <svg viewBox="0 0 960 760" role="img" aria-label="物理構成図：仮想企業（1拠点・約100名）の社内LANに各出自ラボの検証済部品を統合配置した全社トポロジ。緑は部品として実機検証済、灰は設計のみ、赤はCoA自動隔離ループ（発展）。">
+        <defs>
+          <marker id="pa" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#B8B8C0"/></marker>
+          <marker id="pr" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#E60012"/></marker>
+        </defs>
+
+        <!-- ===== Band1 インターネット帯 ===== -->
+        <rect x="20" y="28" width="920" height="82" rx="12" fill="#F7F7F8" stroke="#E7E7EA"/>
+        <text x="36" y="50" font-size="12" font-weight="800" fill="#6B7280" letter-spacing="1">インターネット / 外部ゾーン ｜ 172.30.0.0/24</text>
+        <rect x="300" y="58" width="190" height="44" rx="9" fill="#F3FBF7" stroke="#BFE9D6"/>
+        <text x="395" y="78" font-size="12" font-weight="700" fill="#1A1A1A" text-anchor="middle">remote-pc ✅</text>
+        <text x="395" y="94" font-size="9.5" font-family="SF Mono,Menlo,monospace" fill="#5b8a76" text-anchor="middle">172.30.0.11 ｜ ziti tunneler内蔵</text>
+        <rect x="520" y="58" width="190" height="44" rx="9" fill="#F7F7F8" stroke="#D7D7DC" stroke-dasharray="3 3"/>
+        <text x="615" y="78" font-size="11.5" font-weight="700" fill="#6B7280" text-anchor="middle">attacker（参考・非配置）</text>
+        <text x="615" y="94" font-size="9.5" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA" text-anchor="middle">172.30.0.12 ｜ 脅威モデル</text>
+
+        <!-- ===== Band2 FW/エッジ ===== -->
+        <line x1="430" y1="102" x2="466" y2="126" stroke="#B8B8C0" stroke-width="1.6" marker-end="url(#pa)"/>
+        <rect x="395" y="126" width="170" height="40" rx="9" fill="#F7F7F8" stroke="#D7D7DC"/>
+        <text x="480" y="144" font-size="11.5" font-weight="700" fill="#1A1A1A" text-anchor="middle">FW / エッジルータ ◐</text>
+        <text x="480" y="159" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA" text-anchor="middle">設計のみ</text>
+        <line x1="480" y1="166" x2="480" y2="178" stroke="#B8B8C0" stroke-width="1.6"/>
+
+        <!-- ===== Band3 DMZ認可層（VLAN60） ===== -->
+        <rect x="40" y="178" width="880" height="126" rx="12" fill="#FBFBFC" stroke="#E7E7EA"/>
+        <text x="58" y="200" font-size="12" font-weight="800" fill="#6B7280">DMZ 認可層 ｜ VLAN60  172.31.60.0/24  ◐</text>
+        <!-- Row1 灰（設計のみ） -->
+        <g text-anchor="middle">
+          <rect x="58" y="212" width="150" height="40" rx="9" fill="#F7F7F8" stroke="#D7D7DC"/>
+          <text x="133" y="230" font-size="11.5" font-weight="700" fill="#1A1A1A">keycloak</text>
+          <text x="133" y="245" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA">.60.11 ｜ IdP</text>
+          <rect x="226" y="212" width="150" height="40" rx="9" fill="#F7F7F8" stroke="#D7D7DC"/>
+          <text x="301" y="230" font-size="11.5" font-weight="700" fill="#1A1A1A">pomerium</text>
+          <text x="301" y="245" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA">.60.21 ｜ IAP</text>
+          <rect x="394" y="212" width="150" height="40" rx="9" fill="#F7F7F8" stroke="#D7D7DC"/>
+          <text x="469" y="230" font-size="11.5" font-weight="700" fill="#1A1A1A">oauth2-proxy</text>
+          <text x="469" y="245" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA">.60.22 ｜ IAP起点</text>
+          <rect x="562" y="212" width="150" height="40" rx="9" fill="#F7F7F8" stroke="#D7D7DC"/>
+          <text x="637" y="230" font-size="11.5" font-weight="700" fill="#1A1A1A">mitmproxy</text>
+          <text x="637" y="245" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA">.60.31 ｜ SWG/DLP</text>
+          <rect x="730" y="212" width="150" height="40" rx="9" fill="#F7F7F8" stroke="#D7D7DC"/>
+          <text x="805" y="230" font-size="11.5" font-weight="700" fill="#1A1A1A">step-ca</text>
+          <text x="805" y="245" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA">.60.41 ｜ mTLS</text>
+        </g>
+        <!-- Row2 ziti（部品✅） + 注記 -->
+        <g text-anchor="middle">
+          <rect x="58" y="258" width="150" height="40" rx="9" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="133" y="276" font-size="11.5" font-weight="700" fill="#1A1A1A">ziti-ctrl ✅</text>
+          <text x="133" y="291" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">.60.23 ｜ コントローラ</text>
+          <rect x="226" y="258" width="150" height="40" rx="9" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="301" y="276" font-size="11.5" font-weight="700" fill="#1A1A1A">ziti-router ✅</text>
+          <text x="301" y="291" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">.60.24 ｜ ルータ/ブローカー</text>
+        </g>
+        <text x="394" y="272" font-size="9.5" fill="#9AA0AA">◐ ziti は部品として✅／全社配置は設計。</text>
+        <text x="394" y="288" font-size="9.5" fill="#9AA0AA">keycloak・pomerium・mitmproxy・step-ca は設計のみ ◐。</text>
+        <line x1="480" y1="304" x2="480" y2="320" stroke="#B8B8C0" stroke-width="1.6" marker-end="url(#pa)"/>
+        <text x="490" y="316" font-size="9" fill="#9AA0AA">802.1Q</text>
+
+        <!-- ===== Band4 core-sw ===== -->
+        <rect x="345" y="320" width="270" height="64" rx="11" fill="#F3FBF7" stroke="#BFE9D6"/>
+        <text x="480" y="344" font-size="13" font-weight="800" fill="#1A1A1A" text-anchor="middle">core-sw（Cisco IOL L2/L3）✅</text>
+        <text x="480" y="361" font-size="10" font-family="SF Mono,Menlo,monospace" fill="#5b8a76" text-anchor="middle">SVI 172.31.0.1 ｜ inter-VLAN ACL</text>
+        <rect x="529" y="365" width="76" height="15" rx="7" fill="#FDE8E8"/>
+        <text x="567" y="377" font-size="8.5" font-weight="800" fill="#B4142B" text-anchor="middle">x86エミュ</text>
+        <rect x="353" y="367" width="96" height="15" rx="7" fill="#EEEEF0"/>
+        <text x="401" y="379" font-size="8.5" font-weight="700" fill="#6B7280" text-anchor="middle">SPAN/mirror</text>
+
+        <!-- ===== Band5 アクセス層 ===== -->
+        <rect x="112" y="426" width="200" height="58" rx="10" fill="#F3FBF7" stroke="#BFE9D6"/>
+        <text x="212" y="450" font-size="12" font-weight="700" fill="#1A1A1A" text-anchor="middle">floor-sw1 ✅（出自 31）</text>
+        <text x="212" y="466" font-size="9.5" font-family="SF Mono,Menlo,monospace" fill="#5b8a76" text-anchor="middle">VLAN10 営業 + VLAN30 ゲスト 収容</text>
+        <rect x="120" y="407" width="68" height="15" rx="7" fill="#D6F3E6"/>
+        <text x="154" y="418" font-size="8.5" font-weight="800" fill="#066b47" text-anchor="middle">802.1X</text>
+        <rect x="560" y="426" width="200" height="58" rx="10" fill="#F7F7F8" stroke="#D7D7DC"/>
+        <text x="660" y="450" font-size="12" font-weight="700" fill="#1A1A1A" text-anchor="middle">floor-sw2 ◐</text>
+        <text x="660" y="466" font-size="9.5" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA" text-anchor="middle">VLAN20 開発 収容</text>
+        <!-- terminals -->
+        <g text-anchor="middle">
+          <rect x="56" y="522" width="118" height="48" rx="9" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="115" y="542" font-size="11.5" font-weight="700" fill="#1A1A1A">pc-sales1 ✅</text>
+          <text x="115" y="558" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">172.31.10.101 VLAN10</text>
+          <rect x="190" y="522" width="118" height="48" rx="9" fill="#F7F7F8" stroke="#D7D7DC"/>
+          <text x="249" y="542" font-size="11.5" font-weight="700" fill="#1A1A1A">guest-pc1 ◐</text>
+          <text x="249" y="558" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA">172.31.30.101 VLAN30</text>
+          <rect x="558" y="522" width="118" height="48" rx="9" fill="#F7F7F8" stroke="#D7D7DC"/>
+          <text x="617" y="542" font-size="11.5" font-weight="700" fill="#1A1A1A">pc-dev1 ◐</text>
+          <text x="617" y="558" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA">172.31.20.101 VLAN20</text>
+          <rect x="692" y="522" width="118" height="48" rx="9" fill="#F7F7F8" stroke="#D7D7DC" stroke-dasharray="3 3"/>
+          <text x="751" y="542" font-size="11.5" font-weight="700" fill="#6B7280">隔離端末 ◐</text>
+          <text x="751" y="558" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA">VLAN99 172.31.99.x</text>
+        </g>
+        <!-- core <-> floor trunks -->
+        <line x1="410" y1="384" x2="240" y2="426" stroke="#B8B8C0" stroke-width="1.6" marker-end="url(#pa)"/>
+        <line x1="550" y1="384" x2="650" y2="426" stroke="#B8B8C0" stroke-width="1.6" marker-end="url(#pa)"/>
+        <text x="318" y="404" font-size="9" fill="#9AA0AA">trunk</text>
+        <!-- floor -> terminals -->
+        <line x1="160" y1="484" x2="120" y2="522" stroke="#B8B8C0" stroke-width="1.4" marker-end="url(#pa)"/>
+        <line x1="250" y1="484" x2="249" y2="522" stroke="#B8B8C0" stroke-width="1.4" marker-end="url(#pa)"/>
+        <line x1="612" y1="484" x2="617" y2="522" stroke="#B8B8C0" stroke-width="1.4" marker-end="url(#pa)"/>
+        <line x1="705" y1="484" x2="751" y2="522" stroke="#B8B8C0" stroke-width="1.4" stroke-dasharray="4 4" marker-end="url(#pa)"/>
+
+        <!-- ===== Band7 監視管理SOC（左・VLAN90+VLAN100） ===== -->
+        <rect x="40" y="588" width="440" height="150" rx="12" fill="#FBFBFC" stroke="#E7E7EA"/>
+        <text x="58" y="610" font-size="12" font-weight="800" fill="#6B7280">監視管理SOC ｜ VLAN90 172.31.90.0/24（+ VLAN100 172.31.0.0/24）</text>
+        <g text-anchor="middle">
+          <rect x="56" y="620" width="132" height="40" rx="9" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="122" y="638" font-size="11" font-weight="700" fill="#1A1A1A">radius ✅</text>
+          <text x="122" y="652" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">172.31.0.10 (VLAN100)</text>
+          <rect x="200" y="620" width="132" height="40" rx="9" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="266" y="638" font-size="11" font-weight="700" fill="#1A1A1A">suricata ✅</text>
+          <text x="266" y="652" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">172.31.90.31 NDR</text>
+          <rect x="344" y="620" width="132" height="40" rx="9" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="410" y="638" font-size="11" font-weight="700" fill="#1A1A1A">faucet+gauge ✅</text>
+          <text x="410" y="652" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">.90.21 SDN/統計</text>
+          <rect x="56" y="666" width="86" height="40" rx="9" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="99" y="684" font-size="11" font-weight="700" fill="#1A1A1A">loki ✅</text>
+          <text x="99" y="698" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">.90.41</text>
+          <rect x="150" y="666" width="86" height="40" rx="9" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="193" y="684" font-size="11" font-weight="700" fill="#1A1A1A">promtail ✅</text>
+          <text x="193" y="698" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">.90.42</text>
+          <rect x="244" y="666" width="86" height="40" rx="9" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="287" y="684" font-size="11" font-weight="700" fill="#1A1A1A">grafana ✅</text>
+          <text x="287" y="698" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">.90.43</text>
+          <rect x="344" y="666" width="132" height="40" rx="9" fill="#F7F7F8" stroke="#D7D7DC"/>
+          <text x="410" y="684" font-size="11" font-weight="700" fill="#1A1A1A">soar-lite ◐</text>
+          <text x="410" y="698" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA">.90.51 CoA起点</text>
+        </g>
+        <text x="56" y="726" font-size="9.5" fill="#9AA0AA">loki/promtail/grafana は部品として✅／全社統合は ◐（I-7）。soar-lite は発展 ◐。</text>
+
+        <!-- ===== Band6 サーバ室（右・VLAN50） ===== -->
+        <rect x="500" y="588" width="420" height="120" rx="12" fill="#FBFBFC" stroke="#E7E7EA"/>
+        <text x="518" y="610" font-size="12" font-weight="800" fill="#6B7280">サーバ室 ｜ VLAN50 172.31.50.0/24 ◐（部品✅）</text>
+        <g text-anchor="middle">
+          <rect x="518" y="620" width="180" height="48" rx="9" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="608" y="640" font-size="11.5" font-weight="700" fill="#1A1A1A">k8s-cilium ✅</text>
+          <text x="608" y="656" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">172.31.50.21〜.29</text>
+          <rect x="712" y="620" width="190" height="48" rx="9" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="807" y="640" font-size="11.5" font-weight="700" fill="#1A1A1A">srv-app1 ✅</text>
+          <text x="807" y="656" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">172.31.50.11</text>
+        </g>
+        <text x="518" y="692" font-size="9.5" fill="#9AA0AA">inbound deny ・ overlay outbound のみ（部品✅・全社配置◐）。</text>
+
+        <!-- ===== 配線（下部） ===== -->
+        <!-- core -> SOC / server trunk（中央ガター経由） -->
+        <polyline points="430,384 430,576 250,588" fill="none" stroke="#B8B8C0" stroke-width="1.5" marker-end="url(#pa)"/>
+        <polyline points="540,384 540,576 700,588" fill="none" stroke="#B8B8C0" stroke-width="1.5" marker-end="url(#pa)"/>
+        <text x="452" y="574" font-size="9" fill="#9AA0AA">trunk</text>
+        <!-- floor-sw1 -> radius : RADIUS UDP/1812（左マージン） -->
+        <polyline points="112,452 36,452 36,632 56,640" fill="none" stroke="#B8B8C0" stroke-width="1.5" marker-end="url(#pa)"/>
+        <text transform="rotate(-90 46 540)" x="46" y="540" font-size="8.5" fill="#6B7280" text-anchor="middle">RADIUS UDP/1812</text>
+        <!-- radius -> floor-sw1 : CoA（赤・発展・I-4） -->
+        <polyline points="56,656 24,656 24,440 112,440" fill="none" stroke="#E60012" stroke-width="1.5" stroke-dasharray="6 5" marker-end="url(#pr)"/>
+        <text transform="rotate(-90 16 548)" x="16" y="548" font-size="8.5" fill="#B4142B" text-anchor="middle">CoA/3799 ・ I-4（発展）</text>
+        <!-- SPAN複製（I-3・破線）core-sw -> suricata -->
+        <polyline points="401,382 401,562 266,588 266,620" fill="none" stroke="#B8B8C0" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#pa)"/>
+        <text x="330" y="556" font-size="9" fill="#9AA0AA">SPAN複製 ・ I-3（floor-sw mirror含む）</text>
+        <!-- ZTNA overlay 論理バス（I-5・点線）remote-pc -> ziti-router -> srv-app1 -->
+        <line x1="490" y1="80" x2="935" y2="80" stroke="#9AA0AA" stroke-width="1.4" stroke-dasharray="2 3"/>
+        <line x1="935" y1="80" x2="935" y2="644" stroke="#9AA0AA" stroke-width="1.4" stroke-dasharray="2 3"/>
+        <polyline points="301,298 301,308 935,308" fill="none" stroke="#9AA0AA" stroke-width="1.4" stroke-dasharray="2 3"/>
+        <line x1="935" y1="644" x2="902" y2="644" stroke="#9AA0AA" stroke-width="1.4" stroke-dasharray="2 3" marker-end="url(#pa)"/>
+        <text x="930" y="40" font-size="9" fill="#9AA0AA" text-anchor="end">ZTNA overlay 論理網 ・ I-5（remote-pc↔ziti-router↔srv-app1）</text>
+
+        <!-- ===== 脚注 ===== -->
+        <text x="40" y="752" font-size="10.5" fill="#9AA0AA">本図は全社設計。実行基盤の実体は各出自ラボ（OrbStack VM / containerlab / docker / k3d）にあり、部品単位で実機検証済。</text>
+      </svg>
+      </div>
+      <p class="fignote">物理視点＝全社トポロジ。1拠点・約100名の社内LANに各出自ラボの検証済部品を配置した設計。緑＝部品✅／灰＝設計◐。接続線（統合ポイント）は原則すべて◐で、赤破線はCoA自動隔離ループ（発展・I-4）。</p>
+    </div>
+
+    <h2 class="sec">設計要素 → 実装出自ラボ 対応表</h2>
+    <p class="secd">全社設計上の各要素が、どの出自ラボの実機検証済部品に対応するか。ラボ内実値は検証時の実IP、全社設計値は<a href="IPアドレス管理表.html" style="color:var(--brand)">IPアドレス管理表</a>が正。</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>設計要素</th><th>全社上の位置</th><th>出自テーマとラボ内実値</th><th>状態</th></tr></thead>
+      <tbody>
+        <tr><td>core-sw + radius</td><td>VLAN100 コア認証管理（SVI <code>172.31.0.1</code> / radius <code>172.31.0.10</code>）</td><td>31_nac_dot1x（SVI・RADIUS 実IP無変更）</td><td><span class="st st-ok">部品✅</span></td></tr>
+        <tr><td>pc-sales1</td><td>VLAN10 営業（<code>172.31.10.101</code>）</td><td>31_nac_dot1x（pc1/alice の動的VLAN10割当）</td><td><span class="st st-ok">部品✅</span></td></tr>
+        <tr><td>srv-app1</td><td>VLAN50 サーバ室（<code>172.31.50.11</code>）</td><td>36_ztna_openziti（dark service）／ZERO app <code>172.30.20.21</code></td><td><span class="st st-ok">部品✅</span></td></tr>
+        <tr><td>ziti-ctrl / ziti-router</td><td>VLAN60 DMZ認可層（<code>.23</code> / <code>.24</code>）</td><td>36_ztna_openziti</td><td><span class="st st-ok">部品✅</span></td></tr>
+        <tr><td>k8s-cilium</td><td>VLAN50 サーバ室（<code>.21〜.29</code>）</td><td>microseg_cilium（Hubble/eBPF）</td><td><span class="st st-ok">部品✅</span></td></tr>
+        <tr><td>suricata + loki/grafana</td><td>VLAN90 監視管理SOC（<code>.31</code> / <code>.41-.43</code>）</td><td>42_ndr_flow（ラボ実値 <code>172.40.0.0/24</code>）</td><td><span class="st st-ok">部品✅</span> <span class="st st-plan">全社統合◐</span></td></tr>
+        <tr><td>faucet + gauge</td><td>VLAN90 監視管理SOC（<code>.21</code>）</td><td>35_faucet_sdn（<code>10.0.100.x</code> / <code>10.0.200.x</code>）</td><td><span class="st st-ok">部品✅</span></td></tr>
+        <tr><td>nftables ACLパターン</td><td>VLAN10↔VLAN20 相当（参考）</td><td>microseg_nftables（<code>172.50</code>系）</td><td><span class="st st-ok">部品✅</span></td></tr>
+        <tr><td>実行基盤</td><td>全社設計の外（実体）</td><td>Mac(arm64) → OrbStack VM → docker / containerlab</td><td><span class="st st-ok">稼働</span></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- ============================ 論理構成図 ============================ -->
+  <section class="view" id="view-logi" role="tabpanel" aria-labelledby="tab-logi">
+    <div class="figcard">
+      <div class="figwrap">
+      <svg viewBox="0 0 960 820" role="img" aria-label="論理構成図：アイデンティティ/ポリシー・データ・監視の3プレーンと、E2EフローF-A〜F-Eのバッジ。ノードが緑✅でも統合ポイントI-1〜I-8の接続はほぼ灰◐設計のみ。">
+        <defs>
+          <marker id="la" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#B8B8C0"/></marker>
+          <marker id="lr" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#E60012"/></marker>
+        </defs>
+
+        <!-- ===== 上帯：アイデンティティ/ポリシープレーン ===== -->
+        <text x="24" y="36" font-size="12" font-weight="800" fill="#9AA0AA" letter-spacing="1">① アイデンティティ / ポリシープレーン</text>
+        <rect x="20" y="44" width="920" height="150" rx="12" fill="#FBFBFC" stroke="#E7E7EA"/>
+        <g text-anchor="middle">
+          <rect x="48" y="96" width="160" height="58" rx="10" fill="#F7F7F8" stroke="#D7D7DC"/>
+          <text x="128" y="120" font-size="12" font-weight="700" fill="#1A1A1A">keycloak ◐</text>
+          <text x="128" y="137" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA">OIDC IdP ・ .60.11</text>
+          <rect x="290" y="96" width="160" height="58" rx="10" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="370" y="120" font-size="12" font-weight="700" fill="#1A1A1A">radius ✅</text>
+          <text x="370" y="137" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">FreeRADIUS ・ 172.31.0.10</text>
+          <rect x="530" y="96" width="180" height="58" rx="10" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="620" y="120" font-size="12" font-weight="700" fill="#1A1A1A">アクセス層 floor-sw ✅</text>
+          <text x="620" y="137" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">802.1X ・ 動的VLAN</text>
+          <rect x="760" y="96" width="170" height="58" rx="10" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="845" y="120" font-size="12" font-weight="700" fill="#1A1A1A">μセグポリシー ✅</text>
+          <text x="845" y="137" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">Cilium / nftables</text>
+        </g>
+        <line x1="208" y1="125" x2="290" y2="125" stroke="#B8B8C0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#la)"/>
+        <text x="249" y="114" font-size="9" fill="#9AA0AA" text-anchor="middle">I-1 ◐</text>
+        <line x1="450" y1="125" x2="530" y2="125" stroke="#B8B8C0" stroke-width="1.5" marker-end="url(#la)"/>
+        <text x="490" y="114" font-size="8" fill="#9AA0AA" text-anchor="middle">Tunnel-Private-Group-Id</text>
+        <line x1="710" y1="125" x2="760" y2="125" stroke="#B8B8C0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#la)"/>
+        <text x="735" y="114" font-size="9" fill="#9AA0AA" text-anchor="middle">I-2 ◐</text>
+
+        <!-- ===== 中帯：データプレーン ===== -->
+        <text x="24" y="212" font-size="12" font-weight="800" fill="#9AA0AA" letter-spacing="1">② データプレーン ｜ 172.31.0.0/16（VLAN = 第3オクテット）</text>
+        <rect x="20" y="222" width="920" height="360" rx="12" fill="#FBFBFC" stroke="#E7E7EA"/>
+
+        <!-- 外部 -->
+        <rect x="40" y="250" width="130" height="110" rx="10" fill="#FBFBFC" stroke="#E7E7EA"/>
+        <text x="52" y="270" font-size="11" font-weight="800" fill="#6B7280">外部</text>
+        <text x="52" y="284" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA">172.30.0.0/24</text>
+        <rect x="52" y="294" width="106" height="52" rx="9" fill="#F3FBF7" stroke="#BFE9D6"/>
+        <text x="105" y="315" font-size="11" font-weight="700" fill="#1A1A1A" text-anchor="middle">remote-pc ✅</text>
+        <text x="105" y="330" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#5b8a76" text-anchor="middle">172.30.0.11</text>
+
+        <!-- DMZ VLAN60 -->
+        <rect x="190" y="250" width="180" height="200" rx="10" fill="#FBFBFC" stroke="#E7E7EA"/>
+        <text x="202" y="270" font-size="11" font-weight="800" fill="#6B7280">DMZ VLAN60</text>
+        <text x="202" y="284" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA">172.31.60.0/24</text>
+        <g text-anchor="middle">
+          <rect x="202" y="294" width="156" height="42" rx="9" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="280" y="312" font-size="11" font-weight="700" fill="#1A1A1A">ziti-router ✅</text>
+          <text x="280" y="327" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">.24 broker</text>
+          <rect x="202" y="342" width="156" height="42" rx="9" fill="#F7F7F8" stroke="#D7D7DC"/>
+          <text x="280" y="360" font-size="11" font-weight="700" fill="#1A1A1A">pomerium ◐</text>
+          <text x="280" y="375" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA">.21 IAP</text>
+          <rect x="202" y="390" width="156" height="48" rx="9" fill="#F7F7F8" stroke="#D7D7DC"/>
+          <text x="280" y="409" font-size="10.5" font-weight="700" fill="#1A1A1A">keycloak/mitm/step-ca ◐</text>
+          <text x="280" y="424" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA">認可・検査・証明書</text>
+        </g>
+
+        <!-- 業務VLAN群 -->
+        <rect x="390" y="250" width="250" height="280" rx="10" fill="#FBFBFC" stroke="#E7E7EA"/>
+        <text x="402" y="270" font-size="11" font-weight="800" fill="#6B7280">アクセス層 業務VLAN（floor-sw 直下）</text>
+        <g text-anchor="middle">
+          <rect x="402" y="286" width="226" height="44" rx="9" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="515" y="305" font-size="11" font-weight="700" fill="#1A1A1A">営業 VLAN10 ✅</text>
+          <text x="515" y="320" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">pc-sales1 172.31.10.101</text>
+          <rect x="402" y="338" width="226" height="44" rx="9" fill="#F7F7F8" stroke="#D7D7DC"/>
+          <text x="515" y="357" font-size="11" font-weight="700" fill="#1A1A1A">開発 VLAN20 ◐</text>
+          <text x="515" y="372" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA">pc-dev1 172.31.20.101</text>
+          <rect x="402" y="390" width="226" height="44" rx="9" fill="#F7F7F8" stroke="#D7D7DC"/>
+          <text x="515" y="409" font-size="11" font-weight="700" fill="#1A1A1A">ゲスト VLAN30 ◐</text>
+          <text x="515" y="424" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA">guest-pc1 172.31.30.101</text>
+          <rect x="402" y="442" width="226" height="44" rx="9" fill="#F7F7F8" stroke="#D7D7DC" stroke-dasharray="3 3"/>
+          <text x="515" y="461" font-size="11" font-weight="700" fill="#6B7280">隔離 VLAN99 ◐</text>
+          <text x="515" y="476" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA">172.31.99.x（自動隔離先）</text>
+        </g>
+
+        <!-- サーバ室 VLAN50 -->
+        <rect x="660" y="250" width="170" height="160" rx="10" fill="#FBFBFC" stroke="#E7E7EA"/>
+        <text x="672" y="270" font-size="11" font-weight="800" fill="#6B7280">サーバ室 VLAN50</text>
+        <text x="672" y="284" font-size="9" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA">172.31.50.0/24</text>
+        <g text-anchor="middle">
+          <rect x="672" y="294" width="146" height="44" rx="9" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="745" y="313" font-size="11" font-weight="700" fill="#1A1A1A">srv-app1 ✅</text>
+          <text x="745" y="328" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">.50.11</text>
+          <rect x="672" y="346" width="146" height="50" rx="9" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="745" y="365" font-size="11" font-weight="700" fill="#1A1A1A">k8s-cilium ✅</text>
+          <text x="745" y="380" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">.50.21〜.29 μセグ</text>
+        </g>
+        <text x="745" y="404" font-size="8" fill="#9AA0AA" text-anchor="middle">east-west default-deny ✅ / inbound deny ◐</text>
+
+        <!-- ZTNA overlay（点線・論理網） -->
+        <line x1="158" y1="320" x2="202" y2="316" stroke="#9AA0AA" stroke-width="1.4" stroke-dasharray="2 3"/>
+        <polyline points="358,306 358,240 672,240 672,294" fill="none" stroke="#9AA0AA" stroke-width="1.4" stroke-dasharray="2 3" marker-end="url(#la)"/>
+        <text x="500" y="234" font-size="9.5" fill="#6B7280" text-anchor="middle">ZTNA overlay 論理網 ・ I-5 ◐</text>
+        <!-- 営業VLAN10 -> サーバ（core-sw ACL） -->
+        <line x1="628" y1="308" x2="672" y2="314" stroke="#B8B8C0" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#la)"/>
+        <text x="650" y="298" font-size="8" fill="#9AA0AA" text-anchor="middle">core-sw ACL ◐</text>
+
+        <!-- ===== 下帯：監視プレーン ===== -->
+        <text x="24" y="598" font-size="12" font-weight="800" fill="#9AA0AA" letter-spacing="1">③ 監視プレーン</text>
+        <rect x="20" y="608" width="920" height="176" rx="12" fill="#FBFBFC" stroke="#E7E7EA"/>
+        <g text-anchor="middle">
+          <rect x="300" y="650" width="170" height="54" rx="10" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="385" y="672" font-size="12" font-weight="700" fill="#1A1A1A">suricata NDR ✅</text>
+          <text x="385" y="689" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">eve.json sid:1000001</text>
+          <rect x="560" y="650" width="190" height="54" rx="10" fill="#F3FBF7" stroke="#BFE9D6"/>
+          <text x="655" y="672" font-size="12" font-weight="700" fill="#1A1A1A">loki / grafana ✅</text>
+          <text x="655" y="689" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#5b8a76">全社統合は ◐（I-7）</text>
+          <rect x="300" y="716" width="170" height="44" rx="10" fill="#F7F7F8" stroke="#D7D7DC"/>
+          <text x="385" y="734" font-size="11.5" font-weight="700" fill="#1A1A1A">soar-lite ◐</text>
+          <text x="385" y="749" font-size="8.5" font-family="SF Mono,Menlo,monospace" fill="#9AA0AA">CoA webhook起点</text>
+        </g>
+        <!-- SPAN複製 I-3 -->
+        <polyline points="500,530 500,590 385,620 385,650" fill="none" stroke="#B8B8C0" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#la)"/>
+        <text x="452" y="600" font-size="9" fill="#9AA0AA">I-3 SPAN複製 ◐</text>
+        <!-- suricata -> loki/grafana I-7 -->
+        <line x1="470" y1="677" x2="560" y2="677" stroke="#B8B8C0" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#la)"/>
+        <text x="515" y="668" font-size="9" fill="#9AA0AA" text-anchor="middle">I-7 ◐</text>
+        <!-- 各種ログ -> loki -->
+        <polyline points="830,410 855,430 855,620 720,650" fill="none" stroke="#B8B8C0" stroke-width="1.3" stroke-dasharray="4 4" marker-end="url(#la)"/>
+        <text x="862" y="520" font-size="8.5" fill="#9AA0AA" transform="rotate(-90 862 520)" text-anchor="middle">各種ログ（radius/eve/Hubble/IAP/gauge）◐</text>
+        <!-- suricata -> soar-lite -->
+        <line x1="385" y1="704" x2="385" y2="716" stroke="#E60012" stroke-width="1.5" stroke-dasharray="6 5" marker-end="url(#lr)"/>
+        <!-- CoA I-4 赤ループ soar-lite -> radius -->
+        <polyline points="300,738 30,738 30,180 370,180 370,154" fill="none" stroke="#E60012" stroke-width="1.5" stroke-dasharray="6 5" marker-end="url(#lr)"/>
+        <text x="24" y="440" font-size="9" fill="#B4142B" transform="rotate(-90 24 440)" text-anchor="middle">I-4 CoA 自動隔離ループ（発展）→ radius</text>
+
+        <!-- ===== E2Eフローバッジ F-A〜F-E ===== -->
+        <circle cx="652" cy="298" r="11" fill="#D6F3E6"/><text x="652" y="302" font-size="10" font-weight="800" fill="#066b47" text-anchor="middle">A</text>
+        <circle cx="612" cy="464" r="11" fill="#EEEEF0"/><text x="612" y="468" font-size="10" font-weight="800" fill="#7A7A85" text-anchor="middle">B</text>
+        <circle cx="472" cy="662" r="11" fill="#FDE8E8"/><text x="472" y="666" font-size="10" font-weight="800" fill="#B4142B" text-anchor="middle">C</text>
+        <circle cx="180" cy="300" r="11" fill="#D6F3E6"/><text x="180" y="304" font-size="10" font-weight="800" fill="#066b47" text-anchor="middle">D</text>
+        <circle cx="792" cy="370" r="11" fill="#D6F3E6"/><text x="792" y="374" font-size="10" font-weight="800" fill="#066b47" text-anchor="middle">E</text>
+        <text x="24" y="806" font-size="10" fill="#9AA0AA">◯ = E2E フロー（下表 F-A〜F-E）。緑系＝主に✅、灰＝◐、赤＝発展（CoA）。</text>
+      </svg>
+      </div>
+      <p class="fignote">論理視点＝3プレーン（ID/ポリシー・データ・監視）とE2EフローF-A〜F-E。ノードが緑✅でも、それらを繋ぐ統合ポイント（I-1〜I-8）はほぼ◐設計のみ。詳細は下表と<a href="統合アーキテクチャマップ.html" style="color:var(--brand)">統合アーキテクチャマップ</a>を参照。</p>
+    </div>
+
+    <h2 class="sec">E2Eフロー F-A〜F-E（ステップ）</h2>
+    <p class="secd">図中のバッジに対応。✅=部品として実機検証済／◐=設計のみ・接続未実施／⬜=未実施（発展）。内容は<a href="統合アーキテクチャマップ.html" style="color:var(--brand)">統合アーキテクチャマップ</a>のF-*ステップ分解表と一致。</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>フロー</th><th>経路概要</th><th>統合ポイント</th><th>状態</th><th>対応ゲート</th></tr></thead>
+      <tbody>
+        <tr><td>F-A 社員PC入場</td><td>pc-sales1→floor-sw1→radius(UDP/1812)→VLAN10（①②③✅）→core-sw ACL◐→srv-app1（IAP/overlay経由）◐（④⑤）</td><td>I-2</td><td><span class="st st-plan">接続◐</span></td><td>IG-FA</td></tr>
+        <tr><td>F-B 未認証端末</td><td>802.1X失敗→Unauthorized拒否✅→隔離VLAN99 自動割当◐（T-N1-7）</td><td>N1 / I-4</td><td><span class="st st-plan">接続◐</span></td><td>IG-FB</td></tr>
+        <tr><td>F-C 検知→自動隔離</td><td>感染端末→SPAN✅→suricata検知✅（sid:1000001）→loki/grafana✅→soar-lite◐→CoA⬜（T-N1-8）→VLAN99◐</td><td>I-3 / I-4 / I-7</td><td><span class="st st-dev">発展</span></td><td>IG-FC</td></tr>
+        <tr><td>F-D ZTNA到達（VPNレス）</td><td>remote-pc→overlay✅→ziti-router→srv-app1✅（overlay HTTP200 / 直接000実証）→全社配置◐</td><td>I-5</td><td><span class="st st-plan">接続◐</span></td><td>IG-FD</td></tr>
+        <tr><td>F-E サーバ間μセグ+L7認可</td><td>east-west default-deny✅＋GET /admin=403✅（GET /=200）→全社適用◐</td><td>I-2 / I-5</td><td><span class="st st-plan">接続◐</span></td><td>IG-FE</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+</main>
+
+<footer class="site"><div class="wrap">
+  ゼロトラスト完全版｜構成図 — 単一HTML・外部依存ゼロ（手描きインラインSVG）。データの正は <a href="IPアドレス管理表.html" style="color:var(--brand)">IPアドレス管理表</a>／<a href="統合アーキテクチャマップ.html" style="color:var(--brand)">統合アーキテクチャマップ</a>。
+</div></footer>
+
+<script>
+(function(){
+  var tabs=[document.getElementById('tab-phys'),document.getElementById('tab-logi')];
+  var views={ 'tab-phys':document.getElementById('view-phys'), 'tab-logi':document.getElementById('view-logi') };
+  function activate(tab,focus){
+    tabs.forEach(function(t){
+      var on=(t===tab);
+      t.setAttribute('aria-selected',on?'true':'false');
+      t.tabIndex=on?0:-1;
+      views[t.id].classList.toggle('active',on);
+    });
+    if(focus) tab.focus();
+    try{history.replaceState(null,'',tab.id==='tab-logi'?'#論理':'#物理');}catch(e){}
+  }
+  tabs.forEach(function(t){
+    t.addEventListener('click',function(){activate(t,false);});
+    t.addEventListener('keydown',function(e){
+      var i=tabs.indexOf(t);
+      if(e.key==='ArrowRight'||e.key==='ArrowDown'){e.preventDefault();activate(tabs[(i+1)%tabs.length],true);}
+      if(e.key==='ArrowLeft'||e.key==='ArrowUp'){e.preventDefault();activate(tabs[(i-1+tabs.length)%tabs.length],true);}
+    });
+  });
+  if(decodeURIComponent(location.hash)==='#論理') activate(tabs[1],false);
+})();
+</script>
+</body>
+</html>

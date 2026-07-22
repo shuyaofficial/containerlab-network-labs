@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ゼロトラスト完全版｜IPアドレス管理表 | ゼロトラスト完全版</title>
+<meta name="description" content="ゼロトラスト完全版｜IPアドレス管理表 — ゼロトラスト完全版レポート">
+<style>
+:root{
+  --surface:#FFFFFF; --surface-2:#F7F7F8; --surface-3:#F0F0F2;
+  --ink:#1A1A1A; --ink-2:#6B7280; --ink-3:#9AA0AA;
+  --brand:#E60012; --brand-ink:#FFFFFF; --border:#E7E7EA; --border-2:#EDEDF0;
+  --ok:#0E9F6E; --warn:#B45309; --info:#2563EB;
+  --r-sm:6px; --r-md:10px; --r-lg:16px;
+  --shadow-1:0 1px 2px rgba(17,17,26,.05),0 1px 3px rgba(17,17,26,.05);
+  --shadow-2:0 10px 40px rgba(17,17,26,.10);
+  --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",system-ui,-apple-system,sans-serif;
+  --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  --maxw:1180px; --ease:cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto} *{animation:none!important;transition:none!important}}
+body{font-family:var(--sans);color:var(--ink);background:var(--surface);line-height:1.8;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-feature-settings:"palt" 1}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--info);outline-offset:2px;border-radius:3px}
+.skip{position:absolute;left:-999px;top:0;background:var(--ink);color:#fff;padding:8px 14px;z-index:100;border-radius:0 0 8px 0}
+.skip:focus{left:0}
+
+/* topbar */
+.topbar{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.82);backdrop-filter:saturate(180%) blur(14px);
+  border-bottom:1px solid var(--border)}
+.bar{display:flex;align-items:center;justify-content:space-between;height:60px;gap:24px}
+.brand{display:flex;align-items:center;gap:11px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
+.brand-mark{width:14px;height:14px;border-radius:4px;background:var(--brand);box-shadow:0 0 0 4px rgba(230,0,18,.10)}
+.brand-name{font-size:15px;color:var(--ink)} .brand-name b{color:var(--brand);font-weight:700}
+.stagenav{display:flex;gap:4px;overflow:auto}
+.stagenav a{font-size:13px;color:var(--ink-2);padding:7px 12px;border-radius:999px;transition:color .2s,background .2s;white-space:nowrap}
+.stagenav a:hover{color:var(--ink);background:var(--surface-3)}
+.stagenav a.active{color:var(--brand);background:rgba(230,0,18,.06);font-weight:600}
+
+/* hero strip */
+.hero-strip{background:var(--surface);border-bottom:1px solid var(--border);padding:44px 0 30px}
+.crumbs{font-size:12.5px;color:var(--ink-3);letter-spacing:.02em;margin-bottom:14px}
+.crumbs a:hover{color:var(--brand)} .crumbs span{margin:0 6px;color:var(--border)}
+.doc-title{font-size:clamp(28px,4vw,42px);line-height:1.18;letter-spacing:-.02em;font-weight:800;color:#0F0F12;max-width:24ch}
+.metarow{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;align-items:center}
+.chip{font-size:12px;padding:4px 11px;border-radius:999px;border:1px solid var(--border);color:var(--ink-2);background:var(--surface);letter-spacing:.02em}
+.chip.type{border-color:transparent;background:var(--ink);color:#fff;font-weight:600}
+.chip.date{color:var(--ink-3)}
+.chip.status{font-weight:600;border:none}
+.s-draft{background:#FEF3C7;color:#92400E} .s-review{background:#DBEAFE;color:#1E40AF} .s-done{background:#D1FAE5;color:#065F46}
+.tag{font-size:11.5px;padding:3px 9px;border-radius:6px;background:var(--surface-3);color:var(--ink-2)}
+
+/* layout */
+.layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:48px;padding-top:40px;padding-bottom:80px;align-items:start}
+.side{position:sticky;top:84px}
+.side-h{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:12px}
+.toc{display:flex;flex-direction:column;border-left:1px solid var(--border)}
+.toc a{font-size:13px;color:var(--ink-2);padding:6px 0 6px 16px;margin-left:-1px;border-left:2px solid transparent;transition:color .2s,border-color .2s}
+.toc a:hover{color:var(--ink)}
+.toc a.cur{color:var(--brand);border-left-color:var(--brand);font-weight:600}
+.toc-3{padding-left:28px;font-size:12.5px} .toc-empty{color:var(--ink-3);font-size:13px}
+
+/* document typography */
+.doc{min-width:0;font-size:15.5px;color:#26262B}
+.doc h2{font-size:25px;letter-spacing:-.01em;font-weight:750;color:#0F0F12;margin:52px 0 16px;padding-top:10px}
+.doc h2:first-child{margin-top:0}
+.doc h2::before{content:"";display:block;width:34px;height:3px;background:var(--brand);border-radius:2px;margin-bottom:16px}
+.doc h3{font-size:18.5px;font-weight:700;color:#1A1A1F;margin:34px 0 12px}
+.doc h4{font-size:15.5px;font-weight:700;color:var(--ink-2);margin:24px 0 8px}
+.doc p{margin:14px 0}
+.doc a{color:var(--brand);text-decoration:none;border-bottom:1px solid rgba(230,0,18,.28);transition:border-color .2s}
+.doc a:hover{border-bottom-color:var(--brand)}
+.doc strong{font-weight:700;color:#0F0F12}
+.doc ul,.doc ol{margin:14px 0 14px 4px;padding-left:22px}
+.doc li{margin:7px 0}
+.doc ul li::marker{color:var(--brand)}
+.doc hr{border:none;border-top:1px solid var(--border);margin:40px 0}
+.doc code{font-family:var(--mono);font-size:.88em;background:var(--surface-3);padding:2px 6px;border-radius:5px;color:#B4142B}
+
+/* table */
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r-md);margin:22px 0;box-shadow:var(--shadow-1)}
+table{border-collapse:collapse;width:100%;font-size:13.8px}
+thead th{background:var(--surface-2);text-align:left;font-weight:700;color:var(--ink);padding:12px 14px;border-bottom:1px solid var(--border);white-space:nowrap}
+tbody td{padding:11px 14px;border-bottom:1px solid var(--border-2);vertical-align:top;color:#33333A}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--surface-2)}
+tbody td code{font-size:.85em}
+
+/* code block */
+.code{position:relative;margin:22px 0;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surface-2);overflow:hidden}
+.code-lang{position:absolute;top:0;right:0;font-family:var(--mono);font-size:11px;color:var(--ink-3);background:var(--surface-3);padding:3px 10px;border-radius:0 var(--r-md) 0 var(--r-md);letter-spacing:.04em}
+.code pre{overflow-x:auto;padding:18px 16px;padding-top:22px}
+.code code{font-family:var(--mono);font-size:13px;color:#2A2A31;line-height:1.7;background:none;padding:0}
+
+/* diagram (mermaid source, tasteful panel) */
+.diagram{margin:24px 0;border:1px dashed var(--border);border-radius:var(--r-md);background:var(--surface-2);padding:8px 8px 14px}
+.diagram figcaption{font-size:11.5px;font-weight:700;letter-spacing:.1em;color:var(--ink-3);text-transform:uppercase;padding:8px 8px 6px}
+.diagram .mmd{font-family:var(--mono);font-size:12px;color:var(--ink-2);line-height:1.6;overflow-x:auto;padding:6px 8px;white-space:pre}
+
+/* blockquote / callout */
+blockquote{margin:22px 0;padding:14px 18px;background:var(--surface-2);border-left:3px solid var(--brand);border-radius:0 var(--r-sm) var(--r-sm) 0;color:var(--ink-2);font-size:14.5px}
+blockquote strong{color:var(--ink)}
+
+/* status inline badges */
+.st{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;font-size:11px;font-weight:800;line-height:1;vertical-align:middle}
+.st-ok{background:var(--ok);color:#fff} .st-plan{background:#E5E7EB;color:#6B7280}
+
+/* footer */
+.doc-foot{margin-top:64px;padding-top:24px;border-top:1px solid var(--border);font-size:13px;color:var(--ink-3)}
+.doc-foot .muted{margin-top:6px;font-size:12.5px}
+
+@media (max-width:900px){
+  .layout{grid-template-columns:1fr;gap:0}
+  .side{display:none}
+  .hero-strip{padding:32px 0 22px}
+  .doc h2{font-size:22px;margin-top:40px}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">本文へスキップ</a>
+<header class="topbar">
+  <div class="wrap bar">
+    <a class="brand" href="../index.html"><span class="brand-mark"></span><span class="brand-name">Zero&nbsp;Trust <b>完全版</b></span></a>
+    <nav class="stagenav" aria-label="ステージ"><a href="../README_Lab_Challenge.html">概要</a><a href="../00_ログイン/ログインコマンド.html">00</a><a href="../01_要件定義/要件定義書.html">01</a><a href="../02_基本設計/統合アーキテクチャマップ.html">02</a><a href="../03_詳細設計/コンポーネント詳細設計.html">03</a><a href="../04_構築/実装計画.html">04</a><a href="../05_試験/統合検証結果.html">05</a></nav>
+  </div>
+</header>
+<div class="hero-strip"><div class="wrap">
+  <div class="crumbs"><a href="../index.html">ホーム</a> <span>›</span> <span>02 基本設計</span></div>
+  <h1 class="doc-title">ゼロトラスト完全版｜IPアドレス管理表</h1>
+  <div class="metarow">
+    <span class="chip type">IP管理</span>
+    <span class="chip status s-draft">下書き</span>
+    <span class="chip date">更新 2026-07-08</span>
+    <span class="tag">zero-trust</span><span class="tag">ip-table</span><span class="tag">virtual-company</span><span class="tag">vlan</span><span class="tag">subnet</span>
+  </div>
+</div></div>
+<div class="wrap layout">
+  <aside class="side" aria-label="目次">
+    <div class="side-inner">
+      <p class="side-h">目次</p>
+      <nav class="toc"><a class="toc-2" href="#再マッピング方式の判断理由">再マッピング方式の判断理由</a><a class="toc-2" href="#セグメント表設計値">セグメント表（設計値）</a><a class="toc-2" href="#第4オクテット採番規則">第4オクテット採番規則</a><a class="toc-2" href="#ノード一覧表">ノード一覧表</a><a class="toc-2" href="#出自ラボ実ip対応表">出自ラボ実IP対応表</a><a class="toc-2" href="#参照">参照</a></nav>
+    </div>
+  </aside>
+  <main id="main" class="doc">
+    <blockquote><strong>Phase番号（P0-P6）・N番号（N1-N4）・トラック区分は、各部品の出自ラボにおける管理単位として存続する。本書はそれらの到達点を1つの仮想企業LANへ再配置した設計であり、出自ラボ側のドキュメントそのものは変更しない。</strong></blockquote>
+<p>仮想企業（1拠点・従業員約100名）の社内LANを <code>172.31.0.0/16</code> に統一し、<strong>第3オクテット＝VLAN ID</strong>とする再マッピング方式でアドレス設計する。実機検証済のIP（31_nac_dot1x の SVI／FreeRADIUS 等）は無変更で採用し、他は全社設計値として新規に採番する。<strong>本表が全社設計値の正</strong>であり、出自ラボ側の管理表は検証時実値の正である（<a href="../../ZERO_zero_trust/02_基本設計/IPアドレス管理表.md">ZERO_zero_trust IPアドレス管理表</a> 等、出自ラボ側は一切変更しない）。</p>
+<h2 id="再マッピング方式の判断理由">再マッピング方式の判断理由</h2>
+<ul><li>出自ラボは <code>172.30系</code>（ZERO_zero_trust）・<code>172.31系</code>（31_nac_dot1x/NW-ZT設計）・<code>172.40系</code>（42_ndr_flow）・<code>172.50系</code>（microseg_nftables）・<code>10.0.x系</code>（35_faucet_sdn）とアドレス空間がバラバラで、そのままでは1つの社内LANとして描けない。</li><li>802.1X動的VLAN（31実証）を全社設計の骨格に採用し、<strong>VLAN ID＝第3オクテット</strong>で統一することで、どのVLANのどのノードかをIPから即座に判別できるようにした（第4オクテット採番規則を参照）。</li><li>実機検証済のIP（core-sw SVI・FreeRADIUS）は変更コストとエビデンスの一貫性を優先し無変更のまま採用し、他の部品は出自ラボの元アドレスを保持せず全社設計値へ再採番する（部品ごとに元アドレス体系が競合するため）。</li></ul>
+<h2 id="セグメント表設計値">セグメント表（設計値）</h2>
+<div class="table-wrap"><table><thead><tr><th>セグメント</th><th>VLAN</th><th>サブネット</th><th>状態・出自</th></tr></thead><tbody><tr><td>コア・認証管理</td><td>VLAN100</td><td>172.31.0.0/24</td><td><span class="st st-ok" aria-label="合格">✓</span> 31の実IP無変更（core-sw SVI .1／FreeRADIUS .10）</td></tr><tr><td>営業</td><td>VLAN10</td><td>172.31.10.0/24</td><td><span class="st st-ok" aria-label="合格">✓</span> N1が動的割当を実機実証したVLAN10そのもの</td></tr><tr><td>開発</td><td>VLAN20</td><td>172.31.20.0/24</td><td><span class="st st-plan" aria-label="設計のみ">◐</span> 新設</td></tr><tr><td>ゲスト</td><td>VLAN30</td><td>172.31.30.0/24</td><td><span class="st st-plan" aria-label="設計のみ">◐</span> 新設</td></tr><tr><td>サーバ室</td><td>VLAN50</td><td>172.31.50.0/24</td><td><span class="st st-plan" aria-label="設計のみ">◐</span> 配置（部品<span class="st st-ok" aria-label="合格">✓</span>: 36/microseg_cilium）</td></tr><tr><td>DMZ認可層</td><td>VLAN60</td><td>172.31.60.0/24</td><td><span class="st st-plan" aria-label="設計のみ">◐</span>（ziti部品のみ<span class="st st-ok" aria-label="合格">✓</span>）</td></tr><tr><td>監視管理SOC</td><td>VLAN90</td><td>172.31.90.0/24</td><td><span class="st st-plan" aria-label="設計のみ">◐</span> 配置（部品<span class="st st-ok" aria-label="合格">✓</span>: 42/35）</td></tr><tr><td>隔離</td><td>VLAN99</td><td>172.31.99.0/24</td><td><span class="st st-plan" aria-label="設計のみ">◐</span>（T-N1-7残課題）</td></tr><tr><td>外部（インターネット模擬）</td><td>—</td><td>172.30.0.0/24</td><td><span class="st st-ok" aria-label="合格">✓</span> 出自ZERO Untrust</td></tr><tr><td>ZTNA overlay</td><td>—</td><td>アドレスレス論理網</td><td><span class="st st-ok" aria-label="合格">✓</span> 部品（36）</td></tr></tbody></table></div>
+<h2 id="第4オクテット採番規則">第4オクテット採番規則</h2>
+<p><code>.1</code>=GW/SVI、<code>.10</code>台=認証・ID系、<code>.20</code>台=NW/中継系、<code>.30</code>台=検査系、<code>.40</code>台=SIEM・証明書系、<code>.50</code>台=SOAR/自動化系、<code>.101〜</code>=端末。この規則は管理系セグメント（VLAN60/90等）の目安であり、業務VLAN（10/20/30/99）の端末は <code>.101</code> 〜から採番する。</p>
+<h2 id="ノード一覧表">ノード一覧表</h2>
+<div class="table-wrap"><table><thead><tr><th>ノード名</th><th>役割</th><th>設計IP</th><th>セグメント</th><th>状態</th><th>実装出自</th></tr></thead><tbody><tr><td>core-sw SVI（VLAN100）</td><td>コア認証管理セグメントのL3ゲートウェイ</td><td>172.31.0.1</td><td>VLAN100 コア・認証管理</td><td><span class="st st-ok" aria-label="合格">✓</span></td><td>31_nac_dot1x（interface Vlan100実証）／microseg_nftables（SVI+ACLパターン）</td></tr><tr><td>radius</td><td>FreeRADIUS認証サーバ</td><td>172.31.0.10</td><td>VLAN100 コア・認証管理</td><td><span class="st st-ok" aria-label="合格">✓</span></td><td>31_nac_dot1x</td></tr><tr><td>floor-sw1</td><td>アクセス層L2スイッチ（802.1X認証・動的VLAN割当、営業VLAN10/ゲストVLAN30収容）</td><td>―（L2、設計IP対象外）</td><td>VLAN10/30/99 直下</td><td><span class="st st-ok" aria-label="合格">✓</span></td><td>31_nac_dot1x（Cisco IOL L2、pc1のVLAN10動的割当を実証）</td></tr><tr><td>floor-sw2</td><td>アクセス層L2スイッチ（802.1X認証者、開発VLAN20収容）</td><td>―（L2、設計IP対象外）</td><td>VLAN20/99 直下</td><td><span class="st st-plan" aria-label="設計のみ">◐</span></td><td>新設（31_nac_dot1xのfloor-sw1と同パターン）</td></tr><tr><td>GW（VLAN10）</td><td>営業セグメントL3ゲートウェイ</td><td>172.31.10.1</td><td>VLAN10 営業</td><td><span class="st st-plan" aria-label="設計のみ">◐</span></td><td>新設（L2動的割当はfloor-sw1で<span class="st st-ok" aria-label="合格">✓</span>実証、L3ゲートウェイ自体は未実施）</td></tr><tr><td>pc-sales1</td><td>営業端末（802.1X認証成功端末）</td><td>172.31.10.101</td><td>VLAN10 営業</td><td><span class="st st-ok" aria-label="合格">✓</span>（部品）</td><td>31_nac_dot1x（pc1/alice）</td></tr><tr><td>GW（VLAN20）</td><td>開発セグメントL3ゲートウェイ</td><td>172.31.20.1</td><td>VLAN20 開発</td><td><span class="st st-plan" aria-label="設計のみ">◐</span></td><td>新設</td></tr><tr><td>pc-dev1</td><td>開発端末</td><td>172.31.20.101</td><td>VLAN20 開発</td><td><span class="st st-plan" aria-label="設計のみ">◐</span></td><td>新設</td></tr><tr><td>GW（VLAN30）</td><td>ゲストセグメントL3ゲートウェイ</td><td>172.31.30.1</td><td>VLAN30 ゲスト</td><td><span class="st st-plan" aria-label="設計のみ">◐</span></td><td>新設</td></tr><tr><td>guest-pc1</td><td>ゲスト端末</td><td>172.31.30.101</td><td>VLAN30 ゲスト</td><td><span class="st st-plan" aria-label="設計のみ">◐</span></td><td>新設</td></tr><tr><td>GW（VLAN99）</td><td>隔離セグメントL3ゲートウェイ（remediation用途のみ）</td><td>172.31.99.1</td><td>VLAN99 隔離</td><td><span class="st st-plan" aria-label="設計のみ">◐</span></td><td>新設（T-N1-7残課題）</td></tr><tr><td>GW（VLAN50）</td><td>サーバ室セグメントL3ゲートウェイ</td><td>172.31.50.1</td><td>VLAN50 サーバ室</td><td><span class="st st-plan" aria-label="設計のみ">◐</span></td><td>新設</td></tr><tr><td>srv-app1</td><td>保護対象サービス（overlay/IAP経由のみ到達）</td><td>172.31.50.11</td><td>VLAN50 サーバ室</td><td><span class="st st-ok" aria-label="合格">✓</span>（部品）</td><td>36_ztna_openziti（dark service）／ZERO_zero_trust（app）</td></tr><tr><td>k8s-cilium</td><td>μセグ対象ワークロード群</td><td>172.31.50.21〜.29</td><td>VLAN50 サーバ室</td><td><span class="st st-ok" aria-label="合格">✓</span>（部品）</td><td>microseg_cilium</td></tr><tr><td>GW（VLAN60）</td><td>DMZ認可層L3ゲートウェイ</td><td>172.31.60.1</td><td>VLAN60 DMZ認可層</td><td><span class="st st-plan" aria-label="設計のみ">◐</span></td><td>新設</td></tr><tr><td>keycloak</td><td>ID統制（OIDC IdP）</td><td>172.31.60.11</td><td>VLAN60 DMZ認可層</td><td><span class="st st-plan" aria-label="設計のみ">◐</span></td><td>新設（ZERO Phase1着想）</td></tr><tr><td>pomerium</td><td>IAP（認可ポリシー）</td><td>172.31.60.21</td><td>VLAN60 DMZ認可層</td><td><span class="st st-plan" aria-label="設計のみ">◐</span></td><td>新設（ZERO Phase2着想）</td></tr><tr><td>oauth2-proxy</td><td>IAP起点（未認証拒否）</td><td>172.31.60.22</td><td>VLAN60 DMZ認可層</td><td><span class="st st-plan" aria-label="設計のみ">◐</span></td><td>新設（ZERO Phase2着想）</td></tr><tr><td>ziti-ctrl</td><td>SDP-ZTNAコントローラ</td><td>172.31.60.23</td><td>VLAN60 DMZ認可層</td><td><span class="st st-ok" aria-label="合格">✓</span>（部品）</td><td>36_ztna_openziti</td></tr><tr><td>ziti-router</td><td>SDP-ZTNAルータ/ブローカー</td><td>172.31.60.24</td><td>VLAN60 DMZ認可層</td><td><span class="st st-ok" aria-label="合格">✓</span>（部品）</td><td>36_ztna_openziti</td></tr><tr><td>mitmproxy</td><td>SWG+DLP兼務</td><td>172.31.60.31</td><td>VLAN60 DMZ認可層</td><td><span class="st st-plan" aria-label="設計のみ">◐</span></td><td>新設（ZERO Phase4/5着想）</td></tr><tr><td>step-ca</td><td>デバイス統制（mTLS/posture）</td><td>172.31.60.41</td><td>VLAN60 DMZ認可層</td><td><span class="st st-plan" aria-label="設計のみ">◐</span></td><td>新設（ZERO Phase6着想）</td></tr><tr><td>GW（VLAN90）</td><td>監視管理SOC L3ゲートウェイ</td><td>172.31.90.1</td><td>VLAN90 監視管理SOC</td><td><span class="st st-plan" aria-label="設計のみ">◐</span></td><td>新設</td></tr><tr><td>faucet</td><td>SDN宣言型アクセス層コントローラ</td><td>172.31.90.21</td><td>VLAN90 監視管理SOC</td><td><span class="st st-ok" aria-label="合格">✓</span>（部品）</td><td>35_faucet_sdn</td></tr><tr><td>suricata</td><td>NDRセンサー</td><td>172.31.90.31</td><td>VLAN90 監視管理SOC</td><td><span class="st st-ok" aria-label="合格">✓</span>（部品）</td><td>42_ndr_flow</td></tr><tr><td>loki</td><td>ログ保存</td><td>172.31.90.41</td><td>VLAN90 監視管理SOC</td><td><span class="st st-ok" aria-label="合格">✓</span>（部品）／<span class="st st-plan" aria-label="設計のみ">◐</span>（全社統合）</td><td>42_ndr_flow</td></tr><tr><td>promtail</td><td>ログ収集</td><td>172.31.90.42</td><td>VLAN90 監視管理SOC</td><td><span class="st st-ok" aria-label="合格">✓</span>（部品）／<span class="st st-plan" aria-label="設計のみ">◐</span>（全社統合）</td><td>42_ndr_flow</td></tr><tr><td>grafana</td><td>可視化</td><td>172.31.90.43</td><td>VLAN90 監視管理SOC</td><td><span class="st st-ok" aria-label="合格">✓</span>（部品）／<span class="st st-plan" aria-label="設計のみ">◐</span>（全社統合）</td><td>42_ndr_flow</td></tr><tr><td>soar-lite</td><td>検知→対応の自動化（CoA webhook起点）</td><td>172.31.90.51</td><td>VLAN90 監視管理SOC</td><td><span class="st st-plan" aria-label="設計のみ">◐</span></td><td>新設（発展課題）</td></tr><tr><td>remote-pc</td><td>リモート社員端末（ziti tunneler内蔵）</td><td>172.30.0.11</td><td>外部（インターネット模擬）</td><td><span class="st st-ok" aria-label="合格">✓</span>（部品）</td><td>ZERO_zero_trust（client）／36_ztna_openziti（clienttun）</td></tr><tr><td>attacker</td><td>攻撃者/脅威モデル（参考。全社構成には配置しない）</td><td>172.30.0.12</td><td>外部（インターネット模擬）</td><td>参考</td><td>42_ndr_flow（attacker）／ZERO_zero_trust（external）</td></tr></tbody></table></div>
+<p>同じセグメント内でもノード粒度で状態が異なる場合がある（例: VLAN10はfloor-sw1のL2動的割当が<span class="st st-ok" aria-label="合格">✓</span>実証済である一方、GWのL3ゲートウェイは<span class="st st-plan" aria-label="設計のみ">◐</span>新設）。ノード（部品）の状態と接続（統合ポイント、<a href="統合アーキテクチャマップ.html">統合アーキテクチャマップ</a>参照）の状態は別々に扱う。</p>
+<h2 id="出自ラボ実ip対応表">出自ラボ実IP対応表</h2>
+<div class="table-wrap"><table><thead><tr><th>出自ラボ</th><th>ラボ実値</th><th>全社設計での対応</th></tr></thead><tbody><tr><td>31_nac_dot1x</td><td>SVI 172.31.0.1・FreeRADIUS 172.31.0.10</td><td><strong>無変更採用</strong>。pc1 → pc-sales1</td></tr><tr><td>ZERO_zero_trust</td><td>client 172.30.0.11／external 172.30.0.12／app 172.30.20.21</td><td>client → remote-pc、external → attacker（参考）、app → srv-app1 172.31.50.11</td></tr><tr><td>42_ndr_flow</td><td>attacker 172.40.0.21／victim 172.40.0.22</td><td>F-Cの感染端末役／被害サーバ役（ラボ実値としてのみ記載。全社設計IPは持たない）</td></tr><tr><td>microseg_nftables</td><td>pc10a 172.50.10.11・pc10b 172.50.10.12・srv20 172.50.20.11</td><td>pc-sales/srv-app相当（ラボ実値としてのみ記載。全社設計IPは持たない）</td></tr><tr><td>35_faucet_sdn</td><td>10.0.100.x／10.0.200.x</td><td>アクセス層統計の出自（ラボ実値としてのみ記載）</td></tr></tbody></table></div>
+<p>mgmt網（172.20.20.0/24等、各ラボの containerlab/OrbStack VM 管理ネットワーク）は<strong>ラボ実行基盤であり全社計画の対象外</strong>。</p>
+<blockquote><strong>注記</strong>: ZERO側の旧NW-ZT論理設計（<a href="../../ZERO_zero_trust/02_基本設計/NW-ZT_論理構成設計.md">NW-ZT_論理構成設計</a>）は「監視＝172.31.30.0/24」としていたが、全社統合ではVLAN90（172.31.90.0/24）へ再配置する。172.31.30.0/24は本表でゲスト（VLAN30）に割り当てる。<strong>本表が全社設計値の正、出自ラボ側管理表は検証時実値の正</strong>（<a href="../../ZERO_zero_trust/02_基本設計/NW-ZT_論理構成設計.md">NW-ZT_論理構成設計</a> は変更しない）。</blockquote>
+<h2 id="参照">参照</h2>
+<ul><li><a href="基本設計書.html">基本設計書</a></li><li><a href="統合アーキテクチャマップ.html">統合アーキテクチャマップ</a></li><li><a href="../../ZERO_zero_trust/02_基本設計/IPアドレス管理表.md">ZERO_zero_trust IPアドレス管理表</a></li><li><a href="../../ZERO_zero_trust/02_基本設計/NW-ZT_論理構成設計.md">NW-ZT_論理構成設計</a></li><li><a href="../../31_nac_dot1x/05_試験/試験結果_2026-07-05.md">31_nac_dot1x 試験結果</a></li><li><a href="../../42_ndr_flow/05_試験/試験結果_2026-07-05.md">42_ndr_flow 試験結果</a></li><li><a href="../../microseg_nftables/05_試験/試験結果_2026-07-05.md">microseg_nftables 試験結果</a></li><li><a href="../../35_faucet_sdn/05_試験/試験結果_2026-07-07.md">35_faucet_sdn 試験結果</a></li></ul>
+    <footer class="doc-foot">
+      <p>ゼロトラスト完全版レポート — Markdownをソースに <code>_assets/build_reports.mjs</code> で自動生成（外部依存ゼロ）。</p>
+      <p class="muted">実検証済(P0 / N1-N4) と 設計のみ(L7 P1-P6) を峻別して記載しています。</p>
+    </footer>
+  </main>
+</div>
+<script>
+// スクロールで目次の現在地をハイライト（transform/opacityのみ・軽量）
+(function(){
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var map={}; links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a;});
+  var heads=[].slice.call(document.querySelectorAll('main h2, main h3'));
+  if(!('IntersectionObserver' in window)||!heads.length) return;
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ links.forEach(function(l){l.classList.remove('cur');}); var a=map[e.target.id]; if(a)a.classList.add('cur'); }});
+  },{rootMargin:'-10% 0px -80% 0px'});
+  heads.forEach(function(h){io.observe(h);});
+})();
+</script>
+</body>
+</html>
