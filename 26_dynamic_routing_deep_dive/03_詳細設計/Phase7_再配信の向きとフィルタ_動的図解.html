@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Phase 7｜なぜ「戻り道」だけ route-map で絞るのか（動的図解）</title>
+<style>
+  :root{
+    --bg:#070a12; --bg2:#0a0f1e; --panel:#0d1424; --panel2:#111a2e;
+    --line:#1c2740; --line2:#2a3956;
+    --text:#e9eef9; --muted:#98a5c4; --faint:#63708f;
+    --ospf:#39e0a0; --ospf-d:#0d3b2c;
+    --eigrp:#ffb84d; --eigrp-d:#3a2a0e;
+    --bgp:#b98cff; --bgp-d:#2a1d47;
+    --deny:#ff5d78; --deny-d:#3a1420;
+    --cyan:#37d6ff; --pass:#39e0a0;
+    --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+    --sans:"Hiragino Sans","Noto Sans JP","Yu Gothic",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
+  body{
+    margin:0;min-width:320px;color:var(--text);font-family:var(--sans);
+    font-size:15px;line-height:1.75;letter-spacing:.01em;
+    background:var(--bg);
+    background-image:
+      radial-gradient(900px 520px at 12% -6%, rgba(57,224,160,.10), transparent 60%),
+      radial-gradient(820px 520px at 92% 4%, rgba(185,140,255,.12), transparent 62%),
+      radial-gradient(700px 600px at 78% 96%, rgba(55,214,255,.08), transparent 60%),
+      linear-gradient(180deg,#070a12,#080c17 40%,#070a12);
+    background-attachment:fixed;
+  }
+  /* faint grid overlay */
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;
+    background-image:linear-gradient(rgba(120,150,220,.045) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(120,150,220,.045) 1px,transparent 1px);
+    background-size:44px 44px;
+    mask-image:radial-gradient(1200px 800px at 50% 20%,#000 30%,transparent 85%);
+  }
+  code,.mono{font-family:var(--mono)}
+  a{color:var(--cyan);text-underline-offset:3px}
+  ::selection{background:rgba(57,214,255,.28)}
+  :focus-visible{outline:2px solid var(--cyan);outline-offset:3px;border-radius:6px}
+
+  .shell{position:relative;z-index:1;width:min(1080px,100%);margin:0 auto;padding:clamp(28px,5vw,64px) clamp(16px,4vw,40px) 96px}
+
+  /* ---------- reveal ---------- */
+  .rise{opacity:0;transform:translateY(26px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  .rise.in{opacity:1;transform:none}
+
+  /* ---------- hero ---------- */
+  .eyebrow{display:inline-flex;align-items:center;gap:9px;margin:0 0 18px;padding:7px 14px;border:1px solid var(--line);border-radius:999px;background:rgba(15,22,40,.6);color:var(--muted);font-size:.72rem;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+  .eyebrow .live{width:8px;height:8px;border-radius:50%;background:var(--ospf);box-shadow:0 0 0 0 rgba(57,224,160,.55);animation:pulse 2.4s ease-out infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(57,224,160,.5)}70%{box-shadow:0 0 0 12px rgba(57,224,160,0)}100%{box-shadow:0 0 0 0 rgba(57,224,160,0)}}
+  h1{margin:0;font-size:clamp(2rem,5.4vw,3.7rem);line-height:1.08;letter-spacing:-.035em;font-weight:900}
+  h1 .g{background:linear-gradient(100deg,var(--ospf),var(--cyan) 42%,var(--bgp));-webkit-background-clip:text;background-clip:text;color:transparent}
+  h1 .amber{color:var(--eigrp)}
+  .lead{max-width:680px;margin:22px 0 0;color:var(--muted);font-size:1.06rem}
+  .lead b{color:var(--text);font-weight:700}
+
+  /* ---------- lab (interactive) ---------- */
+  .lab{margin-top:clamp(30px,5vw,52px);border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(180deg,rgba(13,20,36,.9),rgba(10,15,30,.86));box-shadow:0 30px 80px -40px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.03);overflow:hidden}
+  .lab-head{display:flex;flex-wrap:wrap;gap:14px 22px;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid var(--line)}
+  .lab-head h2{margin:0;font-size:1.05rem;font-weight:800;letter-spacing:-.01em}
+  .lab-head p{margin:3px 0 0;color:var(--faint);font-size:.8rem}
+  .switch{display:inline-flex;align-items:center;gap:12px}
+  .switch .txt{font-size:.78rem;font-weight:800;color:var(--muted)}
+  .toggle{position:relative;width:118px;height:38px;border:1px solid var(--line2);border-radius:999px;background:#0a1120;cursor:pointer;padding:0;transition:border-color .25s,box-shadow .25s}
+  .toggle .knob{position:absolute;top:3px;left:3px;width:56px;height:30px;border-radius:999px;background:linear-gradient(180deg,var(--ospf),#1ea877);box-shadow:0 4px 14px rgba(57,224,160,.4);transition:transform .3s cubic-bezier(.3,.8,.3,1),background .3s}
+  .toggle .lab-on,.toggle .lab-off{position:absolute;top:0;height:38px;display:flex;align-items:center;font-size:.68rem;font-weight:900;letter-spacing:.04em}
+  .toggle .lab-on{left:12px;color:#04140d}
+  .toggle .lab-off{right:12px;color:var(--faint)}
+  .toggle[aria-pressed="false"]{border-color:var(--deny);box-shadow:0 0 0 1px rgba(255,93,120,.25)}
+  .toggle[aria-pressed="false"] .knob{transform:translateX(56px);background:linear-gradient(180deg,var(--deny),#b7314a);box-shadow:0 4px 14px rgba(255,93,120,.45)}
+  .toggle[aria-pressed="false"] .lab-off{color:#fff}
+  .toggle[aria-pressed="false"] .lab-on{color:var(--faint)}
+
+  .stage-wrap{position:relative}
+  .stage{display:block;width:100%;height:auto}
+  .loop-warn{position:absolute;top:14px;left:50%;transform:translate(-50%,-10px);translate:-50% 0;display:flex;align-items:center;gap:9px;padding:8px 16px;border:1px solid var(--deny);border-radius:999px;background:rgba(58,20,32,.9);color:#ffd3db;font-size:.82rem;font-weight:800;opacity:0;transition:opacity .3s;pointer-events:none;box-shadow:0 0 30px rgba(255,93,120,.35)}
+  .loop-warn.show{opacity:1}
+  .loop-warn .bolt{animation:flick .5s steps(2) infinite}
+  @keyframes flick{50%{opacity:.35}}
+
+  .readout{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border-top:1px solid var(--line)}
+  .stat{background:var(--panel);padding:14px 16px}
+  .stat .k{font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:800}
+  .stat .v{font-family:var(--mono);font-size:1.5rem;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+  .stat.pass .v{color:var(--pass)} .stat.deny .v{color:var(--deny)} .stat.loop .v{color:var(--eigrp)}
+
+  .caption-bar{padding:16px 22px;border-top:1px solid var(--line);background:rgba(8,12,22,.6);min-height:64px;display:flex;align-items:center}
+  .caption-bar p{margin:0;font-size:.9rem;color:var(--muted)}
+  .caption-bar b{color:var(--text);font-weight:700}
+  .caption-bar .tag{display:inline-block;padding:1px 8px;border-radius:6px;font-family:var(--mono);font-size:.8em;font-weight:700;margin:0 2px}
+  .tag.ext{background:var(--bgp-d);color:var(--bgp)} .tag.int{background:var(--ospf-d);color:var(--ospf)} .tag.dmz{background:rgba(55,214,255,.12);color:var(--cyan)}
+
+  .controls{display:flex;flex-wrap:wrap;gap:10px;padding:14px 22px 18px;border-top:1px solid var(--line)}
+  .btn{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 16px;border:1px solid var(--line2);border-radius:11px;background:#0c1424;color:var(--muted);font-weight:800;font-size:.8rem;cursor:pointer;transition:transform .12s,color .2s,border-color .2s,background .2s}
+  .btn:hover{color:var(--text);border-color:#3a4a6e;background:#101a2e}
+  .btn:active{transform:scale(.97)}
+  .btn .dot{width:9px;height:9px;border-radius:50%}
+  .btn.play .dot{background:var(--ospf)}
+  .legendrow{display:flex;flex-wrap:wrap;gap:8px 18px;margin-left:auto;align-items:center;color:var(--faint);font-size:.74rem}
+  .legendrow span{display:inline-flex;align-items:center;gap:7px}
+  .legendrow i{width:14px;height:14px;border-radius:4px}
+
+  /* ---------- explain ---------- */
+  section{margin-top:clamp(48px,7vw,84px)}
+  .kick{color:var(--cyan);font-size:.72rem;font-weight:900;letter-spacing:.18em;text-transform:uppercase;margin:0 0 12px;display:flex;align-items:center;gap:10px}
+  .kick::before{content:"";width:26px;height:2px;background:var(--cyan);border-radius:2px}
+  h2.sec{margin:0 0 10px;font-size:clamp(1.5rem,3.4vw,2.2rem);line-height:1.2;letter-spacing:-.025em;font-weight:900}
+  .sec-lead{max-width:720px;margin:0 0 30px;color:var(--muted);font-size:1rem}
+
+  .reasons{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .rcard{position:relative;padding:24px 22px;border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(180deg,rgba(14,21,38,.7),rgba(10,15,28,.6));overflow:hidden;transition:transform .3s,border-color .3s}
+  .rcard:hover{transform:translateY(-4px);border-color:#33456a}
+  .rcard .num{font-family:var(--mono);font-size:.8rem;font-weight:800;color:var(--faint)}
+  .rcard::after{content:"";position:absolute;left:0;top:0;height:3px;width:100%;opacity:.85}
+  .rcard.a::after{background:linear-gradient(90deg,var(--ospf),transparent)}
+  .rcard.b::after{background:linear-gradient(90deg,var(--eigrp),transparent)}
+  .rcard.c::after{background:linear-gradient(90deg,var(--deny),transparent)}
+  .rcard h3{margin:12px 0 8px;font-size:1.12rem;font-weight:800;letter-spacing:-.01em}
+  .rcard p{margin:0;color:var(--muted);font-size:.88rem}
+  .rcard p+p{margin-top:9px}
+  .rcard b{color:var(--text)} .rcard code{color:var(--cyan);font-size:.9em}
+  .rcard .pill{display:inline-block;margin-top:14px;padding:4px 11px;border-radius:999px;font-size:.72rem;font-weight:800}
+  .rcard.a .pill{background:var(--ospf-d);color:var(--ospf)}
+  .rcard.b .pill{background:var(--eigrp-d);color:var(--eigrp)}
+  .rcard.c .pill{background:var(--deny-d);color:var(--deny)}
+
+  /* directional compare */
+  .dir{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px}
+  .dir .col{padding:22px;border:1px solid var(--line);border-radius:var(--radius);background:rgba(12,18,33,.66)}
+  .dir .col.fwd{border-left:3px solid var(--ospf)}
+  .dir .col.ret{border-left:3px solid var(--deny)}
+  .dir .head{display:flex;align-items:center;gap:10px;font-weight:900;font-size:1.02rem;letter-spacing:-.01em}
+  .dir .head .arw{font-family:var(--mono);color:var(--faint)}
+  .dir .role{margin:4px 0 16px;font-size:.8rem;color:var(--faint)}
+  .kv{display:grid;grid-template-columns:96px 1fr;gap:8px 12px;font-size:.86rem}
+  .kv dt{color:var(--faint);font-weight:700}
+  .kv dd{margin:0;color:var(--muted)}
+  .kv dd b{color:var(--text)}
+  .kv .yes{color:var(--pass);font-weight:800} .kv .no{color:var(--deny);font-weight:800}
+  code.line{display:block;margin-top:16px;padding:11px 13px;border-radius:10px;background:#060a13;border:1px solid var(--line);color:#cdd8ee;font-size:.78rem;overflow-x:auto;white-space:pre}
+  code.line .cmt{color:var(--faint)} code.line .kw{color:var(--cyan)} code.line .warnk{color:var(--eigrp)}
+
+  .note{margin-top:22px;display:flex;gap:14px;padding:18px 20px;border:1px solid var(--line);border-left:3px solid var(--cyan);border-radius:12px;background:rgba(12,20,34,.6)}
+  .note .i{flex:none;width:26px;height:26px;border-radius:8px;background:rgba(55,214,255,.14);color:var(--cyan);display:flex;align-items:center;justify-content:center;font-weight:900}
+  .note p{margin:0;font-size:.88rem;color:var(--muted)} .note b{color:var(--text)} .note code{color:var(--cyan)}
+
+  /* summary */
+  .sum{width:100%;border-collapse:separate;border-spacing:0;font-size:.85rem;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .sum th,.sum td{padding:14px 16px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+  .sum thead th{background:rgba(16,24,44,.8);color:var(--muted);font-size:.74rem;letter-spacing:.05em;font-weight:800}
+  .sum tbody tr:last-child td{border-bottom:0}
+  .sum td:first-child,.sum th:first-child{font-weight:800}
+  .sum .fwd td:first-child{border-left:3px solid var(--ospf)}
+  .sum .ret td:first-child{border-left:3px solid var(--deny)}
+  .sum .yes{color:var(--pass);font-weight:800}.sum .no{color:var(--deny);font-weight:800}
+  .sum-wrap{overflow-x:auto}
+
+  footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--line);color:var(--faint);font-size:.78rem}
+  footer a{color:var(--cyan)}
+  .backlinks{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:10px}
+
+  @media (max-width:860px){
+    .reasons{grid-template-columns:1fr}
+    .dir{grid-template-columns:1fr}
+  }
+  @media (max-width:560px){
+    .readout{grid-template-columns:1fr 1fr}
+    .legendrow{width:100%;margin-left:0}
+  }
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    .rise{opacity:1;transform:none;transition:none}
+    .eyebrow .live{animation:none}
+  }
+</style>
+</head>
+<body>
+<main class="shell">
+
+  <!-- HERO -->
+  <header>
+    <p class="eyebrow rise"><span class="live"></span>Theme 26 · Phase 7 · Interactive</p>
+    <h1 class="rise">なぜ<span class="amber">戻り道</span>だけ<br><span class="g">route-map で絞る</span>のか。</h1>
+    <p class="lead rise">相互再配信は <b>OSPF → EIGRP → OSPF</b> という一周の輪。輪はどこか1か所を切れば止まります。下のラボで <b>route-map のスイッチを切って</b>みてください。止めていた <span class="tag ext">default 0.0.0.0/0</span> が輪をぐるぐる回り始めます。</p>
+  </header>
+
+  <!-- INTERACTIVE LAB -->
+  <div class="lab rise">
+    <div class="lab-head">
+      <div>
+        <h2>再配信ループ・ライブ</h2>
+        <p>OSPF と EIGRP の間を、経路情報（道案内）が流れています</p>
+      </div>
+      <div class="switch">
+        <span class="txt">route-map（戻り道の関所）</span>
+        <button class="toggle" id="filterToggle" role="switch" aria-pressed="true" aria-label="route-mapフィルタの有効・無効">
+          <span class="lab-on">ON</span><span class="lab-off">OFF</span><span class="knob"></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="stage-wrap">
+      <div class="loop-warn" id="loopWarn"><span class="bolt">⚡</span>ループ検出：default 0/0 が OSPF ⇄ EIGRP を周回中</div>
+      <svg class="stage" id="stage" viewBox="0 0 900 440" role="img" aria-labelledby="stTitle stDesc">
+        <title id="stTitle">再配信ループの動的図</title>
+        <desc id="stDesc">OSPFとEIGRPの2ノードを結ぶ上下2本の経路。上はフィルタ無しでEIGRPへ、下はroute-mapの関所を通ってOSPFへ戻る。経路トークンがアニメーションで流れる。</desc>
+        <defs>
+          <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <marker id="mArrow" markerWidth="10" markerHeight="10" refX="7" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5f7096"/></marker>
+        </defs>
+
+        <!-- direction labels -->
+        <text class="mono" x="450" y="52" text-anchor="middle" fill="#7f8db0" font-size="12" font-weight="700">① OSPF → EIGRP ：フィルタ無しで全部渡す</text>
+        <text class="mono" x="450" y="404" text-anchor="middle" fill="#7f8db0" font-size="12" font-weight="700">② EIGRP → OSPF ：route-map の関所で絞る（戻り道）</text>
+
+        <!-- paths -->
+        <path id="topPath" d="M330 158 C 430 74 500 74 570 158" fill="none" stroke="#243350" stroke-width="2.5" marker-end="url(#mArrow)"/>
+        <path id="botPath" d="M570 250 C 500 348 430 348 330 250" fill="none" stroke="#243350" stroke-width="2.5" marker-end="url(#mArrow)"/>
+
+        <!-- hq-dist dead-end -->
+        <path d="M670 250 V300" fill="none" stroke="#243350" stroke-width="2.5" stroke-dasharray="4 5"/>
+        <g transform="translate(596 300)">
+          <rect width="148" height="52" rx="11" fill="#0b1220" stroke="#26324e"/>
+          <text x="74" y="22" text-anchor="middle" fill="#c3cde6" font-size="12.5" font-weight="800">hq-dist</text>
+          <text x="74" y="39" text-anchor="middle" fill="#5f6f92" font-size="10">袋小路 · 全部を受け取る</text>
+        </g>
+
+        <!-- OSPF node -->
+        <g id="nodeOspf" transform="translate(140 158)">
+          <rect width="190" height="94" rx="16" fill="#0a1a16" stroke="#2f6b58" stroke-width="1.6"/>
+          <rect width="190" height="94" rx="16" fill="none" stroke="#39e0a0" stroke-width="1.2" opacity=".35"/>
+          <circle cx="26" cy="30" r="6" fill="#39e0a0" filter="url(#glow)"/>
+          <text x="46" y="34" fill="#eafff6" font-size="17" font-weight="900">OSPF</text>
+          <text x="20" y="58" fill="#7fd8b8" font-size="10.5" font-family="var(--mono)">Process 10 · Area 0</text>
+          <text x="20" y="76" fill="#5f8f7d" font-size="10" font-family="var(--mono)">DMZ / default / 内部</text>
+        </g>
+
+        <!-- EIGRP node -->
+        <g id="nodeEigrp" transform="translate(570 158)">
+          <rect width="190" height="94" rx="16" fill="#1c1408" stroke="#7a5a24" stroke-width="1.6"/>
+          <rect width="190" height="94" rx="16" fill="none" stroke="#ffb84d" stroke-width="1.2" opacity=".35"/>
+          <circle cx="26" cy="30" r="6" fill="#ffb84d" filter="url(#glow)"/>
+          <text x="46" y="34" fill="#fff4e2" font-size="17" font-weight="900">EIGRP</text>
+          <text x="20" y="58" fill="#e8c184" font-size="10.5" font-family="var(--mono)">AS 100</text>
+          <text x="20" y="76" fill="#a3833f" font-size="10" font-family="var(--mono)">隣は hq-dist だけ</text>
+        </g>
+
+        <!-- GATE on return path (~450,299) -->
+        <g id="gate" transform="translate(450 299)">
+          <rect x="-15" y="-34" width="30" height="68" rx="7" fill="#0e1526" stroke="#3a4a6e"/>
+          <line id="gateBeam" x1="0" y1="-30" x2="0" y2="30" stroke="#39e0a0" stroke-width="2.5" opacity=".8"/>
+          <text x="0" y="-46" text-anchor="middle" fill="#c7d2ea" font-size="11" font-weight="800">route-map</text>
+          <text x="0" y="58" text-anchor="middle" fill="#7f8db0" font-size="9.5">permit 10.26.0.0/16</text>
+        </g>
+
+        <g id="tokenLayer"></g>
+      </svg>
+    </div>
+
+    <div class="readout">
+      <div class="stat pass"><div class="k">OSPFへ通過</div><div class="v" id="cPass">0</div></div>
+      <div class="stat deny"><div class="k">関所で遮断</div><div class="v" id="cDeny">0</div></div>
+      <div class="stat loop"><div class="k">周回（ループ）</div><div class="v" id="cLoop">0</div></div>
+    </div>
+
+    <div class="caption-bar"><p id="cap"><b>route-map は ON。</b> EIGRP から戻る <span class="tag int">HQ 10.26.10.0/24</span> は関所を通過し、外から来た <span class="tag ext">default 0.0.0.0/0</span> は関所で遮断されます。だから輪が閉じません。</p></div>
+
+    <div class="controls">
+      <button class="btn play" id="playBtn"><span class="dot"></span><span id="playLbl">一時停止</span></button>
+      <button class="btn" id="pulseBtn">default を1つ流す</button>
+      <div class="legendrow">
+        <span><i style="background:var(--ospf)"></i>内部（通す）</span>
+        <span><i style="background:var(--cyan)"></i>DMZ</span>
+        <span><i style="background:var(--bgp)"></i>default（危険）</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- WHY (3 reasons) -->
+  <section>
+    <p class="kick rise">3つの理由</p>
+    <h2 class="sec rise">行き（OSPF→EIGRP）に route-map が要らない理由</h2>
+    <p class="sec-lead rise">「行きに無い＝手抜き」ではありません。<b>危険が無い向きなので、置いていない</b>だけです。</p>
+    <div class="reasons">
+      <div class="rcard a rise"><span class="num">01</span>
+        <h3>輪は1回切れば止まる</h3>
+        <p>相互再配信は <b>OSPF→EIGRP→OSPF</b> の一周の輪。ループはこの輪が閉じたときに起きます。</p>
+        <p>関所を <b>戻り道（EIGRP→OSPF）</b>に1つ置けば輪は切れる。両方向に置くのは二重で、片方は無駄。</p>
+        <span class="pill">片側だけで十分</span>
+      </div>
+      <div class="rcard b rise"><span class="num">02</span>
+        <h3>EIGRP 側は袋小路</h3>
+        <p>hq-core の EIGRP 隣は <b>hq-dist 1台だけ</b>。その先は HQ内勤 LAN のみで、別ドメインへの出口がありません。</p>
+        <p>だから DMZ も default も<b>全部そのまま渡してよい</b>。むしろ hq-dist は default が<b>欲しい</b>（外に出るため）。絞ると逆に困る。</p>
+        <span class="pill">全部欲しい・漏れない</span>
+      </div>
+      <div class="rcard c rise"><span class="num">03</span>
+        <h3>危ないのは「逆流」</h3>
+        <p>OSPF 側には hq-edge が BGP から入れた <code>0.0.0.0/0</code> がいる。行きで EIGRP に入るのは <b>OK</b>。</p>
+        <p>でも<b>戻り道で OSPF へ逆流</b>すると本物の default と競合して事故。だから戻り道に「<code>10.26.0.0/16</code> だけ」の関所を置く。</p>
+        <span class="pill">戻り道でだけ止める</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- DIRECTION COMPARE -->
+  <section>
+    <p class="kick rise">向きで役割が違う</p>
+    <h2 class="sec rise">2つの <code style="font-size:.8em">redistribute</code> を並べて読む</h2>
+    <div class="dir">
+      <div class="col fwd rise">
+        <div class="head"><span>OSPF</span><span class="arw">→</span><span style="color:var(--eigrp)">EIGRP</span></div>
+        <div class="role">行き：袋小路の hq-dist へ流し込む</div>
+        <dl class="kv">
+          <dt>route-map</dt><dd><span class="no">不要</span> <b>危険が無いから</b></dd>
+          <dt>別に必須</dt><dd><b>seed metric</b>（EIGRP は種メトリック必須。OSPF の既定20が無い）</dd>
+          <dt>渡すもの</dt><dd>DMZ・default・内部を<b>全部</b></dd>
+        </dl>
+        <code class="line"><span class="cmt">! OSPF → EIGRP（フィルタ無し）</span>
+router eigrp 100
+ redistribute ospf 10 <span class="warnk">metric 1000000 10 255 1 1500</span></code>
+      </div>
+      <div class="col ret rise">
+        <div class="head"><span style="color:var(--eigrp)">EIGRP</span><span class="arw">→</span><span style="color:var(--ospf)">OSPF</span></div>
+        <div class="role">戻り：外部/default を持つ大きい側へ戻る</div>
+        <dl class="kv">
+          <dt>route-map</dt><dd><span class="yes">必要</span> <b>逆流ループを断つ</b></dd>
+          <dt>別に必須</dt><dd><b>subnets</b>（付けないとサブネット化経路が入らない）</dd>
+          <dt>渡すもの</dt><dd><b>10.26.0.0/16 だけ</b>（default は暗黙 deny）</dd>
+        </dl>
+        <code class="line"><span class="cmt">! EIGRP → OSPF（関所つき）</span>
+router ospf 10
+ redistribute eigrp 100 <span class="warnk">subnets</span> <span class="kw">route-map</span> MAP-EIGRP-OSPF</code>
+      </div>
+    </div>
+    <div class="note rise">
+      <span class="i">i</span>
+      <p><b>コメントの「フィルターを通し、細かいサブネットも許可」は担当が2つ混在。</b> 細かいサブネットを拾うのは <code>subnets</code> の仕事。<code>route-map</code>＋<code>prefix-list le 32</code> は「<b>どのプレフィックスを通すか＝10.26系だけ</b>」を決める仕事です。</p>
+    </div>
+  </section>
+
+  <!-- SUMMARY -->
+  <section>
+    <p class="kick rise">まとめ</p>
+    <h2 class="sec rise">一枚で</h2>
+    <div class="sum-wrap rise">
+      <table class="sum">
+        <thead><tr><th>向き</th><th>相手側の性質</th><th>ループの危険</th><th>route-map</th><th>別途必須</th></tr></thead>
+        <tbody>
+          <tr class="fwd"><td>OSPF → EIGRP</td><td>hq-dist ＝袋小路・全部欲しい</td><td>ほぼ無し</td><td class="no">不要</td><td><code>metric …</code></td></tr>
+          <tr class="ret"><td>EIGRP → OSPF</td><td>外部/default を持つ大きい側へ戻る</td><td>逆流ループ</td><td class="yes">必要（10.26/16のみ）</td><td><code>subnets</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <p>動的解説（Phase 7 補助）。設定コマンドの答えではなく「なぜその向きなのか」を体感するための教材です。既存資料は未変更。</p>
+    <nav class="backlinks">
+      <a href="Phase7_なぜ経路を絞るのか_図解.html">← 関所①②の全体図解</a>
+      <a href="パラメータシート_設定順.md">パラメータシート（設定順）</a>
+      <a href="../02_基本設計/IPアドレス管理表.md">IPアドレス管理表</a>
+    </nav>
+  </footer>
+</main>
+
+<script>
+"use strict";
+(function(){
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const svgNS = "http://www.w3.org/2000/svg";
+  const stage = document.getElementById("stage");
+  const layer = document.getElementById("tokenLayer");
+  const topPath = document.getElementById("topPath");
+  const botPath = document.getElementById("botPath");
+  const gateBeam = document.getElementById("gateBeam");
+  const loopWarn = document.getElementById("loopWarn");
+  const cPass = document.getElementById("cPass");
+  const cDeny = document.getElementById("cDeny");
+  const cLoop = document.getElementById("cLoop");
+  const cap = document.getElementById("cap");
+  const toggle = document.getElementById("filterToggle");
+  const playBtn = document.getElementById("playBtn");
+  const playLbl = document.getElementById("playLbl");
+  const pulseBtn = document.getElementById("pulseBtn");
+
+  const topLen = topPath.getTotalLength();
+  const botLen = botPath.getTotalLength();
+  const GATE_FRAC = 0.5;
+  const SPEED = 88; // px per second
+
+  const KINDS = {
+    internal: { label:"HQ 10.26.10.0/24", fill:"#0d2c22", stroke:"#39e0a0", text:"#c9ffe9", danger:false },
+    dmz:      { label:"DMZ 10.26.30.0/24", fill:"#08222c", stroke:"#37d6ff", text:"#d4f4ff", danger:false },
+    external: { label:"default 0.0.0.0/0", fill:"#231640", stroke:"#b98cff", text:"#ecdfff", danger:true }
+  };
+
+  let filterOn = true;
+  let running = !reduce;
+  let stats = { pass:0, deny:0, loop:0 };
+  let tokens = [];
+  let last = 0;
+  let fwdCycle = 0, retCycle = 0;
+  let spawnFwdAcc = 0, spawnRetAcc = 0;
+  const FWD_EVERY = 2.2, RET_EVERY = 2.2; // seconds
+
+  function makeToken(leg, kind){
+    const k = KINDS[kind];
+    const g = document.createElementNS(svgNS,"g");
+    g.setAttribute("class","tok");
+    const w = 150, h = 24;
+    const rect = document.createElementNS(svgNS,"rect");
+    rect.setAttribute("x", -w/2); rect.setAttribute("y", -h/2);
+    rect.setAttribute("width", w); rect.setAttribute("height", h);
+    rect.setAttribute("rx", 12);
+    rect.setAttribute("fill", k.fill); rect.setAttribute("stroke", k.stroke); rect.setAttribute("stroke-width","1.4");
+    const dot = document.createElementNS(svgNS,"circle");
+    dot.setAttribute("cx", -w/2+13); dot.setAttribute("cy",0); dot.setAttribute("r",4); dot.setAttribute("fill",k.stroke);
+    const t = document.createElementNS(svgNS,"text");
+    t.setAttribute("x", 6); t.setAttribute("y", 4); t.setAttribute("text-anchor","middle");
+    t.setAttribute("fill", k.text); t.setAttribute("font-size","10.5"); t.setAttribute("font-weight","700");
+    t.setAttribute("font-family","var(--mono)"); t.textContent = k.label;
+    g.appendChild(rect); g.appendChild(dot); g.appendChild(t);
+    layer.appendChild(g);
+    return { g, rect, leg, kind, danger:k.danger, pos:0, checked:false, dead:false, state:"move", fade:0 };
+  }
+
+  function place(tok){
+    const path = tok.leg==="top" ? topPath : botPath;
+    const len = tok.leg==="top" ? topLen : botLen;
+    const p = path.getPointAtLength(Math.min(tok.pos, len));
+    tok.g.setAttribute("transform", `translate(${p.x.toFixed(1)},${p.y.toFixed(1)})`);
+  }
+
+  function burst(x,y,color){
+    const c = document.createElementNS(svgNS,"circle");
+    c.setAttribute("cx",x); c.setAttribute("cy",y); c.setAttribute("r",6);
+    c.setAttribute("fill","none"); c.setAttribute("stroke",color); c.setAttribute("stroke-width","2.5");
+    layer.appendChild(c);
+    let r=6,o=1;
+    const id=setInterval(()=>{ r+=3; o-=0.12; c.setAttribute("r",r); c.setAttribute("opacity",Math.max(o,0)); c.setAttribute("stroke-width",Math.max(2.5*o,0.3));
+      if(o<=0){clearInterval(id); c.remove();}},26);
+  }
+
+  function flashNode(id,color){
+    const n=document.getElementById(id); if(!n) return;
+    const r=n.querySelector("rect"); if(!r) return;
+    r.animate([{filter:"drop-shadow(0 0 0 "+color+")"},{filter:"drop-shadow(0 0 14px "+color+")"},{filter:"drop-shadow(0 0 0 "+color+")"}],{duration:520});
+  }
+
+  function setFilter(on){
+    filterOn = on;
+    toggle.setAttribute("aria-pressed", String(on));
+    gateBeam.setAttribute("stroke", on ? "#39e0a0" : "#ff5d78");
+    gateBeam.setAttribute("opacity", on ? "0.85" : "0.25");
+    if(on){
+      cap.innerHTML = '<b>route-map は ON。</b> EIGRP から戻る <span class="tag int">HQ 10.26.10.0/24</span> は関所を通過し、外から来た <span class="tag ext">default 0.0.0.0/0</span> は関所で遮断されます。だから輪が閉じません。';
+      setTimeout(()=>{ if(filterOn){ loopWarn.classList.remove("show"); } }, 1400);
+    }else{
+      cap.innerHTML = '<b>route-map を OFF にしました。</b> 関所が開き、<span class="tag ext">default 0.0.0.0/0</span> が OSPF へ逆流 → 再び EIGRP へ… と <b style="color:var(--deny)">輪が閉じて周回</b>し始めます。これが再配信ループです。';
+    }
+  }
+
+  function arriveTop(tok){
+    // delivered to hq-dist dead-end (no harm)
+    flashNode("nodeEigrp","#ffb84d");
+    tok.dead = true;
+  }
+  function arriveBot(tok){
+    // reached OSPF
+    flashNode("nodeOspf","#39e0a0");
+    stats.pass++; cPass.textContent = stats.pass;
+    if(tok.danger && !filterOn){
+      // leak: loop back onto top path
+      stats.loop++; cLoop.textContent = stats.loop;
+      loopWarn.classList.add("show");
+      const nt = makeToken("top","external");
+      tokens.push(nt);
+    }
+    tok.dead = true;
+  }
+
+  function checkGate(tok){
+    const p = botPath.getPointAtLength(botLen*GATE_FRAC);
+    if(tok.danger && filterOn){
+      // deny
+      tok.state="denied"; tok.dead=false; tok.frozen=true;
+      stats.deny++; cDeny.textContent = stats.deny;
+      burst(p.x,p.y,"#ff5d78");
+      tok.rect.setAttribute("stroke","#ff5d78");
+      tok.g.animate([{opacity:1},{opacity:0}],{duration:520,fill:"forwards"});
+      setTimeout(()=>{ tok.dead=true; }, 520);
+    }else{
+      // pass
+      burst(p.x,p.y, tok.danger ? "#b98cff" : "#39e0a0");
+    }
+  }
+
+  function step(ts){
+    if(!last) last = ts;
+    let dt = (ts - last)/1000; last = ts;
+    if(dt>0.05) dt=0.05;
+
+    if(running){
+      spawnFwdAcc += dt; spawnRetAcc += dt;
+      if(spawnFwdAcc >= FWD_EVERY){ spawnFwdAcc = 0;
+        const k = (fwdCycle++ %2===0) ? "dmz" : "external";
+        tokens.push(makeToken("top", k));
+      }
+      if(spawnRetAcc >= RET_EVERY){ spawnRetAcc = 0;
+        const k = (retCycle++ %2===0) ? "internal" : "external";
+        tokens.push(makeToken("bot", k));
+      }
+    }
+
+    for(const tok of tokens){
+      if(tok.dead) continue;
+      if(running && !tok.frozen){
+        tok.pos += SPEED*dt;
+      }
+      const len = tok.leg==="top" ? topLen : botLen;
+      if(tok.leg==="bot" && !tok.checked && tok.pos >= botLen*GATE_FRAC){
+        tok.checked = true; checkGate(tok);
+      }
+      if(!tok.frozen && tok.pos >= len){
+        tok.pos = len;
+        if(tok.leg==="top") arriveTop(tok); else arriveBot(tok);
+      }
+      place(tok);
+    }
+    // cleanup
+    if(tokens.length){
+      tokens = tokens.filter(t=>{ if(t.dead){ t.g.remove(); return false;} return true; });
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ---- controls ----
+  toggle.addEventListener("click", ()=> setFilter(!filterOn));
+  playBtn.addEventListener("click", ()=>{
+    running = !running;
+    playLbl.textContent = running ? "一時停止" : "再生";
+    playBtn.querySelector(".dot").style.background = running ? "var(--ospf)" : "var(--faint)";
+  });
+  pulseBtn.addEventListener("click", ()=>{
+    tokens.push(makeToken("bot","external"));
+  });
+
+  // seed a couple so it isn't empty on load
+  if(!reduce){
+    tokens.push(makeToken("bot","internal"));
+    tokens.push(makeToken("top","dmz"));
+    tokens[0].pos = botLen*0.18;
+    tokens[1].pos = topLen*0.2;
+    requestAnimationFrame(step);
+  }else{
+    // static snapshot for reduced motion
+    running=false; playLbl.textContent="再生";
+    playBtn.querySelector(".dot").style.background="var(--faint)";
+    const a=makeToken("bot","internal"); a.pos=botLen*0.72; place(a); tokens.push(a);
+    const b=makeToken("top","dmz"); b.pos=topLen*0.5; place(b); tokens.push(b);
+    // allow manual play
+    playBtn.addEventListener("click", function once(){ if(!last) requestAnimationFrame(step); }, {once:true});
+  }
+
+  // ---- scroll reveal ----
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); } });
+  }, { threshold:0.16 });
+  document.querySelectorAll(".rise").forEach((el,i)=>{ el.style.transitionDelay = Math.min(i*40,240)+"ms"; io.observe(el); });
+})();
+</script>
+</body>
+</html>

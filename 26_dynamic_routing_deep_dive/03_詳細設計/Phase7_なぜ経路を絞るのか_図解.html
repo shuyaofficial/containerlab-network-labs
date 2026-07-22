@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Phase 7｜なぜ経路を絞るのか（再配信とフィルタの図解）</title>
+  <style>
+    :root {
+      --ink: #18252d;
+      --muted: #5d6b73;
+      --faint: #7d898f;
+      --paper: #fcfbf9;
+      --canvas: #f2efe9;
+      --surface: #fffefa;
+      --line: #d8d3ca;
+      --line-strong: #aaa49a;
+
+      --eigrp: #a86718;   --eigrp-soft: #fbebd4;   --eigrp-line: #d3a668;
+      --ospf:  #27785f;   --ospf-soft:  #e4f1ea;   --ospf-line:  #91b7a4;
+      --bgp:   #71539a;   --bgp-soft:   #efeaf6;   --bgp-line:   #aa98c3;
+
+      --packet: #087da8;  --packet-soft: #e6f3f8;
+      --advert: #d87b17;  --advert-soft: #fdefda;
+      --permit: #2d7a4c;  --permit-soft: #e5f2e9;
+      --deny:   #b34b45;  --deny-soft:   #f7e7e5;
+      --warn:   #8a5a16;  --warn-soft:   #fff5df;
+
+      --shadow: 0 12px 34px rgba(43, 49, 52, .09);
+      --shadow-sm: 0 4px 14px rgba(43, 49, 52, .07);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 620px at 82% -8%, #f7f3ec 0%, rgba(247,243,236,0) 60%),
+        var(--canvas);
+      font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px;
+      line-height: 1.74;
+    }
+    code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: .9em; }
+    button { font: inherit; }
+    a { color: #075f80; text-underline-offset: 3px; }
+    h1, h2, h3 { text-wrap: balance; }
+    p, li { text-wrap: pretty; }
+    :focus-visible { outline: 3px solid rgba(8,125,168,.4); outline-offset: 3px; border-radius: 4px; }
+
+    .shell { width: min(1080px, 100%); margin: 0 auto; padding: 40px clamp(16px, 4vw, 40px) 72px; }
+
+    /* ---------- Hero ---------- */
+    .kicker { margin: 0 0 12px; color: var(--bgp); font-size: .74rem; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
+    .kicker::before { content: ""; display: inline-block; width: 26px; height: 3px; margin: 0 10px 4px 0; border-radius: 3px; background: var(--bgp); vertical-align: middle; }
+    h1 { margin: 0; font-size: clamp(1.9rem, 4.4vw, 3.2rem); line-height: 1.16; letter-spacing: -.035em; font-weight: 900; }
+    h1 .accent-e { color: var(--eigrp); } h1 .accent-o { color: var(--ospf); } h1 .accent-b { color: var(--bgp); }
+    .lead { max-width: 720px; margin: 20px 0 0; color: var(--muted); font-size: 1.05rem; }
+
+    .big-idea { margin: 26px 0 6px; padding: 24px clamp(18px,3vw,30px); border: 1px solid var(--line); border-left: 6px solid var(--bgp); border-radius: var(--radius); background: var(--paper); box-shadow: var(--shadow); }
+    .big-idea p { margin: 0; font-size: clamp(1.05rem, 2vw, 1.35rem); line-height: 1.6; font-weight: 700; letter-spacing: -.01em; }
+    .big-idea p + p { margin-top: 12px; font-size: .96rem; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+    .big-idea b { color: var(--ink); font-weight: 900; box-shadow: inset 0 -.5em 0 rgba(216,123,23,.16); }
+
+    .not-firewall { display: flex; gap: 12px; align-items: flex-start; margin-top: 16px; padding: 14px 16px; border: 1px dashed var(--warn); border-radius: 12px; background: var(--warn-soft); }
+    .not-firewall .b { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--warn); color: #fff; text-align: center; line-height: 26px; font-weight: 900; }
+    .not-firewall p { margin: 0; font-size: .84rem; color: #6a512b; }
+    .not-firewall strong { color: #52400f; }
+
+    /* ---------- Section shell ---------- */
+    section { margin-top: 52px; }
+    .eyebrow { display: inline-block; margin-bottom: 8px; padding: 3px 10px; border-radius: 999px; font-size: .68rem; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; }
+    .eyebrow.q { color: var(--bgp); background: var(--bgp-soft); }
+    .eyebrow.map { color: var(--packet); background: var(--packet-soft); }
+    h2 { margin: 0 0 8px; font-size: clamp(1.35rem, 2.6vw, 1.85rem); line-height: 1.28; letter-spacing: -.02em; font-weight: 900; }
+    .sec-lead { max-width: 760px; margin: 0 0 22px; color: var(--muted); font-size: .96rem; }
+
+    .card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); box-shadow: var(--shadow-sm); }
+
+    /* ---------- Why cards ---------- */
+    .why-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .why { padding: 20px; }
+    .why .n { display: inline-flex; width: 30px; height: 30px; border-radius: 9px; align-items: center; justify-content: center; font-weight: 900; font-size: .9rem; color: #fff; margin-bottom: 12px; }
+    .why.e .n { background: var(--eigrp); } .why.o .n { background: var(--ospf); } .why.b .n { background: var(--bgp); }
+    .why h3 { margin: 0 0 6px; font-size: 1rem; }
+    .why p { margin: 0; font-size: .84rem; color: var(--muted); }
+    .why code { color: var(--ink); }
+    .goal { margin-top: 16px; padding: 16px 18px; border-radius: 14px; background: var(--packet-soft); border: 1px solid #bfe0ec; }
+    .goal strong { color: #06556f; }
+    .goal p { margin: 6px 0 0; font-size: .88rem; color: #2f5462; }
+
+    /* ---------- Map ---------- */
+    .map-card { overflow: hidden; }
+    .map-head { display: flex; flex-wrap: wrap; gap: 14px 18px; justify-content: space-between; align-items: center; padding: 20px 22px 14px; }
+    .toggle { display: inline-flex; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: #efece5; }
+    .toggle button { padding: 9px 15px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-size: .82rem; font-weight: 850; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; transition: color .16s ease, background-color .16s ease, box-shadow .16s ease; }
+    .toggle button .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .toggle button[data-mode="advert"] .dot { background: var(--advert); }
+    .toggle button[data-mode="packet"] .dot { background: var(--packet); }
+    .toggle button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+
+    .mode-caption { padding: 0 22px 4px; }
+    .mode-caption p { margin: 0; font-size: .88rem; color: var(--muted); }
+    .mode-caption b { color: var(--ink); }
+
+    .map-wrap { padding: 6px 14px 12px; }
+    .map-svg { display: block; width: 100%; height: auto; }
+
+    .band { stroke-width: 1.4; }
+    .band-e { fill: var(--eigrp-soft); stroke: var(--eigrp-line); }
+    .band-o { fill: var(--ospf-soft); stroke: var(--ospf-line); }
+    .band-b { fill: var(--bgp-soft); stroke: var(--bgp-line); }
+    .band-title { font-size: 15px; font-weight: 900; }
+    .band-title.e { fill: #7c4d12; } .band-title.o { fill: #1d5a45; } .band-title.b { fill: #543c78; }
+    .band-sub { font-size: 10.5px; font-weight: 600; }
+    .band-sub.e { fill: #97702f; } .band-sub.o { fill: #4d7566; } .band-sub.b { fill: #7a6a95; }
+    .seam { stroke: var(--line-strong); stroke-width: 1.4; stroke-dasharray: 3 6; }
+
+    .link { fill: none; stroke-width: 4.5; stroke-linecap: round; }
+    .link.e { stroke: var(--eigrp); stroke-dasharray: 9 7; }
+    .link.o { stroke: var(--ospf); }
+    .link.b { stroke: var(--bgp); stroke-dasharray: 2.5 7; }
+    .link.lan { stroke: #b1a9a0; }
+
+    .node rect { fill: var(--surface); stroke: #a9b0b2; stroke-width: 1.4; }
+    .node.gw rect { stroke-width: 2.6; }
+    .node.gw.g1 rect { stroke: var(--eigrp); }
+    .node.gw.g2 rect { stroke: var(--bgp); }
+    .node .nm { font-size: 13px; font-weight: 900; fill: var(--ink); text-anchor: middle; }
+    .node .rl { font-size: 9px; fill: #5c6a72; text-anchor: middle; }
+    .node .ip { font-size: 8.5px; font-family: "SFMono-Regular", Consolas, monospace; fill: #74818a; text-anchor: middle; }
+    .chip rect { fill: #f6f3ed; stroke: #cfc9bf; stroke-width: 1.2; }
+    .chip .nm { font-size: 11px; font-weight: 800; fill: #45525a; text-anchor: middle; }
+    .chip .ip { font-size: 8px; font-family: "SFMono-Regular", Consolas, monospace; fill: #79858c; text-anchor: middle; }
+
+    .gate { }
+    .gate .badge { rx: 11; }
+    .gate.g1 .badge { fill: #fff6ea; stroke: var(--eigrp); stroke-width: 1.7; }
+    .gate.g2 .badge { fill: #f4effa; stroke: var(--bgp); stroke-width: 1.7; }
+    .gate .num { font-size: 13px; font-weight: 900; text-anchor: middle; }
+    .gate.g1 .num { fill: var(--eigrp); } .gate.g2 .num { fill: var(--bgp); }
+    .gate .gt { font-size: 10.5px; font-weight: 850; text-anchor: middle; fill: var(--ink); }
+    .gate .gs { font-size: 8.5px; text-anchor: middle; fill: #6c7880; }
+    .gate .stem { stroke-width: 1.6; stroke-dasharray: 3 4; }
+    .gate.g1 .stem { stroke: var(--eigrp); } .gate.g2 .stem { stroke: var(--bgp); }
+    .edge-mark rect { fill: #eef4f6; stroke: var(--packet); stroke-width: 1.3; rx: 9; }
+    .edge-mark text { font-size: 9px; font-weight: 800; text-anchor: middle; fill: #075f80; }
+
+    /* overlay flows */
+    .flow { fill: none; stroke-width: 5.5; stroke-linecap: round; stroke-linejoin: round; }
+    .flow.advert { stroke: var(--advert); stroke-dasharray: 10 8; marker-end: url(#ah-advert); }
+    .flow.advert.two { marker-start: url(#ah-advert); }
+    .flow.packet { stroke: var(--packet); marker-end: url(#ah-packet); }
+    .flow-lbl rect { rx: 6; }
+    .flow-lbl.advert rect { fill: #fff; stroke: var(--advert); stroke-width: 1.3; }
+    .flow-lbl.packet rect { fill: #fff; stroke: var(--packet); stroke-width: 1.3; }
+    .flow-lbl text { font-size: 9.5px; font-weight: 850; text-anchor: middle; }
+    .flow-lbl.advert text { fill: #92510c; } .flow-lbl.packet text { fill: #075f80; }
+    .overlay[hidden] { display: none; }
+    .gate.dim { opacity: .32; } .edge-mark.dim { opacity: .32; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 8px 24px 20px; color: var(--muted); font-size: .76rem; }
+    .legend span { display: inline-flex; align-items: center; gap: 8px; }
+    .legend i { width: 26px; height: 0; border-top: 4px solid; display: inline-block; }
+    .legend i.e { border-color: var(--eigrp); border-top-style: dashed; }
+    .legend i.o { border-color: var(--ospf); }
+    .legend i.b { border-color: var(--bgp); border-top-style: dashed; }
+    .legend i.ad { border-color: var(--advert); border-top-style: dashed; }
+    .legend i.pk { border-color: var(--packet); }
+
+    /* ---------- Gate detail ---------- */
+    .gate-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .gate-card { padding: 24px clamp(18px,3vw,28px); position: relative; overflow: hidden; }
+    .gate-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 6px; }
+    .gate-card.g1::before { background: var(--eigrp); }
+    .gate-card.g2::before { background: var(--bgp); }
+    .gate-tag { display: inline-flex; align-items: center; gap: 8px; font-size: .82rem; font-weight: 900; margin-bottom: 6px; }
+    .gate-card.g1 .gate-tag { color: var(--eigrp); } .gate-card.g2 .gate-tag { color: var(--bgp); }
+    .gate-tag .num { width: 24px; height: 24px; border-radius: 7px; color: #fff; display: inline-flex; align-items: center; justify-content: center; }
+    .gate-card.g1 .gate-tag .num { background: var(--eigrp); } .gate-card.g2 .gate-tag .num { background: var(--bgp); }
+    .fromto { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 14px 0 18px; }
+    .fromto .zone { padding: 8px 14px; border-radius: 10px; font-size: .82rem; font-weight: 850; border: 1px solid transparent; }
+    .zone.z-e { background: var(--eigrp-soft); color: #7c4d12; border-color: var(--eigrp-line); }
+    .zone.z-o { background: var(--ospf-soft); color: #1d5a45; border-color: var(--ospf-line); }
+    .zone.z-b { background: var(--bgp-soft); color: #543c78; border-color: var(--bgp-line); }
+    .zone.z-isp { background: var(--deny-soft); color: #8d3935; border-color: #e3b3ae; }
+    .fromto .arw { color: var(--faint); font-weight: 900; font-size: 1.1rem; }
+    .filter-rows { display: grid; gap: 10px; }
+    .frow { display: grid; grid-template-columns: 84px 1fr; gap: 12px; align-items: start; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); }
+    .frow.pass { background: var(--permit-soft); border-color: #bfe0cb; }
+    .frow.block { background: var(--deny-soft); border-color: #ecc7c2; }
+    .frow .tag { font-size: .74rem; font-weight: 900; padding: 4px 0; text-align: center; border-radius: 8px; }
+    .frow.pass .tag { background: var(--permit); color: #fff; }
+    .frow.block .tag { background: var(--deny); color: #fff; }
+    .frow .body { font-size: .86rem; }
+    .frow .body code { display: inline-block; padding: 1px 7px; border-radius: 6px; background: var(--surface); border: 1px solid var(--line); color: var(--ink); font-weight: 700; }
+    .frow .body .ex { display: block; margin-top: 3px; color: var(--muted); font-size: .8rem; }
+    .why-here { margin-top: 16px; padding: 13px 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); font-size: .86rem; }
+    .why-here strong { color: var(--ink); }
+    .note-le { margin-top: 12px; font-size: .82rem; color: var(--muted); }
+    .note-le code { color: var(--ink); }
+
+    /* ---------- Compare table ---------- */
+    .cmp-wrap { overflow-x: auto; }
+    table.cmp { width: 100%; border-collapse: collapse; font-size: .84rem; min-width: 640px; }
+    table.cmp th, table.cmp td { padding: 12px 13px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    table.cmp thead th { background: #f1eee7; font-weight: 900; color: #45535a; font-size: .78rem; }
+    table.cmp tbody th { font-weight: 900; white-space: nowrap; }
+    table.cmp .risk { font-weight: 800; }
+    table.cmp tr.r1 td:first-child, table.cmp tr.r1 th { border-left: 4px solid var(--eigrp); }
+    table.cmp tr.r2 td:first-child, table.cmp tr.r2 th { border-left: 4px solid var(--bgp); }
+    table.cmp tr.r3 td:first-child, table.cmp tr.r3 th { border-left: 4px solid var(--packet); }
+    .tool-pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: .72rem; font-weight: 850; }
+    .tool-pill.heavy { background: var(--deny-soft); color: #8d3935; }
+    .tool-pill.mid { background: var(--advert-soft); color: #92510c; }
+    .tool-pill.light { background: var(--permit-soft); color: #27653f; }
+    .cmp-kicker { margin-top: 16px; padding: 15px 18px; border-radius: 12px; background: var(--ink); color: #eef2f2; font-size: .92rem; font-weight: 700; }
+    .cmp-kicker b { color: #ffd79a; }
+
+    /* ---------- Loop ---------- */
+    .loop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .loop { padding: 20px; }
+    .loop h3 { margin: 0 0 4px; font-size: 1rem; display: flex; align-items: center; gap: 8px; }
+    .loop.bad h3 { color: var(--deny); } .loop.good h3 { color: var(--permit); }
+    .loop .ic { width: 24px; height: 24px; border-radius: 50%; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 900; }
+    .loop.bad .ic { background: var(--deny); } .loop.good .ic { background: var(--permit); }
+    .loop ul { margin: 10px 0 0; padding-left: 1.1em; }
+    .loop li { font-size: .85rem; margin: 6px 0; color: var(--muted); }
+    .loop li b { color: var(--ink); }
+    .caveat { margin-top: 14px; padding: 13px 16px; border-left: 4px solid var(--warn); border-radius: 0 10px 10px 0; background: var(--warn-soft); font-size: .84rem; color: #6a512b; }
+    .caveat b { color: #52400f; }
+
+    /* ---------- IP flow table ---------- */
+    .ipflow { display: grid; gap: 10px; }
+    .ip-item { display: grid; grid-template-columns: 148px 1fr; gap: 14px; align-items: center; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+    .ip-item .addr { font-family: "SFMono-Regular", Consolas, monospace; font-weight: 800; font-size: .92rem; }
+    .ip-item .addr small { display: block; font-family: inherit; font-weight: 700; font-size: .72rem; color: var(--faint); margin-top: 2px; }
+    .ip-item .path { font-size: .85rem; color: var(--muted); }
+    .ip-item .path .hop { display: inline-flex; align-items: center; gap: 6px; }
+    .ip-item .path b { color: var(--ink); }
+    .ip-item.e { border-left: 4px solid var(--eigrp); }
+    .ip-item.o { border-left: 4px solid var(--ospf); }
+    .ip-item.b { border-left: 4px solid var(--bgp); }
+    .ip-item.d { border-left: 4px solid var(--packet); }
+    .ip-note { margin-top: 14px; font-size: .84rem; color: var(--muted); }
+    .ip-note b { color: var(--ink); }
+
+    /* ---------- Show commands ---------- */
+    .show-intro { padding: 14px 16px; border-radius: 12px; background: var(--permit-soft); border: 1px solid #bfe0cb; font-size: .85rem; color: #2f5a42; margin-bottom: 16px; }
+    .show-intro b { color: #1d5a45; }
+    .show-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .show { padding: 15px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+    .show code { display: inline-block; padding: 4px 10px; border-radius: 7px; background: #252d32; color: #eaf1f1; font-size: .78rem; font-weight: 700; margin-bottom: 8px; }
+    .show p { margin: 0; font-size: .83rem; color: var(--muted); }
+    .show p b { color: var(--ink); }
+    .show .kw { color: var(--packet); font-weight: 800; }
+
+    footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--faint); font-size: .76rem; }
+    footer a { color: #075f80; }
+    .doc-links { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 8px; }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 880px) {
+      .why-grid { grid-template-columns: 1fr; }
+      .loop-grid { grid-template-columns: 1fr; }
+      .show-grid { grid-template-columns: 1fr; }
+      .gate-detail-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .ip-item { grid-template-columns: 1fr; gap: 6px; }
+      .frow { grid-template-columns: 64px 1fr; }
+      .map-head { flex-direction: column; align-items: flex-start; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition-duration: .01ms !important; }
+    }
+    @media print {
+      body { background: #fff; }
+      .toggle { display: none; }
+      .card { box-shadow: none; break-inside: avoid; }
+      .overlay { display: block !important; }
+    }
+  </style>
+</head>
+<body>
+<main class="shell">
+
+  <!-- ============ HERO ============ -->
+  <header>
+    <p class="kicker">Theme 26 · Dynamic Routing Deep Dive · Phase 7</p>
+    <h1>3つの<span class="accent-e">言葉</span>と、<br>2つの<span class="accent-b">関所</span>。</h1>
+    <p class="lead">Phase 7 で何をしているのか。ひとことで言うと「別々のルーティングの言葉をつなぐ翻訳者を置き、その翻訳者に関所を設ける」作業です。設定コマンドの前に、その狙いを図で掴みましょう。</p>
+
+    <div class="big-idea">
+      <p>社内には <b>EIGRP・OSPF・BGP</b> という3つの経路の言葉があり、互いに通じません。Phase 7 は、その境目に<b>「翻訳者（再配信）」</b>を置き、翻訳者に<b>「関所（route-map / prefix-list）」</b>を設ける作業です。</p>
+      <p>関所が選り分けるのは「通信」ではなく「経路情報（＝宛先までの道案内）」です。余計な道案内が漏れたり、ぐるぐる回ったりしないように絞るのが目的です。</p>
+      <div class="not-firewall">
+        <span class="b" aria-hidden="true">!</span>
+        <p><strong>最初に押さえること：route-map / prefix-list は「通信フィルタ」ではありません。</strong> ここで絞るのはルータ同士が交換する道案内です。PC の ping や HTTP を直接止めるのは ACL やファイアウォールの役目で、Phase 7 の対象外です。</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ WHY ============ -->
+  <section aria-labelledby="why-h">
+    <span class="eyebrow q">Q. なぜ設定するの？</span>
+    <h2 id="why-h">そもそも、なぜ再配信が要るのか</h2>
+    <p class="sec-lead">3つの言葉はお互いの経路を自動では共有しません。だから hq-dist（EIGRP しか話さない）は、放っておくと DMZ（<code>10.26.30.0/24</code>）への道を一生知りません。そこをつなぐのが「再配信（redistribute）」＝翻訳者です。</p>
+
+    <div class="why-grid">
+      <div class="card why e">
+        <span class="n">E</span>
+        <h3>EIGRP（AS 100）</h3>
+        <p>HQ の一角だけで動く Cisco 系の言葉。<code>hq-dist ⇄ hq-core</code> 間で HQ 内勤ネット <code>10.26.10.0/24</code> を運ぶ。</p>
+      </div>
+      <div class="card why o">
+        <span class="n">O</span>
+        <h3>OSPF（Process 10）</h3>
+        <p>HQ の Area 0 と支社の Area 1。同じ OSPF でも WAN で分断され、実は<strong>2つの島</strong>。DMZ <code>10.26.30.0/24</code> や支社 <code>10.26.20.0/24</code> を運ぶ。</p>
+      </div>
+      <div class="card why b">
+        <span class="n">B</span>
+        <h3>BGP（eBGP）</h3>
+        <p>拠点間 WAN の言葉。<code>hq-edge(65000) ⇄ isp(65100) ⇄ br-edge(65001)</code>。誰に何を見せるかを細かく制御できる。</p>
+      </div>
+    </div>
+
+    <div class="goal">
+      <strong>Phase 7 のゴール（このために翻訳する）</strong>
+      <p>① hq-pc（<code>10.26.10.10</code>）から dmz-srv（<code>10.26.30.10</code>）へ社内で到達できる。② hq-pc から br-pc（<code>10.26.20.10</code>）へ WAN 越しに到達できる。翻訳が無ければ、この2つは経路が無くて届きません。</p>
+    </div>
+  </section>
+
+  <!-- ============ MAP ============ -->
+  <section aria-labelledby="map-h">
+    <span class="eyebrow map">1枚マップ</span>
+    <h2 id="map-h">どの言葉が、どこで切り替わるか</h2>
+    <p class="sec-lead">横スクロール無しの1枚図です。色帯が3つの言葉、境目に立つルータが翻訳者。丸番号 ①② が「関所」。ボタンで<strong>「経路情報の流れ」</strong>と<strong>「実パケットの流れ」</strong>を切り替えて、両者が別物であることを確かめてください。</p>
+
+    <div class="card map-card">
+      <div class="map-head">
+        <div class="toggle" role="group" aria-label="表示する流れを切り替え">
+          <button type="button" data-mode="advert" aria-pressed="true"><span class="dot"></span>経路情報（道案内）</button>
+          <button type="button" data-mode="packet" aria-pressed="false"><span class="dot"></span>実パケット（通信）</button>
+        </div>
+      </div>
+      <div class="mode-caption">
+        <p id="mode-cap"><b>いま表示中：経路情報の流れ。</b> 各ネットワークの「道案内」が、関所で絞られながら別の言葉へ渡っていきます。関所 ①② が働くのはこの場面です。</p>
+      </div>
+
+      <div class="map-wrap">
+        <svg class="map-svg" viewBox="0 0 1120 620" role="img" aria-labelledby="map-title map-desc">
+          <title id="map-title">Phase 7 の経路制御マップ</title>
+          <desc id="map-desc">EIGRP・OSPF Area0・eBGP WAN・OSPF Area1 の4つの帯に7台のルータを配置し、関所①hq-coreと関所②br-edgeを示す図。経路情報と実パケットの流れをボタンで切り替えられる。</desc>
+          <defs>
+            <marker id="ah-advert" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M0,0 L9,4.5 L0,9 z" fill="#d87b17"/></marker>
+            <marker id="ah-packet" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M0,0 L9,4.5 L0,9 z" fill="#087da8"/></marker>
+          </defs>
+
+          <!-- domain bands -->
+          <rect class="band band-e" x="24"  y="250" width="286" height="346" rx="16"/>
+          <rect class="band band-o" x="316" y="250" width="184" height="346" rx="16"/>
+          <rect class="band band-b" x="506" y="250" width="324" height="346" rx="16"/>
+          <rect class="band band-o" x="836" y="250" width="260" height="346" rx="16"/>
+
+          <text class="band-title e" x="42"  y="280">EIGRP · AS 100</text>
+          <text class="band-sub e"   x="42"  y="297">HQ内勤 10.26.10.0/24</text>
+          <text class="band-title o" x="334" y="280">OSPF · Area 0</text>
+          <text class="band-sub o"   x="334" y="297">HQ core / edge / DMZ</text>
+          <text class="band-title b" x="524" y="280">eBGP · WAN</text>
+          <text class="band-sub b"   x="524" y="297">65000 ⇄ 65100 ⇄ 65001</text>
+          <text class="band-title o" x="854" y="280">OSPF · Area 1</text>
+          <text class="band-sub o"   x="854" y="297">支社 10.26.20.0/24</text>
+
+          <!-- seams -->
+          <line class="seam" x1="313" y1="258" x2="313" y2="588"/>
+          <line class="seam" x1="503" y1="258" x2="503" y2="588"/>
+          <line class="seam" x1="833" y1="258" x2="833" y2="588"/>
+
+          <!-- base links (router row center y = 398) -->
+          <path class="link lan" d="M150 436 V452"/>
+          <path class="link e"   d="M186 398 H254"/>
+          <path class="link o"   d="M366 398 H436"/>
+          <path class="link o"   d="M346 424 L430 470"/>
+          <path class="link o"   d="M430 500 V520"/>
+          <path class="link b"   d="M566 398 H612"/>
+          <path class="link b"   d="M708 398 H772"/>
+          <path class="link o"   d="M896 398 H952"/>
+          <path class="link lan" d="M1000 436 V452"/>
+
+          <!-- OVERLAY: advert (route info) — 関所ごとに1本、双方向/片方向を示す -->
+          <g class="overlay" data-overlay="advert">
+            <!-- gate1: EIGRP <-> OSPF は双方向（相互再配信） -->
+            <path class="flow advert two" d="M184 346 H472"/>
+            <g class="flow-lbl advert"><rect x="248" y="320" width="132" height="18"/><text x="314" y="333">① 10.26.0.0/16 のみ</text></g>
+            <!-- gate2: Branch -> ISP は片方向 -->
+            <path class="flow advert" d="M906 346 H688"/>
+            <g class="flow-lbl advert"><rect x="708" y="320" width="176" height="18"/><text x="796" y="333">② 10.26.20.0/24 だけ ISPへ</text></g>
+          </g>
+
+          <!-- OVERLAY: packet -->
+          <g class="overlay" data-overlay="packet" hidden>
+            <!-- hq-pc -> br-pc (across WAN, NAT) -->
+            <path class="flow packet" d="M148 452 V336 H1000 V452"/>
+            <g class="flow-lbl packet"><rect x="466" y="318" width="184" height="18"/><text x="558" y="331">hq-pc → br-pc（WAN越え）</text></g>
+            <g class="flow-lbl packet"><rect x="448" y="352" width="112" height="18"/><text x="504" y="365">hq-edgeでNAT</text></g>
+            <!-- hq-pc -> dmz-srv (within HQ) -->
+            <path class="flow packet" d="M156 452 V350 H430 V516"/>
+            <g class="flow-lbl packet"><rect x="212" y="330" width="150" height="18"/><text x="287" y="343">社内: hq-pc → dmz-srv</text></g>
+          </g>
+
+          <!-- nodes (routers, center y=398 -> rect y=360 h=76) -->
+          <g class="node" transform="translate(90 360)"><rect width="120" height="76" rx="9"/><text class="nm" x="60" y="26">hq-dist</text><text class="rl" x="60" y="44">EIGRP AS100</text><text class="ip" x="60" y="61">GW 10.26.10.1</text></g>
+          <g class="node gw g1" transform="translate(253 360)"><rect width="120" height="76" rx="9"/><text class="nm" x="60" y="26">hq-core</text><text class="rl" x="60" y="44">EIGRP ⇄ OSPF</text><text class="ip" x="60" y="61">RID 10.26.255.1</text></g>
+          <g class="node" transform="translate(440 360)"><rect width="126" height="76" rx="9"/><text class="nm" x="63" y="26">hq-edge</text><text class="rl" x="63" y="44">OSPF/BGP/NAT</text><text class="ip" x="63" y="61">198.51.100.1</text></g>
+          <g class="node" transform="translate(612 360)"><rect width="96" height="76" rx="9"/><text class="nm" x="48" y="26">isp</text><text class="rl" x="48" y="44">BGP 65100</text><text class="ip" x="48" y="61">.2 / .5</text></g>
+          <g class="node gw g2" transform="translate(772 360)"><rect width="124" height="76" rx="9"/><text class="nm" x="62" y="26">br-edge</text><text class="rl" x="62" y="44">BGP 65001 / OSPF</text><text class="ip" x="62" y="61">198.51.100.6</text></g>
+          <g class="node" transform="translate(952 360)"><rect width="120" height="76" rx="9"/><text class="nm" x="60" y="26">br-core</text><text class="rl" x="60" y="44">OSPF Area1</text><text class="ip" x="60" y="61">GW 10.26.20.1</text></g>
+          <!-- DMZ branch -->
+          <g class="node" transform="translate(370 440)"><rect width="120" height="62" rx="9"/><text class="nm" x="60" y="25">hq-dmz</text><text class="rl" x="60" y="43">OSPF Area0</text></g>
+
+          <!-- endpoints -->
+          <g class="chip" transform="translate(96 452)"><rect width="108" height="50" rx="8"/><text class="nm" x="54" y="22">hq-pc</text><text class="ip" x="54" y="38">10.26.10.10</text></g>
+          <g class="chip" transform="translate(376 516)"><rect width="108" height="50" rx="8"/><text class="nm" x="54" y="22">dmz-srv</text><text class="ip" x="54" y="38">10.26.30.10</text></g>
+          <g class="chip" transform="translate(946 452)"><rect width="108" height="50" rx="8"/><text class="nm" x="54" y="22">br-pc</text><text class="ip" x="54" y="38">10.26.20.10</text></g>
+
+          <!-- GATE 1 badge (seam x=313) -->
+          <g class="gate g1">
+            <line class="stem" x1="313" y1="210" x2="313" y2="250"/>
+            <rect class="badge" x="223" y="150" width="180" height="60"/>
+            <text class="num" x="243" y="184">①</text>
+            <text class="gt" x="322" y="176">route-map + prefix-list</text>
+            <text class="gs" x="322" y="194">EIGRP ⇄ OSPF の関所（最重）</text>
+          </g>
+          <!-- edge marker (seam x=503) -->
+          <g class="edge-mark">
+            <rect x="440" y="160" width="126" height="40"/>
+            <text x="503" y="176">default 注入 + NAT</text>
+            <text x="503" y="190" style="font-size:8px;fill:#4d6b76;">フィルタの関所ではない</text>
+          </g>
+          <!-- GATE 2 badge (seam x=833) -->
+          <g class="gate g2">
+            <line class="stem" x1="833" y1="210" x2="833" y2="250"/>
+            <rect class="badge" x="746" y="150" width="174" height="60"/>
+            <text class="num" x="766" y="184">②</text>
+            <text class="gt" x="843" y="176">prefix-list OUT</text>
+            <text class="gs" x="843" y="194">社内 → ISP の関所</text>
+          </g>
+        </svg>
+      </div>
+
+      <div class="legend" aria-label="凡例">
+        <span><i class="e"></i>EIGRP リンク</span>
+        <span><i class="o"></i>OSPF リンク</span>
+        <span><i class="b"></i>BGP リンク</span>
+        <span><i class="ad"></i>経路情報の流れ</span>
+        <span><i class="pk"></i>実パケットの流れ</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ GATE DETAILS ============ -->
+  <section aria-labelledby="gates-h">
+    <span class="eyebrow q">Q. どのIPを、どこからどこへ？</span>
+    <h2 id="gates-h">2つの関所を開けてみる</h2>
+    <p class="sec-lead">関所ごとに「どの言葉から、どの言葉へ」「どのプレフィックスを通し、何を止めるか」を並べます。ここが Phase 7 の実体です。</p>
+
+    <div class="gate-detail-grid">
+      <!-- Gate 1 -->
+      <div class="card gate-card g1">
+        <span class="gate-tag"><span class="num">①</span>hq-core</span>
+        <h3 style="margin:0 0 2px;font-size:1.15rem;">EIGRP ⇄ OSPF の相互再配信</h3>
+        <div class="fromto">
+          <span class="zone z-e">EIGRP AS100</span>
+          <span class="arw">⇄</span>
+          <span class="zone z-o">OSPF Area0</span>
+        </div>
+        <div class="filter-rows">
+          <div class="frow pass">
+            <span class="tag">通す</span>
+            <span class="body"><code>10.26.0.0/16 le 32</code> 配下すべて
+              <span class="ex">社内で使う 10.26.x.x の実ネット（/24・/30・/32）を双方向に翻訳する。</span></span>
+          </div>
+          <div class="frow block">
+            <span class="tag">止める</span>
+            <span class="body">上記に一致しない経路（外部・想定外）
+              <span class="ex">route-map の permit に載らない経路は末尾で暗黙 deny。誤って外部経路が EIGRP へ逆流するのを防ぐ。</span></span>
+          </div>
+        </div>
+        <div class="why-here"><strong>なぜここが一番厳重か：</strong> 唯一「IGP どうしを双方向で」翻訳する場所だから。行きと帰りが同じルータに集まり、フィルタが甘いと経路がぐるっと戻ってループになりやすい。だから route-map ＋ prefix-list で対象を明示的に絞る。</div>
+        <p class="note-le"><code>le 32</code> が要る理由：<code>permit 10.26.0.0/16</code> だけだと /16 ちょうどにしか一致しない。<code>le 32</code> を足して、内側の /24・/30・/32 まで対象に含める。</p>
+      </div>
+
+      <!-- Gate 2 -->
+      <div class="card gate-card g2">
+        <span class="gate-tag"><span class="num">②</span>br-edge</span>
+        <h3 style="margin:0 0 2px;font-size:1.15rem;">支社が ISP へ見せる経路を限定</h3>
+        <div class="fromto">
+          <span class="zone z-o">OSPF Area1</span>
+          <span class="arw">→</span>
+          <span class="zone z-isp">ISP (BGP)</span>
+        </div>
+        <div class="filter-rows">
+          <div class="frow pass">
+            <span class="tag">通す</span>
+            <span class="body"><code>10.26.20.0/24</code> のみ
+              <span class="ex">支社の利用者ネットだけを ISP へ広告。外から支社に届くための最小限。</span></span>
+          </div>
+          <div class="frow block">
+            <span class="tag">止める</span>
+            <span class="body"><code>10.26.2.0/30</code>・Loopback <code>/32</code> など
+              <span class="ex">Edge–Core リンクやルータ Loopback といった内部基盤は ISP に見せない（暗黙 deny）。</span></span>
+          </div>
+        </div>
+        <div class="why-here"><strong>なぜ絞るか：</strong> 内部の設備アドレスを外に晒さないため。加えて、支社が HQ 行きの経路まで広告すると「支社が HQ への中継地（トランジット）」に化けてしまう。出す経路を <code>10.26.20.0/24</code> だけに固定して、その事故を防ぐ。</div>
+        <p class="note-le">向きは片方向（社内 → ISP の <em>OUT</em>）。IGP 相互再配信ほど複雑な route-map は要らず、prefix-list 一枚で足りる。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ NOT ONLY EIGRP ============ -->
+  <section aria-labelledby="cmp-h">
+    <span class="eyebrow q">Q. なぜ EIGRP だけ特別なの？</span>
+    <h2 id="cmp-h">「EIGRP だけ特別」ではない</h2>
+    <p class="sec-lead">route-map / prefix-list は EIGRP 専用の道具ではありません。境目ごとに使う道具が違うのは、<strong>そこで起きうる事故（リスク）の大きさが違う</strong>から。道具の重さは、リスクの重さに合わせています。</p>
+
+    <div class="card" style="padding:6px 8px;">
+      <div class="cmp-wrap">
+        <table class="cmp">
+          <thead>
+            <tr><th>境目</th><th>向き</th><th>いちばんの心配ごと</th><th>使う道具</th></tr>
+          </thead>
+          <tbody>
+            <tr class="r1">
+              <th>hq-core<br><small style="font-weight:600;color:var(--muted)">EIGRP ⇄ OSPF</small></th>
+              <td>双方向<br>（IGP ⇄ IGP）</td>
+              <td class="risk">再配信ループ・経路の逆流。行き帰りが1台に集まる最難所。</td>
+              <td><span class="tool-pill heavy">route-map + prefix-list</span></td>
+            </tr>
+            <tr class="r2">
+              <th>br-edge<br><small style="font-weight:600;color:var(--muted)">OSPF → BGP</small></th>
+              <td>片方向<br>（社内 → ISP）</td>
+              <td class="risk">内部経路の漏洩・意図しないトランジット化。</td>
+              <td><span class="tool-pill mid">prefix-list（OUT）</span></td>
+            </tr>
+            <tr class="r3">
+              <th>hq-edge / br-edge<br><small style="font-weight:600;color:var(--muted)">BGP → OSPF</small></th>
+              <td>片方向<br>（default 注入）</td>
+              <td class="risk">ほぼ無い。入れるのは <code>0.0.0.0/0</code> の1本だけ。</td>
+              <td><span class="tool-pill light">default-information originate</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="cmp-kicker">結論：<b>道具の重さ ＝ その関所のリスクの重さ。</b> 一番危ない hq-core だけが route-map + prefix-list の“フル装備”に見えるので「EIGRP だけ特別」と感じるだけです。</p>
+  </section>
+
+  <!-- ============ LOOP ============ -->
+  <section aria-labelledby="loop-h">
+    <span class="eyebrow q">Q. なぜループしないの？</span>
+    <h2 id="loop-h">ループはなぜ起きて、なぜ止まるか</h2>
+    <p class="sec-lead">再配信ループは「ある言葉に出した経路が、別の境目を通って元の言葉に戻ってくる」ときに起きます。今回の構成で止まる理由は2つです。</p>
+
+    <div class="loop-grid">
+      <div class="card loop bad">
+        <h3><span class="ic" aria-hidden="true">✕</span>もしフィルタが無ければ</h3>
+        <ul>
+          <li>OSPF に入った経路が、<b>関所を素通り</b>して EIGRP へ。</li>
+          <li>EIGRP 側でメトリックが付き直り、<b>別の道として OSPF に戻る</b>。</li>
+          <li>「どっちが本物？」をルータが決められず、経路がバタつく／最悪ぐるぐる回る。</li>
+        </ul>
+      </div>
+      <div class="card loop good">
+        <h3><span class="ic" aria-hidden="true">✓</span>今回止まる理由</h3>
+        <ul>
+          <li><b>再配信点は hq-core ただ1台。</b> EIGRP 側の隣は hq-dist だけで、戻り口が他に無い。</li>
+          <li><b>route-map で対象を明示。</b> 通すのは <code>10.26.0.0/16</code> 配下に限定し、想定外の経路は暗黙 deny。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="caveat"><b>正直な注意：</b> これは「絶対にループしない」保証ではありません。<code>10.26.0.0/16 le 32</code> は HQ・DMZ・支社をまとめて広く通します。将来、再配信点を2台に増やすなら、<b>再配信時に route tag を付け、反対方向では自分のタグを deny する</b>方式を足すのが定石です（今の Phase 7 の必須設定ではなく、拡張時の設計候補）。</div>
+  </section>
+
+  <!-- ============ IP FLOW ============ -->
+  <section aria-labelledby="ip-h">
+    <span class="eyebrow q">Q. どのIPが、どこからどこへ？</span>
+    <h2 id="ip-h">経路情報の行き先を一覧で</h2>
+    <p class="sec-lead">prefix-list に書くのは「端末1台の IP」ではなく、ルーティングテーブルに載る<strong>宛先ネットワーク</strong>です。どのネットが、どの言葉からどの言葉へ渡るか。</p>
+
+    <div class="ipflow">
+      <div class="ip-item e">
+        <span class="addr">10.26.10.0/24<small>HQ内勤 · hq-pc が所属</small></span>
+        <span class="path"><b>EIGRP</b> →〔関所①〕→ <b>OSPF</b>。hq-edge や hq-dmz にも「内勤ネットへの道」が伝わる。</span>
+      </div>
+      <div class="ip-item o">
+        <span class="addr">10.26.30.0/24<small>DMZ · dmz-srv が所属</small></span>
+        <span class="path"><b>OSPF</b> →〔関所①〕→ <b>EIGRP</b>。hq-dist が DMZ への道を知り、hq-pc→dmz-srv が成立。</span>
+      </div>
+      <div class="ip-item b">
+        <span class="addr">10.26.20.0/24<small>支社 · br-pc が所属</small></span>
+        <span class="path"><b>OSPF Area1</b> →〔関所②〕→ <b>BGP</b> → ISP。支社ネットだけを外へ広告。</span>
+      </div>
+      <div class="ip-item d">
+        <span class="addr">0.0.0.0/0<small>デフォルト経路（それ以外ぜんぶ）</small></span>
+        <span class="path">ISP → <b>BGP</b> → 両Edgeが <b>OSPF</b> へ注入 → HQ では〔関所①〕→ <b>EIGRP</b>。個別に知らない宛先の受け皿。</span>
+      </div>
+    </div>
+    <p class="ip-note"><b>読み方のコツ：</b> <code>10.26.20.10</code>（端末）ではなく <code>10.26.20.0/24</code>（そのネット）を書く。フィルタが見るのは「宛先ネットワークとマスク長」で、個々の PC ではありません。</p>
+  </section>
+
+  <!-- ============ SHOW COMMANDS ============ -->
+  <section aria-labelledby="show-h">
+    <span class="eyebrow map">確認の勘所</span>
+    <h2 id="show-h">投入後は show コマンドで“翻訳”を確かめる</h2>
+    <div class="show-intro"><b>この教材は設定コマンドの答えは載せません。</b> 変換して投入するのは学習者の役目です。ここでは「投入後に何を確認すればよいか」の勘所（show 系のヒント）だけを置きます。</div>
+
+    <div class="show-grid">
+      <div class="show">
+        <code>show ip route</code>
+        <p>再配信された経路は種別で見分ける。<span class="kw">O E2</span>（EIGRP由来がOSPFへ）・<span class="kw">D EX</span>（OSPF由来がEIGRPへ）・<span class="kw">B*</span>（BGPのデフォルト）。<b>期待どおりの種別と next-hop か。</b></p>
+      </div>
+      <div class="show">
+        <code>show ip prefix-list</code>
+        <p>permit 条件と <b>hit count</b> を確認。0 のままなら一致していない＝マスク長や <code>le 32</code> の付け忘れを疑う。暗黙 deny の影響も意識する。</p>
+      </div>
+      <div class="show">
+        <code>show route-map</code>
+        <p>sequence 番号・match 条件・permit/deny の並びを確認。<b>参照している prefix-list 名が合っているか</b>（打ち間違いは全落ちの原因）。</p>
+      </div>
+      <div class="show">
+        <code>show ip protocols</code>
+        <p>再配信元・適用中の route-map 名・EIGRP のシード metric を一望。<b>意図した再配信が有効になっているか。</b></p>
+      </div>
+      <div class="show">
+        <code>show ip bgp</code>
+        <p>支社が広告しているのは <code>10.26.20.0/24</code> だけか。<code>0.0.0.0/0</code> を受信できているか。<b>関所②と default 注入の前提を確認。</b></p>
+      </div>
+      <div class="show">
+        <code>show ip eigrp topology</code>
+        <p>再配信された外部経路が EIGRP トポロジに載っているか。<b>hq-dist から DMZ / default が見えるか</b>を最終確認。</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>本書は Phase 7 の「狙い」を図で理解するための補助教材です。値の正本は各設計書を参照してください。既存の <code>Phase7_経路制御と再配信_解説.html</code> は変更していません。</p>
+    <nav class="doc-links" aria-label="関連ドキュメント">
+      <a href="パラメータシート_設定順.md">パラメータシート（設定順）</a>
+      <a href="パラメータシート.md">ノード別パラメータ</a>
+      <a href="../02_基本設計/IPアドレス管理表.md">IPアドレス管理表</a>
+      <a href="../02_基本設計/ネットワーク構成図.html">ネットワーク構成図</a>
+      <a href="../05_試験/試験計画書.md">試験計画書</a>
+    </nav>
+  </footer>
+</main>
+
+<script>
+  "use strict";
+  const buttons = [...document.querySelectorAll(".toggle button")];
+  const overlays = [...document.querySelectorAll(".overlay")];
+  const gates = [...document.querySelectorAll(".gate")];
+  const edgeMark = document.querySelector(".edge-mark");
+  const cap = document.getElementById("mode-cap");
+
+  const CAPTIONS = {
+    advert: '<b>いま表示中：経路情報の流れ。</b> 各ネットワークの「道案内」が、関所で絞られながら別の言葉へ渡っていきます。関所 ①② が働くのはこの場面です。',
+    packet: '<b>いま表示中：実パケットの流れ。</b> 実際の通信は、道案内が引かれた後を進むだけ。関所は通信を止めません。HQ→支社は hq-edge で NAT されます。'
+  };
+
+  function setMode(mode) {
+    buttons.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.mode === mode)));
+    // SVG <g> は HTMLElement の hidden プロパティを反映しないため、属性で切り替える
+    overlays.forEach(o => o.toggleAttribute("hidden", o.dataset.overlay !== mode));
+    // 経路情報モードでは関所を強調、実パケットモードでは関所を控えめに
+    gates.forEach(g => g.classList.toggle("dim", mode !== "advert"));
+    if (edgeMark) edgeMark.classList.toggle("dim", mode !== "packet");
+    cap.innerHTML = CAPTIONS[mode];
+  }
+
+  buttons.forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
+  setMode("advert");
+</script>
+</body>
+</html>

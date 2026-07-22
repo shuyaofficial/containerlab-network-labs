@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Phase 7｜経路制御と再配信の見える化</title>
+  <style>
+    :root {
+      --ink: #18252d;
+      --muted: #5d6b73;
+      --faint: #7d898f;
+      --paper: #fcfbf9;
+      --canvas: #f2efe9;
+      --surface: #fffefa;
+      --line: #d8d3ca;
+      --line-strong: #aaa49a;
+      --blue: #176d91;
+      --blue-soft: #e8f3f7;
+      --ospf: #27785f;
+      --ospf-soft: #e8f3ed;
+      --eigrp: #a86718;
+      --eigrp-soft: #fff1dc;
+      --bgp: #71539a;
+      --bgp-soft: #f0ebf7;
+      --packet: #087da8;
+      --advert: #d87b17;
+      --permit: #2d7a4c;
+      --deny: #b34b45;
+      --warn: #8a5a16;
+      --warn-soft: #fff5df;
+      --danger-soft: #faece8;
+      --shadow: 0 12px 34px rgba(43, 49, 52, .08);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      background: var(--canvas);
+      font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px;
+      line-height: 1.72;
+    }
+    button, code, pre { font: inherit; }
+    a { color: #075f80; text-underline-offset: 3px; }
+    a:hover { color: var(--packet); }
+    :focus-visible { outline: 3px solid rgba(8, 125, 168, .35); outline-offset: 3px; }
+    h1, h2, h3 { text-wrap: balance; }
+    p, li { text-wrap: pretty; }
+    code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: .92em; }
+
+    .shell { width: min(1520px, 100%); margin: 0 auto; padding: 30px clamp(14px, 3vw, 44px) 56px; }
+    .masthead { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: end; }
+    .kicker { margin: 0 0 7px; color: var(--blue); font-size: .76rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    .kicker::before { content: ""; display: inline-block; width: 27px; height: 3px; margin: 0 9px 3px 0; border-radius: 3px; background: var(--blue); }
+    h1 { margin: 0; font-size: clamp(1.75rem, 3.3vw, 2.75rem); line-height: 1.18; letter-spacing: -.03em; }
+    .lead { max-width: 920px; margin: 10px 0 0; color: var(--muted); font-size: .96rem; }
+    .phase-badge { padding: 9px 13px; border: 1px solid #bbd6df; border-radius: 999px; color: #075d7b; background: var(--blue-soft); font-size: .77rem; font-weight: 850; white-space: nowrap; }
+    .doc-links { display: flex; flex-wrap: wrap; gap: 7px 20px; margin: 19px 0 22px; font-size: .8rem; }
+
+    .truth-banner { display: grid; grid-template-columns: auto 1fr; gap: 13px; margin-bottom: 20px; padding: 15px 18px; border: 1px solid #e4c98f; border-radius: 13px; background: var(--warn-soft); }
+    .truth-banner .mark { width: 29px; height: 29px; border-radius: 50%; color: #fff; background: var(--warn); text-align: center; font-weight: 900; line-height: 29px; }
+    .truth-banner strong { display: block; margin-bottom: 2px; font-size: .9rem; }
+    .truth-banner p { margin: 0; color: #6b542e; font-size: .82rem; }
+
+    .card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); box-shadow: var(--shadow); }
+    .section-head { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; margin-bottom: 14px; }
+    .section-head h2 { margin: 0; font-size: 1.28rem; line-height: 1.35; }
+    .section-head p { max-width: 850px; margin: 5px 0 0; color: var(--muted); font-size: .84rem; }
+    .eyebrow { color: var(--blue); font-size: .7rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+
+    .scenario-card { overflow: hidden; }
+    .scenario-header { padding: 21px 22px 0; }
+    .scenario-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; padding: 0 22px 18px; }
+    .scenario-tab {
+      min-height: 48px;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      color: #4e5c64;
+      background: #f4f1eb;
+      cursor: pointer;
+      font-size: .78rem;
+      font-weight: 850;
+      line-height: 1.35;
+      transition-property: transform, color, background-color, border-color, box-shadow;
+      transition-duration: 150ms;
+      transition-timing-function: ease-out;
+    }
+    .scenario-tab:hover { border-color: #9bbecb; color: #154f68; }
+    .scenario-tab:active { transform: scale(.98); }
+    .scenario-tab[aria-selected="true"] { border-color: #68a7bc; color: #064e68; background: var(--blue-soft); box-shadow: 0 2px 9px rgba(34, 82, 101, .1); }
+
+    .diagram-scroll { overflow-x: auto; border-block: 1px solid var(--line); background: #f8f6f1; }
+    .topology { display: block; width: 100%; min-width: 1360px; height: auto; }
+    .domain { stroke-width: 1.5; }
+    .domain-eigrp { fill: var(--eigrp-soft); stroke: #d3a668; }
+    .domain-ospf { fill: var(--ospf-soft); stroke: #91b7a4; }
+    .domain-bgp { fill: var(--bgp-soft); stroke: #aa98c3; }
+    .domain-title { fill: #3d4a51; font-size: 14px; font-weight: 850; }
+    .domain-sub { fill: #6c777e; font-size: 10px; }
+    .base-link { fill: none; stroke: #a9a39a; stroke-width: 5; stroke-linecap: round; }
+    .base-link.eigrp { stroke: var(--eigrp); stroke-dasharray: 10 7; }
+    .base-link.ospf { stroke: var(--ospf); }
+    .base-link.bgp { stroke: var(--bgp); stroke-dasharray: 3 7; }
+    .node-card {
+      fill: var(--surface);
+      stroke: #aeb6b8;
+      stroke-width: 1.4;
+      transition-property: stroke, stroke-width, filter;
+      transition-duration: 180ms;
+      transition-timing-function: ease-out;
+    }
+    .node-accent { fill: var(--blue); }
+    .node.endpoint .node-accent { fill: #4f8a63; }
+    .node.edge .node-accent { fill: var(--bgp); }
+    .node.isp .node-accent { fill: var(--deny); }
+    .node.core .node-card { stroke: #d17a18; stroke-width: 2.3; }
+    .node.is-active .node-card { stroke: var(--packet); stroke-width: 3.2; filter: drop-shadow(0 4px 5px rgba(30, 72, 89, .2)); }
+    .node-name { fill: var(--ink); font-size: 13px; font-weight: 900; text-anchor: middle; }
+    .node-role { fill: #58666e; font-size: 9.5px; text-anchor: middle; }
+    .node-ip { fill: #69767d; font-size: 9px; font-family: "SFMono-Regular", Consolas, monospace; text-anchor: middle; }
+    .link-tag rect { fill: #fffefa; stroke: #d3cec4; }
+    .link-tag text { fill: #34434b; font-size: 9px; font-weight: 750; text-anchor: middle; }
+    .link-tag .minor { fill: #758087; font-size: 8px; font-weight: 650; }
+    .policy-box { fill: #fff8ea; stroke: #d8a658; stroke-width: 1.5; transition-property: stroke, stroke-width, filter; transition-duration: 180ms; transition-timing-function: ease-out; }
+    .policy.is-active .policy-box { stroke: var(--advert); stroke-width: 3; filter: drop-shadow(0 4px 5px rgba(110, 75, 25, .18)); }
+    .policy-title { fill: #704917; font-size: 10px; font-weight: 900; text-anchor: middle; }
+    .policy-copy { fill: #795c33; font-size: 8px; text-anchor: middle; }
+    .overlay { fill: none; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; opacity: .95; }
+    .overlay.packet { stroke: var(--packet); marker-end: url(#arrow-packet); }
+    .overlay.advert { stroke: var(--advert); stroke-dasharray: 11 8; marker-end: url(#arrow-advert); }
+    .overlay.permit { stroke: var(--permit); stroke-dasharray: 11 7; marker-end: url(#arrow-permit); }
+    .overlay.deny { stroke: var(--deny); stroke-dasharray: 5 7; marker-end: url(#arrow-deny); }
+    .overlay-label rect { fill: #fffefa; stroke-width: 1.5; }
+    .overlay-label text { font-size: 10px; font-weight: 900; text-anchor: middle; }
+    .overlay-label.packet rect { stroke: var(--packet); } .overlay-label.packet text { fill: #075b78; }
+    .overlay-label.advert rect { stroke: var(--advert); } .overlay-label.advert text { fill: #91500d; }
+    .overlay-label.permit rect { stroke: var(--permit); } .overlay-label.permit text { fill: #27653f; }
+    .overlay-label.deny rect { stroke: var(--deny); } .overlay-label.deny text { fill: #8d3935; }
+    .x-mark { stroke: var(--deny); stroke-width: 7; stroke-linecap: round; }
+    .scenario-layer[hidden] { display: none; }
+    .stage-item { opacity: 0; transition-property: opacity; transition-duration: 180ms; transition-timing-function: ease-out; pointer-events: none; }
+    .stage-item.is-shown { opacity: 1; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 9px 20px; padding: 13px 22px; color: var(--muted); font-size: .75rem; }
+    .legend-item { display: inline-flex; align-items: center; gap: 7px; }
+    .legend-line { width: 28px; border-top: 4px solid; }
+    .legend-line.packet { border-color: var(--packet); }
+    .legend-line.advert { border-color: var(--advert); border-top-style: dashed; }
+    .legend-line.permit { border-color: var(--permit); border-top-style: dashed; }
+    .legend-line.deny { border-color: var(--deny); border-top-style: dotted; }
+    .route-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 0 22px 18px; border-bottom: 1px solid var(--line); }
+    .route-control {
+      min-height: 44px;
+      padding: 8px 13px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      color: #47565e;
+      background: #f4f1eb;
+      cursor: pointer;
+      font-size: .76rem;
+      font-weight: 850;
+      transition-property: transform, color, background-color, border-color, box-shadow;
+      transition-duration: 150ms;
+      transition-timing-function: ease-out;
+    }
+    .route-control:hover:not(:disabled) { border-color: #9bbecb; color: #075a78; background: var(--blue-soft); }
+    .route-control:active:not(:disabled) { transform: scale(.98); }
+    .route-control:disabled { cursor: not-allowed; opacity: .45; }
+    .route-control.play { min-width: 104px; color: #fff; border-color: var(--blue); background: var(--blue); }
+    .route-control.play:hover:not(:disabled) { color: #fff; border-color: #075d7b; background: #075d7b; }
+    .step-counter { margin-left: auto; color: var(--muted); font-family: "SFMono-Regular", Consolas, monospace; font-size: .76rem; font-variant-numeric: tabular-nums; }
+    .play-state { width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    .scenario-detail { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.5fr); gap: 18px; padding: 20px 22px 23px; }
+    .scenario-copy { padding: 15px 16px; border: 1px solid #bfd7df; border-radius: 12px; background: var(--blue-soft); }
+    .scenario-copy h3 { margin: 0 0 6px; color: #075a78; font-size: 1rem; }
+    .scenario-copy p { margin: 0; color: #3e5964; font-size: .82rem; }
+    .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .steps li { position: relative; padding: 12px 12px 12px 39px; border: 1px solid var(--line); border-radius: 10px; background: #f8f6f1; color: #4e5c64; font-size: .76rem; transition-property: color, background-color, border-color, box-shadow; transition-duration: 180ms; transition-timing-function: ease-out; }
+    .steps li::before { content: attr(data-step); position: absolute; top: 12px; left: 11px; width: 20px; height: 20px; border-radius: 50%; color: #fff; background: var(--blue); text-align: center; font-size: .68rem; font-weight: 900; line-height: 20px; }
+    .steps li.is-current { color: #174b60; border-color: #8dbdcc; background: var(--blue-soft); box-shadow: 0 2px 8px rgba(34, 82, 101, .08); }
+    .steps li.is-pending { color: var(--faint); background: #fbfaf7; }
+    .steps li.is-pending::before { color: #6b777d; background: #d9d6cf; }
+
+    .content-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 18px; }
+    .content-card { padding: 22px; }
+    .content-card.wide { grid-column: 1 / -1; }
+    .content-card h2 { margin: 0 0 6px; font-size: 1.2rem; }
+    .content-card > p { margin: 0 0 14px; color: var(--muted); font-size: .83rem; }
+    .flow-list { display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; }
+    .flow-list li { display: grid; grid-template-columns: 110px 1fr; gap: 12px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: #f8f6f1; font-size: .79rem; }
+    .flow-list strong { color: var(--blue); }
+    .code-block { position: relative; margin: 11px 0 14px; overflow: auto; border: 1px solid #cac5bc; border-radius: 11px; background: #252d32; color: #edf2f2; }
+    .code-label { padding: 7px 12px; border-bottom: 1px solid #465057; color: #bfccd0; background: #30393f; font-size: .68rem; font-weight: 850; letter-spacing: .05em; }
+    pre { margin: 0; padding: 14px 15px 16px; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: .75rem; line-height: 1.62; tab-size: 2; white-space: pre; }
+    .callout { margin: 12px 0 0; padding: 12px 14px; border-left: 4px solid var(--warn); border-radius: 0 9px 9px 0; color: #6a512b; background: var(--warn-soft); font-size: .78rem; }
+    .callout.danger { border-left-color: var(--deny); color: #713b38; background: var(--danger-soft); }
+    .mini-title { margin: 18px 0 7px; font-size: .91rem; }
+
+    .comparison { width: 100%; border-collapse: collapse; border-spacing: 0; font-size: .78rem; }
+    .comparison th, .comparison td { padding: 10px 11px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    .comparison th { color: #45535a; background: #f1eee7; font-weight: 900; }
+    .comparison tr:last-child td { border-bottom: 0; }
+    .comparison td:first-child { font-weight: 850; white-space: nowrap; }
+    .chip { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 999px; font-size: .68rem; font-weight: 850; }
+    .chip.yes { color: #27653f; background: #e5f2e9; }
+    .chip.no { color: #8d3935; background: #f7e7e5; }
+
+    .order { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; margin: 12px 0 0; padding: 0; counter-reset: order; list-style: none; }
+    .order li { position: relative; min-height: 118px; padding: 39px 12px 12px; border: 1px solid var(--line); border-radius: 11px; background: #f8f6f1; font-size: .75rem; }
+    .order li::before { counter-increment: order; content: counter(order); position: absolute; top: 11px; left: 12px; width: 21px; height: 21px; border-radius: 50%; color: #fff; background: var(--blue); text-align: center; font-size: .7rem; font-weight: 900; line-height: 21px; }
+    .order strong { display: block; margin-bottom: 3px; color: #35434a; }
+    .verify-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 13px; }
+    .verify-item { padding: 11px; border: 1px solid var(--line); border-radius: 9px; background: #f8f6f1; }
+    .verify-item code { display: block; margin-bottom: 5px; color: #075d7b; font-size: .72rem; font-weight: 850; overflow-wrap: anywhere; }
+    .verify-item span { color: var(--muted); font-size: .69rem; }
+    footer { margin-top: 19px; color: var(--faint); font-size: .72rem; }
+
+    @media (max-width: 1050px) {
+      .scenario-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .scenario-detail { grid-template-columns: 1fr; }
+      .content-grid { grid-template-columns: 1fr; }
+      .content-card.wide { grid-column: auto; }
+      .order, .verify-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 680px) {
+      .shell { padding-top: 20px; }
+      .masthead { grid-template-columns: 1fr; }
+      .phase-badge { justify-self: start; }
+      .truth-banner { grid-template-columns: 1fr; }
+      .scenario-tabs { grid-template-columns: 1fr; padding-inline: 14px; }
+      .route-controls { padding-inline: 14px; }
+      .route-control { flex: 1 1 calc(50% - 7px); }
+      .step-counter { flex-basis: 100%; margin-left: 0; text-align: right; }
+      .scenario-header, .scenario-detail, .content-card { padding-inline: 16px; }
+      .steps, .order, .verify-grid { grid-template-columns: 1fr; }
+      .flow-list li { grid-template-columns: 1fr; gap: 3px; }
+      .table-scroll { overflow-x: auto; }
+      .comparison { min-width: 680px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition-duration: .01ms !important; }
+    }
+    @media print {
+      body { background: #fff; }
+      .shell { width: 100%; padding: 0; }
+      .scenario-tabs { display: none; }
+      .card { box-shadow: none; break-inside: avoid; }
+      .diagram-scroll { overflow: visible; }
+      .topology { min-width: 0; }
+      .content-grid { display: block; }
+      .content-card { margin-top: 12px; }
+    }
+  </style>
+</head>
+<body>
+<main class="shell">
+  <header class="masthead">
+    <div>
+      <p class="kicker">Theme 26 · Dynamic Routing Deep Dive</p>
+      <h1>Phase 7｜経路制御と再配信の見える化</h1>
+      <p class="lead">route-map と prefix-list が「どの通信を止めるか」ではなく、「どの経路情報を、どのルーティング領域へ渡すか」を制御する様子を、実際のパケット経路と分けて確認します。</p>
+    </div>
+    <span class="phase-badge">現行設計を解説 · 既存資料は未変更</span>
+  </header>
+
+  <nav class="doc-links" aria-label="関連ドキュメント">
+    <a href="パラメータシート_設定順.md">Phase 7の正本</a>
+    <a href="パラメータシート.md">ノード別パラメータ</a>
+    <a href="../02_基本設計/IPアドレス管理表.md">IPアドレス管理表</a>
+    <a href="../02_基本設計/ネットワーク構成図.html">物理・論理構成図</a>
+    <a href="../05_試験/試験計画書.md">試験計画書</a>
+  </nav>
+
+  <aside class="truth-banner" aria-label="重要な前提">
+    <span class="mark" aria-hidden="true">!</span>
+    <div>
+      <strong>最初に押さえること：経路フィルタと通信フィルタは別物です。</strong>
+      <p>ここでの prefix-list / route-map はルータが交換する「宛先までの道案内」を選別します。PCのHTTPやpingを直接許可・拒否するのは、通常はインターフェースACLやファイアウォールの役目です。</p>
+    </div>
+  </aside>
+
+  <section class="card scenario-card" aria-labelledby="diagram-title">
+    <div class="scenario-header">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">Interactive path map</span>
+          <h2 id="diagram-title">通信と経路広告を、別の線で追う</h2>
+          <p>ボタンを選ぶと、同じネットワーク上で「実パケット」と「経路広告」のどちらが、どの方向へ進むかが切り替わります。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="scenario-tabs" role="tablist" aria-label="通信シナリオ">
+      <button class="scenario-tab" id="tab-hq-dmz" role="tab" aria-selected="true" aria-controls="scenario-description" tabindex="0" data-scenario="hq-dmz">HQ PC → DMZ</button>
+      <button class="scenario-tab" id="tab-hq-branch" role="tab" aria-selected="false" aria-controls="scenario-description" tabindex="-1" data-scenario="hq-branch">HQ PC → Branch PC</button>
+      <button class="scenario-tab" id="tab-default" role="tab" aria-selected="false" aria-controls="scenario-description" tabindex="-1" data-scenario="default">Default Routeの注入</button>
+      <button class="scenario-tab" id="tab-branch-filter" role="tab" aria-selected="false" aria-controls="scenario-description" tabindex="-1" data-scenario="branch-filter">Branch BGP広告フィルタ</button>
+    </div>
+
+    <div class="diagram-scroll">
+      <svg class="topology" viewBox="0 0 1580 640" role="img" aria-labelledby="svg-title svg-desc">
+        <title id="svg-title">Phase 7 経路制御と再配信の構成図</title>
+        <desc id="svg-desc">HQのEIGRPとOSPF、ISPと支社のBGPおよびOSPFを接続し、シナリオごとのパケットと経路広告を重ねて表示する図</desc>
+        <defs>
+          <marker id="arrow-packet" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,5 L0,10 z" fill="#087da8"/></marker>
+          <marker id="arrow-advert" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,5 L0,10 z" fill="#d87b17"/></marker>
+          <marker id="arrow-permit" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,5 L0,10 z" fill="#2d7a4c"/></marker>
+          <marker id="arrow-deny" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,5 L0,10 z" fill="#b34b45"/></marker>
+        </defs>
+
+        <rect class="domain domain-eigrp" x="20" y="52" width="432" height="210" rx="18"/>
+        <text class="domain-title" x="42" y="79">HQ EIGRP AS 100</text><text class="domain-sub" x="42" y="97">10.26.10.0/24 · hq-dist · hq-core E0/1</text>
+        <rect class="domain domain-ospf" x="438" y="52" width="358" height="525" rx="18"/>
+        <text class="domain-title" x="460" y="79">HQ OSPF Process 10 / Area 0</text><text class="domain-sub" x="460" y="97">hq-core · hq-edge · hq-dmz · DMZ</text>
+        <rect class="domain domain-bgp" x="782" y="52" width="450" height="210" rx="18"/>
+        <text class="domain-title" x="804" y="79">eBGP WAN</text><text class="domain-sub" x="804" y="97">AS 65000 ↔ AS 65100 ↔ AS 65001</text>
+        <rect class="domain domain-ospf" x="1218" y="52" width="342" height="210" rx="18"/>
+        <text class="domain-title" x="1240" y="79">Branch OSPF Area 1</text><text class="domain-sub" x="1240" y="97">10.26.20.0/24</text>
+
+        <path class="base-link" d="M166 176 H212"/>
+        <path class="base-link eigrp" d="M362 176 H462"/>
+        <path class="base-link ospf" d="M612 176 H648"/>
+        <path class="base-link bgp" d="M798 176 H842"/>
+        <path class="base-link bgp" d="M962 176 H1006"/>
+        <path class="base-link bgp" d="M1156 176 H1220"/>
+        <path class="base-link ospf" d="M1370 176 H1420"/>
+        <path class="base-link ospf" d="M537 216 V393 H380"/>
+        <path class="base-link" d="M230 393 H170"/>
+
+        <g class="link-tag" transform="translate(189 117)"><rect x="-53" y="-15" width="106" height="30" rx="6"/><text y="-2">10.26.10.0/24</text><text class="minor" y="10">HQ Trust LAN</text></g>
+        <g class="link-tag" transform="translate(412 117)"><rect x="-55" y="-15" width="110" height="30" rx="6"/><text y="-2">10.26.1.0/30</text><text class="minor" y="10">EIGRP</text></g>
+        <g class="link-tag" transform="translate(630 117)"><rect x="-55" y="-15" width="110" height="30" rx="6"/><text y="-2">10.26.1.4/30</text><text class="minor" y="10">OSPF Area 0</text></g>
+        <g class="link-tag" transform="translate(820 117)"><rect x="-62" y="-15" width="124" height="30" rx="6"/><text y="-2">198.51.100.0/30</text><text class="minor" y="10">eBGP / NAT outside</text></g>
+        <g class="link-tag" transform="translate(984 117)"><rect x="-42" y="-15" width="84" height="30" rx="6"/><text y="-2">AS 65100</text><text class="minor" y="10">ISP</text></g>
+        <g class="link-tag" transform="translate(1188 117)"><rect x="-62" y="-15" width="124" height="30" rx="6"/><text y="-2">198.51.100.4/30</text><text class="minor" y="10">eBGP</text></g>
+        <g class="link-tag" transform="translate(1325 117)"><rect x="-55" y="-15" width="110" height="30" rx="6"/><text y="-2">10.26.2.0/30</text><text class="minor" y="10">OSPF Area 1</text></g>
+        <g class="link-tag" transform="translate(1475 117)"><rect x="-58" y="-15" width="116" height="30" rx="6"/><text y="-2">10.26.20.0/24</text><text class="minor" y="10">Branch Trust LAN</text></g>
+        <g class="link-tag" transform="translate(455 335)"><rect x="-55" y="-15" width="110" height="30" rx="6"/><text y="-2">10.26.1.8/30</text><text class="minor" y="10">OSPF Area 0</text></g>
+        <g class="link-tag" transform="translate(200 468)"><rect x="-55" y="-15" width="110" height="30" rx="6"/><text y="-2">10.26.30.0/24</text><text class="minor" y="10">DMZ LAN</text></g>
+
+        <!-- Scenario overlays are painted before nodes so labels remain readable. -->
+        <g class="scenario-layer" data-layer="hq-dmz">
+          <g class="stage-item" data-stage="1">
+            <path class="overlay advert" d="M380 393 H420 V196 H462"/>
+            <g class="overlay-label advert" transform="translate(408 510)"><rect x="-78" y="-15" width="156" height="30" rx="6"/><text y="4">1. DMZ経路をOSPFで広告</text></g>
+          </g>
+          <g class="stage-item" data-stage="2">
+            <path class="overlay advert" d="M462 176 H362"/>
+            <g class="overlay-label advert" transform="translate(408 550)"><rect x="-87" y="-15" width="174" height="30" rx="6"/><text y="4">2. hq-coreでEIGRPへ再配信</text></g>
+          </g>
+          <g class="stage-item" data-stage="3">
+            <path class="overlay packet" d="M166 176 H500 V393 H170"/>
+            <g class="overlay-label packet" transform="translate(408 590)"><rect x="-84" y="-15" width="168" height="30" rx="6"/><text y="4">3. 実パケット 10.26.30.10宛</text></g>
+          </g>
+        </g>
+
+        <g class="scenario-layer" data-layer="hq-branch" hidden>
+          <g class="stage-item" data-stage="1">
+            <path class="overlay advert" d="M842 168 H798 M648 184 H612"/>
+            <g class="overlay-label advert" transform="translate(724 330)"><rect x="-95" y="-15" width="190" height="30" rx="6"/><text y="4">1. DefaultをBGP→OSPFへ注入</text></g>
+          </g>
+          <g class="stage-item" data-stage="2">
+            <path class="overlay advert" d="M462 176 H362"/>
+            <g class="overlay-label advert" transform="translate(724 370)"><rect x="-94" y="-15" width="188" height="30" rx="6"/><text y="4">2. hq-coreでEIGRPへ再配信</text></g>
+          </g>
+          <g class="stage-item" data-stage="3">
+            <path class="overlay packet" d="M166 176 H1485"/>
+            <g class="overlay-label packet" transform="translate(724 410)"><rect x="-91" y="-15" width="182" height="30" rx="6"/><text y="4">3. 実パケット：HQ → Branch</text></g>
+            <g class="overlay-label packet" transform="translate(724 450)"><rect x="-96" y="-15" width="192" height="30" rx="6"/><text y="4">hq-edgeでNAT/PAT（Phase 8）</text></g>
+          </g>
+        </g>
+
+        <g class="scenario-layer" data-layer="default" hidden>
+          <g class="stage-item" data-stage="1">
+            <path class="overlay advert" d="M842 168 H798 M962 184 H1006"/>
+            <g class="overlay-label advert" transform="translate(902 330)"><rect x="-92" y="-15" width="184" height="30" rx="6"/><text y="4">1. ISPが両EdgeへDefault広告</text></g>
+          </g>
+          <g class="stage-item" data-stage="2">
+            <path class="overlay advert" d="M648 168 H612 M1156 184 H1220"/>
+            <g class="overlay-label advert" transform="translate(902 370)"><rect x="-98" y="-15" width="196" height="30" rx="6"/><text y="4">2. 両EdgeがOSPFへDefault注入</text></g>
+          </g>
+          <g class="stage-item" data-stage="3">
+            <path class="overlay advert" d="M462 176 H362"/>
+            <g class="overlay-label advert" transform="translate(902 410)"><rect x="-99" y="-15" width="198" height="30" rx="6"/><text y="4">3. HQではさらにEIGRPへ再配信</text></g>
+          </g>
+        </g>
+
+        <g class="scenario-layer" data-layer="branch-filter" hidden>
+          <g class="stage-item" data-stage="1">
+            <path class="overlay advert" d="M1220 176 H1156"/>
+            <g class="overlay-label advert" transform="translate(1110 330)"><rect x="-100" y="-15" width="200" height="30" rx="6"/><text y="4">1. Branch LANをOSPFで学習</text></g>
+          </g>
+          <g class="stage-item" data-stage="2">
+            <path class="overlay permit" d="M1006 176 H962"/>
+            <g class="overlay-label permit" transform="translate(1110 370)"><rect x="-96" y="-15" width="192" height="30" rx="6"/><text y="4">2. 許可：10.26.20.0/24 → ISP</text></g>
+          </g>
+          <g class="stage-item" data-stage="3">
+            <path class="overlay deny" d="M1006 196 H970"/>
+            <path class="x-mark" d="M958 181 l22 30 M980 181 l-22 30"/>
+            <g class="overlay-label deny" transform="translate(1110 410)"><rect x="-117" y="-15" width="234" height="30" rx="6"/><text y="4">3. 拒否：10.26.2.0/30、Loopback /32</text></g>
+          </g>
+        </g>
+
+        <g class="node endpoint" data-node="hq-pc" transform="translate(36 137)"><rect class="node-card" width="130" height="79" rx="9"/><rect class="node-accent" width="9" height="79" rx="5"/><text class="node-name" x="65" y="25">hq-pc</text><text class="node-role" x="65" y="45">HQ Trust client</text><text class="node-ip" x="65" y="63">10.26.10.10/24</text></g>
+        <g class="node" data-node="hq-dist" transform="translate(212 137)"><rect class="node-card" width="150" height="79" rx="9"/><rect class="node-accent" width="9" height="79" rx="5"/><text class="node-name" x="75" y="25">hq-dist</text><text class="node-role" x="75" y="45">EIGRP AS 100</text><text class="node-ip" x="75" y="63">GW 10.26.10.1</text></g>
+        <g class="node core" data-node="hq-core" transform="translate(462 137)"><rect class="node-card" width="150" height="79" rx="9"/><rect class="node-accent" width="9" height="79" rx="5"/><text class="node-name" x="75" y="25">hq-core</text><text class="node-role" x="75" y="45">OSPF ↔ EIGRP 再配信</text><text class="node-ip" x="75" y="63">RID 10.26.255.1</text></g>
+        <g class="node edge" data-node="hq-edge" transform="translate(648 137)"><rect class="node-card" width="150" height="79" rx="9"/><rect class="node-accent" width="9" height="79" rx="5"/><text class="node-name" x="75" y="25">hq-edge</text><text class="node-role" x="75" y="45">OSPF / BGP / NAT</text><text class="node-ip" x="75" y="63">198.51.100.1</text></g>
+        <g class="node isp" data-node="isp" transform="translate(842 137)"><rect class="node-card" width="120" height="79" rx="9"/><rect class="node-accent" width="9" height="79" rx="5"/><text class="node-name" x="60" y="25">isp</text><text class="node-role" x="60" y="45">BGP AS 65100</text><text class="node-ip" x="60" y="63">.2 / .5</text></g>
+        <g class="node edge" data-node="br-edge" transform="translate(1006 137)"><rect class="node-card" width="150" height="79" rx="9"/><rect class="node-accent" width="9" height="79" rx="5"/><text class="node-name" x="75" y="25">br-edge</text><text class="node-role" x="75" y="45">BGP AS 65001 / OSPF</text><text class="node-ip" x="75" y="63">198.51.100.6</text></g>
+        <g class="node" data-node="br-core" transform="translate(1220 137)"><rect class="node-card" width="150" height="79" rx="9"/><rect class="node-accent" width="9" height="79" rx="5"/><text class="node-name" x="75" y="25">br-core</text><text class="node-role" x="75" y="45">OSPF Area 1</text><text class="node-ip" x="75" y="63">GW 10.26.20.1</text></g>
+        <g class="node endpoint" data-node="br-pc" transform="translate(1420 137)"><rect class="node-card" width="130" height="79" rx="9"/><rect class="node-accent" width="9" height="79" rx="5"/><text class="node-name" x="65" y="25">br-pc</text><text class="node-role" x="65" y="45">Branch Trust client</text><text class="node-ip" x="65" y="63">10.26.20.10/24</text></g>
+        <g class="node" data-node="hq-dmz" transform="translate(230 354)"><rect class="node-card" width="150" height="79" rx="9"/><rect class="node-accent" width="9" height="79" rx="5"/><text class="node-name" x="75" y="25">hq-dmz</text><text class="node-role" x="75" y="45">OSPF Area 0</text><text class="node-ip" x="75" y="63">GW 10.26.30.1</text></g>
+        <g class="node endpoint" data-node="dmz-srv" transform="translate(40 354)"><rect class="node-card" width="130" height="79" rx="9"/><rect class="node-accent" width="9" height="79" rx="5"/><text class="node-name" x="65" y="25">dmz-srv</text><text class="node-role" x="65" y="45">DMZ server</text><text class="node-ip" x="65" y="63">10.26.30.10/24</text></g>
+
+        <g class="policy" data-policy="hq-core" transform="translate(420 244)"><rect class="policy-box" width="234" height="62" rx="10"/><text class="policy-title" x="117" y="22">hq-core：route-map 適用点</text><text class="policy-copy" x="117" y="39">EIGRP → OSPF：10.26.0.0/16 配下を許可</text><text class="policy-copy" x="117" y="52">OSPF → EIGRP：メトリックを付け再配信</text></g>
+        <g class="policy" data-policy="br-edge" transform="translate(966 244)"><rect class="policy-box" width="230" height="62" rx="10"/><text class="policy-title" x="115" y="22">br-edge：prefix-list OUT</text><text class="policy-copy" x="115" y="39">permit 10.26.20.0/24</text><text class="policy-copy" x="115" y="52">その他は暗黙 deny</text></g>
+
+      </svg>
+    </div>
+
+    <div class="legend" aria-label="凡例">
+      <span class="legend-item"><span class="legend-line packet"></span>実際のパケット</span>
+      <span class="legend-item"><span class="legend-line advert"></span>経路広告・再配信</span>
+      <span class="legend-item"><span class="legend-line permit"></span>prefix-listで許可</span>
+      <span class="legend-item"><span class="legend-line deny"></span>prefix-listで拒否</span>
+    </div>
+
+    <div class="route-controls" aria-label="経路ステップ操作">
+      <button class="route-control" type="button" data-action="reset">最初から</button>
+      <button class="route-control" type="button" data-action="previous">前へ</button>
+      <button class="route-control play" id="play-toggle" type="button" data-action="play" aria-pressed="false">再生</button>
+      <button class="route-control" type="button" data-action="next">次へ</button>
+      <span class="step-counter" id="step-counter" aria-live="polite">1 / 3</span>
+      <span class="play-state" id="play-state" aria-live="polite">停止中</span>
+    </div>
+
+    <div class="scenario-detail" id="scenario-description" role="tabpanel" aria-live="polite">
+      <div class="scenario-copy">
+        <h3 id="scenario-title">HQ PCからDMZへ</h3>
+        <p id="scenario-summary">先にDMZ経路がOSPFからEIGRPへ再配信されるため、hq-distは10.26.30.0/24への道を知ります。その後、青線の実パケットがDMZへ進みます。</p>
+      </div>
+      <ol class="steps" id="scenario-steps">
+        <li data-step="1">hq-dmzがDMZ LANをOSPFで広告</li>
+        <li data-step="2">hq-coreがOSPF経路をEIGRPへ再配信</li>
+        <li data-step="3">hq-pcのパケットがhq-dist→hq-core→hq-dmzへ進む</li>
+      </ol>
+    </div>
+  </section>
+
+  <div class="content-grid">
+    <section class="card content-card" aria-labelledby="core-title">
+      <span class="eyebrow">hq-core</span>
+      <h2 id="core-title">OSPF ↔ EIGRPの再配信</h2>
+      <p>現行Phase 7をIOSの構造に落とした学習例です。先にprefix-listとroute-mapを作り、その後で再配信へ適用します。</p>
+
+      <ul class="flow-list">
+        <li><strong>OSPF → EIGRP</strong><span>DMZやデフォルト経路などをEIGRP外部経路（<code>D EX</code>）としてhq-distへ渡す。</span></li>
+        <li><strong>EIGRP → OSPF</strong><span>hq-pc側の経路をOSPF外部経路（<code>O E2</code>）としてhq-edge・hq-dmzへ渡す。</span></li>
+      </ul>
+
+      <div class="code-block">
+        <div class="code-label">HQ-CORE · 学習用CLI例</div>
+        <pre><code>ip prefix-list PL-EIGRP-TO-OSPF seq 10 permit 10.26.0.0/16 le 32
+
+route-map RM-EIGRP-TO-OSPF permit 10
+ match ip address prefix-list PL-EIGRP-TO-OSPF
+
+router eigrp 100
+ redistribute ospf 10 metric 1000000 10 255 1 1500
+
+router ospf 10
+ redistribute eigrp 100 subnets route-map RM-EIGRP-TO-OSPF</code></pre>
+      </div>
+
+      <div class="callout"><strong><code>le 32</code> が必要な理由：</strong> <code>permit 10.26.0.0/16</code> だけなら原則として /16そのものだけに一致します。<code>le 32</code> を付けると、10.26.0.0/16の内側にある /24・/30・/32も対象になります。</div>
+      <div class="callout danger"><strong>暗黙deny：</strong> route-mapのpermit節に一致しない経路は末尾で拒否されます。名前の打ち間違い、prefix-listの未作成、条件の不足があると、必要な経路も一件も再配信されません。</div>
+    </section>
+
+    <section class="card content-card" aria-labelledby="branch-title">
+      <span class="eyebrow">br-edge / hq-edge</span>
+      <h2 id="branch-title">BGP広告とDefault Route</h2>
+      <p>br-edgeのOUTフィルタは「支社からISPへ見せる経路」を限定します。ISPから受けたデフォルトは、各EdgeがOSPFへ注入します。</p>
+
+      <div class="code-block">
+        <div class="code-label">BR-EDGE · 支社プレフィックスだけをISPへ</div>
+        <pre><code>ip prefix-list PL-BRANCH-OUT seq 10 permit 10.26.20.0/24
+
+router bgp 65001
+ network 10.26.20.0 mask 255.255.255.0
+ neighbor 198.51.100.5 remote-as 65100
+ neighbor 198.51.100.5 prefix-list PL-BRANCH-OUT out</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-label">ISP → EDGE → OSPF · Default Routeの流れ</div>
+        <pre><code>! isp（概念例）
+router bgp 65100
+ neighbor 198.51.100.1 default-originate
+ neighbor 198.51.100.6 default-originate
+
+! hq-edge / br-edge
+router ospf 10
+ default-information originate</code></pre>
+      </div>
+
+      <div class="callout"><strong>成立条件：</strong> 通常の <code>default-information originate</code> は、そのEdgeのルーティングテーブルに <code>0.0.0.0/0</code> が存在するときだけOSPFへ広告します。BGP受信を先に確認します。</div>
+      <div class="callout danger"><strong>現行資料の未確定点：</strong> hq-edgeの <code>10.26.0.0/16</code> aggregate広告は、BGPテーブル内に構成要素となる経路が必要です。Phase 7だけでは生成方法が確定しないため、このHTMLでは設計上の前提として扱います。</div>
+    </section>
+
+    <section class="card content-card wide" aria-labelledby="difference-title">
+      <span class="eyebrow">Do not confuse</span>
+      <h2 id="difference-title">prefix-list・route-map・ACLは何を見ているか</h2>
+      <p>「10.26.20.0/24をフィルタする」という同じ言葉でも、対象が経路情報か実パケットかで結果はまったく違います。</p>
+      <div class="table-scroll">
+        <table class="comparison">
+          <thead><tr><th>仕組み</th><th>このPhaseで見る対象</th><th>適用場所</th><th>PC通信を直接止めるか</th><th>Theme 26での例</th></tr></thead>
+          <tbody>
+            <tr><td>prefix-list</td><td>宛先プレフィックスとマスク長</td><td>route-mapのmatch、BGP neighborのin/out</td><td><span class="chip no">直接は止めない</span></td><td>br-edgeから <code>10.26.20.0/24</code> だけを広告</td></tr>
+            <tr><td>route-map</td><td>prefix-listに一致した経路など</td><td><code>redistribute ... route-map</code></td><td><span class="chip no">ここでは止めない</span></td><td>hq-coreのEIGRP→OSPF再配信を限定</td></tr>
+            <tr><td>ACL / Firewall</td><td>送信元・宛先IP、プロトコル、ポート</td><td>インターフェースin/out、Zone Policy等</td><td><span class="chip yes">許可・拒否する</span></td><td>Phase 7の対象外。NAT ACLは変換対象の選択に使用</td></tr>
+            <tr><td>NAT/PAT</td><td>変換対象の内部アドレス</td><td>hq-edgeのinside / outside境界</td><td><span class="chip no">主目的は変換</span></td><td>HQ内の <code>10.26.0.0/16</code> を外向きIPへ変換</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card content-card" aria-labelledby="loop-title">
+      <span class="eyebrow">Loop prevention</span>
+      <h2 id="loop-title">なぜ現行構成ではループしにくいか</h2>
+      <p>再配信ループは「ある領域から出した経路が、別の境界を通って元の領域へ戻る」ときに起きやすくなります。</p>
+      <ul>
+        <li>OSPFとEIGRPの再配信点は <strong>hq-core 1台だけ</strong>。</li>
+        <li>hq-coreのEIGRP側ネイバーもhq-dist 1台で、別の戻り口がない。</li>
+        <li>EIGRP→OSPFにはroute-mapがあり、少なくとも対象を10.26.0.0/16配下へ限定する。</li>
+      </ul>
+      <div class="callout danger"><strong>ただし完全なループ防止策ではありません。</strong> <code>10.26.0.0/16 le 32</code> はHQ・DMZ・Branchの多くをまとめて許可します。将来、再配信点を2台に増やすと、OSPF由来の10.26.x経路がEIGRPから戻ってきても一致する可能性があります。</div>
+      <h3 class="mini-title">将来の複数境界構成</h3>
+      <p>再配信時にroute tagを付け、反対方向では「自分が付けたtagをdeny」する方式を追加します。これは現行Phase 7の主設定ではなく、拡張時の設計候補です。</p>
+    </section>
+
+    <section class="card content-card" aria-labelledby="reading-title">
+      <span class="eyebrow">Address reading</span>
+      <h2 id="reading-title">どのIPアドレスを指定しているのか</h2>
+      <p>prefix-listに書くのは原則として「端末1台のIP」ではなく、ルーティングテーブルに載る宛先ネットワークです。</p>
+      <ul class="flow-list">
+        <li><strong>10.26.10.0/24</strong><span>hq-pc <code>10.26.10.10</code> が所属するHQ LAN。EIGRP側からOSPF側へ知らせたい。</span></li>
+        <li><strong>10.26.30.0/24</strong><span>dmz-srv <code>10.26.30.10</code> が所属するDMZ LAN。OSPF側からEIGRP側へ知らせたい。</span></li>
+        <li><strong>10.26.20.0/24</strong><span>br-pc <code>10.26.20.10</code> が所属するBranch LAN。br-edgeからISPへ広告を許可する。</span></li>
+        <li><strong>0.0.0.0/0</strong><span>個別に知らない宛先をEdgeへ送るためのデフォルト経路。ISP→BGP→OSPF→EIGRPの順で届く。</span></li>
+      </ul>
+    </section>
+
+    <section class="card content-card wide" aria-labelledby="order-title">
+      <span class="eyebrow">Safe sequence &amp; verification</span>
+      <h2 id="order-title">投入順と確認ポイント</h2>
+      <p>「ポリシーを作ってから適用する」がPhase 7の肝です。適用後は保存より先に、経路種別とフィルタのヒット状況を確認します。</p>
+      <ol class="order">
+        <li><strong>既存経路を記録</strong><code>show ip route</code> でOSPF・EIGRP・BGPの現状を残す。</li>
+        <li><strong>prefix-list作成</strong>許可するプレフィックスとマスク長を先に定義する。</li>
+        <li><strong>route-map作成</strong>prefix-listをmatchし、permit/denyの順序を確認する。</li>
+        <li><strong>再配信へ適用</strong>hq-coreでOSPF↔EIGRP、EdgeでDefault Routeを注入する。</li>
+        <li><strong>検証後に保存</strong>期待経路と疎通を確認してからrunning-configを保存する。</li>
+      </ol>
+
+      <div class="verify-grid">
+        <div class="verify-item"><code>show ip route</code><span><code>O E2</code>、<code>D EX</code>、<code>B*</code> の有無とnext-hop</span></div>
+        <div class="verify-item"><code>show route-map</code><span>sequence、match条件、ポリシー適用状況</span></div>
+        <div class="verify-item"><code>show ip prefix-list</code><span>permit条件とhit count、暗黙denyの影響</span></div>
+        <div class="verify-item"><code>show ip protocols</code><span>再配信元、route-map名、EIGRPメトリック</span></div>
+        <div class="verify-item"><code>show ip bgp</code><span>Defaultと10.26.20.0/24の受信・広告状況</span></div>
+      </div>
+      <div class="callout">このCLIはCisco IOL 15.7系ラボ向けの学習例です。実機へ投入する場合は、現行config、管理アクセス、ロールバック手順を確認してから最小単位で適用してください。</div>
+    </section>
+  </div>
+
+  <footer>
+    情報源：Theme 26の要件定義書、基本設計書、IPアドレス管理表、パラメータシート、campus.clab.yml。route-mapのredistribution対応は
+    <a href="https://www.cisco.com/c/en/us/support/docs/ip/border-gateway-protocol-bgp/49111-route-map-bestp.html" target="_blank" rel="noopener noreferrer">Cisco公式資料</a>を参照。
+  </footer>
+</main>
+
+<script>
+  "use strict";
+
+  const SCENARIOS = {
+    "hq-dmz": {
+      title: "HQ PCからDMZへ",
+      summary: "先にDMZ経路がOSPFからEIGRPへ再配信されるため、hq-distは10.26.30.0/24への道を知ります。その後、青線の実パケットがDMZへ進みます。",
+      steps: [
+        { text: "hq-dmzがDMZ LANをOSPFで広告", nodes: ["hq-dmz", "hq-core"], policies: [] },
+        { text: "hq-coreがOSPF経路をEIGRPへ再配信", nodes: ["hq-dist"], policies: ["hq-core"] },
+        { text: "hq-pcのパケットがhq-dist→hq-core→hq-dmzへ進む", nodes: ["hq-pc", "dmz-srv"], policies: [] }
+      ]
+    },
+    "hq-branch": {
+      title: "HQ PCからBranch PCへ",
+      summary: "hq-distは再配信されたデフォルト経路を使ってhq-coreへ送り、hq-edgeでNAT/PATされたパケットがISPとbr-edgeを経由します。経路制御とNATは別の処理です。",
+      steps: [
+        { text: "ISP由来のDefaultをhq-edgeがOSPFへ注入", nodes: ["isp", "hq-edge", "hq-core"], policies: [] },
+        { text: "hq-coreがDefaultをEIGRPへ再配信", nodes: ["hq-dist"], policies: ["hq-core"] },
+        { text: "実パケットはhq-edgeでNAT/PATされBranchへ進む", nodes: ["hq-pc", "br-edge", "br-core", "br-pc"], policies: [] }
+      ]
+    },
+    "default": {
+      title: "ISPのDefault Routeを社内へ",
+      summary: "ISPがBGPで0.0.0.0/0を両Edgeへ広告し、hq-edgeとbr-edgeがOSPFへ注入します。HQ側ではhq-coreがさらにEIGRPへ再配信します。",
+      steps: [
+        { text: "ispがeBGP neighborへ0.0.0.0/0を広告", nodes: ["isp", "hq-edge", "br-edge"], policies: [] },
+        { text: "両Edgeがdefault-information originateでOSPFへ注入", nodes: ["hq-core", "br-core"], policies: [] },
+        { text: "HQではhq-coreがOSPF→EIGRPへ再配信", nodes: ["hq-dist"], policies: ["hq-core"] }
+      ]
+    },
+    "branch-filter": {
+      title: "BranchからISPへ広告する経路を限定",
+      summary: "br-edgeのOUT prefix-listは10.26.20.0/24だけを許可します。10.26.2.0/30やLoopback /32など、支社内部の基盤経路は暗黙denyでISPへ出しません。",
+      steps: [
+        { text: "br-coreが10.26.20.0/24をOSPFでbr-edgeへ通知", nodes: ["br-core", "br-edge"], policies: [] },
+        { text: "BGP network条件を満たした10.26.20.0/24を広告候補にする", nodes: ["isp"], policies: ["br-edge"] },
+        { text: "neighbor OUTのprefix-listで許可し、その他を拒否", nodes: [], policies: ["br-edge"] }
+      ]
+    }
+  };
+
+  const PLAY_INTERVAL_MS = 1400;
+  const state = { scenario: "hq-dmz", step: 0, playing: false, timer: null };
+  const tabs = [...document.querySelectorAll(".scenario-tab")];
+  const layers = [...document.querySelectorAll(".scenario-layer")];
+  const nodes = [...document.querySelectorAll("[data-node]")];
+  const policies = [...document.querySelectorAll("[data-policy]")];
+  const controls = document.querySelector(".route-controls");
+  const playToggle = document.getElementById("play-toggle");
+  const stepCounter = document.getElementById("step-counter");
+  const playState = document.getElementById("play-state");
+  const title = document.getElementById("scenario-title");
+  const summary = document.getElementById("scenario-summary");
+  const steps = document.getElementById("scenario-steps");
+
+  function currentScenario() {
+    return SCENARIOS[state.scenario];
+  }
+
+  function cumulativeValues(key) {
+    return new Set(currentScenario().steps.slice(0, state.step + 1).flatMap(step => step[key]));
+  }
+
+  function render() {
+    const scenario = currentScenario();
+    const activeNodes = cumulativeValues("nodes");
+    const activePolicies = cumulativeValues("policies");
+
+    tabs.forEach(tab => {
+      const active = tab.dataset.scenario === state.scenario;
+      tab.setAttribute("aria-selected", String(active));
+      tab.tabIndex = active ? 0 : -1;
+    });
+
+    layers.forEach(layer => {
+      const active = layer.dataset.layer === state.scenario;
+      layer.hidden = !active;
+      layer.querySelectorAll(".stage-item").forEach(item => {
+        item.classList.toggle("is-shown", active && Number(item.dataset.stage) <= state.step + 1);
+      });
+    });
+
+    nodes.forEach(node => node.classList.toggle("is-active", activeNodes.has(node.dataset.node)));
+    policies.forEach(policy => policy.classList.toggle("is-active", activePolicies.has(policy.dataset.policy)));
+
+    title.textContent = scenario.title;
+    summary.textContent = scenario.summary;
+    steps.replaceChildren(...scenario.steps.map((step, index) => {
+      const item = document.createElement("li");
+      item.dataset.step = String(index + 1);
+      item.textContent = step.text;
+      item.classList.toggle("is-current", index === state.step);
+      item.classList.toggle("is-pending", index > state.step);
+      if (index === state.step) item.setAttribute("aria-current", "step");
+      return item;
+    }));
+
+    controls.querySelector('[data-action="reset"]').disabled = state.step === 0;
+    controls.querySelector('[data-action="previous"]').disabled = state.step === 0;
+    controls.querySelector('[data-action="next"]').disabled = state.step === scenario.steps.length - 1;
+    playToggle.textContent = state.playing ? "一時停止" : "再生";
+    playToggle.setAttribute("aria-pressed", String(state.playing));
+    stepCounter.textContent = `${state.step + 1} / ${scenario.steps.length}`;
+    playState.textContent = state.playing ? "自動再生中" : "停止中";
+  }
+
+  function stopPlayback() {
+    if (state.timer !== null) window.clearTimeout(state.timer);
+    state.timer = null;
+    state.playing = false;
+  }
+
+  function schedulePlayback() {
+    state.timer = window.setTimeout(() => {
+      const lastStep = currentScenario().steps.length - 1;
+      if (state.step < lastStep) state.step += 1;
+      if (state.step >= lastStep) {
+        stopPlayback();
+        render();
+        return;
+      }
+      render();
+      schedulePlayback();
+    }, PLAY_INTERVAL_MS);
+  }
+
+  function togglePlayback() {
+    if (state.playing) {
+      stopPlayback();
+      render();
+      return;
+    }
+    if (state.step === currentScenario().steps.length - 1) state.step = 0;
+    state.playing = true;
+    render();
+    schedulePlayback();
+  }
+
+  function selectScenario(tab, moveFocus = false) {
+    stopPlayback();
+    state.scenario = tab.dataset.scenario;
+    state.step = 0;
+    render();
+    if (moveFocus) tab.focus();
+  }
+
+  controls.addEventListener("click", event => {
+    const button = event.target.closest("button[data-action]");
+    if (!button || button.disabled) return;
+    const action = button.dataset.action;
+    if (action === "play") {
+      togglePlayback();
+      return;
+    }
+    stopPlayback();
+    if (action === "reset") state.step = 0;
+    if (action === "previous") state.step = Math.max(0, state.step - 1);
+    if (action === "next") state.step = Math.min(currentScenario().steps.length - 1, state.step + 1);
+    render();
+  });
+
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => selectScenario(tab));
+    tab.addEventListener("keydown", event => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      let index = tabs.indexOf(tab);
+      if (event.key === "ArrowLeft") index = (index - 1 + tabs.length) % tabs.length;
+      if (event.key === "ArrowRight") index = (index + 1) % tabs.length;
+      if (event.key === "Home") index = 0;
+      if (event.key === "End") index = tabs.length - 1;
+      selectScenario(tabs[index], true);
+    });
+  });
+
+  window.addEventListener("pagehide", stopPlayback);
+  render();
+</script>
+</body>
+</html>
