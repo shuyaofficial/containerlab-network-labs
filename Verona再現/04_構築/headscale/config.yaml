@@ -1,0 +1,59 @@
+# Verona再現: 拠点間トンネル（SD-WAN相当）— Headscale コーディネータ設定
+#
+# tailscaleのcontrol-plane（coordination server）をOSS実装したHeadscaleで、Verona Edgeが
+# 担う「拠点間の安全なプライベートアクセス」（p6）・SD-WANベースの多様な接続方式（p27, p38）を
+# 簡略再現する（△簡略化。WAN冗長化・IPoE・デュアルSIM等のハードウェア機能は対象外＝❌）。
+#
+# 本設定は headscale/headscale:latest の標準的なスキーマを元にした最小構成。
+# バージョンによりフィールド名が変わることがあるため、実デプロイ時は
+# ../keycloak/README.md 同様に `docker logs headscale` でパースエラーが無いか確認し、
+# 必要なら実際のバージョンのschemaに合わせて調整すること（本タスクではdocker実行検証はしていない）。
+
+server_url: http://127.0.0.1:8082
+listen_addr: 0.0.0.0:8080
+metrics_listen_addr: 127.0.0.1:9090
+grpc_listen_addr: 0.0.0.0:50443
+grpc_allow_insecure: false
+
+private_key_path: /var/lib/headscale/private.key
+
+noise:
+  private_key_path: /var/lib/headscale/noise_private.key
+
+prefixes:
+  v4: 100.64.0.0/10
+  v6: fd7a:115c:a1e0::/48
+
+database:
+  type: sqlite
+  sqlite:
+    path: /var/lib/headscale/db.sqlite
+
+log:
+  level: info
+
+dns:
+  magic_dns: true
+  base_domain: verona-lab.internal
+  # このHeadscaleバージョンは override_local_dns の既定が true で、その場合 nameservers.global が必須。
+  # ラボではローカルDNSを上書きしないため false にしつつ、要求を満たす global も明示する。
+  override_local_dns: false
+  nameservers:
+    global:
+      - 1.1.1.1
+
+# Headscale v0.29 は DERPMap が非空である必要がある。外部Tailscale DERPに依存せず
+# ラボ内で完結させるため、埋め込みDERPサーバを有効化する（鍵はマウント済み /var/lib/headscale に生成）。
+derp:
+  server:
+    enabled: true
+    region_id: 999
+    region_code: "headscale"
+    region_name: "Headscale Embedded DERP"
+    stun_listen_addr: "0.0.0.0:3478"
+    private_key_path: /var/lib/headscale/derp_server_private.key
+    automatically_add_embedded_derp_region: true
+  urls: []
+  paths: []
+  auto_update_enabled: false
+  update_frequency: 24h

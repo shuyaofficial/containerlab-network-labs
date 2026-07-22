@@ -1,0 +1,19 @@
+# Verona再現ラボ 共通ブロックリスト（Squid dstdomain ACL / Blocky denylist で共用）
+#
+# 実在の危険サイトではなく、IANA予約TLDの .test（RFC 2606）を使ったテスト専用ドメインを
+# 用いる。確実にブロック挙動を実演できるようにするための設計判断（本番のVeronaは91カテゴリ
+# ＋脅威インテリジェンスDBで実在ドメインを判定する。詳細は ../../02_基本設計/網屋Verona_OSS対応表.md）。
+#
+# Verona p42「DNSセキュリティ：3段階カテゴリフィルタ」（Security/Enterprise/Family）の
+# 思想を模した分類コメント。本ラボでは1リストに集約している（△簡略化）。
+
+# --- Security層相当（マルウェア配布・C2・フィッシング） ---
+malware.verona-lab.test
+c2.verona-lab.test
+phishing.verona-lab.test
+
+# --- Enterprise層相当（暗号資産マイニング等） ---
+crypto-mining.verona-lab.test
+
+# --- Family層相当（アダルト等） ---
+adult-content.verona-lab.test

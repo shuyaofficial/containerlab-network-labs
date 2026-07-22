@@ -1,0 +1,14 @@
+# Verona再現 FWaaS（IPS/IDS）— IDSモード検知ルール（42_ndr_flow/suricata/local.rulesを流用・改変）
+#
+# Verona p43「豊富な不正アクセス防止機能（FWaaS）」のうち IPS/IDS を、本ラボでは
+# IDSモード（検知のみ・インライン遮断はしない）のSuricataで再現する（△簡略化。
+# アンチウイルス/アンチスパムは対象外＝❌。詳細は ../../02_基本設計/網屋Verona_OSS対応表.md）。
+#
+# HOME_NET = 172.60.10.0/24（vsase-cloud）。SASEクラウドの通信結節点(vsase-br0)を
+# host modeで監視し、「全通信の制御/監視」（Verona p7）のうち監視部分を再現する。
+
+# 偵察行為の検知: 10秒間に同一送信元から15回以上のSYN（flags:S）で発報
+alert tcp any any -> $HOME_NET any (msg:"VERONA-IDS recon SYN scan toward SASE cloud chokepoint"; flags:S; threshold:type both,track by_src,count 15,seconds 10; classtype:attempted-recon; sid:2000001; rev:1;)
+
+# 可視化補助: SASEクラウドを経由するHTTP通信を台帳として記録（Verona p31 トラフィックログ相当）
+alert http any any -> $HOME_NET 80 (msg:"VERONA-IDS HTTP traffic through SASE cloud (visibility ledger)"; flow:to_server,established; classtype:not-suspicious; sid:2000002; rev:1;)

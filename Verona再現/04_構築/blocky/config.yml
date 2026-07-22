@@ -1,0 +1,48 @@
+# Verona再現: SWG（DNSセキュリティ）— Blocky設定
+#
+# Verona p41「DNSセキュリティ（SWG）」の思想を再現する:
+#   - DNSレイヤーでの全通信フィルタ（プロトコルに依らずマルウェアの不正なDNS要求をブロック）。
+#     URLフィルタ（Squid）を通過しない・迂回する通信もDNS層で捕捉する二重防御。
+#   - p42「3段階カテゴリフィルタ(Security/Enterprise/Family)」の思想を、本ラボでは
+#     ../squid/blocklist.txt を共用した単一denylistグループ「verona-lab」で簡略再現する
+#     （△簡略化。実際の脅威インテリジェンスDBは持たない）。
+#   - DNSトンネリング攻撃対策（p41）: 本ラボでは検知ロジックまでは実装しない（❌非対応）。
+#     実運用のBlockyはqueryLogとレート監視を組み合わせ、異常な高頻度TXT/サブドメインクエリを
+#     検知できる。ここではqueryLogをconsole出力にし「全DNSクエリの可視化」だけを再現する
+#     （Verona p31「DNSクエリログ」相当）。
+#
+# 想定コンテナ内パス: /app/config.yml（ghcr.io/0xerr0r/blocky:latest の作業ディレクトリ規約）。
+# ※ Blockyのconfig schemaはバージョンにより変わることがある。実デプロイ時は
+#   `docker logs blocky` でパースエラーが無いか確認し、必要なら latest の schema に合わせて
+#   本ファイルを調整すること（本ラボ作成時点ではdocker実行検証はしていない）。
+
+upstreams:
+  groups:
+    default:
+      - 1.1.1.1
+      - 8.8.8.8
+
+# safe.verona-lab.test はURL/DNSフィルタの「許可ケース」を実演するための固定マッピング。
+# safe-site コンテナの固定IP（../../03_詳細設計/パラメータシート.md 参照）。
+customDNS:
+  mapping:
+    safe.verona-lab.test: 172.60.10.13
+
+blocking:
+  denylists:
+    verona-lab:
+      - /app/lists/blocklist.txt
+  clientGroupsBlock:
+    default:
+      - verona-lab
+  # zeroIp: ブロック時は 0.0.0.0 を返す。NXDOMAINだと「そもそも存在しないドメイン」との
+  # 区別がつかないため、ブロック判定であることが明確な zeroIp を採用する。
+  blockType: zeroIp
+  blockTTL: 30m
+
+ports:
+  dns: 53
+  http: 4000
+
+queryLog:
+  type: console
