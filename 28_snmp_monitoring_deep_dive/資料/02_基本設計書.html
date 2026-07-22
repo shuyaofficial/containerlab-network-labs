@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>基本設計書 | テーマ28 SNMP監視Lab</title>
+<style>
+  /* ===== Design Tokens ===== */
+  :root {
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    --accent: #635BFF;
+    --accent-soft: #F0EFFF;
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    --neutral: #94A3B8;
+    --code-bg: #0F172A;
+    --code-ink: #E2E8F0;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  body { font-family: var(--sans); font-size: 15px; line-height: 1.8; color: var(--ink); background: var(--surface); }
+  .mono { font-family: var(--mono); font-feature-settings: "tnum"; }
+  .num { text-align: right; }
+
+  /* ===== Header ===== */
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 20px;
+    height: 56px; padding: 0 24px;
+    background: rgba(250,250,249,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .site-header .back { font-size: 13px; color: var(--ink-2); text-decoration: none; transition: color .15s var(--ease); }
+  .site-header .back:hover { color: var(--accent); }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .brand span { color: var(--accent); }
+  .phase-chip {
+    padding: 3px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+    color: var(--accent); background: var(--accent-soft); border-radius: var(--r-full);
+  }
+  .header-meta { margin-left: auto; font-size: 12px; color: var(--ink-2); }
+  @media (max-width: 768px) { .header-meta, .phase-chip { display: none; } }
+
+  /* ===== 2ペインレイアウト ===== */
+  .layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+  .nav { position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; padding: 32px 0; }
+  .nav-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--ink-3); text-transform: uppercase; margin-bottom: 8px; }
+  .nav a {
+    display: block; padding: 7px 10px; margin-left: -10px; margin-bottom: 2px;
+    font-size: 13.5px; color: var(--ink-2); text-decoration: none; border-radius: var(--r-sm);
+    transition: color .12s var(--ease), background .12s var(--ease);
+  }
+  .nav a:hover { color: var(--ink); background: #F5F5F4; }
+  .nav a.current { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+
+  .doc { padding: 40px 0 96px; min-width: 0; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 20px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; font-size: 12px; font-weight: 500;
+    border-radius: var(--r-full); border: 1px solid var(--border);
+    background: var(--raised); color: var(--ink-2);
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  p.lead { font-size: 14.5px; color: var(--ink-2); max-width: 68ch; margin-bottom: 20px; }
+  .callout { display: flex; gap: 12px; padding: 14px 16px; margin: 0 0 40px; border-radius: var(--r-sm); font-size: 13.5px; border-left: 3px solid var(--info); background: #EFF6FF; }
+  .callout .icon { font-weight: 700; color: var(--info); font-family: var(--mono); }
+  .callout strong { display: block; font-size: 13px; margin-bottom: 2px; }
+
+  section { margin-bottom: 56px; scroll-margin-top: 72px; }
+  h2 { font-size: 20px; font-weight: 600; margin-bottom: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  h2 a { color: var(--ink-3); text-decoration: none; opacity: 0; margin-left: 6px; font-weight: 400; }
+  h2:hover a { opacity: 1; }
+  p.note { font-size: 13.5px; color: var(--ink-2); margin: 10px 0 16px; }
+
+  /* ---- 番号階層テーブル ---- */
+  .design-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 8px; }
+  .design-table th, .design-table td { padding: 10px 12px; text-align: left; vertical-align: top; }
+  .design-table thead th { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--ink-3); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  .design-table tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; scroll-margin-top: 72px; }
+  .design-table tbody tr:hover { background: #F5F5F4; }
+  .design-table th:nth-child(1), .design-table td:nth-child(1) { width: 54px; }
+  .design-table th:nth-child(2), .design-table td:nth-child(2) { width: 190px; font-weight: 500; color: var(--ink); }
+  .design-table th:nth-child(4), .design-table td:nth-child(4) { width: 190px; }
+  .design-table td:nth-child(3) { color: var(--ink-2); }
+
+  .req-chip {
+    display: inline-flex; align-items: center; margin: 2px 4px 2px 0;
+    padding: 2px 8px; font-family: var(--mono); font-size: 11px;
+    color: var(--accent); background: var(--accent-soft); border-radius: var(--r-full);
+    text-decoration: none; transition: background .12s var(--ease);
+  }
+  .req-chip:hover { background: #E4E2FF; }
+
+  /* ---- 方式比較表 ---- */
+  .compare-wrap { margin: 4px 0 24px; }
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 13.5px; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+  .compare-table th, .compare-table td { padding: 10px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+  .compare-table thead th { font-size: 12px; font-weight: 600; color: var(--ink); background: var(--raised); border-bottom: 1px solid var(--border); }
+  .compare-table thead th:first-child { color: var(--ink-3); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; font-weight: 600; }
+  .compare-table tbody td:first-child { color: var(--ink-3); font-size: 12px; font-weight: 500; width: 150px; }
+  .compare-table tbody tr:last-child td { border-bottom: none; }
+  .adopt-badge { display: inline-block; margin-left: 8px; padding: 2px 9px; font-size: 11px; font-weight: 600; color: #fff; background: var(--accent); border-radius: var(--r-full); }
+  .compare-table[data-adopt="a"] th:nth-child(2), .compare-table[data-adopt="a"] td:nth-child(2) { background: var(--accent-soft); }
+  .compare-table[data-adopt="b"] th:nth-child(3), .compare-table[data-adopt="b"] td:nth-child(3) { background: var(--accent-soft); }
+  .compare-table tr.reason-row td { background: var(--accent-soft); font-size: 13px; color: var(--ink); }
+  .compare-table tr.reason-row td:first-child { color: var(--accent); font-weight: 600; }
+
+  /* ---- 付録: セグメント要約表 ---- */
+  .appendix-note { font-size: 12.5px; color: var(--ink-3); margin-top: 8px; }
+  .appendix-note a { color: var(--accent); text-decoration: none; }
+  .appendix-note a:hover { text-decoration: underline; }
+
+  /* ===== フッタ ===== */
+  .doc-footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); }
+  .doc-footer a {
+    display: block; padding: 14px 18px; min-width: 200px;
+    border: 1px solid var(--border); border-radius: var(--r-md);
+    text-decoration: none; color: var(--ink); font-weight: 600; font-size: 14px;
+    background: var(--raised); transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease);
+  }
+  .doc-footer a:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--accent); }
+  .doc-footer a small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-3); letter-spacing: .06em; }
+  .doc-footer .next { text-align: right; margin-left: auto; }
+  .mock-note { margin-top: 24px; font-size: 11px; color: var(--ink-3); }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 190px minmax(0, 1fr); gap: 32px; }
+  }
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; gap: 0; }
+    .nav { position: static; height: auto; padding: 20px 0 0; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+    .nav-label { width: 100%; }
+    section { overflow-x: auto; }
+    .design-table th:nth-child(2), .design-table td:nth-child(2) { width: 130px; }
+    .compare-table tbody td:first-child { width: 100px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    html { scroll-behavior: auto; }
+  }
+  @media (max-width: 480px) {
+    .doc-footer { flex-direction: column; }
+    .doc-footer a { min-width: 0; }
+    .doc-footer .next { margin-left: 0; }
+  }
+  @media print {
+    .site-header, .nav, .doc-footer, .mock-note { display: none !important; }
+    body { background: #FFFFFF; }
+    .layout { display: block; }
+    section, .compare-wrap { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a class="back" href="00_ドキュメントマップ.html">← ドキュメントマップ</a>
+  <div class="brand">テーマ28 <span>SNMP監視Lab</span></div>
+  <span class="phase-chip">PHASE 2 基本設計</span>
+  <div class="header-meta">LAB-2026-T28 / OrbStack clab・snmp-monitoring-lab</div>
+</header>
+
+<div class="layout">
+
+  <nav class="nav" aria-label="章ナビゲーション">
+    <div class="nav-label">目次</div>
+    <a href="#d1" class="current" data-sec="d1">1. 物理設計</a>
+    <a href="#d2" data-sec="d2">2. 論理設計</a>
+    <a href="#d3" data-sec="d3">3. 監視設計</a>
+    <a href="#d4" data-sec="d4">4. セキュリティ設計(v2c→v3)</a>
+    <a href="#d5" data-sec="d5">5. 管理設計</a>
+    <a href="#appendix" data-sec="appendix">付録: セグメント一覧</a>
+  </nav>
+
+  <main class="doc">
+    <h1>基本設計書</h1>
+    <div class="doc-meta">
+      <span class="badge ver">v1.0</span>
+      <span class="badge"><span class="dot"></span>承認済</span>
+      <span class="badge">最終更新 2026-07-17</span>
+      <span class="badge">作成: shuya（AI支援: Claude）</span>
+    </div>
+    <p class="lead">要件定義書で定義した監視要件・セキュリティ要件・学習要件を、書籍準拠の設計項目番号階層（1.物理〜5.管理）に沿って、物理構成・VLAN/IP設計・監視方式・SNMPバージョン移行方針・管理設計の決定方針に落とし込む。</p>
+    <div class="callout">
+      <span class="icon">i</span>
+      <div><strong>トレーサビリティ</strong>各行の「対応要件ID」チップは<a href="01_要件定義書.html">要件定義書</a>の該当要件へのリンク。決定の妥当性は<a href="06_試験仕様書・結果報告書.html">試験仕様書</a>のMission試験で検証する。</div>
+    </div>
+
+    <section id="d1">
+      <h2>1. 物理設計<a href="#d1">#</a></h2>
+      <table class="design-table">
+        <thead><tr><th>項目番号</th><th>設計項目</th><th>決定方針</th><th>対応要件ID</th></tr></thead>
+        <tbody>
+          <tr id="d1-1"><td class="mono">1.1</td><td>物理設計方針</td><td>老朽LAN（old-rt/old-core/old-sw1/old-sw2）には一切手を加えず、監視専用ノード（mon-core・cap-sw・nms・cap）を新設し、cap-swをold-core⇔mon-core間にインラインで挿入する。</td><td><a class="req-chip" href="01_要件定義書.html#REQ-C03">REQ-C03</a> <a class="req-chip" href="01_要件定義書.html#REQ-C04">REQ-C04</a></td></tr>
+          <tr id="d1-2"><td class="mono">1.2</td><td>老朽ポイント（温存対象）</td><td>単一コアold-core（全VLANのSVIとstatic route集約=SPOF）、VLAN20のold-sw1/old-sw2両方への延伸、static一辺倒の経路制御、旧IOS（old-rt=15.6.3M3a等）の4点は意図的に温存し改修しない。</td><td><a class="req-chip" href="01_要件定義書.html#REQ-L01">REQ-L01</a> <a class="req-chip" href="01_要件定義書.html#REQ-C03">REQ-C03</a></td></tr>
+          <tr id="d1-3"><td class="mono">1.3</td><td>ノード構成</td><td>IOL6台（old-rt/old-core/old-sw1/old-sw2/mon-core/cap-sw）、Linux5台（nms/cap/pc-a/pc-b/srv-file）、Zabbix3台（zbx-db/zbx-srv/zbx-web）の計14ノード・リンク11本で構成する。</td><td><a class="req-chip" href="01_要件定義書.html#REQ-M01">REQ-M01</a></td></tr>
+          <tr id="d1-4"><td class="mono">1.4</td><td>インライン挿入点</td><td>cap-swはold-core（E1/0）⇔mon-core（E0/1）間の監視系transit（VLAN900）にのみインラインで挿入し、老朽LAN内部の他区間には新規機器・リンクを追加しない。</td><td><a class="req-chip" href="01_要件定義書.html#REQ-C04">REQ-C04</a></td></tr>
+        </tbody>
+      </table>
+      <p class="note">ノード配置とリンク結線の詳細は<a href="05_ノード配置・リンク収容表.html">ノード配置・リンク収容表</a>を参照。</p>
+    </section>
+
+    <section id="d2">
+      <h2>2. 論理設計<a href="#d2">#</a></h2>
+      <table class="design-table">
+        <thead><tr><th>項目番号</th><th>設計項目</th><th>決定方針</th><th>対応要件ID</th></tr></thead>
+        <tbody>
+          <tr id="d2-1"><td class="mono">2.1</td><td>論理設計方針</td><td>監視対象IPはOOB（172.28.28.0/24）ではなく、機器管理VLAN90または監視系transit VLAN900のin-bandデータプレーンIPを使用する。</td><td><a class="req-chip" href="01_要件定義書.html#REQ-M01">REQ-M01</a></td></tr>
+          <tr id="d2-2"><td class="mono">2.2</td><td>監視セグメント（VLAN100）</td><td>10.28.100.0/24、デフォルトGWはmon-coreのSVI（10.28.100.1）。nms（.10）・zbx-srv（.20）を収容する。</td><td><a class="req-chip" href="01_要件定義書.html#REQ-M01">REQ-M01</a></td></tr>
+          <tr id="d2-3"><td class="mono">2.3</td><td>監視系transit（VLAN900）</td><td>10.28.0.0/29（old-core=.1／mon-core=.2／cap-sw=.3）。/30ではなく/29とした設計根拠は下表参照。</td><td><a class="req-chip" href="01_要件定義書.html#REQ-M07">REQ-M07</a></td></tr>
+          <tr id="d2-4"><td class="mono">2.4</td><td>WAN transit（VLAN901・老朽LAN側/変更なし）</td><td>10.28.1.0/30（old-rt=.1／old-core VLAN901 SVI=.2）。老朽LAN側の既存構成のため変更しない。</td><td><a class="req-chip" href="01_要件定義書.html#REQ-C03">REQ-C03</a></td></tr>
+        </tbody>
+      </table>
+      <div class="compare-wrap">
+        <table class="compare-table" data-adopt="a">
+          <thead><tr><th>比較観点</th><th>案A: 監視系transitを/29とする<span class="adopt-badge">採用</span></th><th>案B: /30（P2Pのみ）</th></tr></thead>
+          <tbody>
+            <tr><td>ホスト収容数</td><td>利用可能ホスト6、old-core（.1）／mon-core（.2）／cap-sw（.3）の3台を収容できる</td><td>利用可能ホスト2のみで、インラインのcap-swにIPを割り当てる余地がない</td></tr>
+            <tr><td>cap-swの管理性</td><td>cap-swがVLAN900上でin-band管理IP（.3）を持てるため、SSH等での個別アクセスが可能</td><td>cap-swにIPを割り当てられず、transit上での直接管理ができない</td></tr>
+            <tr><td>アドレス効率</td><td>/29はアドレス効率をやや犠牲にするが、実利用は6中3</td><td>/30はアドレス効率が高いが、インライン挿入前提の要件を満たせない</td></tr>
+            <tr class="reason-row"><td>採用理由</td><td colspan="2">インライン挿入されるcap-sw自身に管理IPを持たせる必要があるため、利用可能ホスト数6の/29を採用した（詳細は<a href="../02_基本設計/IPアドレス管理表.md">IPアドレス管理表.md</a>参照）。</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="d3">
+      <h2>3. 監視設計<a href="#d3">#</a></h2>
+      <table class="design-table">
+        <thead><tr><th>項目番号</th><th>設計項目</th><th>決定方針</th><th>対応要件ID</th></tr></thead>
+        <tbody>
+          <tr id="d3-1"><td class="mono">3.1</td><td>監視設計方針</td><td>ポーリング対象は老朽LAN側4台＋監視系2台の計6 IOL機器のin-band IPとし、system/interfaces MIBを中心に段階的にポーリング範囲を広げる。</td><td><a class="req-chip" href="01_要件定義書.html#REQ-M01">REQ-M01</a></td></tr>
+          <tr id="d3-2"><td class="mono">3.2</td><td>SPAN設計</td><td>cap-swで<span class="mono">monitor session 1 source interface Ethernet0/1 both</span>＋<span class="mono">destination interface Ethernet0/3</span>を設定する。source指定の設計根拠は下表参照。</td><td><a class="req-chip" href="01_要件定義書.html#REQ-M07">REQ-M07</a> <a class="req-chip" href="01_要件定義書.html#REQ-M08">REQ-M08</a></td></tr>
+        </tbody>
+      </table>
+      <div class="compare-wrap">
+        <table class="compare-table" data-adopt="a">
+          <thead><tr><th>比較観点</th><th>案A: source=E0/1のみ<span class="adopt-badge">採用</span></th><th>案B: source=E0/1＋E0/2両方</th></tr></thead>
+          <tbody>
+            <tr><td>ミラー対象フレーム</td><td>監視系transitを通過する全フレームはE0/1を必ず1回通過するため、これのみで捕捉できる</td><td>同一フレームが往路E0/1・復路E0/2の双方でミラーされ、2重に記録される</td></tr>
+            <tr><td>キャプチャ解析への影響</td><td>Wireshark上で1フレーム=1パケットとして正しく解析できる</td><td>同一パケットが2つ記録され、トラフィック量やシーケンス解析が誤る</td></tr>
+            <tr><td>設定の複雑さ</td><td>source指定が1ポートのみでシンプル</td><td>source指定は2ポートで、別途二重ミラー対策が必要になる</td></tr>
+            <tr class="reason-row"><td>採用理由</td><td colspan="2">cap-swはold-core（E0/1）⇔mon-core（E0/2）間にインライン挿入されており、通過フレームは必ずE0/1を経由するため、E0/1のみをsourceにすることで二重ミラーを防止した。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <table class="design-table">
+        <tbody>
+          <tr id="d3-3"><td class="mono">3.3</td><td>主要OID</td><td>sysName（.1.3.6.1.2.1.1.5）／ifDescr（.1.3.6.1.2.1.2.2.1.2）／ifOperStatus（.1.3.6.1.2.1.2.2.1.8）／ifInOctets（32bit, .1.3.6.1.2.1.2.2.1.10）／ifHCInOctets（64bit, .1.3.6.1.2.1.31.1.1.1.6）を主要ポーリング対象とする。詳細は<a href="04_詳細設計書.html">詳細設計書</a>・<a href="../03_詳細設計/監視設計書.md">監視設計書.md</a>を参照。</td><td><a class="req-chip" href="01_要件定義書.html#REQ-M02">REQ-M02</a> <a class="req-chip" href="01_要件定義書.html#REQ-M03">REQ-M03</a> <a class="req-chip" href="01_要件定義書.html#REQ-M04">REQ-M04</a></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="d4">
+      <h2>4. セキュリティ設計（v2c→v3）<a href="#d4">#</a></h2>
+      <table class="design-table">
+        <thead><tr><th>項目番号</th><th>設計項目</th><th>決定方針</th><th>対応要件ID</th></tr></thead>
+        <tbody>
+          <tr id="d4-1"><td class="mono">4.1</td><td>セキュリティ設計方針</td><td>SNMPはv2c（community public）で導入し、SPANキャプチャで平文の危険性を確認したうえでv3（authPriv）へ段階移行し、移行完了後にv2cを閉塞する。</td><td><a class="req-chip" href="01_要件定義書.html#REQ-S01">REQ-S01</a> <a class="req-chip" href="01_要件定義書.html#REQ-S02">REQ-S02</a></td></tr>
+          <tr id="d4-2"><td class="mono">4.2</td><td>v2c→v3移行方式</td><td>移行方式は下表の比較のとおり、v2c→観測→v3の段階移行を採用する。</td><td><a class="req-chip" href="01_要件定義書.html#REQ-L05">REQ-L05</a></td></tr>
+        </tbody>
+      </table>
+      <div class="compare-wrap">
+        <table class="compare-table" data-adopt="b">
+          <thead><tr><th>比較観点</th><th>案A: v3一斉導入</th><th>案B: v2c→観測→v3段階移行<span class="adopt-badge">採用</span></th></tr></thead>
+          <tbody>
+            <tr><td>学習効果</td><td>v2cの平文リスクを体験できないまま、暗号化前提の設定に入ってしまう</td><td>community平文の危険性をSPANキャプチャで実際に確認したうえで、移行理由を体感できる</td></tr>
+            <tr><td>導入の速さ</td><td>初期投入時から認証・暗号化設定が必要で手順が多い</td><td>まずcommunity ROの一発疎通で確認でき、MIB探索やIF-MIBカウンタ監視を先に学べる</td></tr>
+            <tr><td>実務との整合性</td><td>新規構築では妥当だが、既存v2c環境からの移行学習にはならない</td><td>実務でも多いv2c→v3の段階移行・混在運用（トラップはv2c継続）を体験できる</td></tr>
+            <tr class="reason-row"><td>採用理由</td><td colspan="2">Mission3〜4でv2cによるMIB探索／IF-MIBカウンタ監視を先に習得し、Mission5でキャプチャによる危険性の実演を経てv3へ移行する、教育効果を重視した段階移行を採用した。</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <table class="design-table">
+        <thead><tr><th>項目番号</th><th>設計項目</th><th>決定方針</th><th>対応要件ID</th></tr></thead>
+        <tbody>
+          <tr id="d4-3"><td class="mono">4.3</td><td>SNMPv3パラメータ</td><td>group <span class="mono">NMS-GROUP</span>（v3 priv）／user <span class="mono">nmsuser</span>、auth SHA <span class="mono">SnmpAuth28!</span>、priv AES128 <span class="mono">SnmpPriv28!</span>（学習用値）。</td><td><a class="req-chip" href="01_要件定義書.html#REQ-S01">REQ-S01</a></td></tr>
+          <tr id="d4-4"><td class="mono">4.4</td><td>トラップ運用</td><td>linkdown/linkup/coldstartを10.28.100.10（nms, snmptrapd）へ<span class="mono">version 2c public</span>で送信する。ポーリングv3化後もトラップはv2c混在運用とする。</td><td><a class="req-chip" href="01_要件定義書.html#REQ-M05">REQ-M05</a> <a class="req-chip" href="01_要件定義書.html#REQ-M06">REQ-M06</a></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="d5">
+      <h2>5. 管理設計<a href="#d5">#</a></h2>
+      <table class="design-table">
+        <thead><tr><th>項目番号</th><th>設計項目</th><th>決定方針</th><th>対応要件ID</th></tr></thead>
+        <tbody>
+          <tr id="d5-1"><td class="mono">5.1</td><td>管理設計方針</td><td>機器管理はVLAN90のin-band SVIと、old-sw1/old-sw2の<span class="mono">ip default-gateway</span>運用で確保し、構成情報はMarkdown正本で一元管理する。</td><td><a class="req-chip" href="01_要件定義書.html#REQ-M01">REQ-M01</a></td></tr>
+          <tr id="d5-2"><td class="mono">5.2</td><td>機器管理（VLAN90）</td><td>10.28.90.0/24。old-core（.1）／old-sw1（.13）／old-sw2（.14）にSVIを設定する。</td><td><a class="req-chip" href="01_要件定義書.html#REQ-C03">REQ-C03</a></td></tr>
+          <tr id="d5-3"><td class="mono">5.3</td><td>OOB管理</td><td>containerlab管理ネットワーク172.28.28.0/24を全14ノードに割り当てる（コンテナprefix <span class="mono">clab-snmp-monitoring-lab-</span>）。</td><td><a class="req-chip" href="01_要件定義書.html#REQ-C01">REQ-C01</a></td></tr>
+          <tr id="d5-4"><td class="mono">5.4</td><td>構成管理</td><td>設定値は<a href="../03_詳細設計/パラメータシート.md">パラメータシート.md</a>、IPアドレスは<a href="../02_基本設計/IPアドレス管理表.md">IPアドレス管理表.md</a>を正本として一元管理する（付録は要約）。</td><td><a class="req-chip" href="01_要件定義書.html#REQ-C02">REQ-C02</a></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="appendix">
+      <h2>付録: セグメント一覧（要約）<a href="#appendix">#</a></h2>
+      <p class="note">以下は<a href="../02_基本設計/IPアドレス管理表.md">IPアドレス管理表.md</a>§2「セグメント（VLAN）一覧」の要約です。値の正本はMarkdown側であり、相違が出た場合はMarkdown側を優先します。</p>
+      <table class="design-table">
+        <thead><tr><th>セグメント名</th><th>ネットワーク/CIDR</th><th>VLAN ID</th><th>デフォルトGW</th><th>備考</th></tr></thead>
+        <tbody>
+          <tr><td>営業部</td><td class="mono">10.28.10.0/24</td><td class="mono">10</td><td class="mono">old-core (.1)</td><td>old-sw1収容</td></tr>
+          <tr><td>総務部</td><td class="mono">10.28.20.0/24</td><td class="mono">20</td><td class="mono">old-core (.1)</td><td>old-sw1・old-sw2の両方に跨るL2延伸＝老朽ポイント</td></tr>
+          <tr><td>サーバ</td><td class="mono">10.28.30.0/24</td><td class="mono">30</td><td class="mono">old-core (.1)</td><td>old-sw2収容</td></tr>
+          <tr><td>機器管理</td><td class="mono">10.28.90.0/24</td><td class="mono">90</td><td class="mono">—</td><td>old-core(.1)／old-sw1(.13)／old-sw2(.14)にSVI</td></tr>
+          <tr><td>監視</td><td class="mono">10.28.100.0/24</td><td class="mono">100</td><td class="mono">mon-core (.1)</td><td>nms・zbx-srv収容</td></tr>
+          <tr><td>監視系transit</td><td class="mono">10.28.0.0/29</td><td class="mono">900</td><td class="mono">—</td><td>old-core(.1)／mon-core(.2)／cap-sw(.3)</td></tr>
+          <tr><td>WAN transit</td><td class="mono">10.28.1.0/30</td><td class="mono">901</td><td class="mono">—</td><td>old-rt(.1)／old-core(.2)</td></tr>
+        </tbody>
+      </table>
+      <p class="appendix-note">機器ごとの詳細割当・OOB管理IPは<a href="../02_基本設計/IPアドレス管理表.md">IPアドレス管理表.md</a>を参照。</p>
+    </section>
+
+    <nav class="doc-footer" aria-label="前後のドキュメント">
+      <a class="prev" href="01_要件定義書.html"><small>前の工程</small>要件定義書</a>
+      <a class="next" href="03_物理・論理構成図.html"><small>次の工程</small>物理・論理構成図</a>
+    </nav>
+    <p class="mock-note">本スイートはテーマ28ラボ（containerlab仮想環境）の設計・構築ドキュメントをHTML化した学習用資料です。値の正本は各Markdown（IPアドレス管理表ほか）。</p>
+  </main>
+</div>
+
+<script>
+  "use strict";
+  const navLinks = [...document.querySelectorAll(".nav a[data-sec]")];
+  const sections = navLinks.map((a) => document.getElementById(a.dataset.sec)).filter(Boolean);
+  const spy = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      navLinks.forEach((a) => a.classList.toggle("current", a.dataset.sec === entry.target.id));
+    });
+  }, { rootMargin: "-10% 0px -70% 0px" });
+  sections.forEach((s) => spy.observe(s));
+</script>
+</body>
+</html>

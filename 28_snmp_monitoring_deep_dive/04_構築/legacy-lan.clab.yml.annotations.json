@@ -1,0 +1,116 @@
+{
+  "freeTextAnnotations": [],
+  "freeShapeAnnotations": [],
+  "trafficRateAnnotations": [],
+  "groupStyleAnnotations": [],
+  "networkNodeAnnotations": [],
+  "nodeAnnotations": [
+    {
+      "id": "old-rt",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 0,
+        "y": 240
+      }
+    },
+    {
+      "id": "old-core",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 160,
+        "y": 240
+      }
+    },
+    {
+      "id": "old-sw1",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 0,
+        "y": 380
+      }
+    },
+    {
+      "id": "old-sw2",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 260,
+        "y": 380
+      }
+    },
+    {
+      "id": "mon-core",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 540,
+        "y": 240
+      }
+    },
+    {
+      "id": "cap-sw",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 380,
+        "y": 240
+      }
+    },
+    {
+      "id": "nms",
+      "position": {
+        "x": 540,
+        "y": 380
+      }
+    },
+    {
+      "id": "cap",
+      "position": {
+        "x": 380,
+        "y": 380
+      }
+    },
+    {
+      "id": "pc-a",
+      "position": {
+        "x": 0,
+        "y": 540
+      }
+    },
+    {
+      "id": "pc-b",
+      "position": {
+        "x": 160,
+        "y": 540
+      }
+    },
+    {
+      "id": "srv-file",
+      "position": {
+        "x": 260,
+        "y": 540
+      }
+    },
+    {
+      "id": "zbx-web",
+      "position": {
+        "x": 660,
+        "y": 380
+      }
+    },
+    {
+      "id": "zbx-srv",
+      "position": {
+        "x": 660,
+        "y": 240
+      }
+    },
+    {
+      "id": "zbx-db",
+      "position": {
+        "x": 660,
+        "y": 520
+      }
+    }
+  ],
+  "edgeAnnotations": [],
+  "aliasEndpointAnnotations": [],
+  "viewerSettings": {}
+}

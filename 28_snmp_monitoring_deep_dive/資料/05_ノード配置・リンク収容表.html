@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ノード配置・リンク収容表 | テーマ28 SNMP監視Lab</title>
+<style>
+  /* ===== Design Tokens（共通仕様§2準拠） ===== */
+  :root {
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    --accent: #635BFF;
+    --accent-soft: #F0EFFF;
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    --neutral: #94A3B8;
+    --code-bg: #0F172A;
+    --code-ink: #E2E8F0;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  body { font-family: var(--sans); font-size: 15px; line-height: 1.8; color: var(--ink); background: var(--surface); }
+  .mono { font-family: var(--mono); font-feature-settings: "tnum"; }
+
+  /* ===== Header（共通仕様§3） ===== */
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 20px;
+    height: 56px; padding: 0 24px;
+    background: rgba(250,250,249,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .site-header .back { font-size: 13px; color: var(--ink-2); text-decoration: none; transition: color .15s var(--ease); }
+  .site-header .back:hover { color: var(--accent); }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .brand span { color: var(--accent); }
+  .phase-chip { padding: 3px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--accent); background: var(--accent-soft); border-radius: var(--r-full); }
+  .header-meta { margin-left: auto; font-size: 12px; color: var(--ink-2); }
+  @media (max-width: 768px) { .header-meta, .phase-chip { display: none; } }
+
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 40px 24px 96px; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 20px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; font-size: 12px; font-weight: 500;
+    border-radius: var(--r-full); border: 1px solid var(--border);
+    background: var(--raised); color: var(--ink-2);
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  p.lead { font-size: 14.5px; color: var(--ink-2); max-width: 76ch; margin-bottom: 28px; }
+
+  h2 { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+
+  /* ===== 2カラムレイアウト ===== */
+  .layout2 { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 32px; align-items: start; }
+  .rack-col { position: sticky; top: 76px; }
+  .rack-wrap { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--raised); padding: 16px 12px; box-shadow: var(--shadow-1); }
+  svg.rack { width: 100%; height: auto; display: block; }
+
+  .u-eq rect { fill: var(--raised); stroke: var(--ink-3); stroke-width: 1.2; cursor: pointer; transition: stroke .15s var(--ease), fill .15s var(--ease), stroke-width .15s var(--ease); }
+  .u-eq.old rect { fill: #EFF6FF; stroke: #93C5FD; }
+  .u-eq.mon rect { fill: var(--accent-soft); stroke: #C4C1FF; }
+  .u-eq.ep rect { fill: #ECFDF5; stroke: #A7F3D0; }
+  .u-eq.zbx rect { fill: #FEF2F2; stroke: #FCA5A5; }
+  .u-eq.hi rect { stroke: var(--accent); stroke-width: 2; fill: var(--accent-soft); }
+  .u-group-label { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; fill: var(--ink-3); }
+  .u-guide rect { fill: #F5F5F4; stroke: var(--border); stroke-width: 1; }
+  .u-text { font-size: 11px; fill: var(--ink); text-anchor: middle; pointer-events: none; }
+  .u-text.sub { fill: var(--ink-2); font-size: 9.5px; }
+  .u-vm-title { font-size: 13px; font-weight: 700; fill: var(--ink); text-anchor: middle; }
+  .u-vm-sub { font-size: 10px; fill: var(--ink-2); font-family: var(--mono); text-anchor: middle; }
+  .pdu { fill: #F5F5F4; stroke: var(--border); stroke-width: 1; }
+  .pdu-label { font-size: 11px; fill: var(--ink-3); font-family: var(--mono); text-anchor: middle; }
+  .rack-frame { fill: none; stroke: var(--ink-3); stroke-width: 1.6; }
+
+  .legend-diagram { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; font-size: 12.5px; color: var(--ink-2); }
+  .legend-diagram .item { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-diagram svg { width: 22px; height: 14px; flex-shrink: 0; }
+
+  .power-table, .port-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .power-table th, .power-table td, .port-table th, .port-table td { padding: 9px 10px; text-align: left; vertical-align: top; }
+  .power-table thead th, .port-table thead th { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--ink-3); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  .power-table tbody tr, .port-table tbody tr { border-bottom: 1px solid var(--border); transition: background .12s var(--ease); }
+  .power-table tbody tr:hover { background: #F5F5F4; }
+  .port-table tbody tr { cursor: pointer; }
+  .port-table tbody tr:hover, .port-table tbody tr.hi { background: var(--accent-soft); }
+  .port-table tbody tr.note-row { cursor: default; font-style: italic; color: var(--ink-2); background: #FFFBEB; }
+  .port-table tbody tr.note-row:hover { background: #FFFBEB; }
+  .power-table { margin-top: 8px; }
+
+  .port-col h2 { margin-top: 4px; }
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-md); }
+  .port-table { min-width: 760px; }
+  .port-table thead th { position: sticky; top: 0; background: var(--raised); }
+
+  /* ===== フッタ（共通仕様§3） ===== */
+  .doc-footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); }
+  .doc-footer a {
+    display: block; padding: 14px 18px; min-width: 200px;
+    border: 1px solid var(--border); border-radius: var(--r-md);
+    text-decoration: none; color: var(--ink); font-weight: 600; font-size: 14px;
+    background: var(--raised); transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease);
+  }
+  .doc-footer a:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--accent); }
+  .doc-footer a small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-3); letter-spacing: .06em; }
+  .doc-footer .next { text-align: right; margin-left: auto; }
+  .mock-note { margin-top: 24px; font-size: 11px; color: var(--ink-3); }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 1100px) {
+    .layout2 { grid-template-columns: minmax(0, 1fr); }
+    .rack-col { position: static; max-width: 360px; }
+  }
+  @media (max-width: 768px) {
+    .header-meta { display: none; }
+    .rack-col { max-width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    html { scroll-behavior: auto; }
+  }
+  @media (max-width: 480px) {
+    .doc-footer { flex-direction: column; }
+    .doc-footer a { min-width: 0; }
+    .doc-footer .next { margin-left: 0; }
+  }
+  @media print {
+    .site-header, .doc-footer, .mock-note { display: none !important; }
+    body { background: #FFFFFF; }
+    .layout2 { grid-template-columns: 340px minmax(0, 1fr); }
+    .rack-col { position: static; }
+    section { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a class="back" href="00_ドキュメントマップ.html">← ドキュメントマップ</a>
+  <div class="brand">テーマ28 <span>SNMP監視Lab</span></div>
+  <span class="phase-chip">PHASE 3 詳細設計</span>
+  <div class="header-meta">LAB-2026-T28 / OrbStack clab・snmp-monitoring-lab</div>
+</header>
+
+<main class="wrap">
+  <h1>ノード配置・リンク収容表</h1>
+  <div class="doc-meta">
+    <span class="badge ver">v1.0</span>
+    <span class="badge"><span class="dot"></span>構築完了</span>
+    <span class="badge">最終更新 2026-07-17</span>
+    <span class="badge">作成: shuya（AI支援: Claude）</span>
+  </div>
+  <p class="lead">OrbStack Linux VM「clab」上に構築したcontainerlabノード14台の役割別配置と、11本のリンク（clab.yml links）の収容関係を示す。表の行にホバーすると左のノード配置図の該当スロットが、スロットにホバーすると表の該当行がハイライトされる。</p>
+
+  <div class="layout2">
+    <section class="rack-col" aria-label="ノード配置図">
+      <h2>ノード配置図（OrbStack VM「clab」）</h2>
+      <div class="rack-wrap">
+        <svg class="rack" viewBox="0 0 300 720" role="img" aria-label="OrbStack VM clab 内のDockerコンテナ14台の役割別配置">
+          <rect class="rack-frame" x="70" y="20" width="176" height="672" rx="2"/>
+          <rect class="pdu" x="46" y="20" width="18" height="672"/>
+          <rect class="pdu" x="250" y="20" width="18" height="672"/>
+          <text class="pdu-label" x="55" y="360" transform="rotate(-90 55 360)">mgmtブリッジ 172.28.28.0/24</text>
+          <text class="pdu-label" x="259" y="360" transform="rotate(-90 259 360)">公開ポート 8280→zbx-web(8080)</text>
+
+          <!-- VM見出し -->
+          <g>
+            <rect x="70" y="20" width="176" height="40" rx="3" fill="#F5F5F4" stroke="var(--border)"/>
+            <text class="u-vm-title" x="158" y="36">clab（OrbStack Linux VM）</text>
+            <text class="u-vm-sub" x="158" y="50">containerlab: snmp-monitoring-lab</text>
+          </g>
+
+          <!-- ========== グループ1: 老朽LAN IOL ========== -->
+          <text class="u-group-label" x="78" y="76">老朽LAN IOL</text>
+          <line x1="70" y1="82" x2="246" y2="82" stroke="var(--border)"/>
+          <g class="u-eq old" data-host="old-rt" tabindex="0" role="img" aria-label="old-rt 老朽WANルータ">
+            <rect x="70" y="82" width="176" height="34"/>
+            <text class="u-text" x="158" y="99">old-rt</text>
+            <text class="u-text sub" x="158" y="111">老朽WANルータ・15.6.3M3a</text>
+          </g>
+          <g class="u-eq old" data-host="old-core" tabindex="0" role="img" aria-label="old-core 単一コアL3SW">
+            <rect x="70" y="116" width="176" height="34"/>
+            <text class="u-text" x="158" y="133">old-core</text>
+            <text class="u-text sub" x="158" y="145">単一コアL3SW・SPOF</text>
+          </g>
+          <g class="u-eq old" data-host="old-sw1" tabindex="0" role="img" aria-label="old-sw1 フロアA L2SW">
+            <rect x="70" y="150" width="176" height="34"/>
+            <text class="u-text" x="158" y="167">old-sw1</text>
+            <text class="u-text sub" x="158" y="179">フロアA L2SW</text>
+          </g>
+          <g class="u-eq old" data-host="old-sw2" tabindex="0" role="img" aria-label="old-sw2 フロアB L2SW">
+            <rect x="70" y="184" width="176" height="34"/>
+            <text class="u-text" x="158" y="201">old-sw2</text>
+            <text class="u-text sub" x="158" y="213">フロアB L2SW</text>
+          </g>
+
+          <!-- ========== グループ2: 監視IOL ========== -->
+          <text class="u-group-label" x="78" y="238">監視IOL</text>
+          <line x1="70" y1="244" x2="246" y2="244" stroke="var(--border)"/>
+          <g class="u-eq mon" data-host="mon-core" tabindex="0" role="img" aria-label="mon-core 監視L3SW">
+            <rect x="70" y="248" width="176" height="34"/>
+            <text class="u-text" x="158" y="265">mon-core</text>
+            <text class="u-text sub" x="158" y="277">監視L3SW（VLAN100収容）</text>
+          </g>
+          <g class="u-eq mon" data-host="cap-sw" tabindex="0" role="img" aria-label="cap-sw Wireshark用SW SPAN">
+            <rect x="70" y="282" width="176" height="34"/>
+            <text class="u-text" x="158" y="299">cap-sw</text>
+            <text class="u-text sub" x="158" y="311">Wireshark用SW・SPAN</text>
+          </g>
+
+          <!-- ========== グループ3: エンドポイント ========== -->
+          <text class="u-group-label" x="78" y="336">エンドポイント</text>
+          <line x1="70" y1="342" x2="246" y2="342" stroke="var(--border)"/>
+          <g class="u-eq ep" data-host="nms" tabindex="0" role="img" aria-label="nms 監視サーバ">
+            <rect x="70" y="346" width="176" height="34"/>
+            <text class="u-text" x="158" y="363">nms</text>
+            <text class="u-text sub" x="158" y="375">監視サーバ（wbitt）</text>
+          </g>
+          <g class="u-eq ep" data-host="cap" tabindex="0" role="img" aria-label="cap キャプチャホスト">
+            <rect x="70" y="380" width="176" height="34"/>
+            <text class="u-text" x="158" y="397">cap</text>
+            <text class="u-text sub" x="158" y="409">キャプチャホスト（SPAN受け）</text>
+          </g>
+          <g class="u-eq ep" data-host="pc-a" tabindex="0" role="img" aria-label="pc-a 営業部PC">
+            <rect x="70" y="414" width="176" height="34"/>
+            <text class="u-text" x="158" y="431">pc-a</text>
+            <text class="u-text sub" x="158" y="443">営業部PC（VLAN10）</text>
+          </g>
+          <g class="u-eq ep" data-host="pc-b" tabindex="0" role="img" aria-label="pc-b 総務部PC">
+            <rect x="70" y="448" width="176" height="34"/>
+            <text class="u-text" x="158" y="465">pc-b</text>
+            <text class="u-text sub" x="158" y="477">総務部PC（VLAN20）</text>
+          </g>
+          <g class="u-eq ep" data-host="srv-file" tabindex="0" role="img" aria-label="srv-file ファイルサーバ">
+            <rect x="70" y="482" width="176" height="34"/>
+            <text class="u-text" x="158" y="499">srv-file</text>
+            <text class="u-text sub" x="158" y="511">ファイルサーバ（VLAN30）</text>
+          </g>
+
+          <!-- ========== グループ4: Zabbixスタック ========== -->
+          <text class="u-group-label" x="78" y="536">Zabbixスタック</text>
+          <line x1="70" y1="542" x2="246" y2="542" stroke="var(--border)"/>
+          <g class="u-eq zbx" data-host="zbx-db" tabindex="0" role="img" aria-label="zbx-db Zabbix用DB">
+            <rect x="70" y="546" width="176" height="34"/>
+            <text class="u-text" x="158" y="563">zbx-db</text>
+            <text class="u-text sub" x="158" y="575">PostgreSQL（mgmtのみ）</text>
+          </g>
+          <g class="u-eq zbx" data-host="zbx-srv" tabindex="0" role="img" aria-label="zbx-srv Zabbix Server">
+            <rect x="70" y="580" width="176" height="34"/>
+            <text class="u-text" x="158" y="597">zbx-srv</text>
+            <text class="u-text sub" x="158" y="609">Zabbix Server（in-band）</text>
+          </g>
+          <g class="u-eq zbx" data-host="zbx-web" tabindex="0" role="img" aria-label="zbx-web Zabbix Web UI">
+            <rect x="70" y="614" width="176" height="34"/>
+            <text class="u-text" x="158" y="631">zbx-web</text>
+            <text class="u-text sub" x="158" y="643">Web UI（mgmtのみ・8280公開）</text>
+          </g>
+
+          <g class="u-guide"><rect x="70" y="656" width="176" height="28" rx="3"/><text class="u-text sub" x="158" y="674">計14コンテナ（IOL 6 / Linux 8）</text></g>
+        </svg>
+      </div>
+
+      <div class="legend-diagram" aria-hidden="true">
+        <span class="item"><svg width="22" height="14"><rect x="0" y="0" width="22" height="14" fill="#EFF6FF" stroke="#93C5FD"/></svg>老朽LAN IOL</span>
+        <span class="item"><svg width="22" height="14"><rect x="0" y="0" width="22" height="14" fill="#F0EFFF" stroke="#C4C1FF"/></svg>監視IOL</span>
+        <span class="item"><svg width="22" height="14"><rect x="0" y="0" width="22" height="14" fill="#ECFDF5" stroke="#A7F3D0"/></svg>エンドポイント</span>
+        <span class="item"><svg width="22" height="14"><rect x="0" y="0" width="22" height="14" fill="#FEF2F2" stroke="#FCA5A5"/></svg>Zabbixスタック</span>
+        <span class="item">色 = 役割区分 / ホバーで右表と相互ハイライト</span>
+      </div>
+
+      <h2 style="margin-top:28px">イメージ・リソース表</h2>
+      <table class="power-table">
+        <thead><tr><th>ノード</th><th>イメージ</th><th>mgmt IP</th><th>データプレーンIP</th></tr></thead>
+        <tbody>
+          <tr><td>old-rt</td><td class="mono">vrnetlab/cisco_iol:15.6.3M3a</td><td class="mono">172.28.28.11</td><td class="mono">10.28.1.1（E0/1）・Lo0=203.0.113.1</td></tr>
+          <tr><td>old-core</td><td class="mono">vrnetlab/cisco_iol:L2-15.2</td><td class="mono">172.28.28.12</td><td class="mono">10.28.90.1 ほか各VLAN SVI</td></tr>
+          <tr><td>old-sw1</td><td class="mono">vrnetlab/cisco_iol:L2-15.2</td><td class="mono">172.28.28.13</td><td class="mono">10.28.90.13</td></tr>
+          <tr><td>old-sw2</td><td class="mono">vrnetlab/cisco_iol:L2-15.2</td><td class="mono">172.28.28.14</td><td class="mono">10.28.90.14</td></tr>
+          <tr><td>mon-core</td><td class="mono">vrnetlab/cisco_iol:L2-advipservices-2017</td><td class="mono">172.28.28.21</td><td class="mono">10.28.0.2・10.28.100.1</td></tr>
+          <tr><td>cap-sw</td><td class="mono">vrnetlab/cisco_iol:L2-advipservices-2017</td><td class="mono">172.28.28.22</td><td class="mono">10.28.0.3</td></tr>
+          <tr><td>nms</td><td class="mono">wbitt/network-multitool:latest</td><td class="mono">172.28.28.101</td><td class="mono">10.28.100.10</td></tr>
+          <tr><td>cap</td><td class="mono">wbitt/network-multitool:latest</td><td class="mono">172.28.28.102</td><td class="mono">IPなし（promiscuous）</td></tr>
+          <tr><td>pc-a</td><td class="mono">wbitt/network-multitool:latest</td><td class="mono">172.28.28.103</td><td class="mono">10.28.10.10</td></tr>
+          <tr><td>pc-b</td><td class="mono">wbitt/network-multitool:latest</td><td class="mono">172.28.28.104</td><td class="mono">10.28.20.10</td></tr>
+          <tr><td>srv-file</td><td class="mono">wbitt/network-multitool:latest</td><td class="mono">172.28.28.105</td><td class="mono">10.28.30.10</td></tr>
+          <tr><td>zbx-db</td><td class="mono">postgres:16-alpine</td><td class="mono">172.28.28.111</td><td class="mono">なし（mgmtのみ）</td></tr>
+          <tr><td>zbx-srv</td><td class="mono">zabbix/zabbix-server-pgsql:alpine-7.0-latest</td><td class="mono">172.28.28.112</td><td class="mono">10.28.100.20</td></tr>
+          <tr><td>zbx-web</td><td class="mono">zabbix/zabbix-web-nginx-pgsql:alpine-7.0-latest</td><td class="mono">172.28.28.113</td><td class="mono">なし（mgmtのみ・8280→8080公開）</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="port-col" aria-label="リンク収容表">
+      <h2>リンク収容表</h2>
+      <div class="table-scroll">
+        <table class="port-table">
+          <thead><tr><th>ケーブルID</th><th>自ノード</th><th>自IF</th><th>対向</th><th>対向IF</th><th>VLAN</th><th>用途</th></tr></thead>
+          <tbody id="portRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <nav class="doc-footer" aria-label="前後のドキュメント">
+    <a class="prev" href="04_詳細設計書.html"><small>前の工程</small>詳細設計書</a>
+    <a class="next" href="06_試験仕様書・結果報告書.html"><small>次の工程</small>試験仕様書・結果報告書</a>
+  </nav>
+  <p class="mock-note">本スイートはテーマ28ラボ（containerlab仮想環境）の設計・構築ドキュメントをHTML化した学習用資料です。値の正本は各Markdown（IPアドレス管理表ほか）。</p>
+</main>
+
+<script>
+  "use strict";
+  /* ---- リンクデータ: clab.yml links（L01〜L11）+ SPANミラー注記行 ---- */
+  const PORTS = [
+    { id: "LNK-01", self: "old-rt", sport: "eth1(E0/1)", peer: "old-core", pport: "eth1(E0/1)", vlan: "901", use: "WAN境界（疑似インターネット⇔老朽LAN）", hosts: "old-rt old-core" },
+    { id: "LNK-02", self: "old-core", sport: "eth2(E0/2)", peer: "old-sw1", pport: "eth1(E0/1)", vlan: "trunk 10,20,90", use: "フロアAトランク", hosts: "old-core old-sw1" },
+    { id: "LNK-03", self: "old-core", sport: "eth3(E0/3)", peer: "old-sw2", pport: "eth1(E0/1)", vlan: "trunk 20,30,90", use: "フロアBトランク", hosts: "old-core old-sw2" },
+    { id: "LNK-04", self: "old-sw1", sport: "eth2(E0/2)", peer: "pc-a", pport: "eth1", vlan: "10", use: "営業部PC収容", hosts: "old-sw1 pc-a" },
+    { id: "LNK-05", self: "old-sw1", sport: "eth3(E0/3)", peer: "pc-b", pport: "eth1", vlan: "20", use: "総務部PC収容", hosts: "old-sw1 pc-b" },
+    { id: "LNK-06", self: "old-sw2", sport: "eth2(E0/2)", peer: "srv-file", pport: "eth1", vlan: "30", use: "ファイルサーバ収容", hosts: "old-sw2 srv-file" },
+    { id: "LNK-07", self: "old-core", sport: "eth4(E1/0)", peer: "cap-sw", pport: "eth1(E0/1)", vlan: "900", use: "監視系transit・SPAN source側インライン挿入点", hosts: "old-core cap-sw" },
+    { id: "LNK-08", self: "cap-sw", sport: "eth2(E0/2)", peer: "mon-core", pport: "eth1(E0/1)", vlan: "900", use: "監視系transit・インライン挿入点", hosts: "cap-sw mon-core" },
+    { id: "LNK-09", self: "cap-sw", sport: "eth3(E0/3)", peer: "cap", pport: "eth1", vlan: "無所属", use: "SPAN destination（ミラー受信専用）", hosts: "cap-sw cap" },
+    { id: "LNK-10", self: "mon-core", sport: "eth2(E0/2)", peer: "nms", pport: "eth1", vlan: "100", use: "監視サーバ収容", hosts: "mon-core nms" },
+    { id: "LNK-11", self: "mon-core", sport: "eth3(E0/3)", peer: "zbx-srv", pport: "eth1", vlan: "100", use: "Zabbix Server in-bandポーリング", hosts: "mon-core zbx-srv" },
+  ];
+  const SPAN_NOTE = { id: "LNK-M1", self: "cap-sw", sport: "E0/1", peer: "cap-sw（内部ミラー）", pport: "E0/3", vlan: "—", use: "SPAN内部ミラー: monitor session 1 source Et0/1 both → destination Et0/3（物理リンクはLNK-09と共有）", hosts: "cap-sw" };
+
+  const tbody = document.getElementById("portRows");
+  PORTS.forEach((p) => {
+    const tr = document.createElement("tr");
+    tr.dataset.hosts = p.hosts;
+    tr.innerHTML = `<td class="mono">${p.id}</td><td>${p.self}</td><td class="mono">${p.sport}</td><td>${p.peer}</td><td class="mono">${p.pport}</td><td class="mono">${p.vlan}</td><td>${p.use}</td>`;
+    tbody.appendChild(tr);
+  });
+  const noteTr = document.createElement("tr");
+  noteTr.className = "note-row";
+  noteTr.dataset.hosts = SPAN_NOTE.hosts;
+  noteTr.innerHTML = `<td class="mono">${SPAN_NOTE.id}</td><td>${SPAN_NOTE.self}</td><td class="mono">${SPAN_NOTE.sport}</td><td>${SPAN_NOTE.peer}</td><td class="mono">${SPAN_NOTE.pport}</td><td class="mono">${SPAN_NOTE.vlan}</td><td>${SPAN_NOTE.use}</td>`;
+  tbody.appendChild(noteTr);
+
+  /* ---- 相互ハイライト: 表の行 ⇔ ノード配置図のスロット ---- */
+  const rows = [...document.querySelectorAll(".port-table tbody tr")];
+  const eqEls = [...document.querySelectorAll(".u-eq[data-host]")];
+  function highlightHost(host, on) {
+    eqEls.forEach((el) => { if (el.dataset.host === host) el.classList.toggle("hi", on); });
+  }
+  rows.forEach((row) => {
+    const hosts = row.dataset.hosts.split(" ");
+    row.addEventListener("mouseenter", () => hosts.forEach((h) => highlightHost(h, true)));
+    row.addEventListener("mouseleave", () => hosts.forEach((h) => highlightHost(h, false)));
+  });
+  eqEls.forEach((el) => {
+    const host = el.dataset.host;
+    const setRows = (on) => rows.forEach((row) => { if (row.dataset.hosts.split(" ").includes(host)) row.classList.toggle("hi", on); });
+    el.addEventListener("mouseenter", () => { el.classList.add("hi"); setRows(true); });
+    el.addEventListener("mouseleave", () => { el.classList.remove("hi"); setRows(false); });
+    el.addEventListener("focus", () => { el.classList.add("hi"); setRows(true); });
+    el.addEventListener("blur", () => { el.classList.remove("hi"); setRows(false); });
+  });
+</script>
+</body>
+</html>

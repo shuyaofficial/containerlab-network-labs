@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ドキュメントマップ | テーマ28 SNMP監視Lab</title>
+<style>
+  :root {
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    --accent: #635BFF;
+    --accent-soft: #F0EFFF;
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    --neutral: #94A3B8;
+    --code-bg: #0F172A;
+    --code-ink: #E2E8F0;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--sans); font-size: 15px; line-height: 1.8;
+    color: var(--ink); background: var(--surface);
+  }
+  .mono { font-family: var(--mono); font-feature-settings: "tnum"; }
+
+  /* ===== Header ===== */
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 20px;
+    height: 56px; padding: 0 24px;
+    background: rgba(250,250,249,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .site-header .back { font-size: 13px; color: var(--ink-2); text-decoration: none; transition: color .15s var(--ease); }
+  .site-header .back:hover { color: var(--accent); }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .brand span { color: var(--accent); }
+  .phase-chip {
+    padding: 3px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+    color: var(--accent); background: var(--accent-soft); border-radius: var(--r-full);
+  }
+  .header-meta { margin-left: auto; font-size: 12px; color: var(--ink-2); }
+
+  /* ===== Layout ===== */
+  .hub { max-width: 1180px; margin: 0 auto; padding: 48px 24px 96px; }
+
+  /* ---- Hero ---- */
+  .hero h1 { font-size: 32px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; max-width: 20ch; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 20px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; font-size: 12px; font-weight: 500;
+    border-radius: var(--r-full); border: 1px solid var(--border);
+    background: var(--raised); color: var(--ink-2);
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .badge .dot.accent { background: var(--accent); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); font-family: var(--mono); }
+  .hero .lead { max-width: 72ch; font-size: 15px; color: var(--ink-2); }
+
+  /* ---- Phase progress ---- */
+  .phase-progress { margin-top: 64px; }
+  .ph-head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 4px; }
+  .ph-head h2 { font-size: 20px; font-weight: 600; }
+  .ph-head .asof { font-size: 12px; color: var(--ink-3); font-family: var(--mono); }
+  .ph-legend { display: flex; gap: 16px; margin: 6px 0 24px; font-size: 12px; color: var(--ink-2); }
+  .ph-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .lg-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .lg-dot.ok { background: var(--ok); }
+  .lg-dot.active { background: var(--accent); }
+  .lg-dot.todo { background: var(--border); border: 1px solid var(--ink-3); }
+
+  .phase-wrap { position: relative; padding-top: 22px; }
+  .today-marker { position: absolute; top: 22px; bottom: 20px; width: 0; border-left: 2px dashed var(--accent); z-index: 2; }
+  .today-flag {
+    position: absolute; top: -22px; left: 0; transform: translateX(-50%);
+    font-size: 10px; font-family: var(--mono); color: var(--accent);
+    background: var(--accent-soft); padding: 2px 8px; border-radius: var(--r-full); white-space: nowrap;
+  }
+  .phase-steps { display: flex; gap: 14px; }
+  .phase-step { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .ps-head { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+  .ps-icon { font-size: 10px; }
+  .phase-step.done .ps-icon { color: var(--ok); }
+  .phase-step.active .ps-icon { color: var(--accent); }
+  .phase-step.todo .ps-icon { color: var(--ink-3); }
+  .ps-date { font-size: 11px; color: var(--ink-3); }
+  .ps-track { height: 6px; border-radius: 4px; background: var(--border); overflow: hidden; }
+  .ps-fill { height: 100%; border-radius: 4px; background: var(--ok); transition: width .3s var(--ease); }
+  .phase-step.active .ps-fill { background: var(--accent); }
+  .phase-step.todo .ps-fill { width: 0 !important; }
+
+  .cross-phase { margin-top: 28px; padding-top: 18px; border-top: 1px dashed var(--border); }
+  .cross-label { font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin-bottom: 8px; }
+  .cross-label a { color: var(--accent); text-decoration: none; }
+  .cross-label a:hover { text-decoration: underline; }
+  .cross-track { height: 6px; border-radius: 4px; background: var(--border); }
+  .cross-fill { height: 100%; border-radius: 4px; background: var(--accent); opacity: .55; }
+
+  /* ---- Document groups ---- */
+  .doc-groups { margin-top: 64px; }
+  .group { margin-bottom: 40px; }
+  .group-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  .group-head h3 { font-size: 16px; font-weight: 700; }
+  .group-date { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .group-status { margin-left: auto; font-size: 11.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+  .group-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; }
+  .group-status.done { color: var(--ok); } .group-status.done::before { background: var(--ok); }
+  .group-status.active { color: var(--accent); } .group-status.active::before { background: var(--accent); }
+  .group-status.todo { color: var(--ink-3); } .group-status.todo::before { background: var(--border); border: 1px solid var(--ink-3); }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .doc-card {
+    display: block; padding: 20px; min-width: 0;
+    background: var(--raised); border: 1px solid var(--border); border-radius: var(--r-md);
+    box-shadow: var(--shadow-1); text-decoration: none; color: inherit;
+    transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease);
+  }
+  .doc-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--accent); }
+  .doc-card.ext { border-style: dashed; }
+  .card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .card-ver { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .ext-badge {
+    font-family: var(--mono); font-size: 10px; letter-spacing: .06em; color: var(--ink-2);
+    border: 1px solid var(--border); border-radius: var(--r-sm); padding: 2px 6px;
+  }
+  .doc-card h4 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .doc-card p { font-size: 13px; color: var(--ink-2); line-height: 1.6; }
+
+  .mock-note { margin-top: 48px; font-size: 11px; color: var(--ink-3); }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 1100px) {
+    .hub { padding: 40px 20px 80px; }
+    .phase-steps { gap: 10px; }
+  }
+  @media (max-width: 768px) {
+    .header-meta, .phase-chip { display: none; }
+    .hero h1 { font-size: 26px; }
+    .phase-steps { flex-direction: column; gap: 18px; }
+    .today-marker { display: none; }
+    .ph-legend { flex-wrap: wrap; }
+    .group-status { margin-left: 0; }
+    .cards { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+  @media print {
+    .site-header, .doc-footer, .mock-note { display: none !important; }
+    body { background: #FFFFFF; }
+    .group, .phase-progress { break-inside: avoid; }
+    .doc-card { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a class="back" href="../README_Lab_Challenge.md">← ラボ概要</a>
+  <div class="brand">テーマ28 <span>SNMP監視Lab</span></div>
+  <span class="phase-chip">DOCUMENT MAP</span>
+  <div class="header-meta">LAB-2026-T28 / OrbStack clab・snmp-monitoring-lab</div>
+</header>
+
+<main class="hub">
+
+  <section class="hero" aria-label="ラボ概要">
+    <h1>監視ゼロの老朽LANに、目を持たせる。</h1>
+    <div class="doc-meta">
+      <span class="badge ver">LAB-2026-T28</span>
+      <span class="badge"><span class="dot accent"></span>進行中（Lab Challenge Mission 1〜6 未着手）</span>
+      <span class="badge">現在日 2026-07-17</span>
+      <span class="badge">作成: shuya（AI支援: Claude）</span>
+    </div>
+    <p class="lead">監視が一切ない老朽社内LAN（single core・static一辺倒・旧IOS・VLAN20のL2延伸）に、監視基盤（mon-core / nms / cap-sw / cap＋Zabbix）を後付けし、SNMPをv2c→v3へ段階的に深堀りする学習ラボ（LAB-2026-T28）。老朽LAN側（old-rt/old-core/old-sw1/old-sw2）には一切手を加えず、意図的に仕込んだ4つの老朽ポイントをそのまま温存し、監視によって可視化した課題をテーマ29「更改・移行・移設」の移行元として引き継ぐ。</p>
+  </section>
+
+  <section class="phase-progress" aria-label="ラボ進行状況">
+    <div class="ph-head">
+      <h2>ラボ進行状況</h2>
+      <span class="asof">現在日 2026-07-17 時点のスナップショット</span>
+    </div>
+    <div class="ph-legend">
+      <span><i class="lg-dot ok"></i>完了</span>
+      <span><i class="lg-dot active"></i>進行中</span>
+      <span><i class="lg-dot todo"></i>未着手</span>
+    </div>
+    <div class="phase-wrap">
+      <div class="today-marker" style="left:66.7%"><span class="today-flag">現在 07-17</span></div>
+      <div class="phase-steps">
+        <div class="phase-step done">
+          <div class="ps-head"><span class="ps-icon">●</span>要件定義</div>
+          <div class="ps-date mono">2026-07-16 完了</div>
+          <div class="ps-track"><div class="ps-fill" style="width:100%"></div></div>
+        </div>
+        <div class="phase-step done">
+          <div class="ps-head"><span class="ps-icon">●</span>基本設計</div>
+          <div class="ps-date mono">2026-07-16 完了</div>
+          <div class="ps-track"><div class="ps-fill" style="width:100%"></div></div>
+        </div>
+        <div class="phase-step done">
+          <div class="ps-head"><span class="ps-icon">●</span>詳細設計</div>
+          <div class="ps-date mono">2026-07-17 完了</div>
+          <div class="ps-track"><div class="ps-fill" style="width:100%"></div></div>
+        </div>
+        <div class="phase-step done">
+          <div class="ps-head"><span class="ps-icon">●</span>環境構築</div>
+          <div class="ps-date mono">2026-07-17 完了・deploy済み</div>
+          <div class="ps-track"><div class="ps-fill" style="width:100%"></div></div>
+        </div>
+        <div class="phase-step todo">
+          <div class="ps-head"><span class="ps-icon">○</span>Lab Challenge（Mission 1〜6）</div>
+          <div class="ps-date mono">未着手</div>
+          <div class="ps-track"><div class="ps-fill" style="width:0%"></div></div>
+        </div>
+        <div class="phase-step todo">
+          <div class="ps-head"><span class="ps-icon">○</span>試験・引き継ぎ</div>
+          <div class="ps-date mono">未着手</div>
+          <div class="ps-track"><div class="ps-fill" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="cross-phase">
+      <div class="cross-label">横断管理 — <a href="07_WBS・課題管理表.html">構築ログ・課題管理（07）</a>（全期間を通じて継続）</div>
+      <div class="cross-track"><div class="cross-fill" style="width:67%"></div></div>
+    </div>
+  </section>
+
+  <section class="doc-groups" aria-label="フェーズ別ドキュメント">
+
+    <div class="group">
+      <div class="group-head"><h3>要件定義</h3><span class="group-date mono">2026-07-16</span><span class="group-status done">完了</span></div>
+      <div class="cards">
+        <a class="doc-card" href="01_要件定義書.html">
+          <div class="card-top"><span class="badge"><span class="dot"></span>承認済</span><span class="card-ver">v1.0</span></div>
+          <h4>要件定義書</h4>
+          <p>監視要件・セキュリティ要件・学習要件と、対象範囲・制約/前提を定義する起点ドキュメント</p>
+        </a>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head"><h3>基本設計</h3><span class="group-date mono">2026-07-16</span><span class="group-status done">完了</span></div>
+      <div class="cards">
+        <a class="doc-card" href="02_基本設計書.html">
+          <div class="card-top"><span class="badge"><span class="dot"></span>承認済</span><span class="card-ver">v1.0</span></div>
+          <h4>基本設計書</h4>
+          <p>物理/論理/監視/セキュリティ(v2c→v3)/管理の5領域で設計方針と採用理由を確定</p>
+        </a>
+        <a class="doc-card" href="03_物理・論理構成図.html">
+          <div class="card-top"><span class="badge"><span class="dot"></span>承認済</span><span class="card-ver">v1.0</span></div>
+          <h4>物理・論理構成図</h4>
+          <p>14ノード・11リンクの物理結線とVLAN/ルーティングの論理構成を図で正とする</p>
+        </a>
+        <a class="doc-card ext" href="../02_基本設計/IPアドレス管理表.md">
+          <div class="card-top"><span class="ext-badge">MD正本</span></div>
+          <h4>IPアドレス管理表</h4>
+          <p>VLAN/セグメント・機器ごとのIP割当の正本（Markdown）</p>
+        </a>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head"><h3>詳細設計</h3><span class="group-date mono">2026-07-17</span><span class="group-status done">完了</span></div>
+      <div class="cards">
+        <a class="doc-card" href="04_詳細設計書.html">
+          <div class="card-top"><span class="badge"><span class="dot"></span>承認済</span><span class="card-ver">v1.0</span></div>
+          <h4>詳細設計書</h4>
+          <p>基本設計の方針をコマンド単位（VLAN/SVI/static/SNMP/SPAN）の動作仕様に落とし込む</p>
+        </a>
+        <a class="doc-card" href="05_ノード配置・リンク収容表.html">
+          <div class="card-top"><span class="badge"><span class="dot"></span>承認済</span><span class="card-ver">v1.0</span></div>
+          <h4>ノード配置・リンク収容表</h4>
+          <p>14ノードの配置とリンク11本のIF対応（clab.yml eth⇔IOS IF名）の収容表</p>
+        </a>
+        <a class="doc-card ext" href="../03_詳細設計/監視設計書.md">
+          <div class="card-top"><span class="ext-badge">MD正本</span></div>
+          <h4>監視設計書</h4>
+          <p>ポーリング対象・主要OID・SPAN・トラップ設計の詳細（Markdown）</p>
+        </a>
+        <a class="doc-card ext" href="../03_詳細設計/パラメータシート_設定順.md">
+          <div class="card-top"><span class="ext-badge">MD正本</span></div>
+          <h4>パラメータシート（設定順）</h4>
+          <p>Mission 1〜6で投入するIOS CLIコマンドの実施順（Markdown）</p>
+        </a>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head"><h3>環境構築</h3><span class="group-date mono">2026-07-17</span><span class="group-status done">完了・deploy済み</span></div>
+      <div class="cards">
+        <a class="doc-card ext" href="../04_構築/構築手順書.md">
+          <div class="card-top"><span class="ext-badge">MD正本</span></div>
+          <h4>構築手順書</h4>
+          <p>containerlab初回デプロイ(11ノード)からZabbixスタック増設・再デプロイ(14ノード)までの手順（Markdown）</p>
+        </a>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head"><h3>Lab Challenge（Mission 1〜6）</h3><span class="group-date mono">未着手</span><span class="group-status todo">未着手</span></div>
+      <div class="cards">
+        <a class="doc-card ext" href="../README_Lab_Challenge.md">
+          <div class="card-top"><span class="ext-badge">MD正本</span></div>
+          <h4>README（Lab Challenge）</h4>
+          <p>老朽LANベースライン構築→監視セグメント増設→SNMPv2c→IF-MIB→v3移行→トラップ受信のMission定義（Markdown）</p>
+        </a>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head"><h3>試験・引き継ぎ</h3><span class="group-date mono">未着手</span><span class="group-status todo">未着手</span></div>
+      <div class="cards">
+        <a class="doc-card" href="06_試験仕様書・結果報告書.html">
+          <div class="card-top"><span class="badge"><span class="dot" style="background:var(--ink-3)"></span>未着手</span><span class="card-ver">—</span></div>
+          <h4>試験仕様書・結果報告書</h4>
+          <p>Mission試験項目ごとの手順・判定基準・結果を記録する試験ドキュメント</p>
+        </a>
+        <a class="doc-card ext" href="../05_試験/試験計画書.md">
+          <div class="card-top"><span class="ext-badge">MD正本</span></div>
+          <h4>試験計画書</h4>
+          <p>試験区分・判定基準の計画（Markdown）</p>
+        </a>
+        <a class="doc-card" href="08_運用保守マニュアル.html">
+          <div class="card-top"><span class="badge"><span class="dot" style="background:var(--ink-3)"></span>未着手</span><span class="card-ver">—</span></div>
+          <h4>運用保守マニュアル</h4>
+          <p>監視項目・障害切り分けフローとテーマ29への引継チェック</p>
+        </a>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head"><h3>横断管理</h3><span class="group-date mono">全期間</span><span class="group-status active">進行中</span></div>
+      <div class="cards">
+        <a class="doc-card" href="07_WBS・課題管理表.html">
+          <div class="card-top"><span class="badge"><span class="dot" style="background:var(--neutral)"></span>更新中</span><span class="card-ver">v1.0</span></div>
+          <h4>WBS・課題管理表</h4>
+          <p>構築中に発生したISS-01〜06を含む課題管理表と、フェーズWBSガント</p>
+        </a>
+      </div>
+    </div>
+
+  </section>
+
+  <p class="mock-note">本スイートはテーマ28ラボ（containerlab仮想環境）の設計・構築ドキュメントをHTML化した学習用資料です。値の正本は各Markdown（IPアドレス管理表ほか）。</p>
+</main>
+
+</body>
+</html>

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>運用保守マニュアル | テーマ28 SNMP監視Lab</title>
+<style>
+  :root {
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    --accent: #635BFF;
+    --accent-soft: #F0EFFF;
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    --neutral: #94A3B8;
+    --code-bg: #0F172A;
+    --code-ink: #E2E8F0;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--sans); font-size: 15px; line-height: 1.8; color: var(--ink); background: var(--surface); }
+  .mono { font-family: var(--mono); font-feature-settings: "tnum"; }
+  .num { text-align: right; }
+
+  .site-header { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 20px; height: 56px; padding: 0 24px; background: rgba(250,250,249,.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+  .site-header .back { font-size: 13px; color: var(--ink-2); text-decoration: none; transition: color .15s var(--ease); }
+  .site-header .back:hover { color: var(--accent); }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .brand span { color: var(--accent); }
+  .phase-chip { padding: 3px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--accent); background: var(--accent-soft); border-radius: var(--r-full); }
+  .header-meta { margin-left: auto; font-size: 12px; color: var(--ink-2); }
+
+  .layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 40px; max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+  .nav { position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; padding: 32px 0; }
+  .nav a { display: block; padding: 5px 10px; margin-left: -10px; font-size: 13.5px; color: var(--ink-2); text-decoration: none; border-radius: var(--r-sm); transition: color .12s var(--ease), background .12s var(--ease); }
+  .nav a:hover { color: var(--ink); background: #F5F5F4; }
+
+  .doc { padding: 40px 0 96px; min-width: 0; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+  p.lede { font-size: 14.5px; color: var(--ink-2); max-width: 70ch; margin: 14px 0 28px; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 28px; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; font-size: 12px; font-weight: 500; border-radius: var(--r-full); border: 1px solid var(--border); background: var(--raised); color: var(--ink-2); }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  section { margin-bottom: 56px; scroll-margin-top: 72px; }
+  h2 { font-size: 20px; font-weight: 600; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  p.note { font-size: 13.5px; color: var(--ink-2); margin-bottom: 16px; }
+
+  .op-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .op-table th, .op-table td { padding: 10px 12px; text-align: left; vertical-align: top; }
+  .op-table thead th { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--ink-3); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  .op-table tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+  .op-table tbody tr:hover { background: #F5F5F4; }
+
+  /* ===== Flowchart ===== */
+  .flow-wrap { overflow-x: auto; background: var(--raised); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-1); padding: 8px; }
+  .flow-svg text { font-family: var(--sans); }
+  .fnode-rect { fill: var(--raised); stroke: var(--border); stroke-width: 1.5; }
+  .fnode-rect.terminal-ok { fill: #ECFDF5; stroke: var(--ok); }
+  .fnode-rect.terminal-warn { fill: #FFFBEB; stroke: var(--warn); }
+  .fnode-diamond { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+  .flabel { font-size: 12.5px; fill: var(--ink); }
+  .flabel-cmd { font-family: var(--mono); font-size: 11px; fill: var(--ink-2); }
+  .fbranch-label { font-size: 11px; fill: var(--ink-2); font-weight: 600; }
+  .fedge { fill: none; stroke: var(--ink-3); stroke-width: 1.5; }
+  .flegend { display: flex; flex-wrap: wrap; gap: 18px; font-size: 12px; color: var(--ink-2); margin-top: 12px; }
+  .flegend span { display: inline-flex; align-items: center; gap: 6px; }
+  .flegend i { width: 14px; height: 14px; display: inline-block; border: 1.5px solid var(--accent); background: var(--accent-soft); }
+  .flegend i.rect { border-radius: 3px; border-color: var(--border); background: var(--raised); }
+
+  /* ===== Escalation ===== */
+  .esc-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .esc-table th, .esc-table td { padding: 10px 12px; text-align: left; vertical-align: top; }
+  .esc-table thead th { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--ink-3); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  .esc-table tbody tr { border-bottom: 1px solid var(--border); }
+  .esc-table .lvl { font-weight: 700; color: var(--accent); font-family: var(--mono); }
+
+  /* ===== Checklist ===== */
+  .checklist { list-style: none; }
+  .checklist li { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .checklist li:last-child { border-bottom: none; }
+  .chk-mark { width: 18px; height: 18px; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
+  .chk-mark.done { background: var(--ok); color: #fff; }
+  .chk-mark.pending { background: #FFFBEB; border: 1.5px solid var(--warn); color: var(--warn); }
+  .checklist li.pending { color: var(--ink-2); }
+  .callout { display: flex; gap: 12px; padding: 14px 16px; margin: 16px 0; border-radius: var(--r-sm); font-size: 14px; border-left: 3px solid var(--warn); background: #FFFBEB; }
+  .callout .icon { font-weight: 700; color: var(--warn); font-family: var(--mono); }
+  .callout strong { display: block; font-size: 13px; margin-bottom: 2px; }
+
+  .doc-footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); }
+  .doc-footer a { display: block; padding: 14px 18px; min-width: 200px; border: 1px solid var(--border); border-radius: var(--r-md); text-decoration: none; color: var(--ink); font-weight: 600; font-size: 14px; background: var(--raised); transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease); }
+  .doc-footer a:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--accent); }
+  .doc-footer a small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-3); letter-spacing: .06em; }
+  .doc-footer .next { text-align: right; margin-left: auto; }
+  .mock-note { margin-top: 24px; font-size: 11px; color: var(--ink-3); }
+
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 1fr; }
+    .nav { position: static; height: auto; padding: 20px 0 0; display: flex; gap: 16px; overflow-x: auto; }
+  }
+  @media (max-width: 768px) {
+    .header-meta, .phase-chip { display: none; }
+    .doc section { overflow-x: auto; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+  @media (max-width: 480px) {
+    .doc-footer { flex-direction: column; }
+    .doc-footer a { min-width: 0; }
+    .doc-footer .next { margin-left: 0; }
+  }
+  @media print {
+    .site-header, .nav, .doc-footer, .mock-note { display: none !important; }
+    body { background: #FFFFFF; }
+    .layout { display: block; }
+    section { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a class="back" href="00_ドキュメントマップ.html">← ドキュメントマップ</a>
+  <div class="brand">テーマ28 <span>SNMP監視Lab</span></div>
+  <span class="phase-chip">PHASE 6 運用</span>
+  <div class="header-meta">LAB-2026-T28 / OrbStack clab・snmp-monitoring-lab</div>
+</header>
+
+<div class="layout">
+  <nav class="nav" aria-label="このページの目次">
+    <a href="#monitor">監視項目一覧</a>
+    <a href="#flow">障害一次切り分け</a>
+    <a href="#maint">定期メンテナンス</a>
+    <a href="#escalation">エスカレーション</a>
+    <a href="#handover">引き継ぎチェックリスト</a>
+  </nav>
+
+  <main class="doc">
+    <h1>運用保守マニュアル</h1>
+    <div class="doc-meta">
+      <span class="badge ver">v1.0</span>
+      <span class="badge"><span class="dot"></span>準備中</span>
+      <span class="badge">最終更新 2026-07-17</span>
+      <span class="badge">作成: shuya（AI支援: Claude）</span>
+    </div>
+    <p class="lede">Lab Challenge着手（Mission 1〜6）とテーマ29への引き継ぎに向けて作成するマニュアル。監視の系統、障害発生時の一次切り分け手順、ラボ運用の定型作業、詰まったときの参照順、引き継ぎ条件を1冊にまとめる。</p>
+
+    <section id="monitor">
+      <h2>1. 監視項目一覧</h2>
+      <p class="note">本ラボの監視は「nms系（手動snmpwalk/snmptrapd）」と「Zabbix系（SNMPポーリング）」の2系統＋トラップ受信で構成される（監視設計書.md参照）。</p>
+      <table class="op-table">
+        <thead><tr><th>監視項目</th><th>方式</th><th>対象</th><th>確認内容・備考</th></tr></thead>
+        <tbody>
+          <tr><td>system/OIDの手動確認</td><td>snmpwalk/snmpget（v2c→v3、nmsから随時実行）</td><td>old-rt/old-core/old-sw1/old-sw2/mon-core/cap-sw（6台）</td><td>sysDescr/sysName/sysUpTime等の応答を都度確認（Mission3〜5の学習用途、常時ポーリングではない）</td></tr>
+          <tr><td>IF-MIBカウンタ</td><td>snmpwalk（ifInOctets 32bit／ifHCInOctets 64bit）</td><td>同上6台</td><td>トラフィック生成前後の差分値で増加を確認（Mission4）</td></tr>
+          <tr><td>SNMPポーリング（Zabbix）</td><td>Zabbix Server（zbx-srv）によるin-band SNMPポーリング</td><td>old-rt=10.28.1.1／old-core=10.28.90.1／old-sw1=10.28.90.13／old-sw2=10.28.90.14／mon-core=10.28.0.2／cap-sw=10.28.0.3（対象6IP）</td><td>VLAN100→VLAN900のin-band経由。mon-core E0/3のVLAN100設定投入（Mission2）まで疎通不通（ISS-06）</td></tr>
+          <tr><td>SNMPトラップ受信</td><td>snmptrapd（nms、フォアグラウンド起動）</td><td>送信元: 監視対象6台／受信先: 10.28.100.10</td><td>linkDown/linkUp/coldStartをUDP/162で受信。community public・v2c固定運用（ポーリングv3化後もトラップはv2c混在）</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="flow">
+      <h2>2. 障害一次切り分けフローチャート</h2>
+      <p class="note">例: 「IOLに疎通できない」の申告を受けた場合の一次切り分け手順。ひし形は判断、矩形は実施するアクション。構築手順書・課題管理表（ISS-01・ISS-02）の実話に基づく判断分岐。</p>
+      <div class="flow-wrap">
+        <svg class="flow-svg" viewBox="-12 0 780 890" role="img" aria-label="IOLに疎通できない場合の一次切り分けフローチャート">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#A8A29E"></path>
+            </marker>
+          </defs>
+
+          <rect class="fnode-rect" x="190" y="10" width="320" height="46" rx="8"></rect>
+          <text class="flabel" x="350" y="38" text-anchor="middle">障害検知：「IOLに疎通できない」の申告</text>
+
+          <path class="fedge" d="M350,56 L350,80" marker-end="url(#arrow)"></path>
+          <polygon class="fnode-diamond" points="350,80 470,135 350,190 230,135"></polygon>
+          <text class="flabel" x="350" y="128" text-anchor="middle">コンテナは running か？</text>
+          <text class="flabel-cmd" x="350" y="146" text-anchor="middle">./deploy.sh inspect</text>
+
+          <path class="fedge" d="M470,135 L572,135" marker-end="url(#arrow)"></path>
+          <text class="fbranch-label" x="505" y="126">起動していない</text>
+          <rect class="fnode-rect terminal-warn" x="572" y="100" width="150" height="70" rx="8"></rect>
+          <text class="flabel" x="647" y="120" text-anchor="middle">docker logsを確認</text>
+          <text class="flabel" x="647" y="138" text-anchor="middle">License Errorなら</text>
+          <text class="flabel" x="647" y="156" text-anchor="middle">.iourc確認し再デプロイ</text>
+
+          <path class="fedge" d="M350,190 L350,222" marker-end="url(#arrow)"></path>
+          <text class="fbranch-label" x="362" y="210">起動中</text>
+          <rect class="fnode-rect" x="200" y="222" width="300" height="46" rx="8"></rect>
+          <text class="flabel" x="350" y="240" text-anchor="middle">iouyap動作確認</text>
+          <text class="flabel-cmd" x="350" y="257" text-anchor="middle">/proc/*/comm を走査</text>
+
+          <path class="fedge" d="M350,268 L350,292" marker-end="url(#arrow)"></path>
+          <polygon class="fnode-diamond" points="350,292 460,342 350,392 240,342"></polygon>
+          <text class="flabel" x="350" y="347" text-anchor="middle">iouyapは起動しているか？</text>
+
+          <path class="fedge" d="M240,342 L128,342" marker-end="url(#arrow)"></path>
+          <text class="fbranch-label" x="170" y="333">未起動</text>
+          <rect class="fnode-rect terminal-warn" x="2" y="316" width="126" height="52" rx="8"></rect>
+          <text class="flabel" x="65" y="338" text-anchor="middle">./deploy.sh iouyap</text>
+          <text class="flabel" x="65" y="354" text-anchor="middle">で手動起動し再確認</text>
+
+          <path class="fedge" d="M350,392 L350,416" marker-end="url(#arrow)"></path>
+          <text class="fbranch-label" x="362" y="406">起動済み</text>
+          <rect class="fnode-rect" x="200" y="416" width="300" height="46" rx="8"></rect>
+          <text class="flabel" x="350" y="434" text-anchor="middle">L2設定確認</text>
+          <text class="flabel-cmd" x="350" y="451" text-anchor="middle">VLAN／trunk／access（設定順Phase1・5）</text>
+
+          <path class="fedge" d="M350,462 L350,486" marker-end="url(#arrow)"></path>
+          <polygon class="fnode-diamond" points="350,486 460,536 350,586 240,536"></polygon>
+          <text class="flabel" x="350" y="541" text-anchor="middle">L2設定に誤りがあるか？</text>
+
+          <path class="fedge" d="M460,536 L580,536" marker-end="url(#arrow)"></path>
+          <text class="fbranch-label" x="490" y="527">あり</text>
+          <rect class="fnode-rect terminal-warn" x="572" y="510" width="150" height="52" rx="8"></rect>
+          <text class="flabel" x="647" y="532" text-anchor="middle">該当ノードでVLAN／trunk／</text>
+          <text class="flabel" x="647" y="548" text-anchor="middle">accessを再投入</text>
+
+          <path class="fedge" d="M350,586 L350,610" marker-end="url(#arrow)"></path>
+          <text class="fbranch-label" x="362" y="600">なし</text>
+          <rect class="fnode-rect" x="200" y="610" width="300" height="46" rx="8"></rect>
+          <text class="flabel" x="350" y="628" text-anchor="middle">経路確認</text>
+          <text class="flabel-cmd" x="350" y="645" text-anchor="middle">static route／デフォルトGW（設定順Phase2-3・6）</text>
+
+          <path class="fedge" d="M350,656 L350,680" marker-end="url(#arrow)"></path>
+          <polygon class="fnode-diamond" points="350,680 460,730 350,780 240,730"></polygon>
+          <text class="flabel" x="350" y="735" text-anchor="middle">経路に誤りがあるか？</text>
+
+          <path class="fedge" d="M240,730 L128,730" marker-end="url(#arrow)"></path>
+          <text class="fbranch-label" x="170" y="721">あり</text>
+          <rect class="fnode-rect terminal-warn" x="2" y="704" width="126" height="52" rx="8"></rect>
+          <text class="flabel" x="65" y="726" text-anchor="middle">該当ノードでstatic</text>
+          <text class="flabel" x="65" y="742" text-anchor="middle">route／SVIを再投入</text>
+
+          <path class="fedge" d="M350,780 L350,804" marker-end="url(#arrow)"></path>
+          <text class="fbranch-label" x="362" y="794">なし</text>
+          <rect class="fnode-rect terminal-ok" x="140" y="804" width="420" height="60" rx="8"></rect>
+          <text class="flabel" x="350" y="828" text-anchor="middle">cap-swのSPAN（Et0/1→Et0/3）＋capでの</text>
+          <text class="flabel" x="350" y="846" text-anchor="middle">tcpdumpキャプチャで実トラフィックを確認（特定できなければ§4へ）</text>
+        </svg>
+      </div>
+      <div class="flegend">
+        <span><i class="rect"></i>アクション（矩形）</span>
+        <span><i style="border-radius:2px;transform:rotate(45deg)"></i>判断（ひし形）</span>
+        <span><i class="rect" style="background:#ECFDF5;border-color:var(--ok)"></i>切り分け完了</span>
+        <span><i class="rect" style="background:#FFFBEB;border-color:var(--warn)"></i>設定再投入・要対応</span>
+      </div>
+    </section>
+
+    <section id="maint">
+      <h2>3. 定期メンテナンス（ラボ運用の定型作業）</h2>
+      <table class="op-table">
+        <thead><tr><th>作業</th><th>内容</th><th>コマンド</th><th>備考・注意</th></tr></thead>
+        <tbody>
+          <tr><td>起動確認</td><td>14ノードのステータス確認</td><td class="mono">./deploy.sh inspect</td><td>全ノードrunning・IOL 6台にLicense Errorが無いことを確認（ブートログは<span class="mono">docker logs</span>）</td></tr>
+          <tr><td>コンフィグ保存</td><td>IOS設定の保存</td><td class="mono">write memory</td><td><span class="mono">./deploy.sh destroy</span>は<span class="mono">--cleanup</span>付きのためnvram（保存済みコンフィグ）ごと削除される。設定を残したいときは<span class="mono">sudo containerlab destroy -t legacy-lan.clab.yml</span>（--cleanupなし）を使う</td></tr>
+          <tr><td>再デプロイ</td><td>ラボの再構築</td><td class="mono">./deploy.sh destroy → ./deploy.sh deploy</td><td><span class="mono">deploy</span>はensure_iourc()でIOLライセンスを自動用意し、zbx_net()でzbx-srvのeth1も再投入する</td></tr>
+          <tr><td>nmsのnet-snmp再導入</td><td>snmptrapd等の再インストール</td><td class="mono">sudo docker exec -it clab-snmp-monitoring-lab-nms bash<br>apk add --no-cache net-snmp</td><td>ラボ再デプロイでnmsコンテナが再作成されるとnet-snmpは消える（ISS-05）。Mission6前に必要</td></tr>
+          <tr><td>zbx-srv再起動時のIP再投入</td><td>zbx-srvのeth1（10.28.100.20/24）再設定</td><td class="mono">./deploy.sh zbx-net</td><td>zabbixイメージは非rootのためclab.yml execでは投入できず、コンテナ再起動のたびに再実行が必要（ISS-03）</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="escalation">
+      <h2>4. エスカレーション（詰まったときの参照順）</h2>
+      <table class="esc-table">
+        <thead><tr><th>順序</th><th>参照先</th><th>内容・使いどころ</th></tr></thead>
+        <tbody>
+          <tr><td class="lvl">①</td><td class="mono">03_詳細設計/パラメータシート_設定順.md</td><td>設定順に沿ったフェーズ別チェックポイント（Phase 0〜18）。まずここで自分の投入順序・疎通確認結果を見直す</td></tr>
+          <tr><td class="lvl">②</td><td class="mono">03_詳細設計/パラメータシート.md</td><td>ノード別の設計値一覧＋IOSコマンド解答例。設定順ビュー（①）で行き詰まった場合のみ参照する</td></tr>
+          <tr><td class="lvl">③</td><td class="mono">../../切り分け/containerlab_iol_quirks.md</td><td>Containerlab／Cisco IOL環境特有の既知事象集。IOLライセンス・iouyap起動等の環境固有の詰まりを疑う場合に参照</td></tr>
+          <tr><td class="lvl">④</td><td class="mono">../../27_qos_acl_policy_control/04_構築/トラブルシューティング_IOL受信不能_2026-07-10.md</td><td>テーマ27ラボでのIOL間L2疎通不能の切り分け事例。似た症状の過去事例として参照</td></tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        <span class="icon">!</span>
+        <div><strong>参照順序</strong>必ず①→②→③→④の順に参照する。ラボ構築自体（IOLライセンス・iouyap起動等）で詰まった場合は③④を先に疑うと早い。</div>
+      </div>
+    </section>
+
+    <section id="handover">
+      <h2>5. 引き継ぎチェックリスト</h2>
+      <p class="note">テーマ29「更改・移行・移設」への引き継ぎ条件。2026-07-17時点で環境構築系の2項目のみ完了。</p>
+      <ul class="checklist" id="checklist"></ul>
+    </section>
+  </main>
+</div>
+
+<div class="wrap" style="max-width:1180px;margin:0 auto;padding:0 24px;">
+  <nav class="doc-footer" aria-label="前後のドキュメント">
+    <a class="prev" href="07_WBS・課題管理表.html"><small>前の工程</small>WBS・課題管理表</a>
+    <a class="next" href="00_ドキュメントマップ.html"><small>次の工程</small>ドキュメントマップ</a>
+  </nav>
+  <p class="mock-note">本スイートはテーマ28ラボ（containerlab仮想環境）の設計・構築ドキュメントをHTML化した学習用資料です。値の正本は各Markdown（IPアドレス管理表ほか）。</p>
+</div>
+
+<script>
+"use strict";
+
+/* 引き継ぎ条件（README_Lab_Challenge.md・共通仕様§4の実績に基づく2026-07-17時点の状況） */
+const HANDOVER_ITEMS = [
+  { label: "Mission完走（Mission 1〜6、README_Lab_Challenge.md）", done: false },
+  { label: "老朽ポイント注記済み構成図（ネットワーク構成図.html、①〜④の老朽ポイントを明記済み）", done: true },
+  { label: "保存済みコンフィグ（IOL 6台のrunning-configをwrite memoryで保存）", done: false },
+  { label: "Zabbix監視稼働（zbx-db/zbx-srv/zbx-web起動・Web UI HTTP 200応答）", done: true },
+  { label: "課題クローズ（ISS-01〜06、ISS-06はMission2完了待ちで対応中）", done: false }
+];
+
+const checklist = document.getElementById("checklist");
+checklist.innerHTML = HANDOVER_ITEMS.map(item => `<li class="${item.done ? "done" : "pending"}">
+  <span class="chk-mark ${item.done ? "done" : "pending"}">${item.done ? "✓" : "!"}</span>
+  <span>${item.label}</span>
+</li>`).join("");
+</script>
+</body>
+</html>

@@ -1,0 +1,194 @@
+name: snmp-monitoring-lab
+
+mgmt:
+  network: snmp-monitoring-mgmt
+  ipv4-subnet: 172.28.28.0/24
+
+topology:
+  nodes:
+    # ---------------------------------------------------------
+    # 現行社内LAN（老朽構成）
+    #   old-rt   : 老朽WANルータ（旧IOS 15.6）。Lo0=203.0.113.1 が疑似インターネット
+    #   old-core : 単一コアL3SW（全VLANのSVI・static。SPOF＝テーマ29の更改対象）
+    #   old-sw1  : フロアA L2SW（営業VLAN10 / 総務VLAN20）
+    #   old-sw2  : フロアB L2SW（総務VLAN20の延伸 / サーバVLAN30）
+    # ---------------------------------------------------------
+    old-rt:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.6.3M3a
+      mgmt-ipv4: 172.28.28.11
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+        # IOL実ライセンス（deploy.shがVM内イメージから/opt/clab/.iourcへ自動抽出。git管理外）
+        - /opt/clab/.iourc:/iol/.iourc:ro
+    old-core:
+      kind: cisco_iol
+      type: l2
+      image: vrnetlab/cisco_iol:L2-15.2
+      mgmt-ipv4: 172.28.28.12
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+        # IOL実ライセンス（deploy.shがVM内イメージから/opt/clab/.iourcへ自動抽出。git管理外）
+        - /opt/clab/.iourc:/iol/.iourc:ro
+    old-sw1:
+      kind: cisco_iol
+      type: l2
+      image: vrnetlab/cisco_iol:L2-15.2
+      mgmt-ipv4: 172.28.28.13
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+        # IOL実ライセンス（deploy.shがVM内イメージから/opt/clab/.iourcへ自動抽出。git管理外）
+        - /opt/clab/.iourc:/iol/.iourc:ro
+    old-sw2:
+      kind: cisco_iol
+      type: l2
+      image: vrnetlab/cisco_iol:L2-15.2
+      mgmt-ipv4: 172.28.28.14
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+        # IOL実ライセンス（deploy.shがVM内イメージから/opt/clab/.iourcへ自動抽出。git管理外）
+        - /opt/clab/.iourc:/iol/.iourc:ro
+
+    # ---------------------------------------------------------
+    # 監視基盤（本テーマで増設する部分）
+    #   mon-core : 監視L3SW（監視セグメントVLAN100を収容）
+    #   cap-sw   : Wireshark用SW（old-core〜mon-core間にインライン。SPANで cap へミラー）
+    # ---------------------------------------------------------
+    mon-core:
+      kind: cisco_iol
+      type: l2
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      mgmt-ipv4: 172.28.28.21
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+        # IOL実ライセンス（deploy.shがVM内イメージから/opt/clab/.iourcへ自動抽出。git管理外）
+        - /opt/clab/.iourc:/iol/.iourc:ro
+    cap-sw:
+      kind: cisco_iol
+      type: l2
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      mgmt-ipv4: 172.28.28.22
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+        # IOL実ライセンス（deploy.shがVM内イメージから/opt/clab/.iourcへ自動抽出。git管理外）
+        - /opt/clab/.iourc:/iol/.iourc:ro
+
+    # ---------------------------------------------------------
+    # Zabbix監視スタック（DB / Server / Web UI）
+    #   zbx-db  : PostgreSQL。mgmtネットワーク上のみ（データプレーン無し）
+    #   zbx-srv : Zabbix Server 7.0 LTS。eth1をVLAN100へin-band接続して
+    #             SNMPポーリング（経路がSPAN観測点を通る設計を維持）。
+    #             eth1のIP/経路はdeploy.shのzbx_net()が投入する
+    #             （zabbixイメージは非rootのためclab execでは設定不可）
+    #   zbx-web : Web UI。VMの8280番へ公開（Macから http://clab.orb.local:8280）
+    #   認証情報は本ラボ専用の学習用値。実運用で使い回さないこと
+    # ---------------------------------------------------------
+    zbx-db:
+      kind: linux
+      image: postgres:16-alpine
+      mgmt-ipv4: 172.28.28.111
+      env:
+        POSTGRES_USER: zabbix
+        POSTGRES_PASSWORD: ZbxLab28
+        POSTGRES_DB: zabbix
+
+    zbx-srv:
+      kind: linux
+      image: zabbix/zabbix-server-pgsql:alpine-7.0-latest
+      mgmt-ipv4: 172.28.28.112
+      env:
+        DB_SERVER_HOST: 172.28.28.111
+        POSTGRES_USER: zabbix
+        POSTGRES_PASSWORD: ZbxLab28
+        POSTGRES_DB: zabbix
+
+    zbx-web:
+      kind: linux
+      image: zabbix/zabbix-web-nginx-pgsql:alpine-7.0-latest
+      mgmt-ipv4: 172.28.28.113
+      ports:
+        - 8280:8080
+      env:
+        ZBX_SERVER_HOST: 172.28.28.112
+        DB_SERVER_HOST: 172.28.28.111
+        POSTGRES_USER: zabbix
+        POSTGRES_PASSWORD: ZbxLab28
+        POSTGRES_DB: zabbix
+        PHP_TZ: Asia/Tokyo
+
+    # ---------------------------------------------------------
+    # エンドポイント
+    # ---------------------------------------------------------
+    nms:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.28.28.101
+      exec:
+        - ip link set eth1 up
+        - ip link set eth1 mtu 1500
+        - ip address add 10.28.100.10/24 dev eth1
+        # defaultはmgmt(eth0)側に残す（apk等の外部到達を維持）。
+        # 監視対象は全て10.28.0.0/16内のため、ラボ向けはこの経路のみで足りる
+        - ip route add 10.28.0.0/16 via 10.28.100.1 dev eth1
+
+    cap:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.28.28.102
+      exec:
+        # SPAN destination 受け。IPは持たせずリンクアップのみ（tcpdumpでミラー受信）
+        - ip link set eth1 up
+        - ip link set eth1 mtu 1500
+        - ip link set eth1 promisc on
+
+    pc-a:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.28.28.103
+      exec:
+        - ip link set eth1 up
+        - ip link set eth1 mtu 1500
+        - ip address add 10.28.10.10/24 dev eth1
+        - ip route replace default via 10.28.10.1 dev eth1
+
+    pc-b:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.28.28.104
+      exec:
+        - ip link set eth1 up
+        - ip link set eth1 mtu 1500
+        - ip address add 10.28.20.10/24 dev eth1
+        - ip route replace default via 10.28.20.1 dev eth1
+
+    srv-file:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.28.28.105
+      exec:
+        - ip link set eth1 up
+        - ip link set eth1 mtu 1500
+        - ip address add 10.28.30.10/24 dev eth1
+        - ip route replace default via 10.28.30.1 dev eth1
+
+  links:
+    # WAN（10.28.1.0/30）
+    - endpoints: ["old-rt:eth1", "old-core:eth1"]
+
+    # フロアSWへのトランク（VLAN20は両SWに跨るL2延伸＝老朽ポイント）
+    - endpoints: ["old-core:eth2", "old-sw1:eth1"]
+    - endpoints: ["old-core:eth3", "old-sw2:eth1"]
+
+    # エンドポイント収容
+    - endpoints: ["old-sw1:eth2", "pc-a:eth1"]
+    - endpoints: ["old-sw1:eth3", "pc-b:eth1"]
+    - endpoints: ["old-sw2:eth2", "srv-file:eth1"]
+
+    # 監視系（old-core〜mon-core間の10.28.0.0/30がcap-sw経由で通る＝SPAN観測点）
+    - endpoints: ["old-core:eth4", "cap-sw:eth1"]
+    - endpoints: ["cap-sw:eth2", "mon-core:eth1"]
+    - endpoints: ["cap-sw:eth3", "cap:eth1"]
+    - endpoints: ["mon-core:eth2", "nms:eth1"]
+
+    # Zabbix Serverのin-band接続（mon-core E0/3 = VLAN100 access。IOS側設定は学習者が投入）
+    - endpoints: ["mon-core:eth3", "zbx-srv:eth1"]

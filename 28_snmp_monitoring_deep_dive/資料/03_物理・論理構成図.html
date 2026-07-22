@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>物理・論理構成図 | テーマ28 SNMP監視Lab</title>
+<style>
+  /* ===== Design Tokens（共通仕様§2準拠） ===== */
+  :root {
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    --accent: #635BFF;
+    --accent-soft: #F0EFFF;
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    --neutral: #94A3B8;
+    --code-bg: #0F172A;
+    --code-ink: #E2E8F0;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  body { font-family: var(--sans); font-size: 15px; line-height: 1.8; color: var(--ink); background: var(--surface); }
+  .mono { font-family: var(--mono); font-feature-settings: "tnum"; }
+
+  /* ===== Header（共通仕様§3） ===== */
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 20px;
+    height: 56px; padding: 0 24px;
+    background: rgba(250,250,249,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .site-header .back { font-size: 13px; color: var(--ink-2); text-decoration: none; transition: color .15s var(--ease); }
+  .site-header .back:hover { color: var(--accent); }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .brand span { color: var(--accent); }
+  .phase-chip { padding: 3px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--accent); background: var(--accent-soft); border-radius: var(--r-full); }
+  .header-meta { margin-left: auto; font-size: 12px; color: var(--ink-2); }
+  @media (max-width: 768px) { .header-meta, .phase-chip { display: none; } }
+
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 40px 24px 96px; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 20px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; font-size: 12px; font-weight: 500;
+    border-radius: var(--r-full); border: 1px solid var(--border);
+    background: var(--raised); color: var(--ink-2);
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  .callout { display: flex; gap: 12px; padding: 14px 16px; margin: 0 0 32px; border-radius: var(--r-sm); font-size: 13.5px; border-left: 3px solid var(--info); background: #EFF6FF; }
+  .callout .icon { font-weight: 700; color: var(--info); font-family: var(--mono); }
+  .callout strong { display: block; font-size: 13px; margin-bottom: 2px; }
+  .callout a { color: inherit; }
+
+  /* ===== タブ ===== */
+  .tabbar { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+  .tab {
+    padding: 10px 18px; margin-bottom: -1px; font: inherit; font-size: 14px; font-weight: 600;
+    color: var(--ink-2); background: none; border: none; border-bottom: 2px solid transparent;
+    cursor: pointer; transition: color .15s var(--ease), border-color .15s var(--ease);
+  }
+  .tab:hover { color: var(--ink); }
+  .tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+  .panel { opacity: 0; transform: translateY(6px); transition: opacity .2s var(--ease), transform .2s var(--ease); }
+  .panel.show { opacity: 1; transform: translateY(0); }
+  .panel[hidden] { display: none; }
+
+  .diagram-wrap { position: relative; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--raised); padding: 16px; box-shadow: var(--shadow-1); }
+  svg.diagram { width: 100%; height: auto; display: block; }
+
+  /* ---- SVG共通: レイヤ帯・ゾーン帯 ---- */
+  .band { fill: rgba(28,25,23,.035); }
+  .band-label { font-size: 11px; font-weight: 700; letter-spacing: .12em; fill: var(--ink-3); }
+  .band-sub { font-size: 10px; fill: var(--ink-3); }
+  .zone-label { font-size: 11px; font-weight: 700; letter-spacing: .12em; }
+  .zone-sub { font-size: 10px; fill: var(--ink-3); }
+
+  /* ---- SVG共通: ノード（機器クラス別アイコン） ---- */
+  .node, .seg { cursor: pointer; }
+  .node .box { fill: var(--raised); stroke: #D6D3D1; stroke-width: 1.2; transition: stroke .15s var(--ease), filter .15s var(--ease); }
+  .node:hover .box, .node:focus .box { stroke: var(--accent); filter: drop-shadow(0 4px 10px rgba(28,25,23,.18)); outline: none; }
+  .node.sel .box, .seg.sel rect.body { stroke: var(--accent); stroke-width: 2.2; }
+  .node .name { font-size: 12.5px; font-weight: 700; fill: var(--ink); pointer-events: none; }
+  .node .role { font-size: 10px; fill: var(--ink-2); pointer-events: none; }
+  .node .chip { fill: #F5F5F4; pointer-events: none; }
+  .node .glyph { fill: none; stroke: var(--ink-2); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+  .node.rtr .chip { fill: #EFF6FF; }  .node.rtr .glyph { stroke: var(--info); }
+  .node.core .chip { fill: var(--accent-soft); } .node.core .glyph { stroke: var(--accent); }
+  .node.acc .chip { fill: #ECFDF5; }  .node.acc .glyph { stroke: var(--ok); }
+  .node.ep .chip { fill: #FFFBEB; }   .node.ep .glyph { stroke: var(--warn); }
+  .node.zbx .chip { fill: #FEF2F2; }  .node.zbx .glyph { stroke: var(--error); }
+
+  .pill rect { stroke-width: 1; }
+  .pill text { font-size: 9px; font-weight: 700; letter-spacing: .02em; text-anchor: middle; }
+  .pill.warn rect { fill: #FFFBEB; stroke: #FDE68A; }
+  .pill.warn text { fill: #B45309; }
+
+  .pseudonet rect { fill: #F5F5F4; stroke: var(--ink-3); stroke-width: 1.2; stroke-dasharray: 4 3; }
+  .pseudonet .cname { font-size: 13px; font-weight: 700; fill: var(--ink); text-anchor: middle; }
+  .pseudonet .cas { font-size: 9.5px; font-family: var(--mono); fill: var(--ink-2); text-anchor: middle; }
+
+  /* ---- SVG共通: リンク ---- */
+  .link { fill: none; stroke: var(--ink-2); stroke-width: 2; }                 /* 既存LAN（老朽構成） */
+  .link.new { stroke: var(--accent); stroke-width: 2; }                       /* 監視基盤 新設リンク */
+  .link.span { stroke: var(--accent); stroke-width: 1.6; stroke-dasharray: 5 4; } /* SPANミラー */
+  .link.lo0 { stroke: var(--ink-3); stroke-width: 1.3; stroke-dasharray: 3 3; }   /* Loopback0（疑似インターネット） */
+  .link.ctrl { stroke: var(--accent); stroke-width: 1.4; stroke-dasharray: 2.5 4; } /* static経路（制御プレーン） */
+  .port-tag { font-size: 9.5px; font-family: var(--mono); fill: var(--ink-2); paint-order: stroke; stroke: var(--raised); stroke-width: 3px; }
+  .note-label { font-size: 10px; fill: var(--ink-2); paint-order: stroke; stroke: var(--raised); stroke-width: 3px; }
+  .route-label { font-size: 9.5px; font-family: var(--mono); fill: var(--accent); paint-order: stroke; stroke: var(--raised); stroke-width: 3px; }
+
+  /* ---- L2/L3: VLANセグメント ---- */
+  .seg rect.body { fill: var(--raised); stroke: #D6D3D1; stroke-width: 1.2; }
+  .seg .vname { font-size: 12.5px; font-weight: 600; fill: var(--ink); text-anchor: middle; }
+  .seg .sub { font-size: 10px; fill: var(--ink-2); font-family: var(--mono); text-anchor: middle; }
+
+  /* ---- 詳細パネル ---- */
+  #detailPanel {
+    position: fixed; top: 72px; right: 16px; bottom: 16px; z-index: 60;
+    width: min(370px, calc(100vw - 32px));
+    display: flex; flex-direction: column;
+    background: var(--raised); border: 1px solid var(--border); border-radius: var(--r-md);
+    box-shadow: var(--shadow-2);
+    transform: translateX(calc(100% + 32px)); transition: transform .25s var(--ease);
+  }
+  #detailPanel.open { transform: none; }
+  .dp-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .dp-ic { width: 12px; height: 12px; border-radius: 4px; flex-shrink: 0; background: var(--ink-3); }
+  .dp-ic.rtr { background: var(--info); } .dp-ic.core { background: var(--accent); } .dp-ic.acc { background: var(--ok); }
+  .dp-ic.ep { background: var(--warn); }  .dp-ic.zbx { background: var(--error); }
+  .dp-ic.inet { background: var(--info); } .dp-ic.biz { background: var(--ok); } .dp-ic.mgmt { background: #64748B; }
+  .dp-ic.transit { background: var(--accent); } .dp-ic.mon { background: var(--warn); }
+  .dp-name { font-size: 15px; font-weight: 700; line-height: 1.3; }
+  .dp-sub { font-size: 11.5px; color: var(--ink-2); line-height: 1.4; }
+  .dp-close { margin-left: auto; width: 28px; height: 28px; border: 1px solid var(--border); border-radius: var(--r-full); background: var(--raised); color: var(--ink-2); font-size: 14px; line-height: 1; cursor: pointer; transition: color .15s var(--ease), border-color .15s var(--ease); }
+  .dp-close:hover { color: var(--accent); border-color: var(--accent); }
+  .dp-body { overflow-y: auto; padding: 14px 16px 18px; }
+  .dp-sec { margin: 0 0 18px; }
+  .dp-sec h3 { font-size: 10.5px; font-weight: 700; letter-spacing: .1em; color: var(--ink-3); text-transform: uppercase; margin-bottom: 8px; }
+  .dp-kv { display: grid; grid-template-columns: 92px 1fr; gap: 5px 12px; font-size: 12.5px; line-height: 1.5; }
+  .dp-kv dt { color: var(--ink-3); }
+  .dp-kv dd { color: var(--ink); }
+  .dp-if { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  .dp-if th { font-size: 10px; font-weight: 600; letter-spacing: .05em; color: var(--ink-3); text-align: left; padding: 3px 6px 5px 0; border-bottom: 1px solid var(--border); }
+  .dp-if td { padding: 5px 6px 5px 0; border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.45; }
+  .dp-if td:first-child { font-family: var(--mono); white-space: nowrap; color: var(--ink); }
+  .dp-if td:last-child { font-family: var(--mono); color: var(--ink-2); }
+  .dp-route { list-style: none; font-size: 11.5px; }
+  .dp-route li { position: relative; padding: 4px 0 4px 14px; font-family: var(--mono); color: var(--ink-2); line-height: 1.5; border-bottom: 1px dashed var(--border); }
+  .dp-route li::before { content: ""; position: absolute; left: 0; top: 11px; width: 6px; height: 6px; border-radius: 2px; background: var(--accent-soft); border: 1px solid var(--accent); }
+  @media print { #detailPanel { display: none !important; } }
+
+  /* ---- 凡例 ---- */
+  .legend-diagram { display: flex; flex-wrap: wrap; gap: 14px 18px; margin-top: 14px; font-size: 12.5px; color: var(--ink-2); }
+  .legend-diagram .item { display: inline-flex; align-items: center; gap: 7px; }
+  .legend-diagram svg { width: 30px; height: 12px; flex-shrink: 0; }
+  .legend-diagram .ic { width: 14px; height: 14px; }
+
+  /* ---- ツールチップ ---- */
+  #svgTooltip {
+    position: fixed; pointer-events: none; z-index: 100;
+    padding: 6px 10px; background: var(--ink); color: #fff; font-size: 12px;
+    border-radius: var(--r-sm); box-shadow: var(--shadow-2);
+    opacity: 0; transform: translateY(4px); transition: opacity .15s var(--ease), transform .15s var(--ease);
+    white-space: nowrap;
+  }
+  #svgTooltip.show { opacity: 1; transform: translateY(0); }
+  #svgTooltip .ip { font-family: var(--mono); color: #E7E5E4; margin-left: 8px; }
+
+  section { margin: 40px 0; }
+  h2 { font-size: 18px; font-weight: 600; margin-bottom: 12px; }
+
+  /* ---- 改版履歴 ---- */
+  .rev-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .rev-table th, .rev-table td { padding: 9px 12px; text-align: left; vertical-align: top; }
+  .rev-table thead th { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--ink-3); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  .rev-table tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+  .rev-table tbody tr:hover { background: #F5F5F4; }
+  .rev-table td:first-child { width: 90px; font-weight: 600; }
+
+  /* ===== フッタ（共通仕様§3） ===== */
+  .doc-footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); }
+  .doc-footer a {
+    display: block; padding: 14px 18px; min-width: 200px;
+    border: 1px solid var(--border); border-radius: var(--r-md);
+    text-decoration: none; color: var(--ink); font-weight: 600; font-size: 14px;
+    background: var(--raised); transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease);
+  }
+  .doc-footer a:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--accent); }
+  .doc-footer a small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-3); letter-spacing: .06em; }
+  .doc-footer .next { text-align: right; margin-left: auto; }
+  .mock-note { margin-top: 24px; font-size: 11px; color: var(--ink-3); }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 1100px) {
+    .wrap { max-width: 100%; }
+  }
+  @media (max-width: 768px) {
+    .header-meta { display: none; }
+    .tab { padding: 10px 12px; font-size: 13px; }
+    .legend-diagram { font-size: 12px; gap: 12px; }
+    section { overflow-x: auto; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    html { scroll-behavior: auto; }
+  }
+  @media (max-width: 480px) {
+    .doc-footer { flex-direction: column; }
+    .doc-footer a { min-width: 0; }
+    .doc-footer .next { margin-left: 0; }
+  }
+  @media print {
+    .site-header, .doc-footer, .mock-note, .tabbar { display: none !important; }
+    body { background: #FFFFFF; }
+    section, .diagram-wrap { break-inside: avoid; }
+    .panel[hidden] { display: block !important; opacity: 1; transform: none; margin-top: 32px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a class="back" href="00_ドキュメントマップ.html">← ドキュメントマップ</a>
+  <div class="brand">テーマ28 <span>SNMP監視Lab</span></div>
+  <span class="phase-chip">PHASE 2 基本設計</span>
+  <div class="header-meta">LAB-2026-T28 / OrbStack clab・snmp-monitoring-lab</div>
+</header>
+
+<main class="wrap" id="root">
+  <h1>物理・論理構成図</h1>
+  <div class="doc-meta">
+    <span class="badge ver">v1.0</span>
+    <span class="badge"><span class="dot"></span>構築完了</span>
+    <span class="badge">最終更新 2026-07-17</span>
+    <span class="badge">作成: shuya（AI支援: Claude）</span>
+  </div>
+
+  <div class="callout">
+    <span class="icon">i</span>
+    <div><strong>この図の役割</strong>containerlabラボ「snmp-monitoring-lab」の構築完了時点（2026-07-17・14ノード）における結線・VLAN・経路設計を示す静的な設計図面です。機器ごとの動作仕様は<a href="04_詳細設計書.html">詳細設計書</a>、ノード配置とケーブル対応は<a href="05_ノード配置・リンク収容表.html">ノード配置・リンク収容表</a>を参照してください。</div>
+  </div>
+
+  <div class="tabbar" role="tablist" aria-label="構成図の種類">
+    <button class="tab" role="tab" id="tab-l1" aria-controls="panel-l1" aria-selected="true">L1 物理（仮想リンク）構成図</button>
+    <button class="tab" role="tab" id="tab-l2" aria-controls="panel-l2" aria-selected="false" tabindex="-1">L2/L3 論理構成図</button>
+  </div>
+
+  <!-- ===== L1 物理（仮想リンク）構成図 ===== -->
+  <div class="panel show" id="panel-l1" data-panel="l1" role="tabpanel" aria-labelledby="tab-l1">
+    <div class="diagram-wrap">
+      <svg class="diagram" viewBox="0 0 960 720" role="img" aria-label="老朽LAN・監視基盤・Zabbixスタックの物理（仮想リンク）構成図">
+        <!-- レイヤ帯 -->
+        <rect class="band" x="16" y="92" width="928" height="174"/>
+        <rect class="band" x="16" y="366" width="928" height="190"/>
+        <line x1="16" y1="92" x2="944" y2="92" stroke="#E7E5E4"/>
+        <line x1="16" y1="266" x2="944" y2="266" stroke="#E7E5E4"/>
+        <line x1="16" y1="366" x2="944" y2="366" stroke="#E7E5E4"/>
+        <line x1="16" y1="556" x2="944" y2="556" stroke="#E7E5E4"/>
+        <text class="band-label" x="28" y="40">疑似インターネット(Lo0)</text>
+        <text class="band-label" x="28" y="112">老朽LAN</text>
+        <text class="band-sub" x="28" y="126">old-rt / old-core / old-sw1 / old-sw2</text>
+        <text class="band-label" x="28" y="286">エンドポイント</text>
+        <text class="band-sub" x="28" y="300">pc-a / pc-b / srv-file</text>
+        <text class="band-label" x="28" y="386">監視基盤</text>
+        <text class="band-sub" x="28" y="400">cap-sw / mon-core / nms / cap</text>
+        <text class="band-label" x="28" y="576">Zabbixスタック</text>
+        <text class="band-sub" x="28" y="590">zbx-db / zbx-srv / zbx-web</text>
+
+        <!-- ===== リンク（ノードより下層） ===== -->
+        <!-- Lo0（疑似インターネット・非計上の参考線） -->
+        <line class="link lo0" x1="135" y1="118" x2="135" y2="78"/>
+        <text class="note-label" x="145" y="102">Lo0 203.0.113.1</text>
+
+        <!-- L01〜L06: 既存LAN（老朽構成） -->
+        <line class="link" x1="210" y1="144" x2="310" y2="144"/>
+        <text class="port-tag" x="260" y="138" text-anchor="middle">eth1(E0/1)⇔eth1(E0/1)</text>
+        <path class="link" d="M385,170 V184 H535 V196"/>
+        <text class="port-tag" x="460" y="178" text-anchor="middle">eth2(E0/2)⇔eth1(E0/1)</text>
+        <path class="link" d="M385,170 V222 H680"/>
+        <text class="port-tag" x="530" y="216" text-anchor="middle">eth3(E0/3)⇔eth1(E0/1)</text>
+        <path class="link" d="M500,248 V275 H450 V300"/>
+        <text class="port-tag" x="478" y="268" text-anchor="middle">eth2(E0/2)⇔eth1</text>
+        <path class="link" d="M570,248 V280 H620 V300"/>
+        <text class="port-tag" x="598" y="272" text-anchor="middle">eth3(E0/3)⇔eth1</text>
+        <path class="link" d="M755,248 V280 H820 V300"/>
+        <text class="port-tag" x="788" y="272" text-anchor="middle">eth2(E0/2)⇔eth1</text>
+
+        <!-- L07/L08/L10/L11: 監視基盤 新設リンク -->
+        <path class="link new" d="M330,170 V386 H280 V400"/>
+        <text class="route-label" x="304" y="380" text-anchor="middle">eth4(E1/0)⇔eth1(E0/1)</text>
+        <line class="link new" x1="355" y1="426" x2="445" y2="426"/>
+        <text class="route-label" x="400" y="420" text-anchor="middle">eth2(E0/2)⇔eth1(E0/1)</text>
+        <path class="link new" d="M560,452 V470 H720 V488"/>
+        <text class="route-label" x="620" y="464" text-anchor="middle">eth2(E0/2)⇔eth1</text>
+        <line class="link new" x1="520" y1="452" x2="520" y2="596"/>
+        <text class="route-label" x="528" y="520" text-anchor="middle">eth3(E0/3)⇔eth1</text>
+
+        <!-- L09: SPANミラー -->
+        <line class="link span" x1="280" y1="452" x2="280" y2="488"/>
+        <text class="route-label" x="288" y="472" text-anchor="middle">SPAN mirror</text>
+
+        <!-- ===== 疑似インターネット（老朽ポイントの起点） ===== -->
+        <g class="pseudonet">
+          <rect x="90" y="26" width="220" height="52" rx="26"/>
+          <text class="cname" x="200" y="48">疑似インターネット</text>
+          <text class="cas" x="200" y="64">old-rt Loopback0 = 203.0.113.1/32</text>
+        </g>
+
+        <!-- ===== 老朽LAN ===== -->
+        <g class="node rtr" tabindex="0" role="img" data-name="old-rt（老朽WANルータ）" data-ip="mgmt 172.28.28.11 ／ E0/1 10.28.1.1 ／ Lo0 203.0.113.1" aria-label="old-rt">
+          <rect class="box" x="60" y="118" width="150" height="52" rx="8"/>
+          <circle class="chip" cx="90" cy="144" r="16"/>
+          <g class="glyph" transform="translate(90 144)"><path d="M-7,-3 H4 M0,-7 L4,-3 L0,1 M7,3 H-4 M0,7 L-4,3 L0,-1"/></g>
+          <text class="name" x="118" y="140">old-rt</text>
+          <text class="role" x="118" y="156">WANルータ・旧IOS15.6</text>
+        </g>
+        <g class="node core" tabindex="0" role="img" data-name="old-core（単一コアL3SW）" data-ip="mgmt 172.28.28.12 ／ VLAN90 10.28.90.1" aria-label="old-core">
+          <rect class="box" x="310" y="118" width="150" height="52" rx="8"/>
+          <rect class="chip" x="324" y="128" width="32" height="32" rx="7"/>
+          <g class="glyph" transform="translate(340 144)"><path d="M-8,-4 H4 M1,-7 L5,-4 L1,-1 M8,4 H-4 M-1,7 L-5,4 L-1,1"/></g>
+          <text class="name" x="366" y="140">old-core</text>
+          <text class="role" x="366" y="156">単一コアL3SW・SPOF</text>
+        </g>
+        <g class="node acc" tabindex="0" role="img" data-name="old-sw1（フロアA L2SW）" data-ip="mgmt 172.28.28.13 ／ VLAN90 10.28.90.13" aria-label="old-sw1">
+          <rect class="box" x="460" y="196" width="150" height="52" rx="8"/>
+          <rect class="chip" x="474" y="206" width="32" height="32" rx="7"/>
+          <g class="glyph" transform="translate(490 222)"><path d="M-7,-3.5 H3.5 M1,-6 L4.5,-3.5 L1,-1 M7,3.5 H-3.5 M-1,6 L-4.5,3.5 L-1,1"/></g>
+          <text class="name" x="516" y="218">old-sw1</text>
+          <text class="role" x="516" y="234">フロアA L2SW</text>
+        </g>
+        <g class="node acc" tabindex="0" role="img" data-name="old-sw2（フロアB L2SW）" data-ip="mgmt 172.28.28.14 ／ VLAN90 10.28.90.14" aria-label="old-sw2">
+          <rect class="box" x="680" y="196" width="150" height="52" rx="8"/>
+          <rect class="chip" x="694" y="206" width="32" height="32" rx="7"/>
+          <g class="glyph" transform="translate(710 222)"><path d="M-7,-3.5 H3.5 M1,-6 L4.5,-3.5 L1,-1 M7,3.5 H-3.5 M-1,6 L-4.5,3.5 L-1,1"/></g>
+          <text class="name" x="736" y="218">old-sw2</text>
+          <text class="role" x="736" y="234">フロアB L2SW</text>
+        </g>
+
+        <!-- ===== エンドポイント ===== -->
+        <g class="node ep" tabindex="0" role="img" data-name="pc-a（営業部PC）" data-ip="mgmt 172.28.28.103 ／ eth1 10.28.10.10" aria-label="pc-a">
+          <rect class="box" x="380" y="300" width="140" height="52" rx="8"/>
+          <rect class="chip" x="394" y="310" width="32" height="32" rx="7"/>
+          <g class="glyph" transform="translate(410 326)"><path d="M-7,-5 H7 V3 H-7 Z M-2,3 V6 H2 V3 M-4,6 H4"/></g>
+          <text class="name" x="436" y="322">pc-a</text>
+          <text class="role" x="436" y="338">営業部PC</text>
+        </g>
+        <g class="node ep" tabindex="0" role="img" data-name="pc-b（総務部PC）" data-ip="mgmt 172.28.28.104 ／ eth1 10.28.20.10" aria-label="pc-b">
+          <rect class="box" x="550" y="300" width="140" height="52" rx="8"/>
+          <rect class="chip" x="564" y="310" width="32" height="32" rx="7"/>
+          <g class="glyph" transform="translate(580 326)"><path d="M-7,-5 H7 V3 H-7 Z M-2,3 V6 H2 V3 M-4,6 H4"/></g>
+          <text class="name" x="606" y="322">pc-b</text>
+          <text class="role" x="606" y="338">総務部PC</text>
+        </g>
+        <g class="node ep" tabindex="0" role="img" data-name="srv-file（ファイルサーバ）" data-ip="mgmt 172.28.28.105 ／ eth1 10.28.30.10" aria-label="srv-file">
+          <rect class="box" x="750" y="300" width="140" height="52" rx="8"/>
+          <rect class="chip" x="764" y="310" width="32" height="32" rx="7"/>
+          <g class="glyph" transform="translate(780 326)"><path d="M-7,-5 H7 V3 H-7 Z M-2,3 V6 H2 V3 M-4,6 H4"/></g>
+          <text class="name" x="806" y="322">srv-file</text>
+          <text class="role" x="806" y="338">ファイルサーバ</text>
+        </g>
+
+        <!-- ===== 監視基盤 ===== -->
+        <g class="node acc" tabindex="0" role="img" data-name="cap-sw（Wireshark用SW・SPAN）" data-ip="mgmt 172.28.28.22 ／ VLAN900 10.28.0.3" aria-label="cap-sw">
+          <rect class="box" x="205" y="400" width="150" height="52" rx="8"/>
+          <rect class="chip" x="219" y="410" width="32" height="32" rx="7"/>
+          <g class="glyph" transform="translate(235 426)"><path d="M-7,-3.5 H3.5 M1,-6 L4.5,-3.5 L1,-1 M7,3.5 H-3.5 M-1,6 L-4.5,3.5 L-1,1"/></g>
+          <text class="name" x="261" y="422">cap-sw</text>
+          <text class="role" x="261" y="438">SPAN用SW</text>
+        </g>
+        <g class="node core" tabindex="0" role="img" data-name="mon-core（監視L3SW）" data-ip="mgmt 172.28.28.21 ／ VLAN900 10.28.0.2 ／ VLAN100 10.28.100.1" aria-label="mon-core">
+          <rect class="box" x="445" y="400" width="150" height="52" rx="8"/>
+          <rect class="chip" x="459" y="410" width="32" height="32" rx="7"/>
+          <g class="glyph" transform="translate(475 426)"><path d="M-8,-4 H4 M1,-7 L5,-4 L1,-1 M8,4 H-4 M-1,7 L-5,4 L-1,1"/></g>
+          <text class="name" x="501" y="422">mon-core</text>
+          <text class="role" x="501" y="438">監視L3SW</text>
+        </g>
+        <g class="node ep" tabindex="0" role="img" data-name="cap（キャプチャホスト）" data-ip="mgmt 172.28.28.102 ／ eth1 IPなし(promiscuous)" aria-label="cap">
+          <rect class="box" x="205" y="488" width="150" height="52" rx="8"/>
+          <rect class="chip" x="219" y="498" width="32" height="32" rx="7"/>
+          <g class="glyph" transform="translate(235 514)"><path d="M-7,-5 H7 V3 H-7 Z M-2,3 V6 H2 V3 M-4,6 H4"/></g>
+          <text class="name" x="261" y="510">cap</text>
+          <text class="role" x="261" y="526">キャプチャホスト</text>
+        </g>
+        <g class="node ep" tabindex="0" role="img" data-name="nms（監視サーバ）" data-ip="mgmt 172.28.28.101 ／ eth1 10.28.100.10" aria-label="nms">
+          <rect class="box" x="645" y="488" width="150" height="52" rx="8"/>
+          <rect class="chip" x="659" y="498" width="32" height="32" rx="7"/>
+          <g class="glyph" transform="translate(675 514)"><path d="M-7,-5 H7 V3 H-7 Z M-2,3 V6 H2 V3 M-4,6 H4"/></g>
+          <text class="name" x="701" y="510">nms</text>
+          <text class="role" x="701" y="526">監視サーバ</text>
+        </g>
+
+        <!-- ===== Zabbixスタック ===== -->
+        <g class="node zbx" tabindex="0" role="img" data-name="zbx-db（Zabbix用DB）" data-ip="mgmt 172.28.28.111（データプレーンなし）" aria-label="zbx-db">
+          <rect class="box" x="205" y="596" width="150" height="52" rx="8"/>
+          <rect class="chip" x="219" y="606" width="32" height="32" rx="7"/>
+          <g class="glyph" transform="translate(235 622)"><path d="M-7,-6 a7,3 0 0 1 14,0 v12 a7,3 0 0 1 -14,0 z M-7,-6 a7,3 0 0 0 14,0 M-7,0 a7,3 0 0 0 14,0"/></g>
+          <text class="name" x="261" y="618">zbx-db</text>
+          <text class="role" x="261" y="634">DB（mgmtのみ）</text>
+        </g>
+        <g class="node zbx" tabindex="0" role="img" data-name="zbx-srv（Zabbix Server）" data-ip="mgmt 172.28.28.112 ／ eth1 10.28.100.20" aria-label="zbx-srv">
+          <rect class="box" x="445" y="596" width="150" height="52" rx="8"/>
+          <rect class="chip" x="459" y="606" width="32" height="32" rx="7"/>
+          <g class="glyph" transform="translate(475 622)"><path d="M0,-7 L7,0 L0,7 L-7,0 Z"/></g>
+          <text class="name" x="501" y="618">zbx-srv</text>
+          <text class="role" x="501" y="634">Zabbix Server</text>
+        </g>
+        <g class="node zbx" tabindex="0" role="img" data-name="zbx-web（Zabbix Web UI）" data-ip="mgmt 172.28.28.113（データプレーンなし・8280→8080公開）" aria-label="zbx-web">
+          <rect class="box" x="685" y="596" width="150" height="52" rx="8"/>
+          <rect class="chip" x="699" y="606" width="32" height="32" rx="7"/>
+          <g class="glyph" transform="translate(715 622)"><path d="M-7,-6 H7 V6 H-7 Z M-7,-2 H7"/></g>
+          <text class="name" x="741" y="618">zbx-web</text>
+          <text class="role" x="741" y="634">Web UI（mgmtのみ）</text>
+        </g>
+      </svg>
+    </div>
+    <div class="legend-diagram" aria-hidden="true">
+      <span class="item"><svg><line x1="0" y1="6" x2="30" y2="6" stroke="#57534E" stroke-width="2"/></svg>既存LAN（老朽構成）</span>
+      <span class="item"><svg><line x1="0" y1="6" x2="30" y2="6" stroke="#635BFF" stroke-width="2"/></svg>監視基盤 新設リンク</span>
+      <span class="item"><svg><line x1="0" y1="6" x2="30" y2="6" stroke="#635BFF" stroke-width="1.6" stroke-dasharray="5 4"/></svg>SPANミラー（cap-sw→cap）</span>
+      <span class="item"><svg><line x1="0" y1="6" x2="30" y2="6" stroke="#A8A29E" stroke-width="1.3" stroke-dasharray="3 3"/></svg>Loopback0（疑似インターネット）</span>
+      <span class="item"><svg><rect x="0" y="0" width="14" height="14" fill="#EFF6FF"/></svg>ルータ</span>
+      <span class="item"><svg><rect x="0" y="0" width="14" height="14" fill="#F0EFFF"/></svg>L3SW</span>
+      <span class="item"><svg><rect x="0" y="0" width="14" height="14" fill="#ECFDF5"/></svg>L2SW</span>
+      <span class="item"><svg><rect x="0" y="0" width="14" height="14" fill="#FFFBEB"/></svg>Linux端末</span>
+      <span class="item"><svg><rect x="0" y="0" width="14" height="14" fill="#FEF2F2"/></svg>Zabbixスタック</span>
+      <span class="item">ホバーでmgmt/データプレーンIP / <strong>クリックで詳細（VLAN・IP・ルーティング）</strong></span>
+    </div>
+  </div>
+
+  <!-- ===== L2/L3 論理構成図 ===== -->
+  <div class="panel" id="panel-l2" data-panel="l2" role="tabpanel" aria-labelledby="tab-l2" hidden>
+    <div class="diagram-wrap">
+      <svg class="diagram" viewBox="0 0 960 744" role="img" aria-label="VLAN・ルーティング・老朽ポイントの論理構成図">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#635BFF"/>
+          </marker>
+        </defs>
+
+        <!-- ゾーン帯 -->
+        <rect x="16" y="16" width="928" height="134" fill="rgba(59,130,246,.045)"/>
+        <rect x="16" y="16" width="4" height="134" fill="#3B82F6"/>
+        <text class="zone-label" x="32" y="38" fill="#3B82F6">疑似インターネット</text>
+        <text class="zone-sub" x="32" y="52">203.0.113.1（old-rt Lo0）</text>
+
+        <rect x="16" y="150" width="928" height="180" fill="rgba(16,185,129,.04)"/>
+        <rect x="16" y="150" width="4" height="180" fill="#059669"/>
+        <text class="zone-label" x="32" y="172" fill="#059669">老朽LAN業務</text>
+        <text class="zone-sub" x="32" y="186">VLAN10/20/30</text>
+
+        <rect x="16" y="330" width="928" height="100" fill="rgba(100,116,139,.06)"/>
+        <rect x="16" y="330" width="4" height="100" fill="#64748B"/>
+        <text class="zone-label" x="32" y="352" fill="#64748B">機器管理</text>
+        <text class="zone-sub" x="32" y="366">VLAN90</text>
+
+        <rect x="16" y="430" width="928" height="130" fill="rgba(99,91,255,.05)"/>
+        <rect x="16" y="430" width="4" height="130" fill="#635BFF"/>
+        <text class="zone-label" x="32" y="452" fill="#635BFF">監視transit</text>
+        <text class="zone-sub" x="32" y="466">VLAN900・SPAN観測点</text>
+
+        <rect x="16" y="560" width="928" height="160" fill="rgba(245,158,11,.05)"/>
+        <rect x="16" y="560" width="4" height="160" fill="#D97706"/>
+        <text class="zone-label" x="32" y="582" fill="#D97706">監視セグメント</text>
+        <text class="zone-sub" x="32" y="596">VLAN100</text>
+
+        <!-- ===== リンク（データプレーン） ===== -->
+        <line class="link" x1="260" y1="74" x2="390" y2="74"/>
+        <text class="port-tag" x="325" y="68" text-anchor="middle">eth1⇔eth1</text>
+        <line class="link" x1="480" y1="98" x2="480" y2="126"/>
+
+        <path class="link" d="M420,174 V190 H190 V210"/>
+        <path class="link" d="M480,174 V210"/>
+        <path class="link" d="M540,174 V196 H770 V210"/>
+        <path class="link" d="M400,174 V190 H340 V330 H480 V350"/>
+
+        <path class="link new" d="M560,174 H650 V432"/>
+        <line class="link new" x1="480" y1="498" x2="480" y2="536"/>
+        <line class="link new" x1="480" y1="584" x2="480" y2="600"/>
+        <path class="link new" d="M460,584 V610 H300 V636"/>
+        <path class="link new" d="M500,584 V615 H660 V636"/>
+
+        <!-- ===== 静的経路（制御プレーン・破線＋矢印） ===== -->
+        <path class="link ctrl" d="M420,126 L220,98" marker-end="url(#arrow)"/>
+        <text class="route-label" x="300" y="104" text-anchor="middle">old-core: default→10.28.1.1</text>
+        <path class="link ctrl" d="M240,98 L460,130" marker-end="url(#arrow)"/>
+        <text class="route-label" x="345" y="128" text-anchor="middle">old-rt: 10.28.0.0/16→10.28.1.2</text>
+        <path class="link ctrl" d="M580,160 H610 V560 H580" marker-end="url(#arrow)"/>
+        <text class="route-label" x="616" y="360" text-anchor="start" transform="rotate(90 616 360)">old-core: 10.28.100.0/24→10.28.0.2</text>
+        <path class="link ctrl" d="M580,565 H630 V165 H580" marker-end="url(#arrow)"/>
+        <text class="route-label" x="636" y="380" text-anchor="start" transform="rotate(-90 636 380)">mon-core: default→10.28.0.1</text>
+
+        <!-- ===== 疑似インターネット & old-rt ===== -->
+        <g class="seg" tabindex="0" role="img" data-name="VLAN901（WAN transit）" data-ip="10.28.1.0/30" aria-label="VLAN901">
+          <rect class="body" x="390" y="50" width="190" height="48" rx="8"/>
+          <rect x="390" y="50" width="4" height="48" fill="#3B82F6"/>
+          <text class="vname" x="485" y="70">VLAN901 WAN transit</text>
+          <text class="sub" x="485" y="86">10.28.1.0/30・old-rt.1/old-core.2</text>
+        </g>
+        <g class="node rtr" tabindex="0" role="img" data-name="old-rt" data-ip="mgmt 172.28.28.11 ／ Lo0 203.0.113.1" aria-label="old-rt">
+          <rect class="box" x="90" y="50" width="170" height="48" rx="8"/>
+          <circle class="chip" cx="118" cy="74" r="14"/>
+          <g class="glyph" transform="translate(118 74)"><path d="M-6,-2.6 H3.5 M0,-6 L3.5,-2.6 L0,0.8 M6,2.6 H-3.5 M0,6 L-3.5,2.6 L0,-0.8"/></g>
+          <text class="name" x="140" y="71">old-rt</text>
+          <text class="role" x="140" y="86">旧IOS 15.6</text>
+        </g>
+        <g class="pill warn"><rect x="180" y="38" width="96" height="16" rx="8"/><text x="228" y="49">④ 旧IOS 15.6</text></g>
+
+        <!-- ===== old-core（SPOF・全ゾーンの結節点） ===== -->
+        <g class="node core" tabindex="0" role="img" data-name="old-core" data-ip="mgmt 172.28.28.12 ／ 各VLAN SVI" aria-label="old-core">
+          <rect class="box" x="380" y="126" width="200" height="48" rx="8"/>
+          <rect class="chip" x="393" y="136" width="27" height="27" rx="6"/>
+          <g class="glyph" transform="translate(406.5 149.5)"><path d="M-6.5,-3 H3 M0.5,-5.5 L4,-3 L0.5,-0.5 M6.5,3 H-3 M-0.5,5.5 L-4,3 L-0.5,0.5"/></g>
+          <text class="name" x="429" y="146">old-core</text>
+          <text class="role" x="429" y="162">単一コアL3SW</text>
+        </g>
+        <g class="pill warn"><rect x="500" y="112" width="66" height="16" rx="8"/><text x="533" y="123">① SPOF</text></g>
+
+        <!-- ===== 老朽LAN業務 ===== -->
+        <g class="seg" tabindex="0" role="img" data-name="VLAN10（営業部）" data-ip="10.28.10.0/24" aria-label="VLAN10">
+          <rect class="body" x="90" y="210" width="200" height="56" rx="8"/>
+          <rect x="90" y="210" width="4" height="56" fill="#059669"/>
+          <text class="vname" x="190" y="233">VLAN10 営業部</text>
+          <text class="sub" x="190" y="251">10.28.10.0/24・GW .1</text>
+        </g>
+        <g class="seg" tabindex="0" role="img" data-name="VLAN20（総務部・L2延伸）" data-ip="10.28.20.0/24" aria-label="VLAN20">
+          <rect class="body" x="380" y="210" width="200" height="56" rx="8"/>
+          <rect x="380" y="210" width="4" height="56" fill="#059669"/>
+          <text class="vname" x="480" y="233">VLAN20 総務部</text>
+          <text class="sub" x="480" y="251">10.28.20.0/24・GW .1</text>
+        </g>
+        <text class="note-label" x="480" y="280" text-anchor="middle">old-sw1(フロアA)／old-sw2(フロアB)に跨るL2延伸</text>
+        <g class="pill warn"><rect x="500" y="196" width="82" height="16" rx="8"/><text x="541" y="207">② L2延伸</text></g>
+        <g class="seg" tabindex="0" role="img" data-name="VLAN30（サーバ）" data-ip="10.28.30.0/24" aria-label="VLAN30">
+          <rect class="body" x="670" y="210" width="200" height="56" rx="8"/>
+          <rect x="670" y="210" width="4" height="56" fill="#059669"/>
+          <text class="vname" x="770" y="233">VLAN30 サーバ</text>
+          <text class="sub" x="770" y="251">10.28.30.0/24・GW .1</text>
+        </g>
+
+        <g class="pill warn"><rect x="680" y="98" width="120" height="16" rx="8"/><text x="740" y="109">③ static一辺倒</text></g>
+
+        <!-- ===== 機器管理 ===== -->
+        <g class="seg" tabindex="0" role="img" data-name="VLAN90（機器管理）" data-ip="10.28.90.0/24" aria-label="VLAN90">
+          <rect class="body" x="380" y="350" width="200" height="56" rx="8"/>
+          <rect x="380" y="350" width="4" height="56" fill="#64748B"/>
+          <text class="vname" x="480" y="373">VLAN90 機器管理</text>
+          <text class="sub" x="480" y="391">old-core.1／old-sw1.13／old-sw2.14</text>
+        </g>
+
+        <!-- ===== 監視transit ===== -->
+        <g class="seg" tabindex="0" role="img" data-name="VLAN900（監視transit）" data-ip="10.28.0.0/29" aria-label="VLAN900">
+          <rect class="body" x="300" y="432" width="360" height="74" rx="8"/>
+          <rect x="300" y="432" width="4" height="74" fill="#635BFF"/>
+          <text class="vname" x="480" y="452">VLAN900 監視transit</text>
+          <text class="sub" x="480" y="468">10.28.0.0/29・SPAN観測点（cap-sw インライン）</text>
+        </g>
+        <g class="node acc" tabindex="0" role="img" data-name="cap-sw" data-ip="mgmt 172.28.28.22 ／ VLAN900 10.28.0.3" aria-label="cap-sw">
+          <rect class="box" x="410" y="472" width="140" height="26" rx="6"/>
+          <text class="name" x="480" y="489" text-anchor="middle" font-size="11">cap-sw（E0/1=SPAN source）</text>
+        </g>
+
+        <!-- ===== mon-core ===== -->
+        <g class="node core" tabindex="0" role="img" data-name="mon-core" data-ip="mgmt 172.28.28.21 ／ VLAN900 10.28.0.2 ／ VLAN100 10.28.100.1" aria-label="mon-core">
+          <rect class="box" x="380" y="536" width="200" height="48" rx="8"/>
+          <rect class="chip" x="393" y="546" width="27" height="27" rx="6"/>
+          <g class="glyph" transform="translate(406.5 559.5)"><path d="M-6.5,-3 H3 M0.5,-5.5 L4,-3 L0.5,-0.5 M6.5,3 H-3 M-0.5,5.5 L-4,3 L-0.5,0.5"/></g>
+          <text class="name" x="429" y="556">mon-core</text>
+          <text class="role" x="429" y="572">監視L3SW</text>
+        </g>
+
+        <!-- ===== 監視セグメント ===== -->
+        <g class="seg" tabindex="0" role="img" data-name="VLAN100（監視セグメント）" data-ip="10.28.100.0/24" aria-label="VLAN100">
+          <rect class="body" x="180" y="600" width="600" height="90" rx="8"/>
+          <rect x="180" y="600" width="4" height="90" fill="#D97706"/>
+          <text class="vname" x="480" y="622">VLAN100 監視セグメント</text>
+          <text class="sub" x="480" y="638">10.28.100.0/24・GW mon-core.1</text>
+        </g>
+        <g class="node ep" tabindex="0" role="img" data-name="nms" data-ip="mgmt 172.28.28.101 ／ eth1 10.28.100.10" aria-label="nms">
+          <rect class="box" x="220" y="636" width="160" height="40" rx="7"/>
+          <text class="name" x="300" y="660" text-anchor="middle">nms（10.28.100.10）</text>
+        </g>
+        <g class="node zbx" tabindex="0" role="img" data-name="zbx-srv" data-ip="mgmt 172.28.28.112 ／ eth1 10.28.100.20" aria-label="zbx-srv">
+          <rect class="box" x="580" y="636" width="160" height="40" rx="7"/>
+          <text class="name" x="660" y="660" text-anchor="middle">zbx-srv（10.28.100.20）</text>
+        </g>
+      </svg>
+    </div>
+    <div class="legend-diagram" aria-hidden="true">
+      <span class="item"><svg><rect x="1" y="1" width="28" height="10" fill="rgba(59,130,246,.06)"/><rect x="1" y="1" width="3" height="10" fill="#3B82F6"/></svg>色帯 = ゾーン（VLAN区分）</span>
+      <span class="item"><svg><line x1="0" y1="6" x2="30" y2="6" stroke="#57534E" stroke-width="2"/></svg>実線 = データ経路（既存/新設共通）</span>
+      <span class="item"><svg><line x1="0" y1="6" x2="30" y2="6" stroke="#635BFF" stroke-width="1.4" stroke-dasharray="2.5 4"/></svg>破線＋矢印 = static経路（制御プレーン）</span>
+      <span class="item">①〜④ = 老朽ポイント（バッジ参照）</span>
+      <span class="item"><strong>機器・セグメントをクリックで詳細（VLAN・IP・ルーティング）</strong></span>
+    </div>
+  </div>
+
+  <section>
+    <h2>改版履歴</h2>
+    <table class="rev-table">
+      <thead><tr><th>版数</th><th>日付</th><th>変更内容</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">v1.0</td><td class="mono">2026-07-17</td><td>初版（構築完了時点の構成を反映）</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <nav class="doc-footer" aria-label="前後のドキュメント">
+    <a class="prev" href="02_基本設計書.html"><small>前の工程</small>基本設計書</a>
+    <a class="next" href="04_詳細設計書.html"><small>次の工程</small>詳細設計書</a>
+  </nav>
+  <p class="mock-note">本スイートはテーマ28ラボ（containerlab仮想環境）の設計・構築ドキュメントをHTML化した学習用資料です。値の正本は各Markdown（IPアドレス管理表ほか）。</p>
+</main>
+
+<div id="svgTooltip" role="status"></div>
+
+<aside id="detailPanel" aria-label="機器・セグメント詳細">
+  <div class="dp-head">
+    <span class="dp-ic" id="dpIc"></span>
+    <div><div class="dp-name" id="dpName"></div><div class="dp-sub" id="dpSub"></div></div>
+    <button class="dp-close" id="dpClose" aria-label="閉じる">×</button>
+  </div>
+  <div class="dp-body" id="dpBody"></div>
+</aside>
+
+<script>
+  "use strict";
+  /* ---- タブ切替（opacity/transformのみ） ---- */
+  const tabs = [...document.querySelectorAll(".tab")];
+  const panels = [...document.querySelectorAll(".panel")];
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const target = tab.id === "tab-l1" ? "l1" : "l2";
+      tabs.forEach((t) => { const on = t === tab; t.setAttribute("aria-selected", on ? "true" : "false"); t.tabIndex = on ? 0 : -1; });
+      panels.forEach((p) => {
+        if (p.dataset.panel === target) { p.hidden = false; requestAnimationFrame(() => p.classList.add("show")); }
+        else { p.classList.remove("show"); setTimeout(() => { if (!p.classList.contains("show")) p.hidden = true; }, 200); }
+      });
+    });
+  });
+
+  /* ---- ノード/セグメントのホバー・フォーカスで名称+IPのツールチップ ---- */
+  const tip = document.getElementById("svgTooltip");
+  function place(e) { tip.style.left = `${e.clientX + 14}px`; tip.style.top = `${e.clientY + 14}px`; }
+  document.querySelectorAll(".node[data-name], .seg[data-name]").forEach((n) => {
+    n.addEventListener("mouseenter", (e) => {
+      const name = n.dataset.name, ip = n.dataset.ip;
+      tip.innerHTML = ip ? `${name}<span class="ip">${ip}</span>` : name;
+      tip.classList.add("show"); place(e);
+    });
+    n.addEventListener("mousemove", place);
+    n.addEventListener("mouseleave", () => tip.classList.remove("show"));
+    n.addEventListener("focus", (e) => {
+      const rect = n.getBoundingClientRect();
+      tip.innerHTML = `${n.dataset.name}<span class="ip">${n.dataset.ip || ""}</span>`;
+      tip.style.left = `${rect.left}px`; tip.style.top = `${rect.bottom + 8}px`;
+      tip.classList.add("show");
+    });
+    n.addEventListener("blur", () => tip.classList.remove("show"));
+  });
+
+  /* ---- クリックで機器・セグメントの設計詳細を表示 ---- */
+  const DETAILS = {
+    "old-rt": { cls: "rtr", name: "old-rt", sub: "vrnetlab/cisco_iol:15.6.3M3a・老朽WANルータ",
+      kv: [["mgmt IP", "172.28.28.11"], ["イメージ", "vrnetlab/cisco_iol:15.6.3M3a"], ["役割", "老朽WANルータ（旧IOS 15.6）"], ["ポーリング対象IP", "10.28.1.1"]],
+      ifs: [["eth1(E0/1)", "old-core eth1(E0/1)", "10.28.1.1/30（VLAN901）"], ["Loopback0", "—", "203.0.113.1/32（疑似インターネット）"]],
+      route: ["static: 10.28.0.0/16 → 10.28.1.2（old-core経由で老朽LAN・監視セグメント全体を集約）", "SNMP: v2c(public,RO)→Mission5でv3(NMS-GROUP/nmsuser)へ移行し閉塞", "老朽ポイント④: 旧IOS 15.6.3M3a"] },
+    "old-core": { cls: "core", name: "old-core", sub: "vrnetlab/cisco_iol:L2-15.2・単一コアL3SW（SPOF）",
+      kv: [["mgmt IP", "172.28.28.12"], ["イメージ", "vrnetlab/cisco_iol:L2-15.2"], ["役割", "全VLANのSVI・static経路を集約する単一コア"], ["ポーリング対象IP", "10.28.90.1"]],
+      ifs: [["eth1(E0/1)", "old-rt eth1(E0/1)", "アクセスVLAN901"], ["eth2(E0/2)", "old-sw1 eth1(E0/1)", "トランクVLAN10,20,90"], ["eth3(E0/3)", "old-sw2 eth1(E0/1)", "トランクVLAN20,30,90"], ["eth4(E1/0)", "cap-sw eth1(E0/1)", "アクセスVLAN900"]],
+      route: ["static: default(0.0.0.0/0) → 10.28.1.1（old-rt）", "static: 10.28.100.0/24 → 10.28.0.2（mon-core経由）", "SNMP: v2c→v3移行（共通設計、詳細設計書§SNMP共通設計）", "老朽ポイント①: SPOF（単一コア）"] },
+    "old-sw1": { cls: "acc", name: "old-sw1", sub: "vrnetlab/cisco_iol:L2-15.2・フロアA L2SW",
+      kv: [["mgmt IP", "172.28.28.13"], ["イメージ", "vrnetlab/cisco_iol:L2-15.2"], ["役割", "フロアAアクセススイッチ"], ["ポーリング対象IP", "10.28.90.13"]],
+      ifs: [["eth1(E0/1)", "old-core eth2(E0/2)", "トランクVLAN10,20,90"], ["eth2(E0/2)", "pc-a eth1", "アクセスVLAN10"], ["eth3(E0/3)", "pc-b eth1", "アクセスVLAN20"]],
+      route: ["ip default-gateway 10.28.90.1", "SNMP: v2c→v3移行（共通設計）", "老朽ポイント②: VLAN20がold-sw2とL2延伸"] },
+    "old-sw2": { cls: "acc", name: "old-sw2", sub: "vrnetlab/cisco_iol:L2-15.2・フロアB L2SW",
+      kv: [["mgmt IP", "172.28.28.14"], ["イメージ", "vrnetlab/cisco_iol:L2-15.2"], ["役割", "フロアBアクセススイッチ"], ["ポーリング対象IP", "10.28.90.14"]],
+      ifs: [["eth1(E0/1)", "old-core eth3(E0/3)", "トランクVLAN20,30,90"], ["eth2(E0/2)", "srv-file eth1", "アクセスVLAN30"]],
+      route: ["ip default-gateway 10.28.90.1", "SNMP: v2c→v3移行（共通設計）", "老朽ポイント②: VLAN20がold-sw1とL2延伸"] },
+    "cap-sw": { cls: "acc", name: "cap-sw", sub: "vrnetlab/cisco_iol:L2-advipservices-2017・Wireshark用SW（SPAN）",
+      kv: [["mgmt IP", "172.28.28.22"], ["イメージ", "vrnetlab/cisco_iol:L2-advipservices-2017"], ["役割", "old-core⇔mon-core間インラインSPANスイッチ"], ["ポーリング対象IP", "10.28.0.3"]],
+      ifs: [["eth1(E0/1)", "old-core eth4(E1/0)", "アクセスVLAN900（SPAN source）"], ["eth2(E0/2)", "mon-core eth1(E0/1)", "アクセスVLAN900"], ["eth3(E0/3)", "cap eth1", "VLAN無所属（SPAN destination）"]],
+      route: ["ip default-gateway 10.28.0.1", "SPAN: monitor session 1 source interface Et0/1 both → destination Et0/3", "E0/1のみsourceにする理由: インラインのため通過フレームは必ずE0/1を1回通過。E0/1・E0/2両方だと二重ミラーになる", "SNMP: v2c→v3移行（共通設計）"] },
+    "mon-core": { cls: "core", name: "mon-core", sub: "vrnetlab/cisco_iol:L2-advipservices-2017・監視L3SW",
+      kv: [["mgmt IP", "172.28.28.21"], ["イメージ", "vrnetlab/cisco_iol:L2-advipservices-2017"], ["役割", "監視セグメント(VLAN100)を収容するL3SW"], ["ポーリング対象IP", "10.28.0.2"]],
+      ifs: [["eth1(E0/1)", "cap-sw eth2(E0/2)", "アクセスVLAN900"], ["eth2(E0/2)", "nms eth1", "アクセスVLAN100"], ["eth3(E0/3)", "zbx-srv eth1", "アクセスVLAN100"]],
+      route: ["static: default(0.0.0.0/0) → 10.28.0.1（old-core経由）", "SNMP: v2c→v3移行（共通設計）", "zbx-srvのin-bandポーリングはE0/3設定投入が前提（ISS-06・Mission2で開通予定）"] },
+    "nms": { cls: "ep", name: "nms", sub: "wbitt/network-multitool・監視サーバ",
+      kv: [["mgmt IP", "172.28.28.101"], ["イメージ", "wbitt/network-multitool:latest"], ["役割", "SNMPポーリング・トラップ受信"]],
+      ifs: [["eth1", "mon-core eth2(E0/2)", "10.28.100.10/24（GW10.28.100.1）"]],
+      route: ["ip route add 10.28.0.0/16 via 10.28.100.1 dev eth1", "導入ツール: snmpwalk/snmpget/snmptranslate、トラップ受信はsnmptrapd（apk add net-snmpが必要・ISS-04）", "トラップ受信: /tmp/snmptrapd.confにauthCommunity log public"] },
+    "cap": { cls: "ep", name: "cap", sub: "wbitt/network-multitool・キャプチャホスト",
+      kv: [["mgmt IP", "172.28.28.102"], ["イメージ", "wbitt/network-multitool:latest"], ["役割", "SPAN destination受け（tcpdump/Wireshark）"]],
+      ifs: [["eth1", "cap-sw eth3(E0/3)", "IPなし・promiscuousモード"]],
+      route: ["ip link set eth1 promisc on", "SPAN destinationのミラーフレームをtcpdump/Wiresharkで観測"] },
+    "pc-a": { cls: "ep", name: "pc-a", sub: "wbitt/network-multitool・営業部PC",
+      kv: [["mgmt IP", "172.28.28.103"], ["イメージ", "wbitt/network-multitool:latest"], ["役割", "営業部エンドポイント"]],
+      ifs: [["eth1", "old-sw1 eth2(E0/2)", "10.28.10.10/24（GW10.28.10.1）"]],
+      route: ["ip route replace default via 10.28.10.1 dev eth1"] },
+    "pc-b": { cls: "ep", name: "pc-b", sub: "wbitt/network-multitool・総務部PC",
+      kv: [["mgmt IP", "172.28.28.104"], ["イメージ", "wbitt/network-multitool:latest"], ["役割", "総務部エンドポイント"]],
+      ifs: [["eth1", "old-sw1 eth3(E0/3)", "10.28.20.10/24（GW10.28.20.1）"]],
+      route: ["ip route replace default via 10.28.20.1 dev eth1"] },
+    "srv-file": { cls: "ep", name: "srv-file", sub: "wbitt/network-multitool・ファイルサーバ",
+      kv: [["mgmt IP", "172.28.28.105"], ["イメージ", "wbitt/network-multitool:latest"], ["役割", "ファイルサーバ"]],
+      ifs: [["eth1", "old-sw2 eth2(E0/2)", "10.28.30.10/24（GW10.28.30.1）"]],
+      route: ["ip route replace default via 10.28.30.1 dev eth1"] },
+    "zbx-db": { cls: "zbx", name: "zbx-db", sub: "postgres:16-alpine・Zabbix用DB",
+      kv: [["mgmt IP", "172.28.28.111"], ["イメージ", "postgres:16-alpine"], ["役割", "Zabbix用PostgreSQL（mgmtのみ・データプレーンなし）"]],
+      ifs: [["—", "データプレーン接続なし", "mgmt(172.28.28.111)のみ"]],
+      route: ["POSTGRES_USER=zabbix／POSTGRES_DB=zabbix（学習用値）", "zbx-srv／zbx-webからDB_SERVER_HOST=172.28.28.111で接続"] },
+    "zbx-srv": { cls: "zbx", name: "zbx-srv", sub: "zabbix/zabbix-server-pgsql:alpine-7.0-latest・Zabbix Server",
+      kv: [["mgmt IP", "172.28.28.112"], ["イメージ", "zabbix/zabbix-server-pgsql:alpine-7.0-latest"], ["役割", "Zabbix Server（in-bandポーリング）"]],
+      ifs: [["eth1", "mon-core eth3(E0/3)", "10.28.100.20/24"]],
+      route: ["経路: ip route replace 10.28.0.0/16 via 10.28.100.1 dev eth1", "導入: zabbixイメージが非rootのためdeploy.shのzbx_net()（docker exec -u 0）が後付け投入（ISS-03）", "in-bandポーリングはmon-core E0/3設定が前提（ISS-06、Mission2で開通予定）"] },
+    "zbx-web": { cls: "zbx", name: "zbx-web", sub: "zabbix/zabbix-web-nginx-pgsql:alpine-7.0-latest・Web UI",
+      kv: [["mgmt IP", "172.28.28.113"], ["イメージ", "zabbix/zabbix-web-nginx-pgsql:alpine-7.0-latest"], ["役割", "Zabbix Web UI（mgmtのみ・データプレーンなし）"], ["公開ポート", "8280→8080"]],
+      ifs: [["—", "データプレーン接続なし", "mgmt(172.28.28.113)のみ"]],
+      route: ["アクセス: Macから http://clab.orb.local:8280", "初期ログイン Admin/zabbix（初回変更必須）", "DB_SERVER_HOST=172.28.28.111 ／ ZBX_SERVER_HOST=172.28.28.112"] },
+    "VLAN10": { cls: "biz", name: "VLAN10 営業部", sub: "業務セグメント",
+      kv: [["サブネット", "10.28.10.0/24"], ["GW", "10.28.10.1（old-core SVI）"], ["収容", "old-sw1配下 pc-a"]],
+      route: ["static: old-core SVI直結・追加経路なし", "ACLなし（老朽LANはVLAN間フリー到達が前提の簡易設計）"] },
+    "VLAN20": { cls: "biz", name: "VLAN20 総務部", sub: "業務セグメント・老朽ポイント②",
+      kv: [["サブネット", "10.28.20.0/24"], ["GW", "10.28.20.1（old-core SVI）"], ["収容", "old-sw1配下pc-b・old-sw2側にもL2延伸"]],
+      route: ["老朽ポイント②: old-sw1・old-sw2の両方にトランクで延伸される唯一のVLAN（L2ドメインが2台に跨る）", "static: old-core SVI直結・追加経路なし"] },
+    "VLAN30": { cls: "biz", name: "VLAN30 サーバ", sub: "業務セグメント",
+      kv: [["サブネット", "10.28.30.0/24"], ["GW", "10.28.30.1（old-core SVI）"], ["収容", "old-sw2配下 srv-file"]],
+      route: ["static: old-core SVI直結・追加経路なし"] },
+    "VLAN90": { cls: "mgmt", name: "VLAN90 機器管理", sub: "in-band機器管理",
+      kv: [["サブネット", "10.28.90.0/24"], ["GW", "なし（SVIのみ）"], ["収容", "old-core(.1)／old-sw1(.13)／old-sw2(.14)"]],
+      route: ["old-sw1／old-sw2は ip default-gateway 10.28.90.1 で運用", "SNMPポーリング対象IPとしても使用（監視設計書§1）"] },
+    "VLAN900": { cls: "transit", name: "VLAN900 監視transit", sub: "SPAN観測点・/29",
+      kv: [["サブネット", "10.28.0.0/29"], ["GW", "なし（P2P的トランジット）"], ["収容", "old-core(.1)／cap-sw(.3・インライン)／mon-core(.2)"]],
+      route: ["/29採用理由: インラインのcap-swにも管理IPを割当てるため3ホスト分（.1/.2/.3）を収容", "old-core: static 10.28.100.0/24 → 10.28.0.2", "mon-core: static default → 10.28.0.1", "cap-swのSPAN source=E0/1がこの区間を監視"] },
+    "VLAN100": { cls: "mon", name: "VLAN100 監視セグメント", sub: "監視サーバ収容",
+      kv: [["サブネット", "10.28.100.0/24"], ["GW", "10.28.100.1（mon-core SVI）"], ["収容", "nms(.10)／zbx-srv(.20)"]],
+      route: ["nms: 10.28.0.0/16 via 10.28.100.1（追加経路）", "zbx-srv: 10.28.0.0/16 via 10.28.100.1（zbx_net()が投入）", "SNMPポーリング・Zabbix監視の起点セグメント"] },
+    "VLAN901": { cls: "inet", name: "VLAN901 WAN transit", sub: "疑似インターネット⇔老朽LAN",
+      kv: [["サブネット", "10.28.1.0/30"], ["old-rt", "10.28.1.1（ルーテッド）"], ["old-core SVI", "10.28.1.2"]],
+      route: ["old-rt: static 10.28.0.0/16 → 10.28.1.2（老朽LAN・監視セグメント全体を集約）", "old-core: static default(0.0.0.0/0) → 10.28.1.1", "old-rt Loopback0=203.0.113.1/32が疑似インターネット（RFC5737 TEST-NET-3）"] }
+  };
+  const KEY_ALIAS = {};
+  const dPanel = document.getElementById("detailPanel");
+  const dpIc = document.getElementById("dpIc"), dpName = document.getElementById("dpName"), dpSub = document.getElementById("dpSub"), dpBody = document.getElementById("dpBody");
+  let selEl = null;
+  function keyOf(el) {
+    const raw = el.getAttribute("aria-label") || (el.dataset.name || "").split(/[ （]/)[0];
+    return KEY_ALIAS[raw] || raw;
+  }
+  function closeDetail() {
+    dPanel.classList.remove("open");
+    if (selEl) { selEl.classList.remove("sel"); selEl = null; }
+  }
+  function openDetail(el) {
+    const d = DETAILS[keyOf(el)];
+    if (!d) return;
+    if (selEl) selEl.classList.remove("sel");
+    selEl = el; el.classList.add("sel");
+    dpIc.className = "dp-ic " + d.cls;
+    dpName.textContent = d.name;
+    dpSub.textContent = d.sub;
+    let html = "";
+    html += `<div class="dp-sec"><h3>基本情報</h3><dl class="dp-kv">${d.kv.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl></div>`;
+    if (d.ifs) html += `<div class="dp-sec"><h3>インターフェース</h3><table class="dp-if"><thead><tr><th>自IF</th><th>対向</th><th>IP / VLAN</th></tr></thead><tbody>${d.ifs.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join("")}</tbody></table></div>`;
+    html += `<div class="dp-sec"><h3>L3・ルーティング・SNMP</h3><ul class="dp-route">${d.route.map((r) => `<li>${r}</li>`).join("")}</ul></div>`;
+    html += `<div class="dp-sec"><h3>参照</h3><dl class="dp-kv"><dt>ノード配置</dt><dd><a href="05_ノード配置・リンク収容表.html" style="color:var(--accent)">ノード配置・リンク収容表</a></dd><dt>動作仕様</dt><dd><a href="04_詳細設計書.html" style="color:var(--accent)">詳細設計書</a></dd></dl></div>`;
+    dpBody.innerHTML = html;
+    dpBody.scrollTop = 0;
+    dPanel.classList.add("open");
+  }
+  document.querySelectorAll(".node[data-name], .seg[data-name]").forEach((el) => {
+    el.addEventListener("click", (e) => { e.stopPropagation(); openDetail(el); });
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(el); }
+    });
+  });
+  document.getElementById("dpClose").addEventListener("click", closeDetail);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDetail(); });
+  document.addEventListener("click", (e) => {
+    if (dPanel.classList.contains("open") && !dPanel.contains(e.target)) closeDetail();
+  });
+</script>
+</body>
+</html>

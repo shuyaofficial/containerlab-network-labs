@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>詳細設計書 | テーマ28 SNMP監視Lab</title>
+<style>
+  /* ===== Design Tokens（共通仕様§2準拠） ===== */
+  :root {
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    --accent: #635BFF;
+    --accent-soft: #F0EFFF;
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    --neutral: #94A3B8;
+    --code-bg: #0F172A;
+    --code-ink: #E2E8F0;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  body { font-family: var(--sans); font-size: 15px; line-height: 1.8; color: var(--ink); background: var(--surface); }
+  .mono { font-family: var(--mono); font-feature-settings: "tnum"; }
+
+  /* ===== Header（共通仕様§3） ===== */
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 20px;
+    height: 56px; padding: 0 24px;
+    background: rgba(250,250,249,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .site-header .back { font-size: 13px; color: var(--ink-2); text-decoration: none; transition: color .15s var(--ease); }
+  .site-header .back:hover { color: var(--accent); }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .brand span { color: var(--accent); }
+  .phase-chip {
+    padding: 3px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+    color: var(--accent); background: var(--accent-soft); border-radius: var(--r-full);
+  }
+  .header-meta { margin-left: auto; font-size: 12px; color: var(--ink-2); }
+  @media (max-width: 768px) { .header-meta, .phase-chip { display: none; } }
+
+  /* ===== 2ペインレイアウト ===== */
+  .layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 48px; max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+  .nav { position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; padding: 32px 0; }
+  .nav-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--ink-3); text-transform: uppercase; margin-bottom: 8px; }
+  .nav a {
+    display: block; padding: 7px 10px; margin-left: -10px; margin-bottom: 2px;
+    font-size: 13.5px; color: var(--ink-2); text-decoration: none; border-radius: var(--r-sm);
+    transition: color .12s var(--ease), background .12s var(--ease);
+  }
+  .nav a:hover { color: var(--ink); background: #F5F5F4; }
+  .nav a.current { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+
+  .doc { padding: 40px 0 96px; min-width: 0; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 20px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; font-size: 12px; font-weight: 500;
+    border-radius: var(--r-full); border: 1px solid var(--border);
+    background: var(--raised); color: var(--ink-2);
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  p.lead { font-size: 14.5px; color: var(--ink-2); max-width: 68ch; margin-bottom: 20px; }
+  .callout { display: flex; gap: 12px; padding: 14px 16px; margin: 0 0 40px; border-radius: var(--r-sm); font-size: 13.5px; border-left: 3px solid var(--info); background: #EFF6FF; }
+  .callout .icon { font-weight: 700; color: var(--info); font-family: var(--mono); }
+  .callout strong { display: block; font-size: 13px; margin-bottom: 2px; }
+
+  section { margin-bottom: 56px; scroll-margin-top: 72px; }
+  h2 { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 600; margin-bottom: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  h2 a.perma { color: var(--ink-3); text-decoration: none; opacity: 0; margin-left: auto; font-weight: 400; font-size: 15px; }
+  h2:hover a.perma { opacity: 1; }
+  h3 { font-size: 15.5px; font-weight: 600; margin: 24px 0 10px; }
+  p.note { font-size: 13.5px; color: var(--ink-2); margin: 10px 0 16px; }
+
+  .old-chip {
+    display: inline-flex; align-items: center; margin: 0 4px; padding: 2px 8px;
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    color: #B45309; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: var(--r-full);
+  }
+
+  /* ---- 動作仕様テーブル ---- */
+  .spec-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 16px; }
+  .spec-table th, .spec-table td { padding: 10px 12px; text-align: left; vertical-align: top; }
+  .spec-table thead th { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--ink-3); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  .spec-table tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+  .spec-table tbody tr:hover { background: #F5F5F4; }
+  .spec-table td:first-child { width: 190px; color: var(--ink-2); font-weight: 500; }
+
+  /* ---- Code block ---- */
+  .code-block { border-radius: var(--r-md); overflow: hidden; border: 1px solid #1E293B; margin: 16px 0; }
+  .code-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; background: #1E293B; font-size: 12px; color: #94A3B8; font-family: var(--mono); }
+  .copy-btn {
+    display: inline-flex; align-items: center; padding: 2px 8px; font-size: 11px; font-family: var(--sans);
+    color: var(--ink-3); background: none; border: 1px solid var(--border); border-radius: var(--r-sm);
+    cursor: pointer; transition: all .12s var(--ease);
+  }
+  .code-head .copy-btn { border-color: #334155; color: #94A3B8; }
+  .code-head .copy-btn:hover { color: var(--code-ink); border-color: #64748B; }
+  .code-head .copy-btn.done { color: var(--ok); border-color: var(--ok); }
+  pre { padding: 16px; background: var(--code-bg); color: var(--code-ink); font-family: var(--mono); font-size: 13px; line-height: 1.7; overflow-x: auto; }
+  pre .c { color: #64748B; }
+  pre .k { color: #7DD3FC; }
+  pre .v { color: #FDBA74; }
+
+  /* ===== フッタ（共通仕様§3） ===== */
+  .doc-footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); }
+  .doc-footer a {
+    display: block; padding: 14px 18px; min-width: 200px;
+    border: 1px solid var(--border); border-radius: var(--r-md);
+    text-decoration: none; color: var(--ink); font-weight: 600; font-size: 14px;
+    background: var(--raised); transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease);
+  }
+  .doc-footer a:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--accent); }
+  .doc-footer a small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-3); letter-spacing: .06em; }
+  .doc-footer .next { text-align: right; margin-left: auto; }
+  .mock-note { margin-top: 24px; font-size: 11px; color: var(--ink-3); }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 180px minmax(0, 1fr); gap: 32px; }
+  }
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; gap: 0; }
+    .nav { position: static; height: auto; padding: 20px 0 0; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+    .nav-label { width: 100%; }
+    section { overflow-x: auto; }
+    .spec-table td:first-child { width: 130px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    html { scroll-behavior: auto; }
+  }
+  @media (max-width: 480px) {
+    .doc-footer { flex-direction: column; }
+    .doc-footer a { min-width: 0; }
+    .doc-footer .next { margin-left: 0; }
+  }
+  @media print {
+    .site-header, .nav, .doc-footer, .mock-note, .copy-btn { display: none !important; }
+    body { background: #FFFFFF; }
+    .layout { display: block; }
+    section, .code-block { break-inside: avoid; }
+    pre { white-space: pre-wrap; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a class="back" href="00_ドキュメントマップ.html">← ドキュメントマップ</a>
+  <div class="brand">テーマ28 <span>SNMP監視Lab</span></div>
+  <span class="phase-chip">PHASE 3 詳細設計</span>
+  <div class="header-meta">LAB-2026-T28 / OrbStack clab・snmp-monitoring-lab</div>
+</header>
+
+<div class="layout">
+
+  <nav class="nav" aria-label="機器ナビゲーション">
+    <div class="nav-label">機器別</div>
+    <a href="#old-rt" class="current" data-sec="old-rt">old-rt</a>
+    <a href="#old-core" data-sec="old-core">old-core</a>
+    <a href="#old-sw" data-sec="old-sw">old-sw1・sw2</a>
+    <a href="#mon-core" data-sec="mon-core">mon-core</a>
+    <a href="#cap-sw" data-sec="cap-sw">cap-sw</a>
+    <a href="#endpoint" data-sec="endpoint">nms・cap</a>
+    <a href="#zabbix" data-sec="zabbix">Zabbixスタック</a>
+    <a href="#snmp-common" data-sec="snmp-common">SNMP共通設計</a>
+  </nav>
+
+  <main class="doc">
+    <h1>詳細設計書</h1>
+    <div class="doc-meta">
+      <span class="badge ver">v1.0</span>
+      <span class="badge"><span class="dot"></span>構築完了</span>
+      <span class="badge">最終更新 2026-07-17</span>
+      <span class="badge">作成: shuya（AI支援: Claude）</span>
+    </div>
+    <p class="lead"><a href="02_基本設計書.html">基本設計書</a>の方針を、機器ごとの具体的な動作仕様に展開する。全設定値は<a href="../03_詳細設計/パラメータシート.md">パラメータシート.md</a>と一致させている。</p>
+    <div class="callout">
+      <span class="icon">i</span>
+      <div><strong>役割分担</strong>機器へ投入する全設定値の解答例は<code>03_詳細設計/パラメータシート.md</code>を参照。本書は設定値の<strong>根拠となる動作仕様</strong>を定義する学習用ドキュメントである。</div>
+    </div>
+
+    <section id="old-rt">
+      <h2>old-rt（老朽WANルータ）<a class="perma" href="#old-rt">#</a></h2>
+      <p class="note">旧IOS 15.6.3M3aで稼働する老朽WANルータ。疑似インターネット（Loopback0=203.0.113.1/32）とold-core間のWAN transit（VLAN901）を担う唯一の対外接続点。<span class="old-chip">老朽ポイント④ 旧IOS 15.6</span></p>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>仕様</th></tr></thead>
+        <tbody>
+          <tr><td>イメージ</td><td class="mono">vrnetlab/cisco_iol:15.6.3M3a</td></tr>
+          <tr><td>Ethernet0/1</td><td class="mono">10.28.1.1/30</td></tr>
+          <tr><td>Ethernet0/1 用途</td><td>old-core向けWAN transit（VLAN901）・ルーテッドポート</td></tr>
+          <tr><td>Loopback0</td><td class="mono">203.0.113.1/32</td></tr>
+          <tr><td>Loopback0 用途</td><td>疑似インターネット（RFC5737 TEST-NET-3）</td></tr>
+          <tr><td>静的経路</td><td class="mono">ip route 10.28.0.0 255.255.0.0 10.28.1.2</td></tr>
+          <tr><td>静的経路 用途</td><td>10.28.0.0/16（老朽LAN・監視セグメント全体）をold-core経由で集約</td></tr>
+          <tr><td>mgmt IP（OOB）</td><td class="mono">172.28.28.11</td></tr>
+        </tbody>
+      </table>
+      <div class="code-block">
+        <div class="code-head"><span>old-rt 設定例（抜粋）</span><button class="copy-btn" data-copy-target="oldRtConf">コピー</button></div>
+        <pre id="oldRtConf"><span class="k">hostname</span> <span class="v">old-rt</span>
+<span class="c">!</span>
+<span class="k">interface Loopback0</span>
+ <span class="k">ip address</span> <span class="v">203.0.113.1 255.255.255.255</span>
+<span class="c">!</span>
+<span class="k">interface Ethernet0/1</span>
+ <span class="k">ip address</span> <span class="v">10.28.1.1 255.255.255.252</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">ip route</span> <span class="v">10.28.0.0 255.255.0.0 10.28.1.2</span></pre>
+      </div>
+    </section>
+
+    <section id="old-core">
+      <h2>old-core（単一コアL3SW・SPOF）<a class="perma" href="#old-core">#</a></h2>
+      <p class="note">全VLANのSVIと静的経路を1台に集約する単一コア。old-rt／old-sw1／old-sw2／cap-swの全てがこの1台に直結する。<span class="old-chip">老朽ポイント① SPOF</span></p>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>仕様</th></tr></thead>
+        <tbody>
+          <tr><td>イメージ</td><td class="mono">vrnetlab/cisco_iol:L2-15.2</td></tr>
+          <tr><td>Ethernet0/1</td><td>アクセス VLAN901・old-rt向け</td></tr>
+          <tr><td>Ethernet0/2</td><td>トランク（VLAN10,20,90）・old-sw1向け</td></tr>
+          <tr><td>Ethernet0/3</td><td>トランク（VLAN20,30,90）・old-sw2向け</td></tr>
+          <tr><td>Ethernet1/0</td><td>アクセス VLAN900・cap-sw向け（監視系transit）</td></tr>
+          <tr><td>VLAN10 SVI</td><td class="mono">10.28.10.1/24</td></tr>
+          <tr><td>VLAN10 SVI 用途</td><td>営業部GW</td></tr>
+          <tr><td>VLAN20 SVI</td><td class="mono">10.28.20.1/24</td></tr>
+          <tr><td>VLAN20 SVI 用途</td><td>総務部GW</td></tr>
+          <tr><td>VLAN30 SVI</td><td class="mono">10.28.30.1/24</td></tr>
+          <tr><td>VLAN30 SVI 用途</td><td>サーバGW</td></tr>
+          <tr><td>VLAN90 SVI</td><td class="mono">10.28.90.1/24</td></tr>
+          <tr><td>VLAN90 SVI 用途</td><td>機器管理</td></tr>
+          <tr><td>VLAN900 SVI</td><td class="mono">10.28.0.1/29</td></tr>
+          <tr><td>VLAN900 SVI 用途</td><td>監視系transit</td></tr>
+          <tr><td>VLAN901 SVI</td><td class="mono">10.28.1.2/30</td></tr>
+          <tr><td>VLAN901 SVI 用途</td><td>WAN transit</td></tr>
+          <tr><td>静的経路①</td><td class="mono">ip route 0.0.0.0 0.0.0.0 10.28.1.1</td></tr>
+          <tr><td>静的経路① 用途</td><td>デフォルトルート（old-rt向け）</td></tr>
+          <tr><td>静的経路②</td><td class="mono">ip route 10.28.100.0 255.255.255.0 10.28.0.2</td></tr>
+          <tr><td>静的経路② 用途</td><td>監視セグメント(10.28.100.0/24)をmon-core経由に</td></tr>
+          <tr><td>mgmt IP（OOB）</td><td class="mono">172.28.28.12</td></tr>
+        </tbody>
+      </table>
+      <div class="code-block">
+        <div class="code-head"><span>old-core 設定例（抜粋）</span><button class="copy-btn" data-copy-target="oldCoreConf">コピー</button></div>
+        <pre id="oldCoreConf"><span class="k">hostname</span> <span class="v">old-core</span>
+<span class="c">!</span>
+<span class="k">ip routing</span>
+<span class="c">!</span>
+<span class="k">vlan 10</span>
+ <span class="k">name</span> <span class="v">SALES</span>
+<span class="k">vlan 20</span>
+ <span class="k">name</span> <span class="v">GENERAL_AFFAIRS</span>
+<span class="k">vlan 30</span>
+ <span class="k">name</span> <span class="v">SERVER</span>
+<span class="k">vlan 90</span>
+ <span class="k">name</span> <span class="v">MGMT</span>
+<span class="k">vlan 900</span>
+ <span class="k">name</span> <span class="v">MONITORING_TRANSIT</span>
+<span class="k">vlan 901</span>
+ <span class="k">name</span> <span class="v">WAN_TRANSIT</span>
+<span class="c">!</span>
+<span class="k">interface Ethernet0/1</span>
+ <span class="k">switchport access vlan</span> <span class="v">901</span>
+ <span class="k">switchport mode access</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">interface Ethernet0/2</span>
+ <span class="k">switchport trunk encapsulation dot1q</span>
+ <span class="k">switchport mode trunk</span>
+ <span class="k">switchport trunk allowed vlan</span> <span class="v">10,20,90</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">interface Ethernet0/3</span>
+ <span class="k">switchport trunk encapsulation dot1q</span>
+ <span class="k">switchport mode trunk</span>
+ <span class="k">switchport trunk allowed vlan</span> <span class="v">20,30,90</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">interface Ethernet1/0</span>
+ <span class="k">switchport access vlan</span> <span class="v">900</span>
+ <span class="k">switchport mode access</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">interface Vlan900</span>
+ <span class="k">ip address</span> <span class="v">10.28.0.1 255.255.255.248</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">interface Vlan901</span>
+ <span class="k">ip address</span> <span class="v">10.28.1.2 255.255.255.252</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">ip route</span> <span class="v">0.0.0.0 0.0.0.0 10.28.1.1</span>
+<span class="k">ip route</span> <span class="v">10.28.100.0 255.255.255.0 10.28.0.2</span></pre>
+      </div>
+    </section>
+
+    <section id="old-sw">
+      <h2>old-sw1・old-sw2（フロアA/B L2SW）<a class="perma" href="#old-sw">#</a></h2>
+      <p class="note">フロアA（old-sw1）／フロアB（old-sw2）のアクセススイッチ。総務部VLAN20が両スイッチに跨って延伸しており、<span class="old-chip">老朽ポイント② VLAN20 L2延伸</span>の当事者。</p>
+      <h3>old-sw1（フロアA）</h3>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>仕様</th></tr></thead>
+        <tbody>
+          <tr><td>イメージ</td><td class="mono">vrnetlab/cisco_iol:L2-15.2</td></tr>
+          <tr><td>Ethernet0/1</td><td>トランク（VLAN10,20,90）・old-core向け</td></tr>
+          <tr><td>Ethernet0/2</td><td>アクセス VLAN10・pc-a向け</td></tr>
+          <tr><td>Ethernet0/3</td><td>アクセス VLAN20・pc-b向け</td></tr>
+          <tr><td>VLAN90 SVI</td><td class="mono">10.28.90.13/24</td></tr>
+          <tr><td>デフォルトゲートウェイ</td><td class="mono">ip default-gateway 10.28.90.1</td></tr>
+          <tr><td>mgmt IP（OOB）</td><td class="mono">172.28.28.13</td></tr>
+        </tbody>
+      </table>
+      <div class="code-block">
+        <div class="code-head"><span>old-sw1 設定例（抜粋）</span><button class="copy-btn" data-copy-target="oldSw1Conf">コピー</button></div>
+        <pre id="oldSw1Conf"><span class="k">hostname</span> <span class="v">old-sw1</span>
+<span class="c">!</span>
+<span class="k">vlan 10</span>
+ <span class="k">name</span> <span class="v">SALES</span>
+<span class="k">vlan 20</span>
+ <span class="k">name</span> <span class="v">GENERAL_AFFAIRS</span>
+<span class="k">vlan 90</span>
+ <span class="k">name</span> <span class="v">MGMT</span>
+<span class="c">!</span>
+<span class="k">interface Ethernet0/1</span>
+ <span class="k">switchport trunk encapsulation dot1q</span>
+ <span class="k">switchport mode trunk</span>
+ <span class="k">switchport trunk allowed vlan</span> <span class="v">10,20,90</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">interface Ethernet0/2</span>
+ <span class="k">switchport access vlan</span> <span class="v">10</span>
+ <span class="k">switchport mode access</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">interface Ethernet0/3</span>
+ <span class="k">switchport access vlan</span> <span class="v">20</span>
+ <span class="k">switchport mode access</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">interface Vlan90</span>
+ <span class="k">ip address</span> <span class="v">10.28.90.13 255.255.255.0</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">ip default-gateway</span> <span class="v">10.28.90.1</span></pre>
+      </div>
+      <h3>old-sw2（フロアB）</h3>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>仕様</th></tr></thead>
+        <tbody>
+          <tr><td>イメージ</td><td class="mono">vrnetlab/cisco_iol:L2-15.2</td></tr>
+          <tr><td>Ethernet0/1</td><td>トランク（VLAN20,30,90）・old-core向け</td></tr>
+          <tr><td>Ethernet0/2</td><td>アクセス VLAN30・srv-file向け</td></tr>
+          <tr><td>VLAN90 SVI</td><td class="mono">10.28.90.14/24</td></tr>
+          <tr><td>デフォルトゲートウェイ</td><td class="mono">ip default-gateway 10.28.90.1</td></tr>
+          <tr><td>mgmt IP（OOB）</td><td class="mono">172.28.28.14</td></tr>
+        </tbody>
+      </table>
+      <div class="code-block">
+        <div class="code-head"><span>old-sw2 設定例（抜粋）</span><button class="copy-btn" data-copy-target="oldSw2Conf">コピー</button></div>
+        <pre id="oldSw2Conf"><span class="k">hostname</span> <span class="v">old-sw2</span>
+<span class="c">!</span>
+<span class="k">vlan 20</span>
+ <span class="k">name</span> <span class="v">GENERAL_AFFAIRS</span>
+<span class="k">vlan 30</span>
+ <span class="k">name</span> <span class="v">SERVER</span>
+<span class="k">vlan 90</span>
+ <span class="k">name</span> <span class="v">MGMT</span>
+<span class="c">!</span>
+<span class="k">interface Ethernet0/1</span>
+ <span class="k">switchport trunk encapsulation dot1q</span>
+ <span class="k">switchport mode trunk</span>
+ <span class="k">switchport trunk allowed vlan</span> <span class="v">20,30,90</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">interface Ethernet0/2</span>
+ <span class="k">switchport access vlan</span> <span class="v">30</span>
+ <span class="k">switchport mode access</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">interface Vlan90</span>
+ <span class="k">ip address</span> <span class="v">10.28.90.14 255.255.255.0</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">ip default-gateway</span> <span class="v">10.28.90.1</span></pre>
+      </div>
+    </section>
+
+    <section id="mon-core">
+      <h2>mon-core（監視L3SW）<a class="perma" href="#mon-core">#</a></h2>
+      <p class="note">監視セグメント（VLAN100）を収容するL3SW。監視系transit（VLAN900）経由でold-coreと接続し、nms・zbx-srvを収容する。</p>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>仕様</th></tr></thead>
+        <tbody>
+          <tr><td>イメージ</td><td class="mono">vrnetlab/cisco_iol:L2-advipservices-2017</td></tr>
+          <tr><td>Ethernet0/1</td><td>アクセス VLAN900・cap-sw向け</td></tr>
+          <tr><td>Ethernet0/2</td><td>アクセス VLAN100・nms向け</td></tr>
+          <tr><td>Ethernet0/3</td><td>アクセス VLAN100・zbx-srv向け</td></tr>
+          <tr><td>VLAN900 SVI</td><td class="mono">10.28.0.2/29</td></tr>
+          <tr><td>VLAN100 SVI</td><td class="mono">10.28.100.1/24</td></tr>
+          <tr><td>VLAN100 SVI 用途</td><td>監視セグメントGW</td></tr>
+          <tr><td>静的経路</td><td class="mono">ip route 0.0.0.0 0.0.0.0 10.28.0.1</td></tr>
+          <tr><td>静的経路 用途</td><td>デフォルトルート（old-core向け）</td></tr>
+          <tr><td>mgmt IP（OOB）</td><td class="mono">172.28.28.21</td></tr>
+        </tbody>
+      </table>
+      <div class="code-block">
+        <div class="code-head"><span>mon-core 設定例（抜粋）</span><button class="copy-btn" data-copy-target="monCoreConf">コピー</button></div>
+        <pre id="monCoreConf"><span class="k">hostname</span> <span class="v">mon-core</span>
+<span class="c">!</span>
+<span class="k">ip routing</span>
+<span class="c">!</span>
+<span class="k">vlan 900</span>
+ <span class="k">name</span> <span class="v">MONITORING_TRANSIT</span>
+<span class="k">vlan 100</span>
+ <span class="k">name</span> <span class="v">MONITORING</span>
+<span class="c">!</span>
+<span class="k">interface Ethernet0/1</span>
+ <span class="k">switchport access vlan</span> <span class="v">900</span>
+ <span class="k">switchport mode access</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">interface Ethernet0/2</span>
+ <span class="k">switchport access vlan</span> <span class="v">100</span>
+ <span class="k">switchport mode access</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">interface Ethernet0/3</span>
+ <span class="k">switchport access vlan</span> <span class="v">100</span>
+ <span class="k">switchport mode access</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">interface Vlan900</span>
+ <span class="k">ip address</span> <span class="v">10.28.0.2 255.255.255.248</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">interface Vlan100</span>
+ <span class="k">ip address</span> <span class="v">10.28.100.1 255.255.255.0</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">ip route</span> <span class="v">0.0.0.0 0.0.0.0 10.28.0.1</span></pre>
+      </div>
+    </section>
+
+    <section id="cap-sw">
+      <h2>cap-sw（Wireshark用SW・SPAN）<a class="perma" href="#cap-sw">#</a></h2>
+      <p class="note">old-core⇔mon-core間（監視系transit VLAN900）にインラインで挿入されたSPANスイッチ。Ethernet0/1のみをsourceに指定し二重ミラーを防止する（詳細根拠は<a href="#snmp-common">SNMP共通設計 §SPAN仕様</a>参照）。</p>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>仕様</th></tr></thead>
+        <tbody>
+          <tr><td>イメージ</td><td class="mono">vrnetlab/cisco_iol:L2-advipservices-2017</td></tr>
+          <tr><td>Ethernet0/1</td><td>アクセス VLAN900・old-core向け（SPAN source）</td></tr>
+          <tr><td>Ethernet0/2</td><td>アクセス VLAN900・mon-core向け</td></tr>
+          <tr><td>Ethernet0/3</td><td>VLAN無所属・cap向け（SPAN destination）</td></tr>
+          <tr><td>VLAN900 SVI</td><td class="mono">10.28.0.3/29</td></tr>
+          <tr><td>VLAN900 SVI 用途</td><td>in-band管理</td></tr>
+          <tr><td>デフォルトゲートウェイ</td><td class="mono">ip default-gateway 10.28.0.1</td></tr>
+          <tr><td>SPAN</td><td class="mono">monitor session 1 source interface Et0/1 both / destination interface Et0/3</td></tr>
+          <tr><td>mgmt IP（OOB）</td><td class="mono">172.28.28.22</td></tr>
+        </tbody>
+      </table>
+      <div class="code-block">
+        <div class="code-head"><span>cap-sw 設定例（抜粋）</span><button class="copy-btn" data-copy-target="capSwConf">コピー</button></div>
+        <pre id="capSwConf"><span class="k">hostname</span> <span class="v">cap-sw</span>
+<span class="c">!</span>
+<span class="k">vlan 900</span>
+ <span class="k">name</span> <span class="v">MONITORING_TRANSIT</span>
+<span class="c">!</span>
+<span class="k">interface Ethernet0/1</span>
+ <span class="k">switchport access vlan</span> <span class="v">900</span>
+ <span class="k">switchport mode access</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">interface Ethernet0/2</span>
+ <span class="k">switchport access vlan</span> <span class="v">900</span>
+ <span class="k">switchport mode access</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">interface Ethernet0/3</span>
+ <span class="k">switchport mode access</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">interface Vlan900</span>
+ <span class="k">ip address</span> <span class="v">10.28.0.3 255.255.255.248</span>
+ <span class="k">no shutdown</span>
+<span class="c">!</span>
+<span class="k">ip default-gateway</span> <span class="v">10.28.0.1</span>
+<span class="c">!</span>
+<span class="c">! E0/1のみをsourceにする理由: インライン構成では通過フレームが必ずE0/1を1回通過するため、</span>
+<span class="c">! E0/1・E0/2の双方をsourceにすると同一フレームが2重にミラーされてしまう。</span>
+<span class="k">monitor session 1 source interface Ethernet0/1 both</span>
+<span class="k">monitor session 1 destination interface Ethernet0/3</span></pre>
+      </div>
+    </section>
+
+    <section id="endpoint">
+      <h2>nms・cap（監視サーバ／キャプチャホスト）<a class="perma" href="#endpoint">#</a></h2>
+      <p class="note">両者ともwbitt/network-multitoolコンテナ。nmsはSNMPポーリング・トラップ受信を担い、capはcap-swのSPAN宛先（Ethernet0/3）を収容してpromiscuousモードでミラーフレームを受信する。</p>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>仕様</th></tr></thead>
+        <tbody>
+          <tr><td>nms eth1</td><td class="mono">10.28.100.10/24（GW 10.28.100.1）</td></tr>
+          <tr><td>nms 追加経路</td><td class="mono">ip route add 10.28.0.0/16 via 10.28.100.1 dev eth1</td></tr>
+          <tr><td>nms mgmt IP</td><td class="mono">172.28.28.101</td></tr>
+          <tr><td>nms 備考</td><td>snmptrapd利用時は<code>apk add net-snmp</code>の追加導入が必要（未同梱・ISS-04）</td></tr>
+          <tr><td>cap eth1</td><td>IPなし・promiscuousモード</td></tr>
+          <tr><td>cap mgmt IP</td><td class="mono">172.28.28.102</td></tr>
+          <tr><td>cap 備考</td><td>SPAN destination受け（tcpdump/Wiresharkでミラーフレームを観測）</td></tr>
+        </tbody>
+      </table>
+      <div class="code-block">
+        <div class="code-head"><span>clab.yml exec抜粋（nms／cap）</span><button class="copy-btn" data-copy-target="epConf">コピー</button></div>
+        <pre id="epConf"><span class="c"># nms</span>
+<span class="k">ip link set</span> <span class="v">eth1 up</span>
+<span class="k">ip link set</span> <span class="v">eth1 mtu 1500</span>
+<span class="k">ip address add</span> <span class="v">10.28.100.10/24 dev eth1</span>
+<span class="k">ip route add</span> <span class="v">10.28.0.0/16 via 10.28.100.1 dev eth1</span>
+
+<span class="c"># cap（SPAN destination・promiscuous）</span>
+<span class="k">ip link set</span> <span class="v">eth1 up</span>
+<span class="k">ip link set</span> <span class="v">eth1 mtu 1500</span>
+<span class="k">ip link set</span> <span class="v">eth1 promisc on</span></pre>
+      </div>
+    </section>
+
+    <section id="zabbix">
+      <h2>Zabbixスタック（zbx-db／zbx-srv／zbx-web）<a class="perma" href="#zabbix">#</a></h2>
+      <p class="note">DB／Server／Web UIの3コンテナ構成。zbx-srvのみin-band（VLAN100）接続でSNMPポーリングを行い、zbx-db・zbx-webはmgmtネットワーク上のみでデータプレーンIPを持たない。</p>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>仕様</th></tr></thead>
+        <tbody>
+          <tr><td>zbx-db イメージ</td><td class="mono">postgres:16-alpine</td></tr>
+          <tr><td>zbx-db mgmt IP</td><td class="mono">172.28.28.111</td></tr>
+          <tr><td>zbx-db 備考</td><td>データプレーンなし（mgmtのみ）</td></tr>
+          <tr><td>zbx-srv イメージ</td><td class="mono">zabbix/zabbix-server-pgsql:alpine-7.0-latest</td></tr>
+          <tr><td>zbx-srv mgmt IP</td><td class="mono">172.28.28.112</td></tr>
+          <tr><td>zbx-srv eth1</td><td class="mono">10.28.100.20/24</td></tr>
+          <tr><td>zbx-srv eth1 用途</td><td>in-bandポーリング用</td></tr>
+          <tr><td>zbx-web イメージ</td><td class="mono">zabbix/zabbix-web-nginx-pgsql:alpine-7.0-latest</td></tr>
+          <tr><td>zbx-web mgmt IP</td><td class="mono">172.28.28.113</td></tr>
+          <tr><td>zbx-web 備考</td><td>データプレーンなし（mgmtのみ）</td></tr>
+          <tr><td>公開ポート</td><td class="mono">8280 → 8080（zbx-web）</td></tr>
+          <tr><td>公開ポート 備考</td><td>Macから http://clab.orb.local:8280、初期 Admin/zabbix</td></tr>
+          <tr><td>DB接続</td><td class="mono">DB_SERVER_HOST=172.28.28.111（zbx-db）</td></tr>
+          <tr><td>DB接続 備考</td><td>POSTGRES_USER=zabbix（学習用値、実運用で使い回さないこと）</td></tr>
+        </tbody>
+      </table>
+      <p class="note">zabbixイメージは非rootユーザーで動作するため、containerlabの<code>exec</code>ディレクティブ（コンテナ起動ユーザー権限で実行）ではzbx-srvのeth1へIP／経路を投入できない。そのためdeploy.shの<code>zbx_net()</code>が<code>docker exec -u 0</code>（root指定）で後付け投入する（ISS-03）。</p>
+      <div class="code-block">
+        <div class="code-head"><span>deploy.sh zbx_net()（抜粋）</span><button class="copy-btn" data-copy-target="zbxNetConf">コピー</button></div>
+        <pre id="zbxNetConf"><span class="c"># zabbixイメージが非rootのため、docker exec -u 0（root指定）で後付け投入する</span>
+<span class="k">docker exec -u 0</span> <span class="v">clab-snmp-monitoring-lab-zbx-srv ip link set eth1 up</span>
+<span class="k">docker exec -u 0</span> <span class="v">clab-snmp-monitoring-lab-zbx-srv ip link set eth1 mtu 1500</span>
+<span class="k">docker exec -u 0</span> <span class="v">clab-snmp-monitoring-lab-zbx-srv ip address replace 10.28.100.20/24 dev eth1</span>
+<span class="k">docker exec -u 0</span> <span class="v">clab-snmp-monitoring-lab-zbx-srv ip route replace 10.28.0.0/16 via 10.28.100.1 dev eth1</span></pre>
+      </div>
+      <p class="note">zbx-srvのin-bandポーリングは<strong>mon-core Ethernet0/3（VLAN100）のIOS側設定投入が前提</strong>となる。2026-07-17時点ではこの設定は未投入のため疎通不可（ISS-06、Mission2で開通予定）。</p>
+    </section>
+
+    <section id="snmp-common">
+      <h2>SNMP共通設計<a class="perma" href="#snmp-common">#</a></h2>
+      <p class="note">監視対象6台のIOL機器（old-rt／old-core／old-sw1／old-sw2／mon-core／cap-sw）に共通で投入するSNMP・トラップ・SPAN設計。詳細は<a href="../03_詳細設計/監視設計書.md">監視設計書.md</a>を正本とする。</p>
+
+      <h3>v2c→v3移行仕様</h3>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>仕様</th></tr></thead>
+        <tbody>
+          <tr><td>SNMPv2c community</td><td class="mono">public（RO）</td></tr>
+          <tr><td>SNMPv2c 用途</td><td>Mission3〜4で使用</td></tr>
+          <tr><td>SNMPv3 group</td><td class="mono">NMS-GROUP（v3 priv）</td></tr>
+          <tr><td>SNMPv3 user</td><td class="mono">nmsuser</td></tr>
+          <tr><td>SNMPv3 user 認証</td><td>auth SHA <code>SnmpAuth28!</code> / priv AES128 <code>SnmpPriv28!</code>（学習用値）</td></tr>
+          <tr><td>移行完了後</td><td class="mono">no snmp-server community public</td></tr>
+          <tr><td>移行完了後 効果</td><td>v2cアクセスを閉塞</td></tr>
+        </tbody>
+      </table>
+      <div class="code-block">
+        <div class="code-head"><span>SNMP共通設定（全6台のIOLに共通投入）</span><button class="copy-btn" data-copy-target="snmpCommonConf">コピー</button></div>
+        <pre id="snmpCommonConf"><span class="c">! --- Mission3: SNMPv2c ---</span>
+<span class="k">snmp-server community</span> <span class="v">public RO</span>
+<span class="k">snmp-server location</span> <span class="v">"&lt;設置場所&gt;"</span>
+<span class="k">snmp-server contact</span> <span class="v">noc@example.jp</span>
+<span class="c">!</span>
+<span class="c">! --- Mission5: SNMPv3(authPriv)へ移行 ---</span>
+<span class="k">snmp-server group</span> <span class="v">NMS-GROUP v3 priv</span>
+<span class="k">snmp-server user</span> <span class="v">nmsuser NMS-GROUP v3 auth sha SnmpAuth28! priv aes 128 SnmpPriv28!</span>
+<span class="c">! 移行完了後（v2cアクセスを閉塞）</span>
+<span class="k">no snmp-server community</span> <span class="v">public</span></pre>
+      </div>
+
+      <h3>トラップ仕様</h3>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>仕様</th></tr></thead>
+        <tbody>
+          <tr><td>通知種別</td><td class="mono">linkdown / linkup / coldstart</td></tr>
+          <tr><td>送信先</td><td class="mono">10.28.100.10（nms）version 2c community public</td></tr>
+          <tr><td>受信側</td><td>net-snmpの<code>snmptrapd</code>で待受（<code>snmptrapd -f -Lo -c /tmp/snmptrapd.conf</code>）</td></tr>
+          <tr><td>備考</td><td>ポーリングをv3化した後もトラップはv2cのまま混在運用する（実務でも現実的な構成）</td></tr>
+        </tbody>
+      </table>
+      <div class="code-block">
+        <div class="code-head"><span>トラップ設定（抜粋）</span><button class="copy-btn" data-copy-target="trapConf">コピー</button></div>
+        <pre id="trapConf"><span class="k">snmp-server enable traps snmp</span> <span class="v">linkdown linkup coldstart</span>
+<span class="k">snmp-server host</span> <span class="v">10.28.100.10 version 2c public</span></pre>
+      </div>
+
+      <h3>SPAN仕様（E0/1のみsourceの根拠）</h3>
+      <p class="note">cap-swはold-core⇔mon-core間の監視系transit（VLAN900）にインラインで挿入されている（E0/1=old-core側、E0/2=mon-core側）ため、この区間を通過するフレームは必ずEthernet0/1を1回通過する。<code>monitor session 1 source interface Ethernet0/1 both</code>によりE0/1のみをsourceに指定すれば、往路・復路とも重複なく全通過トラフィックを捕捉できる。E0/1・E0/2の両方をsourceに指定すると、同一フレームが2回（受信時＋送信時）ミラーされ、二重キャプチャとなってしまう。</p>
+      <div class="code-block">
+        <div class="code-head"><span>SPAN設定（cap-sw・再掲）</span><button class="copy-btn" data-copy-target="spanConf">コピー</button></div>
+        <pre id="spanConf"><span class="k">monitor session 1 source interface Ethernet0/1 both</span>
+<span class="k">monitor session 1 destination interface Ethernet0/3</span></pre>
+      </div>
+
+      <h3>主要OID表（監視設計書.md §2準拠）</h3>
+      <table class="spec-table">
+        <thead><tr><th>OID名</th><th>数値OID</th><th>意味 / 規定RFC</th></tr></thead>
+        <tbody>
+          <tr><td>sysDescr</td><td class="mono">1.3.6.1.2.1.1.1.0</td><td>機器のシステム記述（ベンダー・OSバージョン等） / RFC3418</td></tr>
+          <tr><td>sysUpTime</td><td class="mono">1.3.6.1.2.1.1.3.0</td><td>エージェント起動からの経過時間 / RFC3418</td></tr>
+          <tr><td>sysName</td><td class="mono">1.3.6.1.2.1.1.5.0</td><td>管理対象機器のホスト名 / RFC3418</td></tr>
+          <tr><td>ifDescr</td><td class="mono">1.3.6.1.2.1.2.2.1.2</td><td>インターフェースの記述文字列（ifIndexで索引） / RFC2863</td></tr>
+          <tr><td>ifOperStatus</td><td class="mono">1.3.6.1.2.1.2.2.1.8</td><td>インターフェースの動作状態（up(1)/down(2)等） / RFC2863</td></tr>
+          <tr><td>ifInOctets</td><td class="mono">1.3.6.1.2.1.2.2.1.10</td><td>受信オクテット数（32bitカウンタ） / RFC2863</td></tr>
+          <tr><td>ifOutOctets</td><td class="mono">1.3.6.1.2.1.2.2.1.16</td><td>送信オクテット数（32bitカウンタ） / RFC2863</td></tr>
+          <tr><td>ifHCInOctets</td><td class="mono">1.3.6.1.2.1.31.1.1.1.6</td><td>受信オクテット数（64bit High Capacityカウンタ） / RFC2863</td></tr>
+          <tr><td>ifHCOutOctets</td><td class="mono">1.3.6.1.2.1.31.1.1.1.10</td><td>送信オクテット数（64bit High Capacityカウンタ） / RFC2863</td></tr>
+        </tbody>
+      </table>
+
+      <h3>32bit/64bitカウンタ問題</h3>
+      <p class="note"><code>ifInOctets</code> / <code>ifOutOctets</code> は32bitカウンタであり、最大値2^32-1バイト（約4.3GB）でラップアラウンド（0に戻って再カウント）する。高速・高トラフィックな回線ではこの上限に短時間で到達し、単純な差分計算では実際のトラフィック量を過小評価してしまう。そのため64bitカウンタである<code>ifHCInOctets</code> / <code>ifHCOutOctets</code>（High Capacity、最大値約1.8×10^19バイト）の利用が推奨される（RFC2863）。Mission4ではiperf3でトラフィックを生成し、32bit版と64bit版の両方をポーリング・比較してこの問題を体感する。</p>
+    </section>
+
+    <nav class="doc-footer" aria-label="前後のドキュメント">
+      <a class="prev" href="03_物理・論理構成図.html"><small>前の工程</small>物理・論理構成図</a>
+      <a class="next" href="05_ノード配置・リンク収容表.html"><small>次の工程</small>ノード配置・リンク収容表</a>
+    </nav>
+    <p class="mock-note">本スイートはテーマ28ラボ（containerlab仮想環境）の設計・構築ドキュメントをHTML化した学習用資料です。値の正本は各Markdown（IPアドレス管理表ほか）。</p>
+  </main>
+</div>
+
+<script>
+  "use strict";
+  /* コピー機能 */
+  function flashDone(btn) {
+    const original = btn.textContent;
+    btn.textContent = "✓ コピーしました";
+    btn.classList.add("done");
+    setTimeout(() => { btn.textContent = original; btn.classList.remove("done"); }, 1500);
+  }
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".copy-btn");
+    if (!btn) return;
+    const text = btn.dataset.copyTarget
+      ? document.getElementById(btn.dataset.copyTarget).textContent
+      : btn.dataset.copy;
+    navigator.clipboard.writeText(text).then(() => flashDone(btn)).catch(() => {
+      const ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta);
+      ta.select(); document.execCommand("copy"); ta.remove();
+      flashDone(btn);
+    });
+  });
+
+  /* ナビの現在位置ハイライト */
+  const navLinks = [...document.querySelectorAll(".nav a[data-sec]")];
+  const sections = navLinks.map((a) => document.getElementById(a.dataset.sec)).filter(Boolean);
+  const spy = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      navLinks.forEach((a) => a.classList.toggle("current", a.dataset.sec === entry.target.id));
+    });
+  }, { rootMargin: "-10% 0px -70% 0px" });
+  sections.forEach((s) => spy.observe(s));
+</script>
+</body>
+</html>

@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WBS・課題管理表 | テーマ28 SNMP監視Lab</title>
+<style>
+  :root {
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    --accent: #635BFF;
+    --accent-soft: #F0EFFF;
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    --neutral: #94A3B8;
+    --code-bg: #0F172A;
+    --code-ink: #E2E8F0;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--sans); font-size: 15px; line-height: 1.8; color: var(--ink); background: var(--surface); }
+  .mono { font-family: var(--mono); font-feature-settings: "tnum"; }
+  .num { text-align: right; }
+
+  .site-header { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 20px; height: 56px; padding: 0 24px; background: rgba(250,250,249,.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+  .site-header .back { font-size: 13px; color: var(--ink-2); text-decoration: none; transition: color .15s var(--ease); }
+  .site-header .back:hover { color: var(--accent); }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .brand span { color: var(--accent); }
+  .phase-chip { padding: 3px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--accent); background: var(--accent-soft); border-radius: var(--r-full); }
+  .header-meta { margin-left: auto; font-size: 12px; color: var(--ink-2); }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 40px 24px 64px; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+  p.lede { font-size: 14.5px; color: var(--ink-2); max-width: 70ch; margin: 14px 0 28px; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 28px; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; font-size: 12px; font-weight: 500; border-radius: var(--r-full); border: 1px solid var(--border); background: var(--raised); color: var(--ink-2); }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  section { margin-bottom: 56px; }
+  h2 { font-size: 20px; font-weight: 600; margin-bottom: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  p.note { font-size: 13px; color: var(--ink-2); margin: 10px 0 16px; }
+
+  /* ===== WBS Gantt ===== */
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: var(--ink-2); margin-bottom: 14px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 14px; height: 8px; border-radius: 3px; background: var(--accent-soft); display: inline-block; }
+  .legend i.done { background: var(--accent); }
+  .legend .diamond { color: var(--accent); font-family: var(--mono); }
+  .legend .todayl { width: 2px; height: 12px; background: var(--accent); display: inline-block; }
+
+  .gantt-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--raised); box-shadow: var(--shadow-1); }
+  .gantt { min-width: 780px; }
+  .gantt-row { display: grid; grid-template-columns: 56px 260px 96px 1fr 52px; align-items: center; min-height: 34px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .gantt-row:last-child { border-bottom: none; }
+  .gantt-row.head { min-height: 40px; font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--ink-3); text-transform: uppercase; background: #F5F5F4; }
+  .gantt-row.phase { font-weight: 700; background: #FAFAF9; }
+  .gantt-row .wbs { padding-left: 12px; }
+  .gantt-row.task .wbs { padding-left: 22px; color: var(--ink-2); font-weight: 400; }
+  .gantt-row .tname { padding-right: 8px; }
+  .gantt-row .owner { color: var(--ink-2); font-size: 12.5px; }
+  .gantt-row .pctcol { padding-right: 12px; }
+  .col-timeline { position: relative; height: 100%; min-height: 34px; }
+  .today-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); z-index: 2; }
+  .bar { position: absolute; top: 50%; transform: translateY(-50%); height: 12px; border-radius: 4px; background: var(--accent-soft); overflow: hidden; }
+  .gantt-row.phase .bar { height: 16px; }
+  .bar .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); }
+  .month-tick { position: absolute; top: 0; font-size: 11px; color: var(--ink-3); transform: translateX(2px); }
+  .milestone { position: absolute; top: 2px; font-size: 13px; color: var(--accent); font-family: var(--mono); transform: translateX(-50%); cursor: default; }
+
+  /* ===== Issue table ===== */
+  .filters { display: flex; gap: 8px; margin-bottom: 16px; }
+  .chip { padding: 5px 14px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); background: var(--raised); border: 1px solid var(--border); border-radius: var(--r-full); cursor: pointer; transition: color .15s var(--ease), border-color .15s var(--ease), background .15s var(--ease); }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  .chip.active { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+  .issue-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .issue-table th, .issue-table td { padding: 10px 12px; text-align: left; vertical-align: top; }
+  .issue-table thead th { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--ink-3); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  .issue-table tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+  .issue-table tbody tr:hover { background: #F5F5F4; }
+  .issue-table tbody tr.is-hidden { display: none; }
+  .prio { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 12.5px; }
+  .prio::before { font-size: 10px; }
+  .prio.high { color: var(--error); } .prio.high::before { content: "▲"; }
+  .prio.mid { color: var(--warn); } .prio.mid::before { content: "▲"; }
+  .prio.low { color: var(--neutral); } .prio.low::before { content: "●"; }
+  .state { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; }
+  .state::before { content: "●"; font-size: 9px; }
+  .state.closed { color: var(--ok); } .state.closed::before { color: var(--ok); }
+  .state.inprogress { color: var(--ink-2); } .state.inprogress::before { color: var(--warn); }
+  .state.ruled { color: var(--ink-2); } .state.ruled::before { color: var(--info); }
+
+  .doc-footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); }
+  .doc-footer a { display: block; padding: 14px 18px; min-width: 200px; border: 1px solid var(--border); border-radius: var(--r-md); text-decoration: none; color: var(--ink); font-weight: 600; font-size: 14px; background: var(--raised); transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease); }
+  .doc-footer a:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--accent); }
+  .doc-footer a small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-3); letter-spacing: .06em; }
+  .doc-footer .next { text-align: right; margin-left: auto; }
+  .mock-note { margin-top: 24px; font-size: 11px; color: var(--ink-3); }
+
+  @media (max-width: 1100px) {
+    .gantt-row { grid-template-columns: 50px 200px 84px 1fr 48px; }
+  }
+  @media (max-width: 768px) {
+    .header-meta, .phase-chip { display: none; }
+    section { overflow-x: auto; }
+    .issue-table { min-width: 640px; }
+    .filters { flex-wrap: wrap; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+  @media (max-width: 480px) {
+    .doc-footer { flex-direction: column; }
+    .doc-footer a { min-width: 0; }
+    .doc-footer .next { margin-left: 0; }
+  }
+  @media print {
+    .site-header, .doc-footer, .mock-note, .filters { display: none !important; }
+    body { background: #FFFFFF; }
+    section { break-inside: avoid; }
+    .gantt-scroll { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a class="back" href="00_ドキュメントマップ.html">← ドキュメントマップ</a>
+  <div class="brand">テーマ28 <span>SNMP監視Lab</span></div>
+  <span class="phase-chip">CROSS-PHASE 横断管理</span>
+  <div class="header-meta">LAB-2026-T28 / OrbStack clab・snmp-monitoring-lab</div>
+</header>
+
+<div class="wrap">
+  <main>
+    <h1>WBS・課題管理表</h1>
+    <div class="doc-meta">
+      <span class="badge ver">週次更新</span>
+      <span class="badge"><span class="dot"></span>進行中</span>
+      <span class="badge">基準日 2026-07-17</span>
+      <span class="badge">作成: shuya（AI支援: Claude）</span>
+    </div>
+    <p class="lede">要件定義からテーマ29への引き継ぎまで、6フェーズの進捗を1本の時間軸で見渡し、本日（2026-07-17）時点でどこまで進んでいるかを一目で把握する。下段はラボ構築中に起票された課題を優先度でトリアージする。</p>
+
+    <section aria-label="WBSガントチャート">
+      <h2>WBSガントチャート</h2>
+      <p class="note">2026-07-13〜2026-08-31。<span class="mono">縦線</span>は本日（2026-07-17）。バーの濃色部分が完了、淡色部分が残作業。フェーズ5・6の日程は「予定」（Lab Challenge・試験の実施状況により前後する）。</p>
+      <div class="legend">
+        <span><i></i>残作業</span>
+        <span><i class="done"></i>完了</span>
+        <span><span class="diamond">◆</span>マイルストーン</span>
+        <span><span class="todayl"></span>本日線（2026-07-17）</span>
+      </div>
+      <div class="gantt-scroll">
+        <div class="gantt" id="gantt"></div>
+      </div>
+    </section>
+
+    <section aria-label="課題管理表">
+      <h2>課題管理表</h2>
+      <p class="note">2026-07-17時点で起票されている課題（全てラボ構築中に実際に発生した事象）。優先度は影響範囲とスケジュールへの逼迫度から判定。</p>
+      <div class="filters" role="group" aria-label="課題フィルタ">
+        <button class="chip active" data-filter="all">すべて</button>
+        <button class="chip" data-filter="inprogress">対応中</button>
+        <button class="chip" data-filter="high">高優先度</button>
+      </div>
+      <table class="issue-table">
+        <thead><tr><th>ID</th><th>起票日</th><th>課題</th><th>影響</th><th>優先度</th><th>担当</th><th>期限</th><th>状態</th></tr></thead>
+        <tbody id="issueBody"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <nav class="doc-footer" aria-label="前後のドキュメント">
+    <a class="prev" href="06_試験仕様書・結果報告書.html"><small>前の工程</small>試験仕様書・結果報告書</a>
+    <a class="next" href="08_運用保守マニュアル.html"><small>次の工程</small>運用保守マニュアル</a>
+  </nav>
+  <p class="mock-note">本スイートはテーマ28ラボ（containerlab仮想環境）の設計・構築ドキュメントをHTML化した学習用資料です。値の正本は各Markdown（IPアドレス管理表ほか）。</p>
+</div>
+
+<script>
+"use strict";
+
+const RANGE_START = new Date(2026, 6, 13);
+const RANGE_END = new Date(2026, 7, 31);
+const TODAY = new Date(2026, 6, 17);
+const MONTH_TICKS = [
+  { date: "2026-07-13", label: "07月" },
+  { date: "2026-08-01", label: "08月" }
+];
+
+const PHASES = [
+  { id: "1", name: "要件定義", start: "2026-07-16", end: "2026-07-16", progress: 100, tasks: [
+    { wbs: "1.1", name: "要件定義書作成・承認", owner: "shuya", start: "2026-07-16", end: "2026-07-16", progress: 100 }
+  ] },
+  { id: "2", name: "基本設計", start: "2026-07-16", end: "2026-07-16", progress: 100, tasks: [
+    { wbs: "2.1", name: "基本設計書・監視設計書作成", owner: "shuya", start: "2026-07-16", end: "2026-07-16", progress: 100 }
+  ] },
+  { id: "3", name: "詳細設計", start: "2026-07-16", end: "2026-07-17", progress: 100, tasks: [
+    { wbs: "3.1", name: "パラメータシート作成", owner: "shuya", start: "2026-07-16", end: "2026-07-16", progress: 100 },
+    { wbs: "3.2", name: "IPアドレス管理表・パラメータシート最終化", owner: "shuya", start: "2026-07-17", end: "2026-07-17", progress: 100 }
+  ] },
+  { id: "4", name: "環境構築", start: "2026-07-16", end: "2026-07-17", progress: 100, tasks: [
+    { wbs: "4.1", name: "IOLライセンス方式確立（ensure_iourc）", owner: "shuya", start: "2026-07-16", end: "2026-07-16", progress: 100 },
+    { wbs: "4.2", name: "初回デプロイ（11ノード）", owner: "shuya", start: "2026-07-17", end: "2026-07-17", progress: 100 },
+    { wbs: "4.3", name: "Zabbix増設・再デプロイ（14ノード）", owner: "shuya", start: "2026-07-17", end: "2026-07-17", progress: 100 },
+    { wbs: "4.4", name: "ドキュメント整備（構成図・HTMLスイート）", owner: "shuya", start: "2026-07-17", end: "2026-07-17", progress: 100 }
+  ] },
+  { id: "5", name: "Lab Challenge（Mission 1〜6）", start: "2026-07-18", end: "2026-08-14", progress: 0, tasks: [
+    { wbs: "5.1", name: "（予定）Mission 1: 老朽LANベースライン構築", owner: "shuya", start: "2026-07-18", end: "2026-07-20", progress: 0 },
+    { wbs: "5.2", name: "（予定）Mission 2: 監視セグメント増設", owner: "shuya", start: "2026-07-21", end: "2026-07-24", progress: 0 },
+    { wbs: "5.3", name: "（予定）Mission 3: SNMPv2c＋MIBツリー深堀り", owner: "shuya", start: "2026-07-25", end: "2026-07-29", progress: 0 },
+    { wbs: "5.4", name: "（予定）Mission 4: IF-MIBカウンタ監視", owner: "shuya", start: "2026-07-30", end: "2026-08-03", progress: 0 },
+    { wbs: "5.5", name: "（予定）Mission 5: 平文の危険性→SNMPv3移行", owner: "shuya", start: "2026-08-04", end: "2026-08-10", progress: 0 },
+    { wbs: "5.6", name: "（予定）Mission 6: トラップ受信＋総合試験", owner: "shuya", start: "2026-08-11", end: "2026-08-14", progress: 0 }
+  ] },
+  { id: "6", name: "試験・テーマ29引き継ぎ", start: "2026-08-17", end: "2026-08-31", progress: 0, tasks: [
+    { wbs: "6.1", name: "（予定）Mission試験・総合試験の実施", owner: "shuya", start: "2026-08-17", end: "2026-08-24", progress: 0 },
+    { wbs: "6.2", name: "（予定）テーマ29への引き継ぎ（運用保守マニュアル§5）", owner: "shuya", start: "2026-08-25", end: "2026-08-31", progress: 0 }
+  ] }
+];
+
+const MILESTONES = [
+  { date: "2026-07-17", label: "環境構築完了" },
+  { date: "2026-08-14", label: "（予定）Mission完走" },
+  { date: "2026-08-31", label: "（予定）テーマ29着手" }
+];
+
+function pct(dateStr) {
+  const d = new Date(dateStr);
+  return (d - RANGE_START) / (RANGE_END - RANGE_START) * 100;
+}
+
+function timelineHtml(start, end, progress, todayPct) {
+  const left = pct(start);
+  const width = Math.max(0.6, pct(end) - left);
+  return `<div class="col-timeline"><div class="today-line" style="left:${todayPct}%"></div><div class="bar" style="left:${left}%;width:${width}%"><div class="fill" style="width:${progress}%"></div></div></div>`;
+}
+
+function buildGantt() {
+  const gantt = document.getElementById("gantt");
+  const todayPct = pct(TODAY.toISOString().slice(0, 10));
+  let html = `<div class="gantt-row head"><div class="wbs">WBS</div><div class="tname">タスク</div><div class="owner">担当</div><div class="col-timeline">${MONTH_TICKS.map(m => `<span class="month-tick" style="left:${pct(m.date)}%">${m.label}</span>`).join("")}${MILESTONES.map(ms => `<span class="milestone" style="left:${pct(ms.date)}%" title="${ms.label} ${ms.date}">◆</span>`).join("")}</div><div class="pctcol num">進捗</div></div>`;
+  PHASES.forEach(ph => {
+    html += `<div class="gantt-row phase"><div class="wbs mono">${ph.id}</div><div class="tname">${ph.name}</div><div class="owner"></div>${timelineHtml(ph.start, ph.end, ph.progress, todayPct)}<div class="pctcol num mono">${ph.progress}%</div></div>`;
+    ph.tasks.forEach(t => {
+      html += `<div class="gantt-row task"><div class="wbs mono">${t.wbs}</div><div class="tname">${t.name}</div><div class="owner">${t.owner}</div>${timelineHtml(t.start, t.end, t.progress, todayPct)}<div class="pctcol num mono">${t.progress}%</div></div>`;
+    });
+  });
+  gantt.innerHTML = html;
+}
+buildGantt();
+
+/* 課題管理表（ISS-01〜06。共通仕様§4「課題管理の実績」をそのまま反映） */
+const ISSUES = [
+  { id: "ISS-01", filed: "2026-07-16", issue: "L2系IOLイメージ（L2-15.2／L2-advipservices-2017等）のライセンスがイメージ側entrypoint.sh内に埋め込まれており、entrypoint_attach.shのbindで隠れて渡らずLicense Errorになる → 対応: deploy.shのensure_iourc()でイメージからライセンス値を抽出し/opt/clab/.iourcを:ro bindする方式で解決", impact: "IOL 6台のうちL2系5台（old-core/old-sw1/old-sw2/mon-core/cap-sw）が起動不能", prio: "high", owner: "shuya", due: "2026-07-16", state: "closed" },
+  { id: "ISS-02", filed: "2026-07-17", issue: "IOLコンテナにpgrepが無く、iouyap起動確認が全台false誤検出になる → 対応: /proc/*/comm走査方式に変更", impact: "起動確認スクリプトがiouyap未起動を誤検知するリスク", prio: "low", owner: "shuya", due: "2026-07-17", state: "closed" },
+  { id: "ISS-03", filed: "2026-07-17", issue: "zabbixイメージが非rootユーザーで動作するためclab.yml execによるeth1設定投入が不可 → 対応: deploy.shにzbx_net()（docker exec -u 0）を追加", impact: "zbx-srvのin-bandポーリング用IP（10.28.100.20/24）が未投入でZabbix監視が不通", prio: "mid", owner: "shuya", due: "2026-07-17", state: "closed" },
+  { id: "ISS-04", filed: "2026-07-16", issue: "wbitt/network-multitoolイメージにsnmptrapdが未同梱 → 対応: Mission6前に`apk add net-snmp`する手順を構築手順書§4に明記", impact: "そのままではMission6のトラップ受信試験が実施不可", prio: "mid", owner: "shuya", due: "2026-07-16", state: "closed" },
+  { id: "ISS-05", filed: "2026-07-17", issue: "ラボ再デプロイでnmsコンテナが再作成されnet-snmpが消える。また`destroy --cleanup`はnvram（保存済みコンフィグ）ごと削除する → 対応: 再導入手順と「コンフィグ温存はcleanupなしdestroy」を構築手順書に明記し運用ルール化", impact: "再デプロイのたびにnet-snmp再導入・コンフィグ消失のリスクが残る（運用でカバー）", prio: "mid", owner: "shuya", due: "2026-07-17", state: "ruled" },
+  { id: "ISS-06", filed: "2026-07-17", issue: "mon-core E0/3（VLAN100）のIOS設定投入まではzbx-srvのin-bandポーリングが不通（仕様どおり。Mission 2で開通予定）", impact: "Mission2完了までZabbixのSNMPポーリング（in-band経由）が機能しない", prio: "low", owner: "shuya", due: "2026-07-24", state: "inprogress" }
+];
+
+const PRIO_LABEL = { high: "高", mid: "中", low: "低" };
+const STATE_LABEL = { inprogress: "対応中", ruled: "運用ルール化", closed: "クローズ" };
+
+const issueBody = document.getElementById("issueBody");
+issueBody.innerHTML = ISSUES.map(i => `<tr data-prio="${i.prio}" data-state="${i.state}">
+  <td class="mono">${i.id}</td>
+  <td class="mono">${i.filed}</td>
+  <td>${i.issue}</td>
+  <td>${i.impact}</td>
+  <td><span class="prio ${i.prio}">${PRIO_LABEL[i.prio]}</span></td>
+  <td>${i.owner}</td>
+  <td class="mono">${i.due}</td>
+  <td><span class="state ${i.state}">${STATE_LABEL[i.state]}</span></td>
+</tr>`).join("");
+
+const chips = [...document.querySelectorAll(".chip")];
+const rows = [...issueBody.querySelectorAll("tr")];
+chips.forEach(chip => {
+  chip.addEventListener("click", () => {
+    chips.forEach(c => c.classList.remove("active"));
+    chip.classList.add("active");
+    const f = chip.dataset.filter;
+    rows.forEach(row => {
+      const show = f === "all" || (f === "inprogress" && row.dataset.state === "inprogress") || (f === "high" && row.dataset.prio === "high");
+      row.classList.toggle("is-hidden", !show);
+    });
+  });
+});
+</script>
+</body>
+</html>

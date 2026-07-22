@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>試験仕様書・結果報告書 | テーマ28 SNMP監視Lab</title>
+<style>
+  :root {
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    --accent: #635BFF;
+    --accent-soft: #F0EFFF;
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    --neutral: #94A3B8;
+    --code-bg: #0F172A;
+    --code-ink: #E2E8F0;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--sans); font-size: 15px; line-height: 1.8; color: var(--ink); background: var(--surface); }
+  .mono { font-family: var(--mono); font-feature-settings: "tnum"; }
+
+  /* ===== Header (共通) ===== */
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 20px;
+    height: 56px; padding: 0 24px;
+    background: rgba(250,250,249,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .site-header .back { font-size: 13px; color: var(--ink-2); text-decoration: none; transition: color .15s var(--ease); }
+  .site-header .back:hover { color: var(--accent); }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .brand span { color: var(--accent); }
+  .phase-chip { padding: 3px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--accent); background: var(--accent-soft); border-radius: var(--r-full); }
+  .header-meta { margin-left: auto; font-size: 12px; color: var(--ink-2); }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 40px 24px 64px; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+  p.lede { font-size: 14.5px; color: var(--ink-2); max-width: 68ch; margin: 14px 0 28px; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 28px; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; font-size: 12px; font-weight: 500; border-radius: var(--r-full); border: 1px solid var(--border); background: var(--raised); color: var(--ink-2); }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  section { margin-bottom: 48px; }
+  h2 { font-size: 20px; font-weight: 600; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+
+  /* ===== Summary stat tiles ===== */
+  .stats-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+  .stat-tile { flex: 1; min-width: 110px; background: var(--raised); border: 1px solid var(--border); border-radius: var(--r-md); padding: 14px 16px; box-shadow: var(--shadow-1); }
+  .stat-tile .num { font-family: var(--mono); font-size: 32px; font-weight: 600; font-feature-settings: "tnum"; line-height: 1.1; color: var(--ink); }
+  .stat-tile .label { font-size: 12px; color: var(--ink-2); margin-top: 4px; }
+  .stat-tile.ok .num { color: var(--ok); }
+  .stat-tile.ng .num { color: var(--error); }
+  .stat-tile.hold .num { color: var(--warn); }
+  .stat-tile.none .num { color: var(--neutral); }
+  .progress { height: 8px; border-radius: var(--r-full); overflow: hidden; display: flex; background: var(--border); margin-bottom: 8px; }
+  .progress span { height: 100%; }
+  .p-ok { background: var(--ok); } .p-ng { background: var(--error); } .p-hold { background: var(--warn); } .p-none { background: var(--neutral); }
+  .progress-note { font-size: 12px; color: var(--ink-3); }
+
+  /* ===== Tabs ===== */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 24px; flex-wrap: wrap; }
+  .tab-btn { padding: 10px 16px; font: inherit; font-size: 14px; font-weight: 600; color: var(--ink-2); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: color .15s var(--ease), border-color .15s var(--ease); }
+  .tab-btn[aria-selected="true"] { color: var(--accent); border-color: var(--accent); }
+  .tab-btn:hover { color: var(--ink); }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .tab-panel:not([hidden]) { animation: fadeIn .25s var(--ease); }
+
+  /* ===== Test card ===== */
+  .test-card { background: var(--raised); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-1); padding: 20px 22px; margin-bottom: 18px; transition: transform .18s var(--ease), box-shadow .18s var(--ease); }
+  .test-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
+  .test-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12.5px; color: var(--ink-2); padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .test-meta .tid { font-weight: 700; color: var(--accent); font-size: 13px; font-family: var(--mono); }
+  .test-body { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .steps-col h3, .criteria-col h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); margin-bottom: 8px; font-weight: 600; }
+  .steps-col ol { padding-left: 18px; font-size: 13.5px; }
+  .steps-col li { margin-bottom: 6px; }
+  .steps-col .mono { font-size: 12.5px; }
+  .criteria-col ul { list-style: none; }
+  .criteria-col li { position: relative; padding-left: 14px; margin-bottom: 6px; font-size: 13.5px; }
+  .criteria-col li::before { content: "—"; position: absolute; left: 0; color: var(--ink-3); }
+  .test-result { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 13px; }
+  .rst { font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+  .rst::before { font-size: 11px; }
+  .rst.ok { color: var(--ok); } .rst.ok::before { content: "●"; }
+  .rst.ng { color: var(--error); } .rst.ng::before { content: "✕"; }
+  .rst.hold { color: var(--warn); } .rst.hold::before { content: "▲"; }
+  .rst.none { color: var(--neutral); } .rst.none::before { content: "○"; }
+  .rmeta { color: var(--ink-2); }
+  .mission-chips { margin-left: auto; display: flex; gap: 6px; }
+  .mission-chip { font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: var(--r-full); background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+
+  /* ===== Footer nav (共通) ===== */
+  .doc-footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); }
+  .doc-footer a { display: block; padding: 14px 18px; min-width: 200px; border: 1px solid var(--border); border-radius: var(--r-md); text-decoration: none; color: var(--ink); font-weight: 600; font-size: 14px; background: var(--raised); transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease); }
+  .doc-footer a:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--accent); }
+  .doc-footer a small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-3); letter-spacing: .06em; }
+  .doc-footer .next { text-align: right; margin-left: auto; }
+  .mock-note { margin-top: 24px; font-size: 11px; color: var(--ink-3); }
+
+  @media (max-width: 1100px) {
+    .test-body { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 768px) {
+    .header-meta, .phase-chip { display: none; }
+    .stats-row { gap: 8px; }
+    .stat-tile { min-width: 90px; padding: 10px 12px; }
+    .stat-tile .num { font-size: 24px; }
+    .test-meta { gap: 4px 10px; }
+    .mission-chips { margin-left: 0; width: 100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+  @media (max-width: 480px) {
+    .doc-footer { flex-direction: column; }
+    .doc-footer a { min-width: 0; }
+    .doc-footer .next { margin-left: 0; }
+  }
+  @media print {
+    .site-header, .doc-footer, .mock-note, .tabs { display: none !important; }
+    body { background: #FFFFFF; }
+    .tab-panel[hidden] { display: block !important; }
+    .test-card { break-inside: avoid; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a class="back" href="00_ドキュメントマップ.html">← ドキュメントマップ</a>
+  <div class="brand">テーマ28 <span>SNMP監視Lab</span></div>
+  <span class="phase-chip">PHASE 5 試験</span>
+  <div class="header-meta">LAB-2026-T28 / OrbStack clab・snmp-monitoring-lab</div>
+</header>
+
+<div class="wrap">
+  <main>
+    <h1>試験仕様書・結果報告書</h1>
+    <div class="doc-meta">
+      <span class="badge ver">v1.0</span>
+      <span class="badge"><span class="dot"></span>試験準備中</span>
+      <span class="badge">最終更新 2026-07-17</span>
+      <span class="badge">作成: shuya（AI支援: Claude）</span>
+    </div>
+    <p class="lede">監視が一切ない老朽社内LANに後付けした監視基盤（mon-core / nms / cap-sw）とSNMP監視設定が、Mission 1〜6の各段階で要件通りに動作していることを確認する。環境構築（containerlabデプロイ・Zabbixスタック起動）の動作確認は実施済みだが、Mission試験・総合試験は2026-07-17時点でLab Challenge未着手のため未実施。</p>
+
+    <section id="summary" aria-label="結果サマリ">
+      <h2>結果サマリ</h2>
+      <div class="stats-row" id="statsRow"></div>
+      <div class="progress" id="progressBar"></div>
+      <p class="progress-note" id="progressNote"></p>
+    </section>
+
+    <section aria-label="試験項目">
+      <div class="tabs" role="tablist" aria-label="試験区分">
+        <button class="tab-btn" role="tab" id="tabbtn-env" aria-controls="panel-env" aria-selected="true" data-tab="env">環境構築確認（実施済み）</button>
+        <button class="tab-btn" role="tab" id="tabbtn-mission" aria-controls="panel-mission" aria-selected="false" data-tab="mission">Mission試験（M1〜M6）</button>
+        <button class="tab-btn" role="tab" id="tabbtn-integration" aria-controls="panel-integration" aria-selected="false" data-tab="integration">総合試験</button>
+      </div>
+      <div class="tab-panel" id="panel-env" role="tabpanel" aria-labelledby="tabbtn-env"></div>
+      <div class="tab-panel" id="panel-mission" role="tabpanel" aria-labelledby="tabbtn-mission" hidden></div>
+      <div class="tab-panel" id="panel-integration" role="tabpanel" aria-labelledby="tabbtn-integration" hidden></div>
+    </section>
+  </main>
+
+  <nav class="doc-footer" aria-label="前後のドキュメント">
+    <a class="prev" href="05_ノード配置・リンク収容表.html"><small>前の工程</small>ノード配置・リンク収容表</a>
+    <a class="next" href="07_WBS・課題管理表.html"><small>次の工程</small>WBS・課題管理表</a>
+  </nav>
+  <p class="mock-note">本スイートはテーマ28ラボ（containerlab仮想環境）の設計・構築ドキュメントをHTML化した学習用資料です。値の正本は各Markdown（IPアドレス管理表ほか）。</p>
+</div>
+
+<script>
+"use strict";
+
+/* 環境構築確認（実施済み・2026-07-17実施、実施者shuya（AI支援: Claude）） */
+const ENV_TESTS = [
+  { id: "ENV-01", cat: "env", target: "全14ノード（IOL6台・Linux5台・Zabbix3台）", pre: "`./deploy.sh deploy`実行によりデプロイ済みであること",
+    steps: ["<span class=\"mono\">./deploy.sh inspect</span> を実行する"],
+    criteria: ["14ノード全てのステータスが running であること"],
+    result: { status: "ok", date: "2026-07-17", tester: "shuya（AI支援: Claude）" } },
+  { id: "ENV-02", cat: "env", target: "old-rt / old-core / old-sw1 / old-sw2 / mon-core / cap-sw（IOL 6台）", pre: "IOLブート完了（+約60秒）後であること",
+    steps: ["各IOLコンテナで <span class=\"mono\">sudo docker logs --tail 50 clab-snmp-monitoring-lab-&lt;node&gt;</span> を実行する"],
+    criteria: ["6台全てのブートログに License Error が出力されていないこと（0件）", "IOSのブートマーカーが出力されていること"],
+    result: { status: "ok", date: "2026-07-17", tester: "shuya（AI支援: Claude）" } },
+  { id: "ENV-03", cat: "env", target: "IOL 6台", pre: "IOLブート完了後、entrypoint_attach.shによるiouyap自動起動タイミング経過後であること",
+    steps: ["各IOLコンテナで <span class=\"mono\">/proc/*/comm</span> を走査しiouyapプロセスの起動を確認する（ISS-02対応の確認方式）"],
+    criteria: ["6台全てでiouyapプロセスが起動していること（6/6）"],
+    result: { status: "ok", date: "2026-07-17", tester: "shuya（AI支援: Claude）" } },
+  { id: "ENV-04", cat: "env", target: "nms / pc-a / pc-b / srv-file / cap", pre: "clab.ymlのexecブロックによる自動投入が完了していること",
+    steps: ["各Linuxノードにログインし <span class=\"mono\">ip addr</span> / <span class=\"mono\">ip route</span> を確認する"],
+    criteria: ["nms/pc-a/pc-b/srv-fileのeth1 IP・デフォルトルートが自動投入済みであること", "capはpromiscuousのみでIPなしであること"],
+    result: { status: "ok", date: "2026-07-17", tester: "shuya（AI支援: Claude）" } },
+  { id: "ENV-05", cat: "env", target: "zbx-db / zbx-srv / zbx-web", pre: "3コンテナが起動済みであること",
+    steps: ["zbx-srv（zabbix-server-pgsql 7.0.28 LTS）のバージョン応答を確認する"],
+    criteria: ["Zabbix Server 7.0.28 LTSとして応答すること"],
+    result: { status: "ok", date: "2026-07-17", tester: "shuya（AI支援: Claude）" } },
+  { id: "ENV-06", cat: "env", target: "zbx-web", pre: "zbx-web起動済み、VMポート8280が公開されていること",
+    steps: ["Macから <span class=\"mono\">http://clab.orb.local:8280</span> へHTTPアクセスする"],
+    criteria: ["HTTPステータス200が返ること（初期ログイン Admin/zabbix）"],
+    result: { status: "ok", date: "2026-07-17", tester: "shuya（AI支援: Claude）" } }
+];
+
+/* Mission試験（試験計画書.md §1〜§6。Lab Challenge未着手のため全項目「未実施」） */
+const MISSION_TESTS = [
+  { id: "M1", cat: "mission", target: "pc-a / pc-b / srv-file、old-core、old-rt、old-sw1 / old-sw2", pre: "Given: old-rt/old-core/old-sw1/old-sw2からなる老朽LAN（VLAN10/20/30/90、static routing）が構築済みであること",
+    steps: [
+      "pc-a（10.28.10.10）から <span class=\"mono\">ping -c 4 203.0.113.1</span> を実行する",
+      "pc-b（10.28.20.10）から <span class=\"mono\">ping -c 4 203.0.113.1</span> を実行する",
+      "srv-file（10.28.30.10）から <span class=\"mono\">ping -c 4 203.0.113.1</span> を実行する",
+      "old-coreで <span class=\"mono\">show ip route static</span> を実行する",
+      "old-rtで <span class=\"mono\">show ip route static</span> を実行する",
+      "old-sw1・old-sw2それぞれで <span class=\"mono\">show vlan brief</span> を実行する"
+    ],
+    criteria: [
+      "pc-a/pc-b/srv-fileそれぞれから203.0.113.1へのpingが4/4成功する（営業部→old-rt Lo0=疑似インターネットへ到達）",
+      "old-coreの経路にデフォルトルート「0.0.0.0/0 via 10.28.1.1」が存在する",
+      "old-rtの経路に「10.28.0.0/16 via 10.28.1.2」が存在する",
+      "old-sw1・old-sw2の両方にVLAN20が存在する（総務部VLANのL2延伸＝老朽ポイントの確認）"
+    ],
+    result: { status: "none" }, note: "Lab Challenge未着手（README_Lab_Challenge.md参照）" },
+  { id: "M2", cat: "mission", target: "nms、mon-core、cap-sw", pre: "Given: mon-core/cap-swを増設し、VLAN100/900のIPアドレス設計（IPアドレス管理表）に基づき設定済みであること",
+    steps: [
+      "nmsから old-rt（10.28.1.1）へ <span class=\"mono\">ping -c 4 10.28.1.1</span> を実行する",
+      "nmsから old-core（10.28.90.1）へ <span class=\"mono\">ping -c 4 10.28.90.1</span> を実行する",
+      "nmsから old-sw1（10.28.90.13）へ <span class=\"mono\">ping -c 4 10.28.90.13</span> を実行する",
+      "nmsから old-sw2（10.28.90.14）へ <span class=\"mono\">ping -c 4 10.28.90.14</span> を実行する",
+      "nmsから mon-core（10.28.0.2）・cap-sw（10.28.0.3）へそれぞれpingを実行する",
+      "cap-swで <span class=\"mono\">show monitor session 1</span> を実行する"
+    ],
+    criteria: [
+      "old-rt/old-core/old-sw1/old-sw2/mon-core/cap-sw全てへのpingが成功する",
+      "cap-swのmonitor session出力で source=Et0/1(both), destination=Et0/3 と表示される"
+    ],
+    result: { status: "none" }, note: "Lab Challenge未着手（README_Lab_Challenge.md参照）" },
+  { id: "M3", cat: "mission", target: "nms、old-core、old-rt", pre: "Given: 6 IOL機器全てに snmp-server community public RO を投入済みであること", ref: "試験計画書.md §3",
+    steps: [
+      "nmsから <span class=\"mono\">snmpwalk -v2c -c public 10.28.90.1 system</span> を実行する",
+      "nmsから <span class=\"mono\">snmpget -v2c -c public 10.28.90.1 1.3.6.1.2.1.1.5.0</span> を実行する",
+      "nmsから <span class=\"mono\">snmpget -v2c -c public 10.28.90.1 sysName.0</span> を実行する",
+      "nmsから <span class=\"mono\">snmptranslate -Tp -IR system</span> を実行する",
+      "nmsから <span class=\"mono\">snmpwalk -v2c -c public 10.28.1.1 system</span>（old-rt）を実行する"
+    ],
+    criteria: [
+      "old-coreのsystemサブツリー（sysDescr, sysUpTime, sysName等）が返る",
+      "数値OID指定（1.3.6.1.2.1.1.5.0）でsysName=old-coreが返る",
+      "名前OID指定（sysName.0）でも数値OID指定と同じ値が返る",
+      "MIB-IIのsystemサブツリー構造がツリー表示される",
+      "old-rtのsysDescrに旧IOS 15.6のバージョン文字列が含まれる"
+    ],
+    result: { status: "none" }, note: "Lab Challenge未着手（README_Lab_Challenge.md参照）" },
+  { id: "M4", cat: "mission", target: "nms、old-sw2、srv-file、pc-a", pre: "Given: Mission3のSNMPv2c設定が有効であること",
+    steps: [
+      "nmsから <span class=\"mono\">snmpwalk -v2c -c public 10.28.90.14 ifDescr</span> を実行しifIndexを確認する",
+      "srv-fileで <span class=\"mono\">iperf3 -s</span> を起動する",
+      "pc-aから <span class=\"mono\">iperf3 -c 10.28.30.10 -t 30</span> を実行しトラフィックを生成する",
+      "トラフィック生成の前後でnmsから <span class=\"mono\">snmpget -v2c -c public 10.28.90.14 1.3.6.1.2.1.2.2.1.10.&lt;ifIndex&gt;</span>（ifInOctets）を2回ポーリングする",
+      "同区間・同時刻で <span class=\"mono\">snmpget -v2c -c public 10.28.90.14 1.3.6.1.2.1.31.1.1.1.6.&lt;ifIndex&gt;</span>（ifHCInOctets）も2回ポーリングする"
+    ],
+    criteria: [
+      "old-sw2の各インターフェースのifIndexを確認できる",
+      "ifInOctets（32bit）の差分値がトラフィック生成量相当に増加している",
+      "ifHCInOctets（64bit）の差分値が32bit版（ifInOctets）と一致する"
+    ],
+    result: { status: "none" }, note: "Lab Challenge未着手（README_Lab_Challenge.md参照）" },
+  { id: "M5", cat: "mission", target: "cap、nms、監視対象6機器", pre: "Given: Mission2で構築したSPAN（cap-sw、destination=cap）が有効であること", ref: "試験計画書.md §5",
+    steps: [
+      "capで <span class=\"mono\">tcpdump -i eth1 -w /tmp/snmp_v2c.pcap udp port 161</span> を実行しながら、nmsから <span class=\"mono\">snmpget -v2c -c public 10.28.90.1 1.3.6.1.2.1.1.5.0</span> を実行する",
+      "監視対象機器に <span class=\"mono\">snmp-server group NMS-GROUP v3 priv</span> と <span class=\"mono\">snmp-server user nmsuser NMS-GROUP v3 auth sha SnmpAuth28! priv aes 128 SnmpPriv28!</span> を投入する",
+      "nmsから <span class=\"mono\">snmpwalk -v3 -l authPriv -u nmsuser -a SHA -A 'SnmpAuth28!' -x AES -X 'SnmpPriv28!' 10.28.90.1 system</span> を実行する",
+      "capで <span class=\"mono\">tcpdump -i eth1 -w /tmp/snmp_v3.pcap udp port 161</span> を取得する",
+      "監視対象機器で <span class=\"mono\">no snmp-server community public</span> を投入後、nmsから <span class=\"mono\">snmpwalk -v2c -c public 10.28.90.1 system</span> を実行する"
+    ],
+    criteria: [
+      "capのキャプチャファイル（v2c）をWiresharkで開くとUDPペイロード中にコミュニティ名publicがASCII平文で確認できる",
+      "v3 walkでv2c時と同じsystemサブツリーの値が返る",
+      "capのキャプチャファイル（v3）はPDUが暗号化されており、コミュニティ名やOID値がASCII平文では確認できない",
+      "community削除後のv2c snmpwalkは応答がなくTimeoutになる"
+    ],
+    result: { status: "none" }, note: "Lab Challenge未着手（README_Lab_Challenge.md参照）" },
+  { id: "M6", cat: "mission", target: "nms、old-sw1、監視対象6機器", pre: "Given: Mission5でSNMPv3移行が完了していること", ref: "試験計画書.md §6",
+    steps: [
+      "監視対象機器に <span class=\"mono\">snmp-server enable traps snmp linkdown linkup coldstart</span> と <span class=\"mono\">snmp-server host 10.28.100.10 version 2c public</span> を投入する",
+      "nmsで <span class=\"mono\">snmptrapd -f -Lo -c /tmp/snmptrapd.conf</span> をフォアグラウンド起動する",
+      "old-sw1で <span class=\"mono\">interface Ethernet0/2</span> を <span class=\"mono\">shutdown</span> する",
+      "続けて <span class=\"mono\">no shutdown</span> で復旧する",
+      "nmsから6機器全ての監視対象IPへ <span class=\"mono\">snmpwalk -v3 -l authPriv -u nmsuser -a SHA -A 'SnmpAuth28!' -x AES -X 'SnmpPriv28!' &lt;IP&gt; system</span> を実行する"
+    ],
+    criteria: [
+      "nmsのsnmptrapd出力にold-sw1からのlinkDownトラップが着信する",
+      "復旧後にlinkUpトラップが着信する",
+      "6機器全ての監視対象IPへのv3 walkが全て成功する（Mission1〜6で構築した監視基盤が一通り機能していることの確認）"
+    ],
+    result: { status: "none" }, note: "Lab Challenge未着手（README_Lab_Challenge.md参照）" }
+];
+
+/* 総合試験（Mission1〜5の共存確認＋Mission6の通し確認。パラメータシート_設定順.md Phase17相当） */
+const INTEGRATION_TESTS = [
+  { id: "INTEG-01", cat: "integration", target: "old-rt/old-core/old-sw1/old-sw2/mon-core/cap-sw、nms、pc-a/pc-b/srv-file、zbx-srv", pre: "Mission1〜5の全設定投入が完了していること", ref: "パラメータシート_設定順.md Phase17",
+    steps: [
+      "老朽LAN内部疎通（Mission1のミニチェック全項目：pc-a/pc-b/srv-fileから203.0.113.1へのping、old-core/old-rtのstatic経路確認、old-sw1/old-sw2のVLAN20確認）を再実施する",
+      "監視セグメント疎通（Mission2のミニチェック全項目：nmsからold-rt/old-core/old-sw1/old-sw2/mon-core/cap-sw/zbx-srvへのping、cap-swのSPAN状態確認）を再実施する",
+      "nmsから6機器全ての監視対象IP（old-rt=10.28.1.1 / old-core=10.28.90.1 / old-sw1=10.28.90.13 / old-sw2=10.28.90.14 / mon-core=10.28.0.2 / cap-sw=10.28.0.3）へ <span class=\"mono\">snmpwalk -v3 -l authPriv -u nmsuser -a SHA -A 'SnmpAuth28!' -x AES -X 'SnmpPriv28!' &lt;IP&gt; system</span> を実行する",
+      "old-sw1のEthernet0/2（pc-a向けポート）を<span class=\"mono\">shutdown</span>→<span class=\"mono\">no shutdown</span>し、linkDown/linkUpトラップの着信を確認する"
+    ],
+    criteria: [
+      "老朽LAN内部疎通が再度成立していること",
+      "監視セグメント疎通（zbx-srvを含む）が再度成立していること",
+      "6機器全ての監視対象IPへのSNMPv3 walkが全て成功すること",
+      "old-sw1のリンク断・復旧でlinkDown/linkUpトラップがnmsに着信すること"
+    ],
+    result: { status: "none" }, note: "Lab Challenge未着手（README_Lab_Challenge.md参照）", missionChip: "M1〜M6" }
+];
+
+const TESTS = [...ENV_TESTS, ...MISSION_TESTS, ...INTEGRATION_TESTS];
+
+const STATUS_LABEL = { ok: "OK", ng: "NG", hold: "保留", none: "未実施" };
+
+function renderResult(r, note) {
+  if (r.status === "none") {
+    return `<span class="rst none">未実施</span><span class="rmeta">${note || ""}</span>`;
+  }
+  return `<span class="rst ${r.status}">${STATUS_LABEL[r.status]}</span><span class="rmeta">実施日 ${r.date}</span><span class="rmeta">実施者 ${r.tester}</span>`;
+}
+
+function renderMissionChips(t) {
+  const label = t.missionChip || (t.cat === "mission" ? t.id : "");
+  if (!label) return "";
+  return `<div class="mission-chips"><span class="mission-chip">${label}</span></div>`;
+}
+
+function renderCard(t) {
+  const refHtml = t.ref ? `<span>参照: ${t.ref}</span>` : "";
+  return `<article class="test-card">
+    <header class="test-meta">
+      <span class="tid">${t.id}</span>
+      <span>対象: ${t.target}</span>
+      <span>前提: ${t.pre}</span>
+      ${refHtml}
+    </header>
+    <div class="test-body">
+      <div class="steps-col"><h3>試験手順</h3><ol>${t.steps.map(s => `<li>${s}</li>`).join("")}</ol></div>
+      <div class="criteria-col"><h3>合否判定基準</h3><ul>${t.criteria.map(c => `<li>${c}</li>`).join("")}</ul></div>
+    </div>
+    <footer class="test-result">
+      ${renderResult(t.result, t.note)}
+      ${renderMissionChips(t)}
+    </footer>
+  </article>`;
+}
+
+const panels = { env: document.getElementById("panel-env"), mission: document.getElementById("panel-mission"), integration: document.getElementById("panel-integration") };
+Object.keys(panels).forEach(key => {
+  panels[key].innerHTML = TESTS.filter(t => t.cat === key).map(renderCard).join("");
+});
+
+const tabButtons = [...document.querySelectorAll(".tab-btn")];
+tabButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    tabButtons.forEach(b => b.setAttribute("aria-selected", "false"));
+    btn.setAttribute("aria-selected", "true");
+    Object.values(panels).forEach(p => { p.hidden = true; });
+    panels[btn.dataset.tab].hidden = false;
+  });
+});
+
+/* ---- 結果サマリ: TESTS配列から動的に集計してスタットタイル + プログレスバーへ反映 ---- */
+const SUMMARY = TESTS.reduce((acc, t) => ({
+  ...acc,
+  total: acc.total + 1,
+  [t.result.status]: (acc[t.result.status] || 0) + 1
+}), { total: 0, ok: 0, ng: 0, hold: 0, none: 0 });
+
+const statsRow = document.getElementById("statsRow");
+const tiles = [
+  { key: "total", cls: "", label: "総項目数" },
+  { key: "ok", cls: "ok", label: "OK" },
+  { key: "ng", cls: "ng", label: "NG" },
+  { key: "hold", cls: "hold", label: "保留" },
+  { key: "none", cls: "none", label: "未実施" }
+];
+statsRow.innerHTML = tiles.map(t => `<div class="stat-tile ${t.cls}"><div class="num mono">${SUMMARY[t.key]}</div><div class="label">${t.label}</div></div>`).join("");
+
+const progressBar = document.getElementById("progressBar");
+["ok", "ng", "hold", "none"].forEach(key => {
+  const pct = (SUMMARY[key] / SUMMARY.total * 100).toFixed(1);
+  progressBar.insertAdjacentHTML("beforeend", `<span class="p-${key}" style="width:${pct}%"></span>`);
+});
+document.getElementById("progressNote").textContent = `${SUMMARY.total}項目中 OK ${SUMMARY.ok}・NG ${SUMMARY.ng}・保留 ${SUMMARY.hold}・未実施 ${SUMMARY.none}（2026-07-17時点）`;
+</script>
+</body>
+</html>
