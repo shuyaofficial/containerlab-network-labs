@@ -1,0 +1,14 @@
+name: imgv-chr7214
+
+mgmt:
+  network: imgv
+  ipv4-subnet: 172.20.60.0/24
+
+topology:
+  nodes:
+    dut:
+      kind: mikrotik_ros
+      image: vrnetlab/mikrotik_routeros:7.21.4
+      env:
+        # KVM無しホストでは既定の -cpu host がqemu即死を招くため必須(2026-07-17判明)
+        QEMU_CPU: max

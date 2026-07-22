@@ -1,0 +1,14 @@
+name: imgv-c8000v
+
+mgmt:
+  network: imgv
+  ipv4-subnet: 172.20.60.0/24
+
+topology:
+  nodes:
+    dut:
+      kind: cisco_c8000v
+      image: vrnetlab/cisco_c8000v:17.06.03
+      env:
+        # KVM無しホストでは既定の -cpu host がqemu即死を招くため必須(2026-07-17判明)
+        QEMU_CPU: max

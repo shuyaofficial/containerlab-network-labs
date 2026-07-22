@@ -1,0 +1,14 @@
+name: imgv-iol-1563
+
+mgmt:
+  network: imgv
+  ipv4-subnet: 172.20.60.0/24
+
+topology:
+  nodes:
+    dut:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.6.3M3a
+      binds:
+        # IOL実ライセンス(run_one.shがVM内イメージから/opt/clab/.iourcへ自動抽出。git管理外)
+        - /opt/clab/.iourc:/iol/.iourc:ro

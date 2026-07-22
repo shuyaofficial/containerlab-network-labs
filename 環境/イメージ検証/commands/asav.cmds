@@ -1,0 +1,10 @@
+# 出典PDF: /Users/shuya/Documents/claude/ネットワーク技術分析/ネットワーク仕様書/vendors/global/cisco/asa/snapshots/2026-07-16/asa-command-ref-S.pdf
+#        (Cisco Secure Firewall ASA Series Command Reference, S Commands)
+# 抽出日: 2026-07-17 (pdftotext -layout でテキスト化し grep で実在確認)
+# 対象イメージ: Cisco ASAv 9.18.1
+# 注記: show version / show interface ip brief / show route / show running-config は
+#       いずれも分冊 "S" (asa-command-ref-S.pdf) に収録されている。
+show version	9\.18	asa-command-ref-S.pdf show version節(L72421) + Command History表内 "9.18(1) This command was introduced."(L38814)
+show interface ip brief	Interface +IP-Address	asa-command-ref-S.pdf show interface ip brief節(p.747-748) サンプル出力 "ciscoasa# show interface ip brief"(L41183)
+show route	Codes: C - connected	asa-command-ref-S.pdf show route節 サンプル出力 "Codes: C - connected, S - static, I - IGRP, R - RIP, M - mobile, B - BGP"(L63788, show route zoneの例)
+show running-config	: Saved|ASA Version	asa-command-ref-S.pdf show running-config節 サンプル出力 ": Saved" / "ASA Version 9.0(1)"(L63913-63917)

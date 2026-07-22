@@ -1,0 +1,14 @@
+name: imgv-veos
+
+mgmt:
+  network: imgv
+  ipv4-subnet: 172.20.60.0/24
+
+topology:
+  nodes:
+    dut:
+      kind: arista_veos
+      image: vrnetlab/arista_veos:4.29.2F
+      env:
+        # KVM無しホストでは既定の -cpu host がqemu即死を招くため必須(2026-07-17判明)
+        QEMU_CPU: max

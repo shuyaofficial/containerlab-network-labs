@@ -1,0 +1,11 @@
+# 出典: /Users/shuya/Documents/claude/ネットワーク技術分析/ネットワーク仕様書/vendors/global/mikrotik/routeros/snapshots/2026-07-16/llms-full.txt
+#      (MikroTik RouterOS Documentation, llms-full.txt はテキスト形式のため pdftotext不要で直接grep)
+# 抽出日: 2026-07-17
+# 対象イメージ: MikroTik RouterOS 7.5 (SSH用, containerlab routeros)
+# 注記: RouterOSはメニューパスの区切りにスペースとスラッシュのどちらも使用可能(等価)。
+#      出典テキスト内ではスラッシュ表記(例: /system/resource/print)で頻出するため、
+#      スペース表記(/system resource print)は同一コマンドの等価表記として採用。
+/system resource print	version: 7\.(5|21)	llms-full.txt "/system/resource/print"実行例(L45924, L52476) + サンプル出力 "version: 7.11.2 (stable)"(L52477)
+/interface print	NAME|TYPE	llms-full.txt "[admin@Controller_Bridge] > /interface/print where name~\"pe\""実行例(L12280) サンプル出力 "NAME  TYPE  ACTUAL-MTU..."(L12282)
+/ip address print	ADDRESS|NETWORK	llms-full.txt "[admin@pair_r1] > /ip/address/print"実行例(L95703) サンプル出力 "ADDRESS NETWORK INTERFACE"(L95705)
+/ip service print	NAME|PORT|PROTO	llms-full.txt "[admin@dzeltenais_burkaans] /ip/service/print where !dynamic"実行例(L88310) サンプル出力 "NAME PORT PROTO ADDRESS..."(L88318)

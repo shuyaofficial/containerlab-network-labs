@@ -1,0 +1,12 @@
+# 出典PDF: /Users/shuya/Documents/claude/ネットワーク技術分析/ネットワーク仕様書/vendors/global/cisco/catalyst/ios-xe/17.15/b_1715_9300_cr.pdf
+#        (Command Reference, Cisco IOS XE 17.15.x, Catalyst 9300 Switches)
+# 抽出日: 2026-07-17 (pdftotext -layout でテキスト化し grep で実在確認)
+# 対象イメージ: Cisco C9800-CL WLC 17.17.01
+# 注記: WLC固有コマンド(show wireless summary / show ap summary)は、入手済みの
+#       Catalyst 9200/9300/9400/9500/9600 17.15 Command Reference いずれにも実在せず
+#       (grep -l wireless で "show logging profile wireless" のみヒット、WLC運用コマンドは不在)、
+#       不採用とした。指示に従い汎用showコマンドで代替。
+show version	17\.17	b_1715_9300_cr.pdf show version節(p.2458)
+show ip interface brief	Interface +IP-Address	b_1715_9300_cr.pdf show ip interface節 brief引数定義+サンプル出力(L16437-16465, L16664)
+show inventory	NAME:|PID:	b_1715_9300_cr.pdf show inventory節(p.315-316)+サンプル出力 "NAME:"/"PID:"(L17683-17690)
+show running-config	Building configuration	b_1715_9300_cr.pdf TOC "show running-config 2412"(L1884) + サンプル出力(L13925)

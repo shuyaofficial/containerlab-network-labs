@@ -1,0 +1,14 @@
+name: imgv-asav
+
+mgmt:
+  network: imgv
+  ipv4-subnet: 172.20.60.0/24
+
+topology:
+  nodes:
+    dut:
+      kind: cisco_asav
+      image: vrnetlab/cisco_asav:9-18-1
+      env:
+        # KVM無しホストでは既定の -cpu host がqemu即死を招くため必須(2026-07-17判明)
+        QEMU_CPU: max

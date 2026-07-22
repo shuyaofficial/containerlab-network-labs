@@ -1,0 +1,6 @@
+# 出典PDF: /Users/shuya/Documents/claude/ネットワーク技術分析/ネットワーク仕様書/vendors/global/cisco/catalyst/ios-xe/17.15/b_1715_9300_cr.pdf
+#        (Command Reference, Cisco IOS XE 17.15.x, Catalyst 9300 Switches) / b_1715_9200_cr.pdf (Catalyst 9200 Switches) も参照
+# 抽出日: 2026-07-17 (pdftotext -layout でテキスト化し grep で実在確認)
+# 対象イメージ: Cisco CSR1000v 16.12.05 (IOS-XE)
+# 注記: 指示により show version のみの1行とする。
+show version	16\.12	b_1715_9300_cr.pdf show version節定義(p.2458) + b_1715_9200_cr.pdf内 "System Bootstrap, Version 16.12.1r [FC6], RELEASE SOFTWARE (P)"実例(L95098)

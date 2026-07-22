@@ -1,0 +1,8 @@
+# 出典PDF: /Users/shuya/Documents/claude/ネットワーク技術分析/ネットワーク仕様書/vendors/global/juniper/junos/cli/snapshots/2026-07-16/cli.pdf
+#        (Junos OS CLI User Guide for Junos OS, Published 2026-06-18)
+# 抽出日: 2026-07-17 (pdftotext -layout でテキスト化し grep で実在確認)
+# 対象イメージ: Juniper vSRX JunOS 24.4R1.9 (containerlab vsrx)
+show version	24\.4R1	cli.pdf Table 12 "Commonly Used Operational Mode Commands"内 "Software version ... show version"(L14066) + Change History表内 "24.4R1"実例(L16340)
+show interfaces terse	Admin|Link	cli.pdf サンプル出力 "user@host> show interfaces ge-* terse" → "Interface  Admin Link Proto  Local  Remote"(L15947-15963)
+show route	destinations	cli.pdf Table 12 "Routing table information ... show route"(L14112) + サンプル出力 "iso.0: 1 destinations, 1 routes (1 active, 0 holddown, 0 hidden)"(L15743)
+show chassis hardware	Hardware inventory	cli.pdf Table 12 "Hardware inventory ... show chassis hardware"(L14109) + サンプル出力 "user@host> show chassis hardware" → "Hardware inventory:"(L15250-15253)

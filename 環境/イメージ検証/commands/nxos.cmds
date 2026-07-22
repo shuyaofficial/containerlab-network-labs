@@ -1,0 +1,14 @@
+# 出典PDF: /Users/shuya/Documents/claude/ネットワーク技術分析/ネットワーク仕様書/vendors/global/cisco/nexus/9000/nx-os/10.5/b_n9k_show_commands_1051.pdf
+#        (Cisco Nexus 9000 Series NX-OS Command Reference (Show Commands), Release 10.5(x))
+# 抽出日: 2026-07-17 (pdftotext -layout でテキスト化し grep で実在確認)
+# 対象イメージ: NX-OS titanium 7.3.0.D1.1 (containerlab nxos)
+# 注記: 出典は10.5系の仕様書だが、show version/show interface brief/show vlan/show running-config は
+#       7.3系にも確実に存在する基本コマンドのみ選定。本PDFは構文定義のみのリファレンス集で
+#       サンプル出力を含まないため、期待regexの出力パターンは一般知識で構築。
+#       "show vlan brief"はSyntax Description上 brief オプションが定義されておらず(controllerのみ、
+#       かつ未サポート表記)確認できなかったため、確認できた"show vlan"を採用。
+#       titanium固有のバージョン文字列(7.3(0)D1(1))は本PDF内には存在しない。
+show version	7\.3\(0\)|titanium	b_n9k_show_commands_1051.pdf show version節(p.2601, L83270)
+show interface brief	Eth[0-9]|mgmt0	b_n9k_show_commands_1051.pdf show interface brief節(p.718-719, L26660-26665)
+show vlan	VLAN Name|active	b_n9k_show_commands_1051.pdf show vlan節(p.2611, L83540-83546)
+show running-config	!Command: show running-config|version 7\.3	b_n9k_show_commands_1051.pdf show running-config節(p.1866, L63428-63434)

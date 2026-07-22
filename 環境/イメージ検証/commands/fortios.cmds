@@ -1,0 +1,14 @@
+# 出典PDF: /Users/shuya/Documents/claude/ネットワーク技術分析/ネットワーク仕様書/vendors/global/fortinet/fortigate/fortigate_7.4.0_cli-troubleshooting-cheat-sheet.pdf
+#        (FortiOS 7.4 Troubleshooting Cheat Sheet)
+# 抽出日: 2026-07-17 (pdftotext -layout でテキスト化し grep で実在確認)
+# 対象イメージ: Fortinet FortiGate (FortiOS) 7.4.2
+# 注記: 当初指定のfortigate_7.4.0_cli-reference.pdfは変更履歴(Change Log)に
+#       "2023-07-28 Removed get commands incorrectly labeled as config commands." とあり、
+#       get系実行コマンド(get system status等)が収録されていなかった。
+#       同ディレクトリのfortigate_7.4.0_cli-troubleshooting-cheat-sheet.pdfにget/diagnose系
+#       コマンドが一覧化されていたためこちらを出典として採用。
+#       v7.4.2の厳密なバージョン文字列は本PDF(汎用チートシート)内には存在しない。
+get system status	v7\.4\.2	fortigate_7.4.0_cli-troubleshooting-cheat-sheet.pdf "get system status  Show system information."(L30)
+get system interface physical	speed|Speed	fortigate_7.4.0_cli-troubleshooting-cheat-sheet.pdf "get system interface  Show a summary of interface details..." / "get sys interface physical"(L114-115)
+get router info routing-table all	Routing table|Codes:	fortigate_7.4.0_cli-troubleshooting-cheat-sheet.pdf "get router info routing-table  all  Show routing table."(L181-182)
+get system performance status	CPU states|Memory states	fortigate_7.4.0_cli-troubleshooting-cheat-sheet.pdf "get system performance status  Show CPU and memory utilization."(L32)

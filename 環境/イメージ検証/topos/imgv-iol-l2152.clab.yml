@@ -1,0 +1,15 @@
+name: imgv-iol-l2152
+
+mgmt:
+  network: imgv
+  ipv4-subnet: 172.20.60.0/24
+
+topology:
+  nodes:
+    dut:
+      kind: cisco_iol
+      type: l2
+      image: vrnetlab/cisco_iol:L2-15.2
+      binds:
+        # IOL実ライセンス(run_one.shがVM内イメージから/opt/clab/.iourcへ自動抽出。git管理外)
+        - /opt/clab/.iourc:/iol/.iourc:ro

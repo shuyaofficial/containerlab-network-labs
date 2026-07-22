@@ -1,0 +1,8 @@
+# 出典なし(仕様書未収録)
+# vendors/global/arista/ ディレクトリは空(.DS_Storeのみ)で、Arista EOS公式コマンドリファレンスPDFは
+# 本リポジトリに未収集のため、grep実在確認は実施不可。以下は一般知識に基づく採用。
+# 抽出日: 2026-07-17
+# 対象イメージ: Arista vEOS 4.29.2F
+show version	4\.29\.2F	出典なし(一般知識)
+show ip interface brief	Interface|IP Address	出典なし(一般知識)
+show running-config	! Command: show running-config|hostname	出典なし(一般知識)

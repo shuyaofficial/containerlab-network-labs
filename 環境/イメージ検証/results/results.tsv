@@ -1,0 +1,23 @@
+date	image:tag	class	boot	access	cmds_pass/total	version_match	verdict	duration_s	notes
+2026-07-17	vrnetlab/cisco_iol:15.6.3M3a	S	running	false	0/0	n/a	BOOT_ONLY	96	boot=running access=ng
+2026-07-17	vrnetlab/cisco_iol:L2-15.2	S	running	false	0/0	n/a	BOOT_ONLY	97	boot=running access=ng
+2026-07-17	vrnetlab/cisco_vios:159-3.M6	M	failed	false	0/0	n/a	NG	1808	boot=failed
+2026-07-17	vrnetlab/mikrotik_routeros:7.5	M	healthy	true	4/4	yes	PARTIAL	89	boot=healthy access=ok(admin) cmds=4/4 routeros-rest=ng 
+2026-07-17	vrnetlab/cisco_vios:159-3.M6	M	running	false	0/0	n/a	BOOT_ONLY	1500	QEMU_CPU=max必須; IOS 15.9(3)M6起動実証(約2分,診断コンテナ); vrnetlab bootstrap(scrapli)未完走でSSH不可=コンソール手動運用のみ
+2026-07-17	vrnetlab/cisco_vios:L2-20200929	M	running	false	0/0	n/a	BOOT_ONLY	720	QEMU_CPU=max必須; IOS L2起動実証(診断コンテナ); 同上bootstrap未完走
+2026-07-17	vrnetlab/mikrotik_routeros:7.21.4	M	failed	false	0/0	n/a	NG	1805	boot=failed
+2026-07-17	vrnetlab/mikrotik_routeros:7.5	M	healthy	true	4/4	yes	PARTIAL	131	boot=healthy access=ok(admin) cmds=4/4 routeros-rest=ng 
+2026-07-17	vrnetlab/mikrotik_routeros:7.21.4	M	healthy	true	4/4	yes	FULL	108	boot=healthy access=ok(admin) cmds=4/4 routeros-rest=ok 
+2026-07-17	vrnetlab/mikrotik_routeros:7.5	M	healthy	true	4/4	yes	FULL	132	boot=healthy access=ok(admin) cmds=4/4 routeros-rest=ok 
+2026-07-17	vrnetlab/fortinet_fortios:7.4.2.F	M	healthy	false	0/0	n/a	BOOT_ONLY	535	boot=healthy access=ng
+2026-07-17	vrnetlab/arista_veos:4.29.2F	M	timeout	false	0/0	n/a	NG	2708	boot=timeout
+2026-07-17	vrnetlab/cisco_nxostitanium:7.3.0.D1.1	L	healthy	true	4/4	yes	FULL	967	boot=healthy access=ok(admin) cmds=4/4 
+2026-07-17	vrnetlab/cisco_asav:9-18-1	M	healthy	false	0/0	n/a	BOOT_ONLY	1033	boot=healthy access=ng
+2026-07-17	vrnetlab/cisco_asav:9-18-1	M	healthy	false	0/0	n/a	BOOT_ONLY	1003	boot=healthy access=ng
+2026-07-17	vrnetlab/cisco_asav:9-18-1	M	failed	false	0/0	n/a	NG	1805	boot=failed
+2026-07-17	vrnetlab/cisco_csr1000v:17.03.05	L	timeout	false	0/0	n/a	NG	5413	boot=timeout
+2026-07-17	vrnetlab/cisco_csr1000v:16.12.05	L	timeout	false	0/0	n/a	NG	5413	boot=timeout
+2026-07-17	vrnetlab/cisco_asav:9-18-1	M	failed	false	0/0	n/a	NG	1805	boot=failed
+2026-07-17	vrnetlab/juniper_vsrx:24.4R1.9	XL	-	-	-	n/a	NG-RESOURCE	0	ram-insufficient
+2026-07-17	vrnetlab/cisco_asav:9-18-1	M	failed	false	0/0	n/a	NG	1805	boot=failed
+2026-07-17	vrnetlab/cisco_c8000v:17.06.03	L	timeout	false	0/0	n/a	NG	5410	boot=timeout
