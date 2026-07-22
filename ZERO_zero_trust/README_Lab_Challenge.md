@@ -15,6 +15,8 @@ title: "テーマZERO｜ゼロトラストラボ Lab Challenge"
 
 ## 概要
 
+**ゼロトラスト全体の入口は [ゼロトラスト統合マップ](02_基本設計/ゼロトラスト統合マップ.md)**（L7・NW-ZT・実装テーマを1枚で俯瞰）。
+
 - 目的: 商用ZT製品を **OSSで代替**できるかを、6観点それぞれで実装可能性まで確かめる。
 - 到達点（今回スコープ）: 設計書一式 ＋ Phase 0 土台（docker network + multitool）＋ arm64 可用性の軽量検証まで。Phase 1-6 はデプロイしない（見込みが立てば十分、というユーザー決定）。
 - 実行基盤: OrbStack VM `clab`（Ubuntu 24.04 / arm64、containerlab 0.76.1）。
@@ -29,7 +31,7 @@ title: "テーマZERO｜ゼロトラストラボ Lab Challenge"
 | **L7 トラック**（既存） | ID統制・IAP・SWG/DLP・SIEM・デバイス統制 | Phase 0-6 | docker 完結（IOL 非連携、D-1） | 本 README、[段階ロードマップ](02_基本設計/段階ロードマップ.md)、[解説/phase0-6](解説/) |
 | **NW-ZT トラック**（新規） | NAC/802.1X・SDP型ZTNA・NDR・μセグ | N1-N4 | IOL 連携を解禁（D-7） | [NW-ZT_トラックロードマップ](02_基本設計/NW-ZT_トラックロードマップ.md)、[NW-ZT_ギャップ分析](02_基本設計/NW-ZT_ギャップ分析.md)、[教材/](教材/README_教材ガイド.md) |
 
-NW-ZT トラックは「ネットワーク側のゼロトラスト」（NWエンジニア本業領域）を扱う。設計・教材・arm64 検証を本テーマ ZERO に集約し（設計ハブ）、実装は既存の番号テーマ（[ロードマップ PHASE2](../ロードマップ/PHASE2_MODERN_ENTERPRISE.md) のテーマ29/31/42/35）へ委譲する。商用製品（Zscaler / Palo Alto / Cisco ISE 等）の仕組みは [教材/](教材/README_教材ガイド.md) で解説する。Phase 番号（L7）と N 番号（NW-ZT）は別系列で、混同しない。
+NW-ZT トラックは「ネットワーク側のゼロトラスト」（NWエンジニア本業領域）を扱う。設計・教材・arm64 検証を本テーマ ZERO に集約し（設計ハブ）、実装は既存の番号テーマ（[ロードマップ PHASE2](../ロードマップ/PHASE2_MODERN_ENTERPRISE.md) のテーマ31/35/36/42、および microseg_cilium／microseg_nftables）へ委譲する。31/35/36/42 は実装済・実機検証済（2026-07-05、35は2026-07-07）、microseg_cilium／microseg_nftables も実装済。商用製品（Zscaler / Palo Alto / Cisco ISE 等）の仕組みは [教材/](教材/README_教材ガイド.md) で解説する。Phase 番号（L7）と N 番号（NW-ZT）は別系列で、混同しない。
 
 ## トポロジ
 

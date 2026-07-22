@@ -23,6 +23,8 @@ east-west を含む通信を可視化し、フロー統計と DPI（Deep Packet 
 | goflow2 | NetFlow/IPFIX の収集 |
 | ntopng / ElastiFlow | フロー可視化 |
 | 既存 Loki/Grafana（ZERO Phase 3） | ログ・メトリクスの集約先ダッシュボード |
+| Faucet + OVS(mirror/SPAN) | 東西トラフィックを宣言的ミラーでセンサへ複製 |
+| gauge(Prometheus:9303) | ポート統計/フローテレメトリ供給 |
 
 ## 依存
 
@@ -36,7 +38,7 @@ east-west を含む通信を可視化し、フロー統計と DPI（Deep Packet 
 
 ## 実装先
 
-**テーマ42（フロー可視化＆NDR）**。[ロードマップPHASE2](../../../../ロードマップ/PHASE2_MODERN_ENTERPRISE.md) を入口として参照する。テーマ35（Faucet）がミラー環境の補助として使える場合がある。
+**テーマ42（フロー可視化＆NDR）**。[ロードマップPHASE2](../../../../ロードマップ/PHASE2_MODERN_ENTERPRISE.md) を入口として参照する。テーマ35（Faucet／[README](../../../../35_faucet_sdn/README_Lab_Challenge.md)）：SDN基礎(Phase A)＋ミラー/SPAN・gauge統計→NDR(Phase B)を実機連携（2026-07-07検証済）。
 
 ## 実装時の作業リスト
 
@@ -45,6 +47,7 @@ east-west を含む通信を可視化し、フロー統計と DPI（Deep Packet 
 - [ ] Zeek/Suricata のデプロイと DPI ルール適用
 - [ ] ntopng / ElastiFlow のデプロイとフロー可視化確認
 - [ ] 既存 Loki/Grafana（ZERO Phase 3）への連携設定
+- [ ] Faucetミラーポートをセンサ入力に使う
 - [ ] 想定外の east-west 通信を意図的に発生させ検知できることを確認
 - [ ] スキャン挙動を模擬し検知できることを確認
 - [ ] Grafana ダッシュボードでの可視化確認

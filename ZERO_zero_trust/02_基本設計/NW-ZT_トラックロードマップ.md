@@ -26,7 +26,7 @@ title: "テーマZERO｜NW-ZT トラックロードマップ（N1-N4）"
 |---|---|---|---|---|---|---|
 | **N1** | NAC / 802.1X | FreeRADIUS + Cisco IOL L2 + client | FreeRADIUS=**arm64 apt導入で可**（公式イメージはamd64のみ）/ IOL は実機検証 | ZERO Phase 1（Keycloak）任意連携 | 未認証端末が隔離VLANへ、認証成功で業務VLANへ動的割当。CoA で強制再認証 | 中〜大 |
 | **N2** | SDP型ZTNA | OpenZiti（発展: Headscale / Netbird） | ✅ 実測確定（全て arm64） | ZERO Phase 2（IAP）概念前提 | 内向きポート非開放のまま、app-connector 経由でのみ `app` に到達 | 中 |
-| **N3** | NDR | Zeek/Suricata + goflow2 + ntopng | Zeek/Suricata/goflow2/Faucet=✅ / ntopng=**arm64 apt導入で可** / ElastiFlow=不要 | ZERO Phase 3（Loki/Grafana） | ミラー/NetFlow から異常フローを検知し、Loki/Grafana で可視化 | 中〜大 |
+| **N3** | NDR | Zeek/Suricata + goflow2 + ntopng | Zeek/Suricata/goflow2/Faucet=✅ / ntopng=**arm64 apt導入で可** / ElastiFlow=不要 | ZERO Phase 3（Loki/Grafana）、OVS(Faucet, mirror/gauge) 実機連携済 | ミラー/NetFlow から異常フローを検知し、Loki/Grafana で可視化 | 中〜大 |
 | **N4** | μセグメンテーション | IOL VLAN/ACL + ホスト nftables | nftables ✅ / IOL は実機検証 | N1（VLAN 基盤）、テーマ22 参照 | ゾーン内 east-west 通信をタグ/ACL で最小権限化し、横移動を遮断 | 中 |
 
 > **arm64 実測（2026-07-04）**: N1-N4 すべて実装見込みが立った（[軽量検証結果_nwzt](../03_詳細設計/軽量検証結果_nwzt_2026-07-04.md)）。要注意は FreeRADIUS・ntopng が公式 Docker イメージ amd64-only のため **arm64 OS ベースの Dockerfile 自作（apt 導入）** で入れる点のみ。前回の osquery/clamav（apt にも無い真の非対応）とは異なり、arm64 パッケージは存在する。
@@ -51,12 +51,12 @@ graph LR
 
 | N | 主実装先（番号テーマ） | 補助 / 参照 | 委譲方式 | 席の状態 |
 |---|---|---|---|---|
-| N1 NAC | テーマ29（RADIUS）＋ テーマ31（NAC/802.1X） | — | [ロードマップ PHASE2](../../ロードマップ/PHASE2_MODERN_ENTERPRISE.md) 経由で参照 | 席のみ（薄い） |
-| N2 SDP-ZTNA | 新規（OpenZiti、番号未採番） | ZERO Phase 2 発展系と連続 | ZERO 内で設計、実装着手時に採番 | 番号なし |
-| N3 NDR | テーマ42（フロー可視化＆NDR） | テーマ35（Faucet）でミラー環境補助可 | ロードマップ PHASE2 経由で参照 | 席のみ（薄い） |
-| N4 μセグ | テーマ31 拡張 | テーマ22（既存 VLAN/ACL 資産）参照 | テーマ31 拡張＋テーマ22 参照 | 席のみ＋既存22 |
+| N1 NAC | テーマ31（NAC/802.1X） | — | [ロードマップ PHASE2](../../ロードマップ/PHASE2_MODERN_ENTERPRISE.md) 経由で参照 | 実装済・検証済 2026-07-05 |
+| N2 SDP-ZTNA | テーマ36（OpenZiti） | ZERO Phase 2 発展系と連続 | [ロードマップ PHASE2](../../ロードマップ/PHASE2_MODERN_ENTERPRISE.md) 経由で参照 | 実装済・検証済 2026-07-05 |
+| N3 NDR | テーマ42（フロー可視化＆NDR） | テーマ35（Faucet）：Phase A+B を N3 に実機連携（2026-07-07検証済） | ロードマップ PHASE2 経由で参照 | 実装済・検証済 2026-07-05（42） |
+| N4 μセグ | microseg_cilium／microseg_nftables（テーマ22資産を参照） | テーマ22（既存 VLAN/ACL 資産）参照 | 独立テーマ2種＋テーマ22 参照 | 実装済（2実装） |
 
-> 番号テーマは現状フォルダ未作成で中身が薄い。ZERO からは番号テーマ MD へ直リンクせず、実在する [ロードマップ PHASE2](../../ロードマップ/PHASE2_MODERN_ENTERPRISE.md) を入口に参照する（ビルド検証のリンク切れ回避＋委譲構造の明示）。
+> 31/35/36/42・microseg_* は実在するため直リンク可（build.mjsがリンク解決を検証）。PHASE2 ロードマップは番号・工程の参照として併記する。
 
 ## N1 — NAC / 802.1X
 
@@ -79,8 +79,8 @@ graph LR
 ## N3 — NDR
 
 - **目的**: east-west を含む通信を可視化し、フロー統計と DPI 振る舞いから異常を検知して SIEM に集約する。「侵害前提」を成立させる。
-- **コンポーネント**: Zeek / Suricata（ミラーからの DPI・振る舞い検知）／ goflow2（NetFlow/IPFIX 収集）／ ntopng / ElastiFlow（フロー可視化）→ 既存 Loki/Grafana。
-- **依存**: ZERO Phase 3（Loki/Grafana）。ミラー/NetFlow の出力源として IOL または OVS。
+- **コンポーネント**: Zeek / Suricata（ミラーからの DPI・振る舞い検知）／ goflow2（NetFlow/IPFIX 収集）／ ntopng / ElastiFlow（フロー可視化）→ 既存 Loki/Grafana。テーマ35（Faucet）の OVS ミラー/SPAN と gauge（Prometheus:9303）を東西トラフィック複製・ポート統計の実機供給源として正式連携（2026-07-07検証済）。
+- **依存**: ZERO Phase 3（Loki/Grafana）。ミラー/NetFlow の出力源として IOL または OVS(Faucet, mirror/gauge) 実機連携済。
 - **ゲート条件**: ミラーポートまたは NetFlow エクスポートから異常フロー（例: 想定外の east-west、スキャン挙動）を検知し、Loki/Grafana のダッシュボードで可視化できる。
 - **想定作業量**: 中〜大（対象イメージ数が多く実測依存、ミラー設定、パーサ/ダッシュボード）。
 - **学べること**: フロー可視化、DPI 振る舞い検知、SIEM 連携、Palo Content-ID / Darktrace 系の中身、NetFlow/IPFIX の実務。
