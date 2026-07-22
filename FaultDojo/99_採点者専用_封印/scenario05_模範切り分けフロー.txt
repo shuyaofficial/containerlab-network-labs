@@ -1,0 +1,117 @@
+== 採点者専用・封印 ==
+プレイヤーは開かないこと。開いた場合、このシナリオのプレイは無効となる。
+
+対応シナリオ: シナリオ05 上級「営業部全滅・HSRP異常」
+フォルダ名: シナリオ05_上級_営業部全滅
+
+独立3原因シナリオ（要件「上級は独立2原因以上」を満たす）。
+
+----------------------------------------------------------------------
+注入内容（平文）
+----------------------------------------------------------------------
+
+対象機器: hq-core1 + hq-core2 の2台・3原因
+
+hq-core1:
+conf t
+interface Vlan10
+ shutdown
+router ospf 1
+ no network 10.1.10.0 0.0.0.255 area 0
+end
+
+（原因①L3-IF層: SVI管理shutdown ／ 原因③-a 制御プレーン層: 営業部経路の広報停止）
+
+hq-core2:
+conf t
+no vlan 10
+router ospf 1
+ no network 10.1.10.0 0.0.0.255 area 0
+end
+
+（原因②L2-VLAN層: VLAN DBから削除→core2のSVIはautostateでdown（quirks#8の実挙動）／ 原因③-b: 広報停止の対向側。③はa+bで1つの独立原因として数える）
+
+----------------------------------------------------------------------
+切り戻し（平文）
+----------------------------------------------------------------------
+
+hq-core1:
+conf t
+interface Vlan10
+ no shutdown
+router ospf 1
+ network 10.1.10.0 0.0.0.255 area 0
+end
+
+hq-core2:
+conf t
+vlan 10
+ name SALES
+router ospf 1
+ network 10.1.10.0 0.0.0.255 area 0
+end
+
+（注: core2のVLAN再作成後、SVIはautostateで自動up。トランク・アクセスポートは無傷）
+
+----------------------------------------------------------------------
+症状全容マトリクス／進行設計（3幕で体験させる）
+----------------------------------------------------------------------
+
+初期観測（提示）: 「営業部が全滅。PCからGW(10.1.10.254)にpingすら通らない。監視ではHSRPの状態異常（unknown/Init）を検知」
+
+第1幕（注入直後）:
+- PC→GW失敗（ARP不応答: core1 SVIはadmin down、core2はVLAN10自体が不在でSVI down/down）
+- core1 `show standby brief`: Vlan10 Init (interface down)
+- core2: Vlan10 SVIがdown/down・`show vlan brief` にVLAN10なし
+
+第2幕（ユーザーが原因①を修復後）:
+- core1 SVI up→HSRP Active(standby unknownのまま=core2不在)→PC→GWは回復
+- しかしPC→8.8.8.8・支社は依然全滅（原因③: 両coreとも10.1.10.0/24を広報せず、復路がedgeで消える。NATの往路は出るが復路のun-NAT後経路がない）
+
+第3幕（原因③を修復後）:
+- E2E回復
+- ただし `show standby brief` の standby欄は unknown のまま（原因②が残存＝冗長性喪失）
+- ここで終了宣言したら不完全特定（上限B）。show vlan briefでcore2のVLAN10不在まで特定して満点対象
+
+修復順が異なる場合の分岐:
+- ②を先に直してもPC→GWは①が残る限り不通
+- ③だけ直しても第1幕のまま（PC→GW自体が不通のため）
+
+----------------------------------------------------------------------
+模範切り分けフロー（層別の型 / quirks#8）
+----------------------------------------------------------------------
+
+1. L2到達: PC `ip neigh`（GW不応答）→ core1 `show interfaces status`（e1/3 up・トランクup）→ L1は無罪
+2. VLAN存在: core1 `show vlan brief`（VLAN10あり・e1/3所属正常）／core2 `show vlan brief`（VLAN10不在→原因②発見）
+3. SVI Up: core1 `show ip interface brief | include Vlan`（administratively down→原因①発見）／core2（down/down=VLAN不在の帰結と識別。admin downとdown/downの違いを読み分けるのがアンカー）
+4. HSRP解釈: core1 `show standby brief`（Init=interface down。quirks#8: InitはIF down、unknownは対向不在）
+5. ここで止まらない（Dの核心）: ①②を直しても全症状が消えるか再確認→WAN不通が残存→層を上げる
+6. 制御プレーン: edge1 `show ip route 10.1.10.0`（経路不在）→ core1/2 `show run | section router ospf` または `show ip ospf database`（network文欠落）→ 原因③特定
+7. 根本原因宣言（3点セット）: 「①core1 SVI admin down ②core2 VLAN10がDBから削除 ③両coreの営業部OSPF広報停止」
+
+----------------------------------------------------------------------
+ヒント（3段階・全文）※複層シナリオ用の追加規定
+----------------------------------------------------------------------
+
+（ヒントは「現在未発見の原因」に対してのみ出す）
+
+1. 方角: 「障害は本社コア層に集中している。ただし原因は1つとは限らない。全部見つけるまで終わらない」
+2. 層: 「L2到達→VLAN存在→SVI Up→経路広報 の順で、両コアを対称に比較せよ。片方だけ見て安心するな」
+3. 観測ポイント: 「show vlan brief / show ip interface brief | include Vlan / show standby brief を両コアで採取し表にせよ。InitとunknownとDown/Downの意味の違いを読め。直したら“全症状”を再測定せよ」
+
+----------------------------------------------------------------------
+採点重みとアンカー（A20/B15/C20/D30/E15）
+----------------------------------------------------------------------
+
+- D満点条件: 1原因修復後に全症状再確認を毎回実施＋最終的に3原因すべて特定（standby unknown残存に気づき②まで到達）
+- A: L2→VLAN→SVI→経路の順序遵守＋両コア対称比較
+- C: 「HSRPの障害」という初期監視情報を鵜呑みにせず、HSRPは結果であることを層別に証明
+- B: ライブ状態(show系)を設定ファイル・記憶より先に採取したか
+- E: 症状と無関係な機器・コマンドの乱発がないか
+- 部分特定の扱い: 2原因まで=B上限、1原因=C上限（ルーブリック共通の級位認定条項を適用）
+
+----------------------------------------------------------------------
+Mistakes.md該当教訓の引用
+----------------------------------------------------------------------
+
+[2026-06-29] (Mac仮想環境構築/23_campus_collapsed_core) 事象: HSRP「standby unknown」/STP Split Brain を、iouyap未起動という単一原因と決めつけて進めたが、iouyap修正後も解消せず遠回り。真因は3層重複(①iouyap未起動 ②coredist2にVLAN10/20未作成 ③VLAN作成後もSVIがautostateでInit/down)／原因: 同一症状に複数の独立原因が積み重なる可能性を最初に想定せず、1症状=1原因で切り分け順序を組まなかった／次回対策: 「standby unknown/Split Brain」は必ず層別に L2到達(iouyap: CDP/input=0) → VLAN存在(show vlan brief/trunkのallowed列) → SVI Up(show standbyがInit=interface down/autostate) の順で切り分ける。allowed列だけ見て満足しない。詳細は 切り分け/containerlab_iol_quirks.md #8
