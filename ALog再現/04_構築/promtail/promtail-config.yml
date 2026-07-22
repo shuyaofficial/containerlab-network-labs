@@ -1,0 +1,28 @@
+# Promtail（ALog再現）: Suricata の eve.json を tail し、job="suricata" ラベルで Loki へ送る。
+# host mode で起動するため Loki は localhost:3101。42_ndr_flowの設定を踏襲しポート/ラベルのみ調整。
+server:
+  http_listen_port: 9081
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/promtail-alog-positions.yaml
+
+clients:
+  - url: http://localhost:3101/loki/api/v1/push
+
+scrape_configs:
+  - job_name: suricata
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: suricata
+          host: alog-sensor
+          __path__: /var/log/suricata/eve.json
+    pipeline_stages:
+      # eve.json は 1 行 1 JSON。event_type をラベル化して LogQL で絞れるようにする。
+      - json:
+          expressions:
+            event_type: event_type
+      - labels:
+          event_type:

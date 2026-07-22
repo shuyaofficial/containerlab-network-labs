@@ -1,0 +1,109 @@
+# Vector: syslog(5514, TCP/UDP)で AD/サーバ/NW機器の代表ログを受信し、
+# VRL(remap)で ALog の特許「翻訳変換」の思想（READ→「ファイルを開いた」等）を再現する。
+# 生ログから event/user/src_ip 等を抽出して人間可読な message_ja を付与し、Loki(3101)へ push する。
+#
+# 対応するログソース種別（p6の「対応ログソース」= ファイルサーバ/DB/APサーバ/ADサーバ/PC/NW機器 の代表）:
+#   1. SSH認証失敗   → event=auth_fail   （サーバの代表）
+#   2. sudo実行       → event=priv_exec   （サーバの代表・内部不正監視の代表操作）
+#   3. AD風ログオン失敗 → event=ad_logon_fail（ADサーバの代表。Windowsイベントログ転送を模擬）
+#   4. NW機器インターフェース状態変化 → event=nw_if_down（ネットワーク機器の代表）
+#   上記いずれにもマッチしない行は event=raw としてそのまま通す（ALogでも未対応システムは生ログ保管）。
+
+sources:
+  syslog_tcp:
+    type: syslog
+    mode: tcp
+    address: 0.0.0.0:5514
+
+  syslog_udp:
+    type: syslog
+    mode: udp
+    address: 0.0.0.0:5514
+
+  internal_metrics:
+    type: internal_metrics
+
+transforms:
+  normalize:
+    type: remap
+    inputs:
+      - syslog_tcp
+      - syslog_udp
+    source: |
+      raw = to_string(.message) ?? ""
+      host_tag = to_string(.hostname) ?? to_string(.appname) ?? "unknown"
+
+      # 1) SSH認証失敗（Linuxサーバの代表）
+      ssh_m, ssh_err = parse_regex(raw, r'Failed password for(?: invalid user)? (?P<user>\S+) from (?P<src_ip>[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+) port (?P<port>\d+) ssh2')
+
+      # 2) sudo実行（内部不正監視の代表操作。ALogのファイルREAD/WRITE可視化に相当する「誰が何をしたか」の抽出）
+      sudo_m, sudo_err = parse_regex(raw, r'^(?P<invoker>\S+)\s*:\s*TTY=\S+\s*;\s*PWD=\S+\s*;\s*USER=(?P<target_user>\S+)\s*;\s*COMMAND=(?P<command>.+)$')
+
+      # 3) AD風ログオン失敗（ADサーバの代表。Windowsイベントログ4625相当をsyslog転送した想定）
+      ad_m, ad_err = parse_regex(raw, r'EventID=4625.*Account Name:\s*(?P<user>\S+).*Source Network Address:\s*(?P<src_ip>[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)')
+
+      # 4) NW機器インターフェース状態変化（ネットワーク機器の代表。Cisco風%LINEPROTOメッセージを模擬）
+      nw_m, nw_err = parse_regex(raw, r'%LINEPROTO-5-UPDOWN: Line protocol on Interface (?P<iface>[^,]+), changed state to (?P<state>\S+)')
+
+      if ssh_err == null {
+        .event = "auth_fail"
+        .source_type = "server"
+        .user = ssh_m.user
+        .src_ip = ssh_m.src_ip
+        .dst_port = to_int(ssh_m.port) ?? 0
+        .message_ja = to_string(ssh_m.user) + " が " + to_string(ssh_m.src_ip) + " からのSSHログインに失敗した"
+      } else if sudo_err == null {
+        .event = "priv_exec"
+        .source_type = "server"
+        .user = sudo_m.invoker
+        .target_user = sudo_m.target_user
+        .command = sudo_m.command
+        .message_ja = to_string(sudo_m.invoker) + " が管理者権限(sudo)で「" + to_string(sudo_m.command) + "」を実行した"
+      } else if ad_err == null {
+        .event = "ad_logon_fail"
+        .source_type = "ad"
+        .user = ad_m.user
+        .src_ip = ad_m.src_ip
+        .message_ja = to_string(ad_m.user) + " のドメインログオンが失敗した（送信元 " + to_string(ad_m.src_ip) + "）"
+      } else if nw_err == null {
+        .event = "nw_if_down"
+        .source_type = "network"
+        .interface = nw_m.iface
+        .if_state = nw_m.state
+        .message_ja = to_string(nw_m.iface) + " のインターフェース状態が " + to_string(nw_m.state) + " に変化した"
+      } else {
+        .event = "raw"
+        .source_type = "unknown"
+        .message_ja = raw
+      }
+
+      .job = "alog"
+      .host = host_tag
+      .raw_message = raw
+
+sinks:
+  loki:
+    type: loki
+    inputs:
+      - normalize
+    endpoint: "http://localhost:3101"
+    encoding:
+      codec: json
+    out_of_order_action: accept
+    healthcheck:
+      enabled: true
+    # event/source_type は完全に動的なラベル値（"auth_fail" 等）。LogQLが event="auth_fail" で
+    # 絞るためプレフィックスは付けられない。新しいVectorは静的プレフィックス無しの動的ラベルを
+    # 既定で拒否するため、この明示オプトインで許可する（ラベル基数はevent/source_typeの少数値に限定）。
+    dangerously_allow_unconfined_template_resolution: true
+    labels:
+      job: "alog"
+      event: "{{ event }}"
+      source_type: "{{ source_type }}"
+
+  # Vectorメトリクス（9598, Prometheus形式）。デプロイ環境の疎通確認・自己監視用。
+  prometheus_metrics:
+    type: prometheus_exporter
+    inputs:
+      - internal_metrics
+    address: 0.0.0.0:9598

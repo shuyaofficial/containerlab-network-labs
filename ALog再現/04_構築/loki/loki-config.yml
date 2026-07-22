@@ -1,0 +1,59 @@
+# Loki（ALog再現）。42_ndr_flowの最小構成を踏襲しつつ、chunksの保存先をローカルfilesystemから
+# MinIO(S3互換)へ変更し、retentionを有効化することで ALog の「アクセスログのオフロード機能」
+# （保管期限超過ログをAmazon S3へ自動移行）を再現する。
+#
+# 認証情報は環境変数展開（-config.expand-env=true、deploy.shで指定）で注入する。
+# retention_period等は学習用に大幅短縮している（ALogの実運用ではSCS評価制度等に合わせ6ヶ月保管が目安）。
+auth_enabled: false
+
+server:
+  http_listen_port: 3101
+  grpc_listen_port: 9097
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /tmp/loki-alog
+  storage:
+    s3:
+      endpoint: localhost:9001
+      insecure: true
+      s3forcepathstyle: true
+      bucketnames: loki
+      access_key_id: ${MINIO_ROOT_USER}
+      secret_access_key: ${MINIO_ROOT_PASSWORD}
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: s3
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  allow_structured_metadata: true
+  reject_old_samples: false
+  volume_enabled: true
+  # 学習用に大幅短縮（1セッション内で失効・削除を観測できるようにするため）。
+  retention_period: 2h
+
+compactor:
+  working_directory: /tmp/loki-alog/compactor
+  retention_enabled: true
+  # object_store=s3のため、削除リクエストの保存先もs3を明示する必要がある。
+  delete_request_store: s3
+  compaction_interval: 5m
+  retention_delete_delay: 5m
+
+query_range:
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 100

@@ -1,0 +1,14 @@
+# ALog再現: アラート通知先（p18「メールやWebhookによるアラート通知」の再現。
+# 本ラボはWebhookのみを実装し、メール送信はスコープ外とする）。
+# 受信確認用の簡易受信器は 04_構築/webhook/README.md を参照。
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: alog-webhook
+    receivers:
+      - uid: alog-webhook-receiver
+        type: webhook
+        settings:
+          url: http://localhost:9099
+          httpMethod: POST

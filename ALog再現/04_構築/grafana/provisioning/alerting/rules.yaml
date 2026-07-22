@@ -1,0 +1,136 @@
+# ALog再現: AI異常検知の代替となる3観点検知ルール（p16「件数の変化・値の変化・新規出現」）。
+# ALogはAI(教師なし学習でユーザー行動をスコアリング)だが、本ラボはOSS学習用にLogQLのルール/統計で
+# 近似する。「AIそのものの再現ではなく、3観点という検知の考え方の再現」である点に注意（過大評価しない）。
+#
+# 時間窓は 04_構築/deploy.sh の logs/attack サブコマンドの実行間隔と対応させている
+# （直近5分 vs 過去1時間(直近5分を除く)）。detail: 03_詳細設計/パラメータシート.md 7章。
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: alog-3axis-detection
+    folder: ALog再現
+    interval: 1m
+    rules:
+      # (a) 件数の変化: 直近5分の認証失敗が10件を超えたら発報（例: ログイン失敗の急増）
+      - uid: alog-count-change-auth-fail
+        title: "件数の変化: 認証失敗の急増"
+        condition: C
+        for: 1m
+        noDataState: NoData
+        execErrState: Error
+        annotations:
+          summary: "直近5分間で認証失敗(event=auth_fail)が閾値(10件)を超えました"
+        labels:
+          axis: count_change
+          severity: warning
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: range
+              expr: 'sum(count_over_time({job="alog",event="auth_fail"} | json [5m]))'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [10]
+
+      # (b) 新規出現: 過去1時間(直近5分を除く)に一度も出ていないsrc_ipがauth_failで出現したら発報
+      - uid: alog-new-appearance-src-ip
+        title: "新規出現: 未知の送信元IPからの認証失敗"
+        condition: C
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: "過去1時間に出現実績のないsrc_ipから認証失敗が発生しました（新規出現）"
+        labels:
+          axis: new_appearance
+          severity: critical
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: range
+              expr: >-
+                sum by (src_ip) (count_over_time({job="alog",event="auth_fail"} | json [5m]))
+                unless
+                sum by (src_ip) (count_over_time({job="alog",event="auth_fail"} | json [1h] offset 5m))
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+
+      # (c) 値の変化: 直近5分の全イベント件数が閾値(50件)を超えたら発報（例: 通信量/イベント数の異常増大）
+      - uid: alog-value-change-event-volume
+        title: "値の変化: イベント件数の急増"
+        condition: C
+        for: 1m
+        noDataState: NoData
+        execErrState: Error
+        annotations:
+          summary: "直近5分間の全イベント件数(job=alog)が閾値(50件)を超えました"
+        labels:
+          axis: value_change
+          severity: warning
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              queryType: range
+              expr: 'sum(count_over_time({job="alog"} | json [5m]))'
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [50]

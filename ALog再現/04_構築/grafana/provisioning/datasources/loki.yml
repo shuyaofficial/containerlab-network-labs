@@ -1,0 +1,14 @@
+# Grafana に Loki を datasource として自動プロビジョン（ALog再現）。
+# uid: loki を固定し、alerting/rules.yaml・dashboards/*.json から参照する。
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    type: loki
+    uid: loki
+    access: proxy
+    url: http://localhost:3101
+    isDefault: true
+    editable: true
+    jsonData:
+      maxLines: 1000

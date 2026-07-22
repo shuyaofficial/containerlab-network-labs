@@ -1,0 +1,12 @@
+# ALog再現: 通知ポリシー。3観点検知ルール（axis=count_change/new_appearance/value_change）を
+# すべて alog-webhook（contactpoints.yaml）へルーティングする。
+apiVersion: 1
+
+policies:
+  - orgId: 1
+    receiver: alog-webhook
+    group_by: ["alertname"]
+    routes:
+      - receiver: alog-webhook
+        object_matchers:
+          - ["axis", "=~", ".*"]

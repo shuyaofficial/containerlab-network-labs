@@ -1,0 +1,14 @@
+# ALog再現: ダッシュボード自動プロビジョン設定。
+# 同ディレクトリのJSONファイル(alog_overview.json)をALog再現フォルダ配下に読み込む。
+apiVersion: 1
+
+providers:
+  - name: "ALog再現"
+    orgId: 1
+    folder: "ALog再現"
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false
