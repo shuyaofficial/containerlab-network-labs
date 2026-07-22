@@ -1,0 +1,96 @@
+{
+  "freeTextAnnotations": [],
+  "freeShapeAnnotations": [],
+  "trafficRateAnnotations": [],
+  "groupStyleAnnotations": [],
+  "networkNodeAnnotations": [],
+  "nodeAnnotations": [
+    {
+      "id": "hq-core",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 460,
+        "y": 60
+      }
+    },
+    {
+      "id": "hq-dist",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 320,
+        "y": -40
+      }
+    },
+    {
+      "id": "hq-edge",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 580,
+        "y": 60
+      }
+    },
+    {
+      "id": "hq-dmz",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 320,
+        "y": 180
+      }
+    },
+    {
+      "id": "br-core",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 820,
+        "y": 180
+      }
+    },
+    {
+      "id": "br-edge",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 820,
+        "y": 60
+      }
+    },
+    {
+      "id": "isp",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 700,
+        "y": 60
+      }
+    },
+    {
+      "id": "hq-pc",
+      "position": {
+        "x": 180,
+        "y": -120
+      }
+    },
+    {
+      "id": "hq-voip",
+      "position": {
+        "x": 180,
+        "y": 40
+      }
+    },
+    {
+      "id": "br-pc",
+      "position": {
+        "x": 820,
+        "y": 320
+      }
+    },
+    {
+      "id": "dmz-srv",
+      "position": {
+        "x": 180,
+        "y": 200
+      }
+    }
+  ],
+  "edgeAnnotations": [],
+  "aliasEndpointAnnotations": [],
+  "viewerSettings": {}
+}

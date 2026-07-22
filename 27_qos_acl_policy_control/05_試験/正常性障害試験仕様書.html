@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>正常性障害試験仕様書 | Theme 27 QoS/ACL/PBR</title>
+<style>
+  /* =====================================================
+     Theme 27 ドキュメントスイート 共通デザイントークン
+     基準: UIデザイン案/DESIGN.md（引き算の機能美・ジョブズ基準）
+     この <style> ブロック全体を各文書にコピーして使う。
+     ===================================================== */
+  :root {
+    /* 基調（warm gray ライト） */
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    /* アクセント（スイート全体で1色のみ） */
+    --accent: #635BFF;
+    --accent-soft: #F0EFFF;
+    /* ステータス（意味固定・転用禁止） */
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    /* ゾーン（構成図・表のセマンティック色） */
+    --zone-trust: #16A34A;   --zone-trust-soft: #F0FDF4;
+    --zone-dmz: #D97706;     --zone-dmz-soft: #FFFBEB;
+    --zone-untrust: #DC2626; --zone-untrust-soft: #FEF2F2;
+    --zone-wan: #2563EB;     --zone-wan-soft: #EFF6FF;
+    /* コード */
+    --code-bg: #0F172A;
+    --code-ink: #E2E8F0;
+    /* フォント・形状・動き */
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  body {
+    font-family: var(--sans);
+    font-size: 15px; line-height: 1.8;
+    color: var(--ink); background: var(--surface);
+  }
+
+  /* ===== サイトヘッダ（全文書共通） ===== */
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 16px;
+    height: 56px; padding: 0 24px;
+    background: rgba(250,250,249,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; white-space: nowrap; }
+  .brand span { color: var(--accent); }
+  .phase-badge {
+    padding: 2px 10px; font-size: 11.5px; font-weight: 600; letter-spacing: .04em;
+    color: var(--accent); background: var(--accent-soft);
+    border-radius: var(--r-full); white-space: nowrap;
+  }
+  .header-nav { margin-left: auto; display: flex; gap: 4px; }
+  .header-nav a {
+    padding: 6px 12px; font-size: 13px; color: var(--ink-2);
+    text-decoration: none; border-radius: var(--r-sm);
+    transition: color .12s var(--ease), background .12s var(--ease);
+  }
+  .header-nav a:hover { color: var(--ink); background: #F5F5F4; }
+
+  /* ===== レイアウト =====
+     長文文書: .layout（3ペイン）/ 表・図中心: .container（1カラム） */
+  .layout {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr) 200px;
+    gap: 48px; max-width: 1280px; margin: 0 auto; padding: 0 24px;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
+
+  .nav { padding: 32px 0; }
+  .nav, .toc { position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; }
+  .nav-group { margin-bottom: 24px; }
+  .nav-label {
+    font-size: 11px; font-weight: 600; letter-spacing: .08em;
+    color: var(--ink-3); text-transform: uppercase; margin-bottom: 8px;
+  }
+  .nav a {
+    display: block; padding: 5px 10px; margin-left: -10px;
+    font-size: 13.5px; color: var(--ink-2); text-decoration: none;
+    border-radius: var(--r-sm);
+    transition: color .12s var(--ease), background .12s var(--ease);
+  }
+  .nav a:hover { color: var(--ink); background: #F5F5F4; }
+  .nav a.current { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+
+  .doc { padding: 40px 0 96px; min-width: 0; }
+  .breadcrumb { font-size: 12px; color: var(--ink-3); margin-bottom: 12px; }
+  .breadcrumb a { color: inherit; text-decoration: none; }
+  .breadcrumb a:hover { color: var(--accent); }
+  .kicker {
+    font-size: 11px; font-weight: 600; letter-spacing: .12em;
+    color: var(--accent); text-transform: uppercase; margin-bottom: 6px;
+  }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 40px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; font-size: 12px; font-weight: 500;
+    border-radius: var(--r-full); border: 1px solid var(--border);
+    background: var(--raised); color: var(--ink-2);
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  section { margin-bottom: 56px; scroll-margin-top: 72px; }
+  h2 {
+    font-size: 20px; font-weight: 600; margin-bottom: 16px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--border);
+  }
+  h2 a.anchor { color: var(--ink-3); text-decoration: none; opacity: 0; margin-left: 6px; font-weight: 400; }
+  h2:hover a.anchor { opacity: 1; }
+  h3 { font-size: 16px; font-weight: 600; margin: 24px 0 10px; }
+  p { margin-bottom: 12px; }
+  p.note { font-size: 13.5px; color: var(--ink-2); margin-bottom: 16px; }
+  ul.plain, ol.plain { padding-left: 22px; margin-bottom: 12px; }
+
+  /* ===== テーブル（パラメータ・仕様） ===== */
+  .param-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .param-table th, .param-table td { padding: 10px 12px; text-align: left; vertical-align: top; }
+  .param-table thead th {
+    font-size: 11px; font-weight: 600; letter-spacing: .06em;
+    color: var(--ink-3); text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .param-table tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+  .param-table tbody tr:hover { background: #F5F5F4; }
+  .param-table .k { width: 220px; color: var(--ink-2); font-weight: 500; }
+  .mono { font-family: var(--mono); font-size: 13px; font-feature-settings: "tnum"; }
+  .num { text-align: right; }
+
+  /* ===== グリッド（台帳・一覧: カード内スクロール型） ===== */
+  .grid-card { background: var(--raised); border-radius: var(--r-md); box-shadow: var(--shadow-1); overflow: hidden; margin-bottom: 24px; }
+  .grid-scroll { max-height: 560px; overflow: auto; }
+  .grid-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .grid-table thead th {
+    position: sticky; top: 0; z-index: 2;
+    padding: 10px 14px; text-align: left; white-space: nowrap;
+    font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--ink-3); background: var(--raised);
+    border-bottom: 1px solid var(--border);
+  }
+  .grid-table tbody td { padding: 9px 14px; border-bottom: 1px solid #F5F5F4; white-space: nowrap; }
+  .grid-table tbody tr:hover { background: #FAFAF9; }
+  .grid-table tbody tr:last-child td { border-bottom: none; }
+
+  /* ステータスピル（●=色+形の二重符号） */
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; font-size: 11.5px; font-weight: 600; border-radius: var(--r-full); }
+  .pill::before { content: "●"; font-size: 8px; }
+  .pill.ok    { color: #065F46; background: #ECFDF5; }
+  .pill.warn  { color: #92400E; background: #FFFBEB; }
+  .pill.warn::before { content: "▲"; font-size: 9px; }
+  .pill.error { color: #991B1B; background: #FEF2F2; }
+  .pill.error::before { content: "✕"; font-size: 10px; }
+  .pill.todo  { color: #57534E; background: #F5F5F4; }
+  .pill.todo::before { content: "○"; }
+
+  /* ゾーンチップ */
+  .zone { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; font-size: 11.5px; font-weight: 600; border-radius: var(--r-full); }
+  .zone::before { content: "■"; font-size: 8px; }
+  .zone.trust   { color: #14532D; background: var(--zone-trust-soft); }
+  .zone.trust::before   { color: var(--zone-trust); }
+  .zone.dmz     { color: #78350F; background: var(--zone-dmz-soft); }
+  .zone.dmz::before     { color: var(--zone-dmz); }
+  .zone.untrust { color: #7F1D1D; background: var(--zone-untrust-soft); }
+  .zone.untrust::before { color: var(--zone-untrust); }
+  .zone.wan     { color: #1E3A8A; background: var(--zone-wan-soft); }
+  .zone.wan::before     { color: var(--zone-wan); }
+
+  /* コピー（IP・コマンドの転記ミス防止） */
+  .copyable { display: inline-flex; align-items: center; gap: 8px; }
+  .copy-btn {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px; font-size: 11px; font-family: var(--sans);
+    color: var(--ink-3); background: none;
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    cursor: pointer; opacity: 0;
+    transition: all .12s var(--ease);
+  }
+  tr:hover .copy-btn, .code-head .copy-btn, .copyable:hover .copy-btn { opacity: 1; }
+  .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .copy-btn.done { opacity: 1; color: var(--ok); border-color: var(--ok); }
+
+  /* ===== コードブロック（ライト紙面内でもダーク固定） ===== */
+  .code-block { border-radius: var(--r-md); overflow: hidden; border: 1px solid #1E293B; margin: 16px 0; }
+  .code-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 14px; background: #1E293B;
+    font-size: 12px; color: #94A3B8; font-family: var(--mono);
+  }
+  .code-head .copy-btn { border-color: #334155; color: #94A3B8; }
+  .code-head .copy-btn:hover { color: var(--code-ink); border-color: #64748B; }
+  .code-head .copy-btn.done { color: var(--ok); border-color: var(--ok); }
+  pre {
+    padding: 16px; background: var(--code-bg); color: var(--code-ink);
+    font-family: var(--mono); font-size: 13px; line-height: 1.7;
+    overflow-x: auto;
+  }
+  pre .c { color: #64748B; }  /* コメント */
+  pre .k { color: #7DD3FC; }  /* コマンド */
+  pre .v { color: #FDBA74; }  /* 値 */
+
+  /* ===== コールアウト（左ボーダー3px・枠で囲まない） ===== */
+  .callout {
+    display: flex; gap: 12px; padding: 14px 16px; margin: 16px 0;
+    border-radius: var(--r-sm); font-size: 14px;
+    border-left: 3px solid var(--warn); background: #FFFBEB;
+  }
+  .callout .icon { font-weight: 700; color: var(--warn); font-family: var(--mono); }
+  .callout strong { display: block; font-size: 13px; margin-bottom: 2px; }
+  .callout.info  { border-left-color: var(--info); background: #EFF6FF; }
+  .callout.info .icon { color: var(--info); }
+  .callout.error { border-left-color: var(--error); background: #FEF2F2; }
+  .callout.error .icon { color: var(--error); }
+
+  /* ===== 解答編（details 折りたたみ） ===== */
+  details.answer { margin: 16px 0; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--raised); }
+  details.answer > summary {
+    padding: 12px 16px; cursor: pointer; user-select: none;
+    font-size: 14px; font-weight: 600; color: var(--accent);
+    list-style: none; display: flex; align-items: center; gap: 10px;
+  }
+  details.answer > summary::-webkit-details-marker { display: none; }
+  details.answer > summary::before { content: "▸"; transition: transform .15s var(--ease); }
+  details.answer[open] > summary::before { transform: rotate(90deg); }
+  details.answer > summary .hint { font-weight: 400; font-size: 12px; color: var(--ink-3); }
+  details.answer > .answer-body { padding: 0 16px 16px; }
+
+  /* ===== 手順ステップ ===== */
+  .steps { list-style: none; counter-reset: step; }
+  .steps > li {
+    position: relative; padding: 0 0 24px 44px; counter-increment: step;
+    border-left: 1px solid var(--border); margin-left: 14px;
+  }
+  .steps > li:last-child { border-left-color: transparent; padding-bottom: 0; }
+  .steps > li::before {
+    content: counter(step); position: absolute; left: -15px; top: 0;
+    width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 13px; font-weight: 600;
+    color: var(--accent); background: var(--accent-soft);
+    border: 1px solid var(--accent); border-radius: 50%;
+  }
+  .steps > li > strong { display: block; margin-bottom: 4px; }
+
+  /* ===== 変更履歴 ===== */
+  .changelog { list-style: none; }
+  .changelog li { position: relative; padding: 0 0 20px 24px; border-left: 1px solid var(--border); margin-left: 6px; }
+  .changelog li:last-child { padding-bottom: 0; }
+  .changelog li::before {
+    content: ""; position: absolute; left: -5px; top: 7px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--surface); border: 2px solid var(--ink-3);
+  }
+  .changelog li:first-child::before { border-color: var(--accent); background: var(--accent); }
+  .changelog .date { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+  .changelog .desc { font-size: 14px; }
+
+  /* ===== 右目次 ===== */
+  .toc { padding: 40px 0; font-size: 12.5px; }
+  .toc-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--ink-3); margin-bottom: 10px; }
+  .toc a {
+    display: block; padding: 4px 0 4px 12px;
+    color: var(--ink-3); text-decoration: none;
+    border-left: 2px solid var(--border);
+    transition: color .12s var(--ease), border-color .12s var(--ease);
+  }
+  .toc a:hover { color: var(--ink); }
+  .toc a.active { color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+
+  /* ===== フッタ ===== */
+  .site-footer {
+    max-width: 1280px; margin: 0 auto; padding: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--ink-3);
+    display: flex; flex-wrap: wrap; gap: 8px 24px;
+  }
+
+  /* ===== レスポンシブ / 印刷 / モーション ===== */
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 220px minmax(0, 1fr); }
+    .toc { display: none; }
+  }
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; gap: 0; }
+    .nav { position: static; height: auto; padding: 20px 0 0; display: flex; gap: 20px; overflow-x: auto; }
+    .nav-group { margin: 0; white-space: nowrap; }
+    .param-table .k { width: 130px; }
+    .doc section, .container section { overflow-x: auto; }
+  }
+  @media print {
+    .site-header, .nav, .toc, .copy-btn { display: none !important; }
+    .layout { display: block; }
+    body { background: #fff; font-size: 12px; }
+    .grid-scroll { max-height: none; overflow: visible; }
+    details.answer { border: none; }
+    details.answer > summary { display: none; }
+    details.answer > .answer-body { padding: 0; }
+    section, .grid-card, .code-block, tr { break-inside: avoid; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    html { scroll-behavior: auto; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand">Theme 27 <span>·</span> QoS / ACL / PBR</div>
+  <span class="phase-badge">05 試験</span>
+  <nav class="header-nav" aria-label="文書ナビゲーション">
+    <a href="../index.html">文書一覧</a>
+  </nav>
+</header>
+
+<div class="container">
+  <div class="breadcrumb"><a href="../index.html">Theme 27</a> / 05_試験 / 正常性障害試験仕様書</div>
+  <div class="kicker">Theme 27 · QoS / ACL / route-map Applied</div>
+  <h1>正常性障害試験仕様書</h1>
+  <div class="doc-meta">
+    <span class="badge ver">v1.0</span>
+    <span class="badge"><span class="dot"></span>承認済み</span>
+    <span class="badge">最終更新 2026-07-08</span>
+    <span class="badge">ソース: 試験計画書.md</span>
+  </div>
+  <p class="note">関連文書: <a href="単体試験仕様書.html">単体試験仕様書</a> ・ <a href="結合試験仕様書.html">結合試験仕様書</a> ・ <a href="../index.html">Theme 27 文書一覧</a></p>
+
+  <section id="sec1">
+    <h2>1. 試験方針<a class="anchor" href="#sec1">#</a></h2>
+    <h3>1.1 目的</h3>
+    <p>試験計画書.md の Mission 1〜6 に対応し、ゾーン間ACL・PBR・DSCPマーキング・LLQ優先制御・BGP経路フィルタが要件通りに動作すること（ST-N: 正常性試験）、および経路障害発生時・復旧時にもこれらのポリシーが変更なく継続動作すること（ST-F: 障害試験）を検証する。</p>
+    <h3>1.2 範囲</h3>
+    <ul class="plain">
+      <li>ST-N: ゾーン間ACL（Mission 1）/ PBR（Mission 2）/ DSCPマーキング（Mission 3）/ LLQ・帯域制御（Mission 4）/ BGP経路フィルタ（Mission 5）</li>
+      <li>ST-F: hq-core–hq-edge リンク障害・復旧時の総合シナリオ（Mission 6）</li>
+    </ul>
+    <h3>1.3 前提条件</h3>
+    <ul class="plain">
+      <li><a href="単体試験仕様書.html">単体試験仕様書</a>・<a href="結合試験仕様書.html">結合試験仕様書</a>の全項目が合格していること</li>
+      <li>hq-edge の ACL <span class="mono">OUTSIDE-IN</span>、hq-dmz の ACL <span class="mono">DMZ-OUT</span>、hq-dist の PBR <span class="mono">PBR_VOICE</span>、hq-edge の QoS <span class="mono">WAN-EDGE</span>、br-edge の prefix-list <span class="mono">BRANCH_NET</span> が投入済みであること</li>
+      <li>作業は OrbStack Linux VM <span class="mono">clab</span>（<span class="mono">ssh clab@orb</span>）上で実施すること</li>
+    </ul>
+  </section>
+
+  <section id="sec2">
+    <h2>2. 試験環境<a class="anchor" href="#sec2">#</a></h2>
+    <p>実施場所: OrbStack Linux VM <span class="mono">clab</span>（<span class="mono">ssh clab@orb</span>）。対象ノードは以下の通り。</p>
+    <table class="param-table">
+      <thead><tr><th>ノード</th><th>種別</th><th>役割</th><th>ゾーン</th></tr></thead>
+      <tbody>
+        <tr><td class="k mono">hq-core</td><td>cisco_iol</td><td>HQ Core / OSPF Area 0</td><td><span class="zone trust">Trust</span></td></tr>
+        <tr><td class="k mono">hq-dist</td><td>cisco_iol</td><td>HQ Distribution / PBR_VOICE 設定点</td><td><span class="zone trust">Trust</span></td></tr>
+        <tr><td class="k mono">hq-edge</td><td>cisco_iol</td><td>QoS(WAN-EDGE)/NAT/ACL(OUTSIDE-IN)/BGP AS65000</td><td><span class="zone untrust">Untrust境界</span></td></tr>
+        <tr><td class="k mono">hq-dmz</td><td>cisco_iol</td><td>ACL(DMZ-OUT) 設定点</td><td><span class="zone dmz">DMZ</span></td></tr>
+        <tr><td class="k mono">br-core</td><td>cisco_iol</td><td>Branch Core / OSPF Area 1</td><td><span class="zone trust">Trust</span></td></tr>
+        <tr><td class="k mono">br-edge</td><td>cisco_iol</td><td>prefix-list(BRANCH_NET)/BGP AS65001</td><td><span class="zone wan">WAN</span></td></tr>
+        <tr><td class="k mono">isp</td><td>cisco_iol</td><td>ISP Router / BGP AS65100</td><td><span class="zone untrust">Untrust</span></td></tr>
+        <tr><td class="k mono">hq-pc</td><td>linux</td><td>データ端末（10.27.10.10）</td><td><span class="zone trust">Trust</span></td></tr>
+        <tr><td class="k mono">hq-voip</td><td>linux</td><td>音声端末（10.27.50.10）/ PBR・DSCP対象</td><td><span class="zone trust">Trust</span></td></tr>
+        <tr><td class="k mono">br-pc</td><td>linux</td><td>支社端末（10.27.20.10）</td><td><span class="zone trust">Trust</span></td></tr>
+        <tr><td class="k mono">dmz-srv</td><td>linux</td><td>Webサーバ（10.27.30.10）</td><td><span class="zone dmz">DMZ</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="sec3">
+    <h2>3. 試験項目<a class="anchor" href="#sec3">#</a></h2>
+    <p class="note">判定は実施後に ● 合格 / ▲ 条件付き / ✕ 不合格 のいずれかへ更新する。</p>
+
+    <h3>3.1 正常性試験（ST-N）</h3>
+    <div class="grid-card">
+      <div class="grid-scroll">
+        <table class="grid-table">
+          <thead><tr><th>試験ID</th><th>分類</th><th>試験項目</th><th>手順</th><th>期待結果</th><th>判定</th><th>備考</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">ST-N01</td><td>ACL</td><td>hq-pc→isp ping許可（Trust→Untrust）</td><td class="mono">(hq-pc) ping -c 5 10.27.255.100</td><td>5/5 成功</td><td><span class="pill todo">未実施</span></td><td>Mission1</td></tr>
+            <tr><td class="mono">ST-N02</td><td>ACL</td><td>hq-pc→dmz-srv TCP80/443許可</td><td class="mono">(hq-pc) telnet 10.27.30.10 80<br>(hq-pc) telnet 10.27.30.10 443</td><td>両方とも Connected to 10.27.30.10 が表示され接続成立(Connection refused/timeoutでない)</td><td><span class="pill todo">未実施</span></td><td>Mission1</td></tr>
+            <tr><td class="mono">ST-N03</td><td>ACL</td><td>isp→hq-pc ping拒否（Untrust→Trust）</td><td class="mono">(isp) ping -c 5 10.27.10.10</td><td>0/5 成功（hq-edge の OUTSIDE-IN でdeny ip any any によりdrop）</td><td><span class="pill todo">未実施</span></td><td>Mission1</td></tr>
+            <tr><td class="mono">ST-N04</td><td>ACL</td><td>isp→dmz-srv TCP80許可・ICMP拒否</td><td class="mono">(isp) telnet 10.27.30.10 80<br>(isp) ping -c 5 10.27.30.10</td><td>telnetは接続成立、pingは0/5 成功</td><td><span class="pill todo">未実施</span></td><td>Mission1</td></tr>
+            <tr><td class="mono">ST-N05</td><td>ACL</td><td>dmz-srv→hq-pc 通信開始拒否（DMZ→Trust）</td><td class="mono">(dmz-srv) ping -c 5 10.27.10.10</td><td>0/5 成功（hq-dmz の DMZ-OUT でdenyされる）</td><td><span class="pill todo">未実施</span></td><td>Mission1</td></tr>
+            <tr><td class="mono">ST-N06</td><td>PBR</td><td>hq-voip traceroute の next-hop 確認</td><td class="mono">(hq-voip) traceroute 10.27.255.100</td><td>1ホップ目が <span class="mono">10.27.1.1</span>（hq-core E0/1、PBRのset ip next-hop）</td><td><span class="pill todo">未実施</span></td><td>Mission2。次ホップは通常経路と同一のため教育効果は限定的（課題管理表#3）</td></tr>
+            <tr><td class="mono">ST-N07</td><td>PBR</td><td>hq-dist PBR matchカウント増加確認</td><td class="mono">(hq-dist) show route-map PBR_VOICE</td><td>route-map PBR_VOICE permit 10 の match カウンタが試験前より増加している</td><td><span class="pill todo">未実施</span></td><td>Mission2</td></tr>
+            <tr><td class="mono">ST-N08</td><td>DSCP</td><td>dmz-srv到達時のDSCPマーキング確認</td><td class="mono">(hq-voip) ping 10.27.30.10 &（継続実行）<br>(dmz-srv) tcpdump -i eth1 -vv icmp -c 5</td><td>各パケットのTOSフィールドが <span class="mono">0xb8</span>（DSCP EF = 0x2E / 46）</td><td><span class="pill todo">未実施</span></td><td>Mission3</td></tr>
+            <tr><td class="mono">ST-N09</td><td>DSCP</td><td>hq-pc到達時のDSCPマーキング確認（同一拠点宛）</td><td class="mono">(hq-voip) ping 10.27.10.10 &（継続実行）<br>(hq-pc) tcpdump -i eth1 -vv icmp -c 5</td><td>TOSフィールドが <span class="mono">0xb8</span>（DSCP EF）。宛先anyのmatchのため同一拠点宛でもマーキングされる</td><td><span class="pill todo">未実施</span></td><td>Mission3</td></tr>
+            <tr><td class="mono">ST-N10</td><td>LLQ</td><td>WAN-EDGE VOICEクラス分類確認</td><td class="mono">(hq-edge) show policy-map interface Ethernet0/2</td><td>class VOICE のマッチパケット数が試験前より増加（EFトラフィックがpriority 2000kbpsクラスに分類）</td><td><span class="pill todo">未実施</span></td><td>Mission4</td></tr>
+            <tr><td class="mono">ST-N11</td><td>LLQ</td><td>高負荷時のEF帯域確保確認</td><td class="mono">(br-pc) iperf3 -s<br>(hq-pc) iperf3 -c 10.27.20.10 -t 30 -b 20M<br>(hq-voip) ping -c 20 10.27.20.10<br>(hq-edge) show policy-map interface Ethernet0/2</td><td>負荷中も class VOICE のドロップは0のまま。ping応答が継続し目立った遅延・損失がない</td><td><span class="pill todo">未実施</span></td><td>Mission4。WAN帯域上限10Mbps想定に対し20Mbpsで輻輳させる</td></tr>
+            <tr><td class="mono">ST-N12</td><td>LLQ</td><td>他クラス（class-default）のドロップ発生確認</td><td class="mono">(hq-edge) show policy-map interface Ethernet0/2</td><td>class-default（fair-queue）でdrop（Tail Drop/WRED）カウンタが増加している</td><td><span class="pill todo">未実施</span></td><td>Mission4。ST-N11と同一負荷試験中に確認</td></tr>
+            <tr><td class="mono">ST-N13</td><td>BGP</td><td>isp が br-edge から受信する経路フィルタ確認</td><td class="mono">(isp) show ip bgp neighbors 198.51.100.14 received-routes</td><td><span class="mono">10.27.20.0/24</span> のみを受信。HQ内部プレフィックス等の漏えいがない</td><td><span class="pill todo">未実施</span></td><td>Mission5。br-edge prefix-list BRANCH_NET out</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <h3>3.2 障害試験（ST-F）</h3>
+    <div class="callout info">
+      <span class="icon">i</span>
+      <div><strong>本ラボのトポロジ補足</strong>campus.clab.yml はhq-core を中心としたスター構成であり、hq-core–hq-edge間に冗長経路は存在しない。したがって本リンクの障害は「別経路への迂回」ではなく、HQ内部からWAN/インターネット方向への単一障害点による通信断として現れる。試験計画書.md Mission6が指す「迂回後もポリシーが継続動作すること」は、本ラボでは「① 障害の影響範囲がhq-core–hq-edge間の到達性に限定され、他ポリシー（Area 0内部到達性、Branch/WAN側のBGP・QoS・ACL）は無停止で動作し続けること」「② リンク復旧後にACL/QoS/PBR設定が再投入なしで即座に機能すること」として検証する。</div>
+    </div>
+    <div class="grid-card">
+      <div class="grid-scroll">
+        <table class="grid-table">
+          <thead><tr><th>試験ID</th><th>分類</th><th>試験項目</th><th>手順</th><th>期待結果</th><th>判定</th><th>備考</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">ST-F01</td><td>障害注入</td><td>hq-core–hq-edge リンクダウン発生</td><td class="mono">(hq-core) interface Ethernet0/2<br>(hq-core) shutdown</td><td>hq-core の show ip interface brief で E0/2 が down/down。show ip ospf neighbor から hq-edge のネイバーが消失</td><td><span class="pill todo">未実施</span></td><td>Mission6</td></tr>
+            <tr><td class="mono">ST-F02</td><td>影響確認</td><td>HQ内部からWANへの到達性への影響確認</td><td class="mono">(hq-pc) ping -c 5 10.27.255.100</td><td>0/5 成功（冗長経路がないため計画通りの通信断。上記callout参照）</td><td><span class="pill todo">未実施</span></td><td>Mission6</td></tr>
+            <tr><td class="mono">ST-F03</td><td>継続動作</td><td>HQ内部（Area 0）到達性・DMZ ACLの継続動作確認</td><td class="mono">(hq-pc) telnet 10.27.30.10 80</td><td>障害中も接続成立（hq-dmzのACLはhq-core経由のみでhq-edge非依存のため影響を受けない）</td><td><span class="pill todo">未実施</span></td><td>Mission6</td></tr>
+            <tr><td class="mono">ST-F04</td><td>継続動作</td><td>Branch/WAN側ポリシーの継続動作確認</td><td class="mono">(isp) show ip bgp summary<br>(isp) show ip bgp neighbors 198.51.100.14 received-routes</td><td>br-edge⇔ispのBGPピアはEstablishedのまま。10.27.20.0/24のみ受信するフィルタも変更なく継続</td><td><span class="pill todo">未実施</span></td><td>Mission6。hq-core障害の影響を受けないことの確認</td></tr>
+            <tr><td class="mono">ST-F05</td><td>復旧</td><td>hq-core–hq-edge リンク復旧</td><td class="mono">(hq-core) interface Ethernet0/2<br>(hq-core) no shutdown</td><td>E0/2 が up/up。show ip ospf neighbor で hq-edge とのネイバーが FULL に復旧</td><td><span class="pill todo">未実施</span></td><td>Mission6</td></tr>
+            <tr><td class="mono">ST-F06</td><td>切り戻り</td><td>復旧後のACL/QoS/PBR全機能確認</td><td class="mono">(hq-pc) ping -c 5 10.27.255.100<br>(hq-pc) telnet 10.27.30.10 80<br>(hq-edge) show policy-map interface Ethernet0/2<br>(hq-dist) show route-map PBR_VOICE</td><td>ST-N01/N02相当のACL許可、QoS(LLQ)のVOICEクラス動作、PBRのmatchカウント増加のいずれも設定変更なく復旧している</td><td><span class="pill todo">未実施</span></td><td>Mission6</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="sec4">
+    <h2>4. 合格基準<a class="anchor" href="#sec4">#</a></h2>
+    <ul class="plain">
+      <li>ST-N・ST-F をあわせた全19項目が <span class="pill ok">合格</span> であること。</li>
+      <li>ST-N01〜05（ゾーン間ACL）は許可/拒否の方向性を1件でも取り違えると<span class="pill error">不合格</span>とし、該当ACLのエントリ順序・条件を是正する。</li>
+      <li>ST-N08・N09（DSCP）は <span class="mono">0x2E / 46</span> 以外の値が観測された場合、hq-distの <span class="mono">set dscp ef</span> 設定を再確認する。</li>
+      <li>ST-N11・N12（LLQ）はVOICEクラスに1パケットでもドロップが発生した場合<span class="pill error">不合格</span>とし、priority帯域とWAN帯域設定の整合性を見直す。</li>
+      <li>ST-F04（Branch/WAN側の非依存性）が不合格の場合、hq-core側の障害がBGP/OSPFの再帰的な経路喪失を通じてBranch側に波及していないか設計を見直す。</li>
+      <li>本試験の合格をもってTheme 27の全試験を完了とする。</li>
+    </ul>
+  </section>
+
+  <section id="sec5">
+    <h2>5. 結果記録欄<a class="anchor" href="#sec5">#</a></h2>
+    <table class="param-table">
+      <thead><tr><th>項目</th><th>記入欄</th></tr></thead>
+      <tbody>
+        <tr><td class="k">実施日</td><td>&nbsp;</td></tr>
+        <tr><td class="k">実施者</td><td>&nbsp;</td></tr>
+        <tr><td class="k">実施環境</td><td class="mono">OrbStack VM clab</td></tr>
+        <tr><td class="k">合格項目数 / 全19項目（ST-N 13 + ST-F 6）</td><td>&nbsp;</td></tr>
+        <tr><td class="k">総合判定</td><td><span class="pill todo">未実施</span></td></tr>
+        <tr><td class="k">特記事項</td><td>&nbsp;</td></tr>
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<footer class="site-footer">
+  <span>Theme 27 · QoS / ACL / route-map Applied</span>
+  <span>ソース: 05_試験/試験計画書.md</span>
+  <span>生成 2026-07-08</span>
+</footer>
+
+<script>
+  "use strict";
+  /* ---- コピー（clipboard API + file:// フォールバック） ---- */
+  function flashDone(btn) {
+    const original = btn.textContent;
+    btn.textContent = "✓ コピーしました";
+    btn.classList.add("done");
+    setTimeout(() => { btn.textContent = original; btn.classList.remove("done"); }, 1500);
+  }
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".copy-btn");
+    if (!btn) return;
+    const text = btn.dataset.copyTarget
+      ? document.getElementById(btn.dataset.copyTarget).textContent
+      : btn.dataset.copy;
+    navigator.clipboard.writeText(text).then(() => flashDone(btn)).catch(() => {
+      const ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta);
+      ta.select(); document.execCommand("copy"); ta.remove();
+      flashDone(btn);
+    });
+  });
+
+  /* ---- 右目次スクロール連動（3ペイン文書のみ） ---- */
+  const tocLinks = [...document.querySelectorAll(".toc a")];
+  if (tocLinks.length) {
+    const sections = [...document.querySelectorAll("main section")];
+    const spy = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        tocLinks.forEach((a) =>
+          a.classList.toggle("active", a.getAttribute("href") === `#${entry.target.id}`));
+      });
+    }, { rootMargin: "-20% 0px -70% 0px" });
+    sections.forEach((s) => spy.observe(s));
+  }
+
+  /* ---- 印刷時に解答編を開く ---- */
+  window.addEventListener("beforeprint", () =>
+    document.querySelectorAll("details.answer").forEach((d) => { d.open = true; }));
+</script>
+</body>
+</html>

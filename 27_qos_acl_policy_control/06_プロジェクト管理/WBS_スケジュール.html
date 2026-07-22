@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>WBS・スケジュール | Theme 27 QoS/ACL/PBR</title>
+<style>
+  /* =====================================================
+     Theme 27 ドキュメントスイート 共通デザイントークン
+     基準: UIデザイン案/DESIGN.md（引き算の機能美・ジョブズ基準）
+     この <style> ブロック全体を各文書にコピーして使う。
+     ===================================================== */
+  :root {
+    /* 基調（warm gray ライト） */
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    /* アクセント（スイート全体で1色のみ） */
+    --accent: #635BFF;
+    --accent-soft: #F0EFFF;
+    /* ステータス（意味固定・転用禁止） */
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    /* ゾーン（構成図・表のセマンティック色） */
+    --zone-trust: #16A34A;   --zone-trust-soft: #F0FDF4;
+    --zone-dmz: #D97706;     --zone-dmz-soft: #FFFBEB;
+    --zone-untrust: #DC2626; --zone-untrust-soft: #FEF2F2;
+    --zone-wan: #2563EB;     --zone-wan-soft: #EFF6FF;
+    /* コード */
+    --code-bg: #0F172A;
+    --code-ink: #E2E8F0;
+    /* フォント・形状・動き */
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  body {
+    font-family: var(--sans);
+    font-size: 15px; line-height: 1.8;
+    color: var(--ink); background: var(--surface);
+  }
+
+  /* ===== サイトヘッダ（全文書共通） ===== */
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 16px;
+    height: 56px; padding: 0 24px;
+    background: rgba(250,250,249,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; white-space: nowrap; }
+  .brand span { color: var(--accent); }
+  .phase-badge {
+    padding: 2px 10px; font-size: 11.5px; font-weight: 600; letter-spacing: .04em;
+    color: var(--accent); background: var(--accent-soft);
+    border-radius: var(--r-full); white-space: nowrap;
+  }
+  .header-nav { margin-left: auto; display: flex; gap: 4px; }
+  .header-nav a {
+    padding: 6px 12px; font-size: 13px; color: var(--ink-2);
+    text-decoration: none; border-radius: var(--r-sm);
+    transition: color .12s var(--ease), background .12s var(--ease);
+  }
+  .header-nav a:hover { color: var(--ink); background: #F5F5F4; }
+
+  /* ===== レイアウト =====
+     長文文書: .layout（3ペイン）/ 表・図中心: .container（1カラム） */
+  .layout {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr) 200px;
+    gap: 48px; max-width: 1280px; margin: 0 auto; padding: 0 24px;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
+
+  .nav { padding: 32px 0; }
+  .nav, .toc { position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; }
+  .nav-group { margin-bottom: 24px; }
+  .nav-label {
+    font-size: 11px; font-weight: 600; letter-spacing: .08em;
+    color: var(--ink-3); text-transform: uppercase; margin-bottom: 8px;
+  }
+  .nav a {
+    display: block; padding: 5px 10px; margin-left: -10px;
+    font-size: 13.5px; color: var(--ink-2); text-decoration: none;
+    border-radius: var(--r-sm);
+    transition: color .12s var(--ease), background .12s var(--ease);
+  }
+  .nav a:hover { color: var(--ink); background: #F5F5F4; }
+  .nav a.current { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+
+  .doc { padding: 40px 0 96px; min-width: 0; }
+  .breadcrumb { font-size: 12px; color: var(--ink-3); margin-bottom: 12px; }
+  .breadcrumb a { color: inherit; text-decoration: none; }
+  .breadcrumb a:hover { color: var(--accent); }
+  .kicker {
+    font-size: 11px; font-weight: 600; letter-spacing: .12em;
+    color: var(--accent); text-transform: uppercase; margin-bottom: 6px;
+  }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 40px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; font-size: 12px; font-weight: 500;
+    border-radius: var(--r-full); border: 1px solid var(--border);
+    background: var(--raised); color: var(--ink-2);
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  section { margin-bottom: 56px; scroll-margin-top: 72px; }
+  h2 {
+    font-size: 20px; font-weight: 600; margin-bottom: 16px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--border);
+  }
+  h2 a.anchor { color: var(--ink-3); text-decoration: none; opacity: 0; margin-left: 6px; font-weight: 400; }
+  h2:hover a.anchor { opacity: 1; }
+  h3 { font-size: 16px; font-weight: 600; margin: 24px 0 10px; }
+  p { margin-bottom: 12px; }
+  p.note { font-size: 13.5px; color: var(--ink-2); margin-bottom: 16px; }
+  ul.plain, ol.plain { padding-left: 22px; margin-bottom: 12px; }
+
+  /* ===== テーブル（パラメータ・仕様） ===== */
+  .param-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .param-table th, .param-table td { padding: 10px 12px; text-align: left; vertical-align: top; }
+  .param-table thead th {
+    font-size: 11px; font-weight: 600; letter-spacing: .06em;
+    color: var(--ink-3); text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .param-table tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+  .param-table tbody tr:hover { background: #F5F5F4; }
+  .param-table .k { width: 220px; color: var(--ink-2); font-weight: 500; }
+  .mono { font-family: var(--mono); font-size: 13px; font-feature-settings: "tnum"; }
+  .num { text-align: right; }
+
+  /* ===== グリッド（台帳・一覧: カード内スクロール型） ===== */
+  .grid-card { background: var(--raised); border-radius: var(--r-md); box-shadow: var(--shadow-1); overflow: hidden; margin-bottom: 24px; }
+  .grid-scroll { max-height: 560px; overflow: auto; }
+  .grid-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .grid-table thead th {
+    position: sticky; top: 0; z-index: 2;
+    padding: 10px 14px; text-align: left; white-space: nowrap;
+    font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--ink-3); background: var(--raised);
+    border-bottom: 1px solid var(--border);
+  }
+  .grid-table tbody td { padding: 9px 14px; border-bottom: 1px solid #F5F5F4; white-space: nowrap; }
+  .grid-table tbody tr:hover { background: #FAFAF9; }
+  .grid-table tbody tr:last-child td { border-bottom: none; }
+
+  /* ステータスピル（●=色+形の二重符号） */
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; font-size: 11.5px; font-weight: 600; border-radius: var(--r-full); }
+  .pill::before { content: "●"; font-size: 8px; }
+  .pill.ok    { color: #065F46; background: #ECFDF5; }
+  .pill.warn  { color: #92400E; background: #FFFBEB; }
+  .pill.warn::before { content: "▲"; font-size: 9px; }
+  .pill.error { color: #991B1B; background: #FEF2F2; }
+  .pill.error::before { content: "✕"; font-size: 10px; }
+  .pill.todo  { color: #57534E; background: #F5F5F4; }
+  .pill.todo::before { content: "○"; }
+
+  /* ゾーンチップ */
+  .zone { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; font-size: 11.5px; font-weight: 600; border-radius: var(--r-full); }
+  .zone::before { content: "■"; font-size: 8px; }
+  .zone.trust   { color: #14532D; background: var(--zone-trust-soft); }
+  .zone.trust::before   { color: var(--zone-trust); }
+  .zone.dmz     { color: #78350F; background: var(--zone-dmz-soft); }
+  .zone.dmz::before     { color: var(--zone-dmz); }
+  .zone.untrust { color: #7F1D1D; background: var(--zone-untrust-soft); }
+  .zone.untrust::before { color: var(--zone-untrust); }
+  .zone.wan     { color: #1E3A8A; background: var(--zone-wan-soft); }
+  .zone.wan::before     { color: var(--zone-wan); }
+
+  /* コピー（IP・コマンドの転記ミス防止） */
+  .copyable { display: inline-flex; align-items: center; gap: 8px; }
+  .copy-btn {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px; font-size: 11px; font-family: var(--sans);
+    color: var(--ink-3); background: none;
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    cursor: pointer; opacity: 0;
+    transition: all .12s var(--ease);
+  }
+  tr:hover .copy-btn, .code-head .copy-btn, .copyable:hover .copy-btn { opacity: 1; }
+  .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .copy-btn.done { opacity: 1; color: var(--ok); border-color: var(--ok); }
+
+  /* ===== コードブロック（ライト紙面内でもダーク固定） ===== */
+  .code-block { border-radius: var(--r-md); overflow: hidden; border: 1px solid #1E293B; margin: 16px 0; }
+  .code-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 14px; background: #1E293B;
+    font-size: 12px; color: #94A3B8; font-family: var(--mono);
+  }
+  .code-head .copy-btn { border-color: #334155; color: #94A3B8; }
+  .code-head .copy-btn:hover { color: var(--code-ink); border-color: #64748B; }
+  .code-head .copy-btn.done { color: var(--ok); border-color: var(--ok); }
+  pre {
+    padding: 16px; background: var(--code-bg); color: var(--code-ink);
+    font-family: var(--mono); font-size: 13px; line-height: 1.7;
+    overflow-x: auto;
+  }
+  pre .c { color: #64748B; }  /* コメント */
+  pre .k { color: #7DD3FC; }  /* コマンド */
+  pre .v { color: #FDBA74; }  /* 値 */
+
+  /* ===== コールアウト（左ボーダー3px・枠で囲まない） ===== */
+  .callout {
+    display: flex; gap: 12px; padding: 14px 16px; margin: 16px 0;
+    border-radius: var(--r-sm); font-size: 14px;
+    border-left: 3px solid var(--warn); background: #FFFBEB;
+  }
+  .callout .icon { font-weight: 700; color: var(--warn); font-family: var(--mono); }
+  .callout strong { display: block; font-size: 13px; margin-bottom: 2px; }
+  .callout.info  { border-left-color: var(--info); background: #EFF6FF; }
+  .callout.info .icon { color: var(--info); }
+  .callout.error { border-left-color: var(--error); background: #FEF2F2; }
+  .callout.error .icon { color: var(--error); }
+
+  /* ===== 解答編（details 折りたたみ） ===== */
+  details.answer { margin: 16px 0; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--raised); }
+  details.answer > summary {
+    padding: 12px 16px; cursor: pointer; user-select: none;
+    font-size: 14px; font-weight: 600; color: var(--accent);
+    list-style: none; display: flex; align-items: center; gap: 10px;
+  }
+  details.answer > summary::-webkit-details-marker { display: none; }
+  details.answer > summary::before { content: "▸"; transition: transform .15s var(--ease); }
+  details.answer[open] > summary::before { transform: rotate(90deg); }
+  details.answer > summary .hint { font-weight: 400; font-size: 12px; color: var(--ink-3); }
+  details.answer > .answer-body { padding: 0 16px 16px; }
+
+  /* ===== 手順ステップ ===== */
+  .steps { list-style: none; counter-reset: step; }
+  .steps > li {
+    position: relative; padding: 0 0 24px 44px; counter-increment: step;
+    border-left: 1px solid var(--border); margin-left: 14px;
+  }
+  .steps > li:last-child { border-left-color: transparent; padding-bottom: 0; }
+  .steps > li::before {
+    content: counter(step); position: absolute; left: -15px; top: 0;
+    width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 13px; font-weight: 600;
+    color: var(--accent); background: var(--accent-soft);
+    border: 1px solid var(--accent); border-radius: 50%;
+  }
+  .steps > li > strong { display: block; margin-bottom: 4px; }
+
+  /* ===== 変更履歴 ===== */
+  .changelog { list-style: none; }
+  .changelog li { position: relative; padding: 0 0 20px 24px; border-left: 1px solid var(--border); margin-left: 6px; }
+  .changelog li:last-child { padding-bottom: 0; }
+  .changelog li::before {
+    content: ""; position: absolute; left: -5px; top: 7px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--surface); border: 2px solid var(--ink-3);
+  }
+  .changelog li:first-child::before { border-color: var(--accent); background: var(--accent); }
+  .changelog .date { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+  .changelog .desc { font-size: 14px; }
+
+  /* ===== 右目次 ===== */
+  .toc { padding: 40px 0; font-size: 12.5px; }
+  .toc-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--ink-3); margin-bottom: 10px; }
+  .toc a {
+    display: block; padding: 4px 0 4px 12px;
+    color: var(--ink-3); text-decoration: none;
+    border-left: 2px solid var(--border);
+    transition: color .12s var(--ease), border-color .12s var(--ease);
+  }
+  .toc a:hover { color: var(--ink); }
+  .toc a.active { color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+
+  /* ===== フッタ ===== */
+  .site-footer {
+    max-width: 1280px; margin: 0 auto; padding: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--ink-3);
+    display: flex; flex-wrap: wrap; gap: 8px 24px;
+  }
+
+  /* ===== レスポンシブ / 印刷 / モーション ===== */
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 220px minmax(0, 1fr); }
+    .toc { display: none; }
+  }
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; gap: 0; }
+    .nav { position: static; height: auto; padding: 20px 0 0; display: flex; gap: 20px; overflow-x: auto; }
+    .nav-group { margin: 0; white-space: nowrap; }
+    .param-table .k { width: 130px; }
+    .doc section, .container section { overflow-x: auto; }
+  }
+  @media print {
+    .site-header, .nav, .toc, .copy-btn { display: none !important; }
+    .layout { display: block; }
+    body { background: #fff; font-size: 12px; }
+    .grid-scroll { max-height: none; overflow: visible; }
+    details.answer { border: none; }
+    details.answer > summary { display: none; }
+    details.answer > .answer-body { padding: 0; }
+    section, .grid-card, .code-block, tr { break-inside: avoid; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    html { scroll-behavior: auto; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand">Theme 27 <span>·</span> QoS / ACL / PBR</div>
+  <span class="phase-badge">06 プロジェクト管理</span>
+  <nav class="header-nav" aria-label="文書ナビゲーション">
+    <a href="../index.html">文書一覧</a>
+  </nav>
+</header>
+
+<main class="container">
+  <div class="breadcrumb"><a href="../index.html">Theme 27</a> / 06_プロジェクト管理 / WBS・スケジュール</div>
+  <div class="kicker">Theme 27 · QoS / ACL / route-map Applied</div>
+  <h1>WBS・スケジュール</h1>
+  <div class="doc-meta">
+    <span class="badge ver">v1.0</span>
+    <span class="badge"><span class="dot"></span>ドキュメント整備完了</span>
+    <span class="badge">最終更新 2026-07-08</span>
+    <span class="badge">ソース: README_Lab_Challenge.md ほか</span>
+  </div>
+
+  <section id="sec1">
+    <h2>1. プロジェクト概要<a class="anchor" href="#sec1">#</a></h2>
+    <h3>目的</h3>
+    <p>動的ルーティング基盤（OSPF/BGP）の上に、セキュリティ要件（ACL）と通信品質要件（QoS/PBR）を同時に満たすポリシー制御を実装し、中規模企業ネットワークを模したラボ環境で設計〜構築〜試験の一連を検証することを目的とする。</p>
+    <h3>体制</h3>
+    <table class="param-table">
+      <thead><tr><th>役割</th><th>主な責務</th></tr></thead>
+      <tbody>
+        <tr><td class="k">受講者</td><td>設計構築担当。要件定義から構築・試験・引き渡しまでを一貫して実施する。</td></tr>
+        <tr><td class="k">メンター</td><td>レビュー担当。各フェーズの成果物レビュー・障害切り分け時の相談対応・合否判定を行う。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="sec2">
+    <h2>2. WBS表<a class="anchor" href="#sec2">#</a></h2>
+    <p class="note">工数バーは相対比較用（最大値6h = 100%）。ガントチャートではなく、フェーズ内のタスク粒度を俯瞰するための簡易表示。</p>
+    <div class="grid-card">
+      <div class="grid-scroll">
+        <table class="grid-table">
+          <thead>
+            <tr>
+              <th>WBS</th><th>タスク</th><th>フェーズ</th><th>成果物</th><th>担当</th><th>予定工数(h)</th><th>状態</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="mono">1.1</td>
+              <td>要件の整理・定義</td>
+              <td>1. 要件定義</td>
+              <td>要件定義書</td>
+              <td>受講者</td>
+              <td class="num">4h<div style="height:4px;border-radius:var(--r-full);background:var(--border);margin-top:4px;width:64px;overflow:hidden;"><div style="height:100%;width:67%;background:var(--accent);"></div></div></td>
+              <td><span class="pill ok">完了</span></td>
+            </tr>
+            <tr>
+              <td class="mono">2.1</td>
+              <td>ネットワークゾーン・論理構成の設計</td>
+              <td>2. 基本設計</td>
+              <td>基本設計書</td>
+              <td>受講者</td>
+              <td class="num">4h<div style="height:4px;border-radius:var(--r-full);background:var(--border);margin-top:4px;width:64px;overflow:hidden;"><div style="height:100%;width:67%;background:var(--accent);"></div></div></td>
+              <td><span class="pill ok">完了</span></td>
+            </tr>
+            <tr>
+              <td class="mono">2.2</td>
+              <td>論理・物理構成図の作成</td>
+              <td>2. 基本設計</td>
+              <td>物理ネットワーク構成図・論理ネットワーク構成図</td>
+              <td>受講者</td>
+              <td class="num">3h<div style="height:4px;border-radius:var(--r-full);background:var(--border);margin-top:4px;width:64px;overflow:hidden;"><div style="height:100%;width:50%;background:var(--accent);"></div></div></td>
+              <td><span class="pill ok">完了</span></td>
+            </tr>
+            <tr>
+              <td class="mono">2.3</td>
+              <td>IPアドレス管理表の作成</td>
+              <td>2. 基本設計</td>
+              <td>IPアドレス管理表</td>
+              <td>受講者</td>
+              <td class="num">2h<div style="height:4px;border-radius:var(--r-full);background:var(--border);margin-top:4px;width:64px;overflow:hidden;"><div style="height:100%;width:33%;background:var(--accent);"></div></div></td>
+              <td><span class="pill ok">完了</span></td>
+            </tr>
+            <tr>
+              <td class="mono">3.1</td>
+              <td>ACL/PBR/QoS/BGPのパラメータ設計</td>
+              <td>3. 詳細設計</td>
+              <td>パラメータシート</td>
+              <td>受講者</td>
+              <td class="num">4h<div style="height:4px;border-radius:var(--r-full);background:var(--border);margin-top:4px;width:64px;overflow:hidden;"><div style="height:100%;width:67%;background:var(--accent);"></div></div></td>
+              <td><span class="pill ok">完了</span></td>
+            </tr>
+            <tr>
+              <td class="mono">3.2</td>
+              <td>機器別詳細設計書の作成</td>
+              <td>3. 詳細設計</td>
+              <td>詳細設計書</td>
+              <td>受講者</td>
+              <td class="num">3h<div style="height:4px;border-radius:var(--r-full);background:var(--border);margin-top:4px;width:64px;overflow:hidden;"><div style="height:100%;width:50%;background:var(--accent);"></div></div></td>
+              <td><span class="pill ok">完了</span></td>
+            </tr>
+            <tr>
+              <td class="mono">3.3</td>
+              <td>ポート収容・ラック搭載設計</td>
+              <td>3. 詳細設計</td>
+              <td>ポート収容表・ラック搭載図</td>
+              <td>受講者</td>
+              <td class="num">2h<div style="height:4px;border-radius:var(--r-full);background:var(--border);margin-top:4px;width:64px;overflow:hidden;"><div style="height:100%;width:33%;background:var(--accent);"></div></div></td>
+              <td><span class="pill ok">完了</span></td>
+            </tr>
+            <tr>
+              <td class="mono">4.1</td>
+              <td>環境デプロイ＋Mission 1: ベースライン構築＋ゾーン間ACL</td>
+              <td>4. 構築</td>
+              <td>deploy.sh実行ログ・hq-*/br-* running-config（ACL）</td>
+              <td>受講者</td>
+              <td class="num">6h<div style="height:4px;border-radius:var(--r-full);background:var(--border);margin-top:4px;width:64px;overflow:hidden;"><div style="height:100%;width:100%;background:var(--accent);"></div></div></td>
+              <td><span class="pill todo">未着手</span></td>
+            </tr>
+            <tr>
+              <td class="mono">4.2</td>
+              <td>Mission 2: route-mapによるPBR</td>
+              <td>4. 構築</td>
+              <td>hq-dist running-config（route-map）</td>
+              <td>受講者</td>
+              <td class="num">3h<div style="height:4px;border-radius:var(--r-full);background:var(--border);margin-top:4px;width:64px;overflow:hidden;"><div style="height:100%;width:50%;background:var(--accent);"></div></div></td>
+              <td><span class="pill todo">未着手</span></td>
+            </tr>
+            <tr>
+              <td class="mono">4.3</td>
+              <td>Mission 3: DSCPマーキング（DiffServ QoS基礎）</td>
+              <td>4. 構築</td>
+              <td>hq-voip/hq-edge running-config（class-map/policy-map）</td>
+              <td>受講者</td>
+              <td class="num">3h<div style="height:4px;border-radius:var(--r-full);background:var(--border);margin-top:4px;width:64px;overflow:hidden;"><div style="height:100%;width:50%;background:var(--accent);"></div></div></td>
+              <td><span class="pill todo">未着手</span></td>
+            </tr>
+            <tr>
+              <td class="mono">4.4</td>
+              <td>Mission 4: LLQ＋帯域制御</td>
+              <td>4. 構築</td>
+              <td>hq-edge running-config（policy-map WAN-EDGE）</td>
+              <td>受講者</td>
+              <td class="num">3h<div style="height:4px;border-radius:var(--r-full);background:var(--border);margin-top:4px;width:64px;overflow:hidden;"><div style="height:100%;width:50%;background:var(--accent);"></div></div></td>
+              <td><span class="pill todo">未着手</span></td>
+            </tr>
+            <tr>
+              <td class="mono">4.5</td>
+              <td>Mission 5: prefix-list/distribute-listによる経路広告制御</td>
+              <td>4. 構築</td>
+              <td>br-edge/isp/hq-core running-config</td>
+              <td>受講者</td>
+              <td class="num">3h<div style="height:4px;border-radius:var(--r-full);background:var(--border);margin-top:4px;width:64px;overflow:hidden;"><div style="height:100%;width:50%;background:var(--accent);"></div></div></td>
+              <td><span class="pill todo">未着手</span></td>
+            </tr>
+            <tr>
+              <td class="mono">4.6</td>
+              <td>Mission 6: 総合シナリオ試験（障害迂回含む）</td>
+              <td>4. 構築</td>
+              <td>全機器running-config・動作確認ログ</td>
+              <td>受講者</td>
+              <td class="num">4h<div style="height:4px;border-radius:var(--r-full);background:var(--border);margin-top:4px;width:64px;overflow:hidden;"><div style="height:100%;width:67%;background:var(--accent);"></div></div></td>
+              <td><span class="pill todo">未着手</span></td>
+            </tr>
+            <tr>
+              <td class="mono">5.1</td>
+              <td>単体試験（ACL/PBR/QoS個別確認）</td>
+              <td>5. 試験</td>
+              <td>試験計画書 §1〜5 実施結果</td>
+              <td>受講者</td>
+              <td class="num">4h<div style="height:4px;border-radius:var(--r-full);background:var(--border);margin-top:4px;width:64px;overflow:hidden;"><div style="height:100%;width:67%;background:var(--accent);"></div></div></td>
+              <td><span class="pill todo">未着手</span></td>
+            </tr>
+            <tr>
+              <td class="mono">5.2</td>
+              <td>結合試験（ACL＋PBR＋QoS同時動作確認）</td>
+              <td>5. 試験</td>
+              <td>試験計画書 §6 実施結果</td>
+              <td>受講者</td>
+              <td class="num">3h<div style="height:4px;border-radius:var(--r-full);background:var(--border);margin-top:4px;width:64px;overflow:hidden;"><div style="height:100%;width:50%;background:var(--accent);"></div></div></td>
+              <td><span class="pill todo">未着手</span></td>
+            </tr>
+            <tr>
+              <td class="mono">5.3</td>
+              <td>正常性・障害試験（リンクダウン時の迂回確認）</td>
+              <td>5. 試験</td>
+              <td>試験計画書 §6 実施結果（障害注入）</td>
+              <td>受講者</td>
+              <td class="num">3h<div style="height:4px;border-radius:var(--r-full);background:var(--border);margin-top:4px;width:64px;overflow:hidden;"><div style="height:100%;width:50%;background:var(--accent);"></div></div></td>
+              <td><span class="pill todo">未着手</span></td>
+            </tr>
+            <tr>
+              <td class="mono">6.1</td>
+              <td>運用保守マニュアルの整備</td>
+              <td>6. 引き渡し</td>
+              <td>運用保守マニュアル</td>
+              <td>受講者</td>
+              <td class="num">3h<div style="height:4px;border-radius:var(--r-full);background:var(--border);margin-top:4px;width:64px;overflow:hidden;"><div style="height:100%;width:50%;background:var(--accent);"></div></div></td>
+              <td><span class="pill todo">未着手</span></td>
+            </tr>
+            <tr>
+              <td class="mono">6.2</td>
+              <td>AAR（振り返り）の実施</td>
+              <td>6. 引き渡し</td>
+              <td>AAR記録</td>
+              <td>受講者・メンター</td>
+              <td class="num">2h<div style="height:4px;border-radius:var(--r-full);background:var(--border);margin-top:4px;width:64px;overflow:hidden;"><div style="height:100%;width:33%;background:var(--accent);"></div></div></td>
+              <td><span class="pill todo">未着手</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="sec3">
+    <h2>3. マイルストーン<a class="anchor" href="#sec3">#</a></h2>
+    <ul class="changelog">
+      <li>
+        <span class="date">2026-07-08</span>
+        <div class="desc">文書フェーズ（要件定義〜詳細設計、WBS1〜3）完了 <span class="pill ok">完了</span></div>
+      </li>
+      <li>
+        <span class="date">未定</span>
+        <div class="desc">構築フェーズ（Mission 1〜6、WBS4.1〜4.6）着手・完了 <span class="pill todo">未着手</span></div>
+      </li>
+      <li>
+        <span class="date">未定</span>
+        <div class="desc">試験フェーズ（単体・結合・正常性/障害試験、WBS5.1〜5.3）完了 <span class="pill todo">未着手</span></div>
+      </li>
+      <li>
+        <span class="date">未定</span>
+        <div class="desc">引き渡し（運用保守マニュアル整備・AAR実施、WBS6.1〜6.2）完了 <span class="pill todo">未着手</span></div>
+      </li>
+    </ul>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <span>Theme 27 · QoS / ACL / route-map Applied</span>
+  <span>ソース: README_Lab_Challenge.md ほか各フェーズ文書</span>
+  <span>生成 2026-07-08</span>
+</footer>
+
+<script>
+  "use strict";
+  /* ---- コピー（clipboard API + file:// フォールバック） ---- */
+  function flashDone(btn) {
+    const original = btn.textContent;
+    btn.textContent = "✓ コピーしました";
+    btn.classList.add("done");
+    setTimeout(() => { btn.textContent = original; btn.classList.remove("done"); }, 1500);
+  }
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".copy-btn");
+    if (!btn) return;
+    const text = btn.dataset.copyTarget
+      ? document.getElementById(btn.dataset.copyTarget).textContent
+      : btn.dataset.copy;
+    navigator.clipboard.writeText(text).then(() => flashDone(btn)).catch(() => {
+      const ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta);
+      ta.select(); document.execCommand("copy"); ta.remove();
+      flashDone(btn);
+    });
+  });
+
+  /* ---- 右目次スクロール連動（3ペイン文書のみ） ---- */
+  const tocLinks = [...document.querySelectorAll(".toc a")];
+  if (tocLinks.length) {
+    const sections = [...document.querySelectorAll("main section")];
+    const spy = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        tocLinks.forEach((a) =>
+          a.classList.toggle("active", a.getAttribute("href") === `#${entry.target.id}`));
+      });
+    }, { rootMargin: "-20% 0px -70% 0px" });
+    sections.forEach((s) => spy.observe(s));
+  }
+
+  /* ---- 印刷時に解答編を開く ---- */
+  window.addEventListener("beforeprint", () =>
+    document.querySelectorAll("details.answer").forEach((d) => { d.open = true; }));
+</script>
+</body>
+</html>

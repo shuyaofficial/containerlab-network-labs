@@ -1,0 +1,178 @@
+
+
+hq-edge#terminal length 0
+hq-edge#show policy-map interface Ethernet0/2
+ Ethernet0/2 
+
+  Service-policy output: WAN-EDGE
+
+    queue stats for all priority classes:
+      Queueing
+      queue limit 64 packets
+      (queue depth/total drops/no-buffer drops) 0/0/0
+      (pkts output/bytes output) 87/8526
+
+    Class-map: VOICE (match-any)  
+      87 packets, 8526 bytes
+      5 minute offered rate 1000 bps, drop rate 0000 bps
+      Match:  dscp ef (46)
+        87 packets, 8526 bytes
+        5 minute rate 1000 bps
+      Priority: 2000 kbps, burst bytes 50000, b/w exceed drops: 0
+      
+
+    Class-map: class-default (match-any)  
+      12810 packets, 19255702 bytes
+      5 minute offered rate 276000 bps, drop rate 2000 bps
+      Match: any 
+      Queueing
+      queue limit 64 packets
+      (queue depth/total drops/no-buffer drops/flowdrops) 130/85/0/85
+      (pkts output/bytes output) 12725/19127012
+      Fair-queue: per-flow queue limit 16 packets
+      shape (average) cir 10000000, bc 40000, be 40000
+      target shape rate 10000000
+hq-edge#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+hq-edge con0 is now available
+
+
+
+
+
+Press RETURN to get started.
+
+
+
+
+
+
+hq-edge>en
+hq-edge#configure terminal
+Enter configuration commands, one per line.  End with CNTL/Z.
+hq-edge(config)#ip domain name lab
+hq-edge(config)#crypto key generate rsa modulus 1024
+The name for the keys will be: hq-edge.lab
+
+% The key modulus size is 1024 bits
+% Generating 1024 bit RSA keys, keys will be non-exportable...
+[OK] (elapsed time was 1 seconds)
+
+hq-edge(config)#end
+hq-edge#
+*Jul 16 08:32:28.382: %SSH-5-ENABLED: SSH 2.0 has been enabled
+*Jul 16 08:32:28.438: %SYS-5-CONFIG_I: Configured from console by console
+hq-edge#
+*Jul 16 08:34:47.736: %SSH-3-NO_MATCH: No matching kex algorithm found: client sntrup761x25519-sha512@openssh.com,curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group-exchange-sha256,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512,diffie-hellman-group14-sha256,ext-info-c,kex-strict-c-v00@openssh.com server diffie-hellman-group-exchange-sha1,diffie-hellman-group14-sha1,diffie-hellman-group1-sha1
+hq-edge#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+hq-edge con0 is now available
+
+
+
+
+
+Press RETURN to get started.
+
+
+
+
+
+
+
+
+
+
+

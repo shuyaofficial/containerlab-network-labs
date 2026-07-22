@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>ラック搭載図 | Theme 27 QoS/ACL/PBR</title>
+<style>
+  :root {
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    --accent: #635BFF;
+    --accent-soft: #F0EFFF;
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    --zone-trust: #16A34A;   --zone-trust-soft: #F0FDF4;
+    --zone-dmz: #D97706;     --zone-dmz-soft: #FFFBEB;
+    --zone-untrust: #DC2626; --zone-untrust-soft: #FEF2F2;
+    --zone-wan: #2563EB;     --zone-wan-soft: #EFF6FF;
+    --code-bg: #0F172A;
+    --code-ink: #E2E8F0;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  body {
+    font-family: var(--sans);
+    font-size: 15px; line-height: 1.8;
+    color: var(--ink); background: var(--surface);
+  }
+
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 16px;
+    height: 56px; padding: 0 24px;
+    background: rgba(250,250,249,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; white-space: nowrap; }
+  .brand span { color: var(--accent); }
+  .phase-badge {
+    padding: 2px 10px; font-size: 11.5px; font-weight: 600; letter-spacing: .04em;
+    color: var(--accent); background: var(--accent-soft);
+    border-radius: var(--r-full); white-space: nowrap;
+  }
+  .header-nav { margin-left: auto; display: flex; gap: 4px; }
+  .header-nav a {
+    padding: 6px 12px; font-size: 13px; color: var(--ink-2);
+    text-decoration: none; border-radius: var(--r-sm);
+    transition: color .12s var(--ease), background .12s var(--ease);
+  }
+  .header-nav a:hover { color: var(--ink); background: #F5F5F4; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr) 200px;
+    gap: 48px; max-width: 1280px; margin: 0 auto; padding: 0 24px;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
+
+  .nav { padding: 32px 0; }
+  .nav, .toc { position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; }
+  .nav-group { margin-bottom: 24px; }
+  .nav-label {
+    font-size: 11px; font-weight: 600; letter-spacing: .08em;
+    color: var(--ink-3); text-transform: uppercase; margin-bottom: 8px;
+  }
+  .nav a {
+    display: block; padding: 5px 10px; margin-left: -10px;
+    font-size: 13.5px; color: var(--ink-2); text-decoration: none;
+    border-radius: var(--r-sm);
+    transition: color .12s var(--ease), background .12s var(--ease);
+  }
+  .nav a:hover { color: var(--ink); background: #F5F5F4; }
+  .nav a.current { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+
+  .doc { padding: 40px 0 96px; min-width: 0; }
+  .breadcrumb { font-size: 12px; color: var(--ink-3); margin-bottom: 12px; }
+  .breadcrumb a { color: inherit; text-decoration: none; }
+  .breadcrumb a:hover { color: var(--accent); }
+  .kicker {
+    font-size: 11px; font-weight: 600; letter-spacing: .12em;
+    color: var(--accent); text-transform: uppercase; margin-bottom: 6px;
+  }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 40px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; font-size: 12px; font-weight: 500;
+    border-radius: var(--r-full); border: 1px solid var(--border);
+    background: var(--raised); color: var(--ink-2);
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  section { margin-bottom: 56px; scroll-margin-top: 72px; }
+  h2 {
+    font-size: 20px; font-weight: 600; margin-bottom: 16px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--border);
+  }
+  h2 a.anchor { color: var(--ink-3); text-decoration: none; opacity: 0; margin-left: 6px; font-weight: 400; }
+  h2:hover a.anchor { opacity: 1; }
+  h3 { font-size: 16px; font-weight: 600; margin: 24px 0 10px; }
+  p { margin-bottom: 12px; }
+  p.note { font-size: 13.5px; color: var(--ink-2); margin-bottom: 16px; }
+  ul.plain, ol.plain { padding-left: 22px; margin-bottom: 12px; }
+
+  .param-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .param-table th, .param-table td { padding: 10px 12px; text-align: left; vertical-align: top; }
+  .param-table thead th {
+    font-size: 11px; font-weight: 600; letter-spacing: .06em;
+    color: var(--ink-3); text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .param-table tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+  .param-table tbody tr:hover { background: #F5F5F4; }
+  .param-table .k { width: 220px; color: var(--ink-2); font-weight: 500; }
+  .mono { font-family: var(--mono); font-size: 13px; font-feature-settings: "tnum"; }
+  .num { text-align: right; }
+
+  .grid-card { background: var(--raised); border-radius: var(--r-md); box-shadow: var(--shadow-1); overflow: hidden; margin-bottom: 24px; }
+  .grid-scroll { max-height: 560px; overflow: auto; }
+  .grid-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .grid-table thead th {
+    position: sticky; top: 0; z-index: 2;
+    padding: 10px 14px; text-align: left; white-space: nowrap;
+    font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--ink-3); background: var(--raised);
+    border-bottom: 1px solid var(--border);
+  }
+  .grid-table tbody td { padding: 9px 14px; border-bottom: 1px solid #F5F5F4; white-space: nowrap; }
+  .grid-table tbody tr:hover { background: #FAFAF9; }
+  .grid-table tbody tr:last-child td { border-bottom: none; }
+
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; font-size: 11.5px; font-weight: 600; border-radius: var(--r-full); }
+  .pill::before { content: "●"; font-size: 8px; }
+  .pill.ok    { color: #065F46; background: #ECFDF5; }
+  .pill.warn  { color: #92400E; background: #FFFBEB; }
+  .pill.warn::before { content: "▲"; font-size: 9px; }
+  .pill.error { color: #991B1B; background: #FEF2F2; }
+  .pill.error::before { content: "✕"; font-size: 10px; }
+  .pill.todo  { color: #57534E; background: #F5F5F4; }
+  .pill.todo::before { content: "○"; }
+
+  .zone { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; font-size: 11.5px; font-weight: 600; border-radius: var(--r-full); }
+  .zone::before { content: "■"; font-size: 8px; }
+  .zone.trust   { color: #14532D; background: var(--zone-trust-soft); }
+  .zone.trust::before   { color: var(--zone-trust); }
+  .zone.dmz     { color: #78350F; background: var(--zone-dmz-soft); }
+  .zone.dmz::before     { color: var(--zone-dmz); }
+  .zone.untrust { color: #7F1D1D; background: var(--zone-untrust-soft); }
+  .zone.untrust::before { color: var(--zone-untrust); }
+  .zone.wan     { color: #1E3A8A; background: var(--zone-wan-soft); }
+  .zone.wan::before     { color: var(--zone-wan); }
+
+  .copyable { display: inline-flex; align-items: center; gap: 8px; }
+  .copy-btn {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px; font-size: 11px; font-family: var(--sans);
+    color: var(--ink-3); background: none;
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    cursor: pointer; opacity: 0;
+    transition: all .12s var(--ease);
+  }
+  tr:hover .copy-btn, .code-head .copy-btn, .copyable:hover .copy-btn { opacity: 1; }
+  .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .copy-btn.done { opacity: 1; color: var(--ok); border-color: var(--ok); }
+
+  .code-block { border-radius: var(--r-md); overflow: hidden; border: 1px solid #1E293B; margin: 16px 0; }
+  .code-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 14px; background: #1E293B;
+    font-size: 12px; color: #94A3B8; font-family: var(--mono);
+  }
+  .code-head .copy-btn { border-color: #334155; color: #94A3B8; }
+  .code-head .copy-btn:hover { color: var(--code-ink); border-color: #64748B; }
+  .code-head .copy-btn.done { color: var(--ok); border-color: var(--ok); }
+  pre {
+    padding: 16px; background: var(--code-bg); color: var(--code-ink);
+    font-family: var(--mono); font-size: 13px; line-height: 1.7;
+    overflow-x: auto;
+  }
+  pre .c { color: #64748B; }
+  pre .k { color: #7DD3FC; }
+  pre .v { color: #FDBA74; }
+
+  .callout {
+    display: flex; gap: 12px; padding: 14px 16px; margin: 16px 0;
+    border-radius: var(--r-sm); font-size: 14px;
+    border-left: 3px solid var(--warn); background: #FFFBEB;
+  }
+  .callout .icon { font-weight: 700; color: var(--warn); font-family: var(--mono); }
+  .callout strong { display: block; font-size: 13px; margin-bottom: 2px; }
+  .callout.info  { border-left-color: var(--info); background: #EFF6FF; }
+  .callout.info .icon { color: var(--info); }
+  .callout.error { border-left-color: var(--error); background: #FEF2F2; }
+  .callout.error .icon { color: var(--error); }
+
+  details.answer { margin: 16px 0; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--raised); }
+  details.answer > summary {
+    padding: 12px 16px; cursor: pointer; user-select: none;
+    font-size: 14px; font-weight: 600; color: var(--accent);
+    list-style: none; display: flex; align-items: center; gap: 10px;
+  }
+  details.answer > summary::-webkit-details-marker { display: none; }
+  details.answer > summary::before { content: "▸"; transition: transform .15s var(--ease); }
+  details.answer[open] > summary::before { transform: rotate(90deg); }
+  details.answer > summary .hint { font-weight: 400; font-size: 12px; color: var(--ink-3); }
+  details.answer > .answer-body { padding: 0 16px 16px; }
+
+  .steps { list-style: none; counter-reset: step; }
+  .steps > li {
+    position: relative; padding: 0 0 24px 44px; counter-increment: step;
+    border-left: 1px solid var(--border); margin-left: 14px;
+  }
+  .steps > li:last-child { border-left-color: transparent; padding-bottom: 0; }
+  .steps > li::before {
+    content: counter(step); position: absolute; left: -15px; top: 0;
+    width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 13px; font-weight: 600;
+    color: var(--accent); background: var(--accent-soft);
+    border: 1px solid var(--accent); border-radius: 50%;
+  }
+  .steps > li > strong { display: block; margin-bottom: 4px; }
+
+  .changelog { list-style: none; }
+  .changelog li { position: relative; padding: 0 0 20px 24px; border-left: 1px solid var(--border); margin-left: 6px; }
+  .changelog li:last-child { padding-bottom: 0; }
+  .changelog li::before {
+    content: ""; position: absolute; left: -5px; top: 7px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--surface); border: 2px solid var(--ink-3);
+  }
+  .changelog li:first-child::before { border-color: var(--accent); background: var(--accent); }
+  .changelog .date { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+  .changelog .desc { font-size: 14px; }
+
+  .toc { padding: 40px 0; font-size: 12.5px; }
+  .toc-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--ink-3); margin-bottom: 10px; }
+  .toc a {
+    display: block; padding: 4px 0 4px 12px;
+    color: var(--ink-3); text-decoration: none;
+    border-left: 2px solid var(--border);
+    transition: color .12s var(--ease), border-color .12s var(--ease);
+  }
+  .toc a:hover { color: var(--ink); }
+  .toc a.active { color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+
+  .site-footer {
+    max-width: 1280px; margin: 0 auto; padding: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--ink-3);
+    display: flex; flex-wrap: wrap; gap: 8px 24px;
+  }
+
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 220px minmax(0, 1fr); }
+    .toc { display: none; }
+  }
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; gap: 0; }
+    .nav { position: static; height: auto; padding: 20px 0 0; display: flex; gap: 20px; overflow-x: auto; }
+    .nav-group { margin: 0; white-space: nowrap; }
+    .param-table .k { width: 130px; }
+    .doc section, .container section { overflow-x: auto; }
+  }
+  @media print {
+    .site-header, .nav, .toc, .copy-btn { display: none !important; }
+    .layout { display: block; }
+    body { background: #fff; font-size: 12px; }
+    .grid-scroll { max-height: none; overflow: visible; }
+    details.answer { border: none; }
+    details.answer > summary { display: none; }
+    details.answer > .answer-body { padding: 0; }
+    section, .grid-card, .code-block, tr { break-inside: avoid; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    html { scroll-behavior: auto; }
+  }
+
+  /* =====================================================
+     ここから 図版（ラック搭載図）専用の追加スタイル
+     色はすべて上記トークンの再利用のみ・新規色定義なし
+     ===================================================== */
+  .svg-figure {
+    background: var(--raised); border: 1px solid var(--border);
+    border-radius: var(--r-md); box-shadow: var(--shadow-1);
+    padding: 20px; margin: 16px 0;
+  }
+  .svg-figure svg { display: block; width: 100%; height: auto; }
+
+  .rack-frame  { fill: var(--surface); stroke: var(--ink-3); stroke-width: 2; }
+  .rack-title  { font-family: var(--sans); font-size: 15px; font-weight: 700; fill: var(--ink); }
+  .u-number    { font-family: var(--mono); font-size: 9px; fill: var(--ink-3); }
+
+  .device-rect { fill: var(--raised); stroke: var(--border); stroke-width: 1.5; }
+  .device-rect.passive { fill: #F5F5F4; }
+  .device-text { font-family: var(--sans); font-size: 11px; }
+  .device-text .name  { font-weight: 700; fill: var(--ink); }
+  .device-text .model { fill: var(--ink-2); }
+
+  .empty-band  { fill: none; stroke: var(--border); stroke-width: 1.2; stroke-dasharray: 4 4; }
+  .empty-label { font-family: var(--sans); font-size: 11px; fill: var(--ink-3); text-anchor: middle; }
+
+  .pdu-a { fill: var(--zone-wan-soft); stroke: var(--zone-wan); stroke-width: 1.5; }
+  .pdu-b { fill: var(--zone-dmz-soft); stroke: var(--zone-dmz); stroke-width: 1.5; }
+  .pdu-text { font-family: var(--sans); font-size: 11px; font-weight: 700; text-anchor: middle; }
+  .pdu-text.a { fill: #1E3A8A; }
+  .pdu-text.b { fill: #78350F; }
+
+  .psu-tab-a { fill: var(--zone-wan); }
+  .psu-tab-b { fill: var(--zone-dmz); }
+
+  .side-note { font-family: var(--sans); font-size: 12.5px; fill: var(--ink-2); }
+  .side-note .strong { font-weight: 700; fill: var(--ink); }
+
+  .legend-row { display: flex; flex-wrap: wrap; gap: 18px; margin: 16px 0 20px; font-size: 13px; color: var(--ink-2); }
+  .legend-item { display: inline-flex; align-items: center; gap: 8px; }
+  .legend-swatch { display: inline-block; width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid; flex: none; }
+  .legend-swatch.pdu-a { background: var(--zone-wan-soft); border-color: var(--zone-wan); }
+  .legend-swatch.pdu-b { background: var(--zone-dmz-soft); border-color: var(--zone-dmz); }
+  .legend-swatch.passive { background: #F5F5F4; border-color: var(--border); }
+  .legend-swatch.empty { background: none; border-color: var(--border); border-style: dashed; }
+
+  @media print {
+    .svg-figure { padding: 8px; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand">Theme 27 <span>·</span> QoS / ACL / PBR</div>
+  <span class="phase-badge">03 詳細設計</span>
+  <nav class="header-nav" aria-label="文書ナビゲーション">
+    <a href="../index.html">文書一覧</a>
+  </nav>
+</header>
+
+<div class="container">
+  <div class="breadcrumb"><a href="../index.html">Theme 27</a> / 03_詳細設計 / ラック搭載図</div>
+  <div class="kicker">Theme 27 · QoS / ACL / route-map Applied</div>
+  <h1>ラック搭載図</h1>
+  <div class="doc-meta">
+    <span class="badge ver">v1.0</span>
+    <span class="badge"><span class="dot"></span>確定</span>
+    <span class="badge">最終更新 2026-07-08</span>
+    <span class="badge">ソース: 新規作成</span>
+  </div>
+
+  <div class="callout info">
+    <span class="icon">i</span>
+    <div><strong>本図の位置づけ</strong>本図は本ラボの構成を物理実装する場合の想定図（学習用リファレンス）である。実体は containerlab 上の仮想ノード（cisco_iol / network-multitool コンテナ）であり、物理ラック・物理機器は存在しない。</div>
+  </div>
+
+  <section id="sec1">
+    <h2>1. 本社 HQラック（RACK-HQ-01・24U）<a class="anchor" href="#sec1">#</a></h2>
+    <p class="note">上部に軽量なパッチパネルを、中段にルータ4台を、下部にPDUを配置する想定。空きUは将来の増設余地として確保する。</p>
+
+    <figure class="svg-figure">
+      <svg viewBox="0 0 900 780" role="img" aria-label="本社HQラック RACK-HQ-01 24Uの搭載想定図。U24-U23にパッチパネル、U22にhq-edge、U21にhq-core、U20にhq-dist、U19にhq-dmzを搭載し、U13にケーブルガイド、U2にPDU-B系統、U1にPDU-A系統を配置する。" xmlns="http://www.w3.org/2000/svg">
+        <title>本社HQラック搭載図（RACK-HQ-01・24U）</title>
+
+        <text class="rack-title" x="120" y="40">本社 HQラック（RACK-HQ-01・24U）</text>
+        <rect class="rack-frame" x="120" y="60" width="320" height="672" rx="6"/>
+
+        <!-- U目盛り（左右・全24U） -->
+        <text class="u-number" x="108" y="78" text-anchor="end">U24</text><text class="u-number" x="452" y="78">U24</text>
+        <text class="u-number" x="108" y="106" text-anchor="end">U23</text><text class="u-number" x="452" y="106">U23</text>
+        <text class="u-number" x="108" y="134" text-anchor="end">U22</text><text class="u-number" x="452" y="134">U22</text>
+        <text class="u-number" x="108" y="162" text-anchor="end">U21</text><text class="u-number" x="452" y="162">U21</text>
+        <text class="u-number" x="108" y="190" text-anchor="end">U20</text><text class="u-number" x="452" y="190">U20</text>
+        <text class="u-number" x="108" y="218" text-anchor="end">U19</text><text class="u-number" x="452" y="218">U19</text>
+        <text class="u-number" x="108" y="246" text-anchor="end">U18</text><text class="u-number" x="452" y="246">U18</text>
+        <text class="u-number" x="108" y="274" text-anchor="end">U17</text><text class="u-number" x="452" y="274">U17</text>
+        <text class="u-number" x="108" y="302" text-anchor="end">U16</text><text class="u-number" x="452" y="302">U16</text>
+        <text class="u-number" x="108" y="330" text-anchor="end">U15</text><text class="u-number" x="452" y="330">U15</text>
+        <text class="u-number" x="108" y="358" text-anchor="end">U14</text><text class="u-number" x="452" y="358">U14</text>
+        <text class="u-number" x="108" y="386" text-anchor="end">U13</text><text class="u-number" x="452" y="386">U13</text>
+        <text class="u-number" x="108" y="414" text-anchor="end">U12</text><text class="u-number" x="452" y="414">U12</text>
+        <text class="u-number" x="108" y="442" text-anchor="end">U11</text><text class="u-number" x="452" y="442">U11</text>
+        <text class="u-number" x="108" y="470" text-anchor="end">U10</text><text class="u-number" x="452" y="470">U10</text>
+        <text class="u-number" x="108" y="498" text-anchor="end">U9</text><text class="u-number" x="452" y="498">U9</text>
+        <text class="u-number" x="108" y="526" text-anchor="end">U8</text><text class="u-number" x="452" y="526">U8</text>
+        <text class="u-number" x="108" y="554" text-anchor="end">U7</text><text class="u-number" x="452" y="554">U7</text>
+        <text class="u-number" x="108" y="582" text-anchor="end">U6</text><text class="u-number" x="452" y="582">U6</text>
+        <text class="u-number" x="108" y="610" text-anchor="end">U5</text><text class="u-number" x="452" y="610">U5</text>
+        <text class="u-number" x="108" y="638" text-anchor="end">U4</text><text class="u-number" x="452" y="638">U4</text>
+        <text class="u-number" x="108" y="666" text-anchor="end">U3</text><text class="u-number" x="452" y="666">U3</text>
+        <text class="u-number" x="108" y="694" text-anchor="end">U2</text><text class="u-number" x="452" y="694">U2</text>
+        <text class="u-number" x="108" y="722" text-anchor="end">U1</text><text class="u-number" x="452" y="722">U1</text>
+
+        <!-- パッチパネル U24-U23（パッシブ・電源なし） -->
+        <rect class="device-rect passive" x="120" y="60" width="320" height="56"/>
+        <text class="device-text" x="132" y="92"><tspan class="name">パッチパネル</tspan><tspan class="model"> — 24ポート結線盤（想定）</tspan></text>
+
+        <!-- hq-edge U22 -->
+        <rect class="device-rect" x="120" y="116" width="320" height="28"/>
+        <text class="device-text" x="132" y="134"><tspan class="name">hq-edge</tspan><tspan class="model"> — Cisco ISR 4331相当</tspan></text>
+        <rect class="psu-tab-a" x="422" y="120" width="10" height="8"/>
+        <rect class="psu-tab-b" x="422" y="132" width="10" height="8"/>
+
+        <!-- hq-core U21 -->
+        <rect class="device-rect" x="120" y="144" width="320" height="28"/>
+        <text class="device-text" x="132" y="162"><tspan class="name">hq-core</tspan><tspan class="model"> — Cisco ISR 4321相当</tspan></text>
+        <rect class="psu-tab-a" x="422" y="148" width="10" height="8"/>
+        <rect class="psu-tab-b" x="422" y="160" width="10" height="8"/>
+
+        <!-- hq-dist U20 -->
+        <rect class="device-rect" x="120" y="172" width="320" height="28"/>
+        <text class="device-text" x="132" y="190"><tspan class="name">hq-dist</tspan><tspan class="model"> — Cisco ISR 4321相当</tspan></text>
+        <rect class="psu-tab-a" x="422" y="176" width="10" height="8"/>
+        <rect class="psu-tab-b" x="422" y="188" width="10" height="8"/>
+
+        <!-- hq-dmz U19 -->
+        <rect class="device-rect" x="120" y="200" width="320" height="28"/>
+        <text class="device-text" x="132" y="218"><tspan class="name">hq-dmz</tspan><tspan class="model"> — Cisco ISR 4321相当</tspan></text>
+        <rect class="psu-tab-a" x="422" y="204" width="10" height="8"/>
+        <rect class="psu-tab-b" x="422" y="216" width="10" height="8"/>
+
+        <!-- 空きU18-U14（増設余地） -->
+        <rect class="empty-band" x="120" y="228" width="320" height="140"/>
+        <text class="empty-label" x="280" y="302">空き（増設用）</text>
+
+        <!-- ケーブルガイド U13（パッシブ） -->
+        <rect class="device-rect passive" x="120" y="368" width="320" height="28"/>
+        <text class="device-text" x="132" y="386"><tspan class="name">ケーブルガイド</tspan><tspan class="model"> — 配線整理用（1U）</tspan></text>
+
+        <!-- 空きU12-U3（増設余地） -->
+        <rect class="empty-band" x="120" y="396" width="320" height="280"/>
+        <text class="empty-label" x="280" y="540">空き（増設用）</text>
+
+        <!-- PDU-B U2 -->
+        <rect class="pdu-b" x="120" y="676" width="320" height="28"/>
+        <text class="pdu-text b" x="280" y="694">PDU-B（電源分配ユニット・B系統）</text>
+
+        <!-- PDU-A U1 -->
+        <rect class="pdu-a" x="120" y="704" width="320" height="28"/>
+        <text class="pdu-text a" x="280" y="722">PDU-A（電源分配ユニット・A系統）</text>
+
+        <!-- 側注: 電源冗長 -->
+        <text class="side-note" x="520" y="600"><tspan class="strong">電源冗長（側注）</tspan></text>
+        <rect class="psu-tab-a" x="520" y="614" width="10" height="8"/>
+        <text class="side-note" x="538" y="622">= PDU-A系統（青）</text>
+        <rect class="psu-tab-b" x="520" y="632" width="10" height="8"/>
+        <text class="side-note" x="538" y="640">= PDU-B系統（琥珀）</text>
+        <text class="side-note" x="520" y="662">hq-edge/hq-core/hq-dist/hq-dmzは</text>
+        <text class="side-note" x="520" y="680">デュアルPSU想定でA/B両系統に接続する。</text>
+        <text class="side-note" x="520" y="698">カード右端のタブが接続系統を示す。</text>
+        <text class="side-note" x="520" y="726">パッチパネル・ケーブルガイドは</text>
+        <text class="side-note" x="520" y="744">パッシブ機器のため電源接続なし。</text>
+      </svg>
+    </figure>
+  </section>
+
+  <section id="sec2">
+    <h2>2. 支社 Branchラック（RACK-BR-01・12U）<a class="anchor" href="#sec2">#</a></h2>
+    <p class="note">HQラックと同じ設計原則（上部=パッチパネル、下部=PDU）を12Uの小規模ラックに適用する。</p>
+
+    <figure class="svg-figure">
+      <svg viewBox="0 0 900 440" role="img" aria-label="支社Branchラック RACK-BR-01 12Uの搭載想定図。U12-U11にパッチパネル、U10にbr-edge、U9にbr-core、U2にPDU-B系統、U1にPDU-A系統を配置する。" xmlns="http://www.w3.org/2000/svg">
+        <title>支社Branchラック搭載図（RACK-BR-01・12U）</title>
+
+        <text class="rack-title" x="120" y="40">支社 Branchラック（RACK-BR-01・12U）</text>
+        <rect class="rack-frame" x="120" y="60" width="320" height="336" rx="6"/>
+
+        <!-- U目盛り（左右・全12U） -->
+        <text class="u-number" x="108" y="78" text-anchor="end">U12</text><text class="u-number" x="452" y="78">U12</text>
+        <text class="u-number" x="108" y="106" text-anchor="end">U11</text><text class="u-number" x="452" y="106">U11</text>
+        <text class="u-number" x="108" y="134" text-anchor="end">U10</text><text class="u-number" x="452" y="134">U10</text>
+        <text class="u-number" x="108" y="162" text-anchor="end">U9</text><text class="u-number" x="452" y="162">U9</text>
+        <text class="u-number" x="108" y="190" text-anchor="end">U8</text><text class="u-number" x="452" y="190">U8</text>
+        <text class="u-number" x="108" y="218" text-anchor="end">U7</text><text class="u-number" x="452" y="218">U7</text>
+        <text class="u-number" x="108" y="246" text-anchor="end">U6</text><text class="u-number" x="452" y="246">U6</text>
+        <text class="u-number" x="108" y="274" text-anchor="end">U5</text><text class="u-number" x="452" y="274">U5</text>
+        <text class="u-number" x="108" y="302" text-anchor="end">U4</text><text class="u-number" x="452" y="302">U4</text>
+        <text class="u-number" x="108" y="330" text-anchor="end">U3</text><text class="u-number" x="452" y="330">U3</text>
+        <text class="u-number" x="108" y="358" text-anchor="end">U2</text><text class="u-number" x="452" y="358">U2</text>
+        <text class="u-number" x="108" y="386" text-anchor="end">U1</text><text class="u-number" x="452" y="386">U1</text>
+
+        <!-- パッチパネル U12-U11（パッシブ） -->
+        <rect class="device-rect passive" x="120" y="60" width="320" height="56"/>
+        <text class="device-text" x="132" y="92"><tspan class="name">パッチパネル</tspan><tspan class="model"> — 12ポート結線盤（想定）</tspan></text>
+
+        <!-- br-edge U10 -->
+        <rect class="device-rect" x="120" y="116" width="320" height="28"/>
+        <text class="device-text" x="132" y="134"><tspan class="name">br-edge</tspan><tspan class="model"> — Cisco ISR 4321相当</tspan></text>
+        <rect class="psu-tab-a" x="422" y="120" width="10" height="8"/>
+        <rect class="psu-tab-b" x="422" y="132" width="10" height="8"/>
+
+        <!-- br-core U9 -->
+        <rect class="device-rect" x="120" y="144" width="320" height="28"/>
+        <text class="device-text" x="132" y="162"><tspan class="name">br-core</tspan><tspan class="model"> — Cisco ISR 4321相当</tspan></text>
+        <rect class="psu-tab-a" x="422" y="148" width="10" height="8"/>
+        <rect class="psu-tab-b" x="422" y="160" width="10" height="8"/>
+
+        <!-- 空きU8-U3（増設余地） -->
+        <rect class="empty-band" x="120" y="172" width="320" height="168"/>
+        <text class="empty-label" x="280" y="260">空き（増設用）</text>
+
+        <!-- PDU-B U2 -->
+        <rect class="pdu-b" x="120" y="340" width="320" height="28"/>
+        <text class="pdu-text b" x="280" y="358">PDU-B（電源分配ユニット・B系統）</text>
+
+        <!-- PDU-A U1 -->
+        <rect class="pdu-a" x="120" y="368" width="320" height="28"/>
+        <text class="pdu-text a" x="280" y="386">PDU-A（電源分配ユニット・A系統）</text>
+
+        <!-- 側注: 電源冗長 -->
+        <text class="side-note" x="520" y="180"><tspan class="strong">電源冗長（側注）</tspan></text>
+        <rect class="psu-tab-a" x="520" y="194" width="10" height="8"/>
+        <text class="side-note" x="538" y="202">= PDU-A系統（青）</text>
+        <rect class="psu-tab-b" x="520" y="212" width="10" height="8"/>
+        <text class="side-note" x="538" y="220">= PDU-B系統（琥珀）</text>
+        <text class="side-note" x="520" y="242">br-edge/br-coreはHQラックと同様</text>
+        <text class="side-note" x="520" y="260">デュアルPSU想定でA/B両系統に接続する。</text>
+      </svg>
+    </figure>
+
+    <div class="legend-row">
+      <span class="legend-item"><span class="legend-swatch pdu-a"></span>PDU-A系統（青）</span>
+      <span class="legend-item"><span class="legend-swatch pdu-b"></span>PDU-B系統（琥珀）</span>
+      <span class="legend-item"><span class="legend-swatch passive"></span>パッシブ機器（電源接続なし）</span>
+      <span class="legend-item"><span class="legend-swatch empty"></span>空きU（増設余地）</span>
+    </div>
+  </section>
+
+  <section id="sec3">
+    <h2>3. 搭載表<a class="anchor" href="#sec3">#</a></h2>
+    <div class="grid-card">
+      <div class="grid-scroll">
+        <table class="grid-table">
+          <thead><tr><th>機器</th><th>ラック</th><th>U位置</th><th>想定機種</th><th>電源A系統</th><th>電源B系統</th><th>備考</th></tr></thead>
+          <tbody>
+            <tr><td>パッチパネル</td><td>RACK-HQ-01</td><td class="mono">U24-U23</td><td>24ポート結線盤（想定）</td><td>—</td><td>—</td><td>パッシブ・電源接続なし</td></tr>
+            <tr><td>hq-edge</td><td>RACK-HQ-01</td><td class="mono">U22</td><td>Cisco ISR 4331相当</td><td>PDU-A(HQ)</td><td>PDU-B(HQ)</td><td>QoS/NAT/ACL/BGP境界</td></tr>
+            <tr><td>hq-core</td><td>RACK-HQ-01</td><td class="mono">U21</td><td>Cisco ISR 4321相当</td><td>PDU-A(HQ)</td><td>PDU-B(HQ)</td><td>OSPF Area 0 コア</td></tr>
+            <tr><td>hq-dist</td><td>RACK-HQ-01</td><td class="mono">U20</td><td>Cisco ISR 4321相当</td><td>PDU-A(HQ)</td><td>PDU-B(HQ)</td><td>PBR適用ディストリビューション</td></tr>
+            <tr><td>hq-dmz</td><td>RACK-HQ-01</td><td class="mono">U19</td><td>Cisco ISR 4321相当</td><td>PDU-A(HQ)</td><td>PDU-B(HQ)</td><td>DMZゾーンACL</td></tr>
+            <tr><td>ケーブルガイド</td><td>RACK-HQ-01</td><td class="mono">U13</td><td>配線整理用（1U）</td><td>—</td><td>—</td><td>パッシブ・電源接続なし</td></tr>
+            <tr><td>PDU-B(HQ)</td><td>RACK-HQ-01</td><td class="mono">U2</td><td>PDU（電源分配ユニット）</td><td>—</td><td>給電元</td><td>B系統</td></tr>
+            <tr><td>PDU-A(HQ)</td><td>RACK-HQ-01</td><td class="mono">U1</td><td>PDU（電源分配ユニット）</td><td>給電元</td><td>—</td><td>A系統</td></tr>
+            <tr><td>パッチパネル</td><td>RACK-BR-01</td><td class="mono">U12-U11</td><td>12ポート結線盤（想定）</td><td>—</td><td>—</td><td>パッシブ・電源接続なし</td></tr>
+            <tr><td>br-edge</td><td>RACK-BR-01</td><td class="mono">U10</td><td>Cisco ISR 4321相当</td><td>PDU-A(BR)</td><td>PDU-B(BR)</td><td>BGP AS65001フィルタ</td></tr>
+            <tr><td>br-core</td><td>RACK-BR-01</td><td class="mono">U9</td><td>Cisco ISR 4321相当</td><td>PDU-A(BR)</td><td>PDU-B(BR)</td><td>OSPF Area 1</td></tr>
+            <tr><td>PDU-B(BR)</td><td>RACK-BR-01</td><td class="mono">U2</td><td>PDU（電源分配ユニット）</td><td>—</td><td>給電元</td><td>B系統</td></tr>
+            <tr><td>PDU-A(BR)</td><td>RACK-BR-01</td><td class="mono">U1</td><td>PDU（電源分配ユニット）</td><td>給電元</td><td>—</td><td>A系統</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span class="icon">!</span>
+      <div><strong>isp は搭載対象外</strong>isp はキャリア局側設備（ISPが管理する設備）であり、自社ラックへの搭載対象外とする。上表・上図には含めない。</div>
+    </div>
+
+    <h3>設計メモ</h3>
+    <ul class="plain">
+      <li>上部には軽量なパッチパネル・配線盤を配置し、下部には重量のあるPDUを配置するのが一般則である（重心を下げ、転倒・積載荷重リスクを低減する）。</li>
+      <li>発熱の大きい機器は排気経路を確保しやすい中段に分散配置し、単一箇所への熱集中を避ける。</li>
+      <li>空きUは将来の増設余地として確保し、配線・気流を妨げない範囲で機器追加時に活用する。</li>
+    </ul>
+  </section>
+</div>
+
+<footer class="site-footer">
+  <span>Theme 27 · QoS / ACL / route-map Applied</span>
+  <span>ソース: 03_詳細設計/パラメータシート.md</span>
+  <span>生成 2026-07-08</span>
+</footer>
+
+<script>
+  "use strict";
+  function flashDone(btn) {
+    const original = btn.textContent;
+    btn.textContent = "✓ コピーしました";
+    btn.classList.add("done");
+    setTimeout(() => { btn.textContent = original; btn.classList.remove("done"); }, 1500);
+  }
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".copy-btn");
+    if (!btn) return;
+    const text = btn.dataset.copyTarget
+      ? document.getElementById(btn.dataset.copyTarget).textContent
+      : btn.dataset.copy;
+    navigator.clipboard.writeText(text).then(() => flashDone(btn)).catch(() => {
+      const ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta);
+      ta.select(); document.execCommand("copy"); ta.remove();
+      flashDone(btn);
+    });
+  });
+
+  const tocLinks = [...document.querySelectorAll(".toc a")];
+  if (tocLinks.length) {
+    const sections = [...document.querySelectorAll("main section")];
+    const spy = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        tocLinks.forEach((a) =>
+          a.classList.toggle("active", a.getAttribute("href") === `#${entry.target.id}`));
+      });
+    }, { rootMargin: "-20% 0px -70% 0px" });
+    sections.forEach((s) => spy.observe(s));
+  }
+
+  window.addEventListener("beforeprint", () =>
+    document.querySelectorAll("details.answer").forEach((d) => { d.open = true; }));
+</script>
+</body>
+</html>

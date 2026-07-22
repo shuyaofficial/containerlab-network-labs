@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>基本設計書 | Theme 27 QoS/ACL/PBR</title>
+<style>
+  /* =====================================================
+     Theme 27 ドキュメントスイート 共通デザイントークン
+     基準: UIデザイン案/DESIGN.md（引き算の機能美・ジョブズ基準）
+     この <style> ブロック全体を各文書にコピーして使う。
+     ===================================================== */
+  :root {
+    /* 基調（warm gray ライト） */
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    /* アクセント（スイート全体で1色のみ） */
+    --accent: #635BFF;
+    --accent-soft: #F0EFFF;
+    /* ステータス（意味固定・転用禁止） */
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    /* ゾーン（構成図・表のセマンティック色） */
+    --zone-trust: #16A34A;   --zone-trust-soft: #F0FDF4;
+    --zone-dmz: #D97706;     --zone-dmz-soft: #FFFBEB;
+    --zone-untrust: #DC2626; --zone-untrust-soft: #FEF2F2;
+    --zone-wan: #2563EB;     --zone-wan-soft: #EFF6FF;
+    /* コード */
+    --code-bg: #0F172A;
+    --code-ink: #E2E8F0;
+    /* フォント・形状・動き */
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  body {
+    font-family: var(--sans);
+    font-size: 15px; line-height: 1.8;
+    color: var(--ink); background: var(--surface);
+  }
+
+  /* ===== サイトヘッダ（全文書共通） ===== */
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 16px;
+    height: 56px; padding: 0 24px;
+    background: rgba(250,250,249,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; white-space: nowrap; }
+  .brand span { color: var(--accent); }
+  .phase-badge {
+    padding: 2px 10px; font-size: 11.5px; font-weight: 600; letter-spacing: .04em;
+    color: var(--accent); background: var(--accent-soft);
+    border-radius: var(--r-full); white-space: nowrap;
+  }
+  .header-nav { margin-left: auto; display: flex; gap: 4px; }
+  .header-nav a {
+    padding: 6px 12px; font-size: 13px; color: var(--ink-2);
+    text-decoration: none; border-radius: var(--r-sm);
+    transition: color .12s var(--ease), background .12s var(--ease);
+  }
+  .header-nav a:hover { color: var(--ink); background: #F5F5F4; }
+
+  /* ===== レイアウト =====
+     長文文書: .layout（3ペイン）/ 表・図中心: .container（1カラム） */
+  .layout {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr) 200px;
+    gap: 48px; max-width: 1280px; margin: 0 auto; padding: 0 24px;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
+
+  .nav { padding: 32px 0; }
+  .nav, .toc { position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; }
+  .nav-group { margin-bottom: 24px; }
+  .nav-label {
+    font-size: 11px; font-weight: 600; letter-spacing: .08em;
+    color: var(--ink-3); text-transform: uppercase; margin-bottom: 8px;
+  }
+  .nav a {
+    display: block; padding: 5px 10px; margin-left: -10px;
+    font-size: 13.5px; color: var(--ink-2); text-decoration: none;
+    border-radius: var(--r-sm);
+    transition: color .12s var(--ease), background .12s var(--ease);
+  }
+  .nav a:hover { color: var(--ink); background: #F5F5F4; }
+  .nav a.current { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+
+  .doc { padding: 40px 0 96px; min-width: 0; }
+  .breadcrumb { font-size: 12px; color: var(--ink-3); margin-bottom: 12px; }
+  .breadcrumb a { color: inherit; text-decoration: none; }
+  .breadcrumb a:hover { color: var(--accent); }
+  .kicker {
+    font-size: 11px; font-weight: 600; letter-spacing: .12em;
+    color: var(--accent); text-transform: uppercase; margin-bottom: 6px;
+  }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 40px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; font-size: 12px; font-weight: 500;
+    border-radius: var(--r-full); border: 1px solid var(--border);
+    background: var(--raised); color: var(--ink-2);
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  section { margin-bottom: 56px; scroll-margin-top: 72px; }
+  h2 {
+    font-size: 20px; font-weight: 600; margin-bottom: 16px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--border);
+  }
+  h2 a.anchor { color: var(--ink-3); text-decoration: none; opacity: 0; margin-left: 6px; font-weight: 400; }
+  h2:hover a.anchor { opacity: 1; }
+  h3 { font-size: 16px; font-weight: 600; margin: 24px 0 10px; }
+  p { margin-bottom: 12px; }
+  p.note { font-size: 13.5px; color: var(--ink-2); margin-bottom: 16px; }
+  ul.plain, ol.plain { padding-left: 22px; margin-bottom: 12px; }
+
+  /* ===== テーブル（パラメータ・仕様） ===== */
+  .param-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .param-table th, .param-table td { padding: 10px 12px; text-align: left; vertical-align: top; }
+  .param-table thead th {
+    font-size: 11px; font-weight: 600; letter-spacing: .06em;
+    color: var(--ink-3); text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .param-table tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+  .param-table tbody tr:hover { background: #F5F5F4; }
+  .param-table .k { width: 220px; color: var(--ink-2); font-weight: 500; }
+  .mono { font-family: var(--mono); font-size: 13px; font-feature-settings: "tnum"; }
+  .num { text-align: right; }
+
+  /* ===== グリッド（台帳・一覧: カード内スクロール型） ===== */
+  .grid-card { background: var(--raised); border-radius: var(--r-md); box-shadow: var(--shadow-1); overflow: hidden; margin-bottom: 24px; }
+  .grid-scroll { max-height: 560px; overflow: auto; }
+  .grid-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .grid-table thead th {
+    position: sticky; top: 0; z-index: 2;
+    padding: 10px 14px; text-align: left; white-space: nowrap;
+    font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--ink-3); background: var(--raised);
+    border-bottom: 1px solid var(--border);
+  }
+  .grid-table tbody td { padding: 9px 14px; border-bottom: 1px solid #F5F5F4; white-space: nowrap; }
+  .grid-table tbody tr:hover { background: #FAFAF9; }
+  .grid-table tbody tr:last-child td { border-bottom: none; }
+
+  /* ステータスピル（●=色+形の二重符号） */
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; font-size: 11.5px; font-weight: 600; border-radius: var(--r-full); }
+  .pill::before { content: "●"; font-size: 8px; }
+  .pill.ok    { color: #065F46; background: #ECFDF5; }
+  .pill.warn  { color: #92400E; background: #FFFBEB; }
+  .pill.warn::before { content: "▲"; font-size: 9px; }
+  .pill.error { color: #991B1B; background: #FEF2F2; }
+  .pill.error::before { content: "✕"; font-size: 10px; }
+  .pill.todo  { color: #57534E; background: #F5F5F4; }
+  .pill.todo::before { content: "○"; }
+
+  /* ゾーンチップ */
+  .zone { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; font-size: 11.5px; font-weight: 600; border-radius: var(--r-full); }
+  .zone::before { content: "■"; font-size: 8px; }
+  .zone.trust   { color: #14532D; background: var(--zone-trust-soft); }
+  .zone.trust::before   { color: var(--zone-trust); }
+  .zone.dmz     { color: #78350F; background: var(--zone-dmz-soft); }
+  .zone.dmz::before     { color: var(--zone-dmz); }
+  .zone.untrust { color: #7F1D1D; background: var(--zone-untrust-soft); }
+  .zone.untrust::before { color: var(--zone-untrust); }
+  .zone.wan     { color: #1E3A8A; background: var(--zone-wan-soft); }
+  .zone.wan::before     { color: var(--zone-wan); }
+
+  /* コピー（IP・コマンドの転記ミス防止） */
+  .copyable { display: inline-flex; align-items: center; gap: 8px; }
+  .copy-btn {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px; font-size: 11px; font-family: var(--sans);
+    color: var(--ink-3); background: none;
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    cursor: pointer; opacity: 0;
+    transition: all .12s var(--ease);
+  }
+  tr:hover .copy-btn, .code-head .copy-btn, .copyable:hover .copy-btn { opacity: 1; }
+  .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .copy-btn.done { opacity: 1; color: var(--ok); border-color: var(--ok); }
+
+  /* ===== コードブロック（ライト紙面内でもダーク固定） ===== */
+  .code-block { border-radius: var(--r-md); overflow: hidden; border: 1px solid #1E293B; margin: 16px 0; }
+  .code-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 14px; background: #1E293B;
+    font-size: 12px; color: #94A3B8; font-family: var(--mono);
+  }
+  .code-head .copy-btn { border-color: #334155; color: #94A3B8; }
+  .code-head .copy-btn:hover { color: var(--code-ink); border-color: #64748B; }
+  .code-head .copy-btn.done { color: var(--ok); border-color: var(--ok); }
+  pre {
+    padding: 16px; background: var(--code-bg); color: var(--code-ink);
+    font-family: var(--mono); font-size: 13px; line-height: 1.7;
+    overflow-x: auto;
+  }
+  pre .c { color: #64748B; }  /* コメント */
+  pre .k { color: #7DD3FC; }  /* コマンド */
+  pre .v { color: #FDBA74; }  /* 値 */
+
+  /* ===== コールアウト（左ボーダー3px・枠で囲まない） ===== */
+  .callout {
+    display: flex; gap: 12px; padding: 14px 16px; margin: 16px 0;
+    border-radius: var(--r-sm); font-size: 14px;
+    border-left: 3px solid var(--warn); background: #FFFBEB;
+  }
+  .callout .icon { font-weight: 700; color: var(--warn); font-family: var(--mono); }
+  .callout strong { display: block; font-size: 13px; margin-bottom: 2px; }
+  .callout.info  { border-left-color: var(--info); background: #EFF6FF; }
+  .callout.info .icon { color: var(--info); }
+  .callout.error { border-left-color: var(--error); background: #FEF2F2; }
+  .callout.error .icon { color: var(--error); }
+
+  /* ===== 解答編（details 折りたたみ） ===== */
+  details.answer { margin: 16px 0; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--raised); }
+  details.answer > summary {
+    padding: 12px 16px; cursor: pointer; user-select: none;
+    font-size: 14px; font-weight: 600; color: var(--accent);
+    list-style: none; display: flex; align-items: center; gap: 10px;
+  }
+  details.answer > summary::-webkit-details-marker { display: none; }
+  details.answer > summary::before { content: "▸"; transition: transform .15s var(--ease); }
+  details.answer[open] > summary::before { transform: rotate(90deg); }
+  details.answer > summary .hint { font-weight: 400; font-size: 12px; color: var(--ink-3); }
+  details.answer > .answer-body { padding: 0 16px 16px; }
+
+  /* ===== 手順ステップ ===== */
+  .steps { list-style: none; counter-reset: step; }
+  .steps > li {
+    position: relative; padding: 0 0 24px 44px; counter-increment: step;
+    border-left: 1px solid var(--border); margin-left: 14px;
+  }
+  .steps > li:last-child { border-left-color: transparent; padding-bottom: 0; }
+  .steps > li::before {
+    content: counter(step); position: absolute; left: -15px; top: 0;
+    width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 13px; font-weight: 600;
+    color: var(--accent); background: var(--accent-soft);
+    border: 1px solid var(--accent); border-radius: 50%;
+  }
+  .steps > li > strong { display: block; margin-bottom: 4px; }
+
+  /* ===== 変更履歴 ===== */
+  .changelog { list-style: none; }
+  .changelog li { position: relative; padding: 0 0 20px 24px; border-left: 1px solid var(--border); margin-left: 6px; }
+  .changelog li:last-child { padding-bottom: 0; }
+  .changelog li::before {
+    content: ""; position: absolute; left: -5px; top: 7px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--surface); border: 2px solid var(--ink-3);
+  }
+  .changelog li:first-child::before { border-color: var(--accent); background: var(--accent); }
+  .changelog .date { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+  .changelog .desc { font-size: 14px; }
+
+  /* ===== 右目次 ===== */
+  .toc { padding: 40px 0; font-size: 12.5px; }
+  .toc-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--ink-3); margin-bottom: 10px; }
+  .toc a {
+    display: block; padding: 4px 0 4px 12px;
+    color: var(--ink-3); text-decoration: none;
+    border-left: 2px solid var(--border);
+    transition: color .12s var(--ease), border-color .12s var(--ease);
+  }
+  .toc a:hover { color: var(--ink); }
+  .toc a.active { color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+
+  /* ===== フッタ ===== */
+  .site-footer {
+    max-width: 1280px; margin: 0 auto; padding: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--ink-3);
+    display: flex; flex-wrap: wrap; gap: 8px 24px;
+  }
+
+  /* ===== レスポンシブ / 印刷 / モーション ===== */
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 220px minmax(0, 1fr); }
+    .toc { display: none; }
+  }
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; gap: 0; }
+    .nav { position: static; height: auto; padding: 20px 0 0; display: flex; gap: 20px; overflow-x: auto; }
+    .nav-group { margin: 0; white-space: nowrap; }
+    .param-table .k { width: 130px; }
+    .doc section, .container section { overflow-x: auto; }
+  }
+  @media print {
+    .site-header, .nav, .toc, .copy-btn { display: none !important; }
+    .layout { display: block; }
+    body { background: #fff; font-size: 12px; }
+    .grid-scroll { max-height: none; overflow: visible; }
+    details.answer { border: none; }
+    details.answer > summary { display: none; }
+    details.answer > .answer-body { padding: 0; }
+    section, .grid-card, .code-block, tr { break-inside: avoid; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    html { scroll-behavior: auto; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand">Theme 27 <span>·</span> QoS / ACL / PBR</div>
+  <span class="phase-badge">02 基本設計</span>
+  <nav class="header-nav" aria-label="文書ナビゲーション">
+    <a href="../index.html">文書一覧</a>
+  </nav>
+</header>
+
+<div class="layout">
+  <nav class="nav" aria-label="章ナビゲーション">
+    <div class="nav-group">
+      <div class="nav-label">本書の章</div>
+      <a href="#sec1" class="current">1. 設計方針</a>
+      <a href="#sec2">2. 全体構成</a>
+      <a href="#sec3">3. ルーティング設計</a>
+      <a href="#sec4">4. アクセス制御(ACL)設計</a>
+      <a href="#sec5">5. PBR設計</a>
+      <a href="#sec6">6. QoS設計</a>
+      <a href="#sec7">7. BGP経路フィルタリング設計</a>
+      <a href="#sec8">8. NAT設計</a>
+      <a href="#sec9">9. 設計判断の記録</a>
+    </div>
+  </nav>
+
+  <main class="doc">
+    <div class="breadcrumb"><a href="../index.html">Theme 27</a> / 02_基本設計 / 基本設計書</div>
+    <div class="kicker">Theme 27 · QoS / ACL / route-map Applied</div>
+    <h1>基本設計書</h1>
+    <div class="doc-meta">
+      <span class="badge ver">v1.0</span>
+      <span class="badge"><span class="dot"></span>承認済み</span>
+      <span class="badge">最終更新 2026-07-08</span>
+      <span class="badge">ソース: 基本設計書.md</span>
+    </div>
+
+    <section id="sec1">
+      <h2>1. 設計方針（4ゾーンモデル）<a class="anchor" href="#sec1">#</a></h2>
+      <p>本システムは『ネットワーク・デザインパターン』のコンセプトに基づき、4つのゾーンを構成する。各ゾーンの境界（エッジルータやディストリビューションスイッチ）で適切なセキュリティ・QoSポリシーを適用する。</p>
+      <table class="param-table">
+        <thead><tr><th>ゾーン</th><th>該当サブネット</th><th>境界実装ノード</th></tr></thead>
+        <tbody>
+          <tr><td class="k"><span class="zone trust">Trust</span></td><td class="mono">10.27.10.0/24, 10.27.20.0/24, 10.27.50.0/24</td><td>本社・支社の社内LAN（hq-dist配下: PC/VoIP、br-core配下: PC）</td></tr>
+          <tr><td class="k"><span class="zone dmz">DMZ</span></td><td class="mono">10.27.30.0/24</td><td>本社公開サーバ（hq-dmz配下）</td></tr>
+          <tr><td class="k"><span class="zone untrust">Untrust</span></td><td class="mono">198.51.100.0/24</td><td>ISP/インターネット（hq-edge, isp, br-edge境界）</td></tr>
+          <tr><td class="k"><span class="zone wan">WAN</span></td><td class="mono">198.51.100.8/30, 198.51.100.12/30</td><td>拠点間接続網（hq-edge–isp–br-edge間）</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="sec2">
+      <h2>2. 全体構成<a class="anchor" href="#sec2">#</a></h2>
+      <p>ラボは cisco_iol 7台 + Linuxエンドポイント4台の計11ノードで構成する（コンテナ名: <span class="mono">clab-qos-acl-policy-lab-&lt;ノード名&gt;</span>、管理ネット <span class="mono">172.27.27.0/24</span>）。</p>
+      <div class="grid-card">
+        <div class="grid-scroll">
+          <table class="grid-table">
+            <thead><tr><th>ノード</th><th>種別</th><th>役割</th><th>mgmt IP</th><th>Loopback0</th><th>ゾーン</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">hq-core</td><td>cisco_iol</td><td>HQ Core / OSPF Area 0</td><td class="mono">172.27.27.11</td><td class="mono">10.27.255.1/32</td><td><span class="zone trust">Trust</span></td></tr>
+              <tr><td class="mono">hq-dist</td><td>cisco_iol</td><td>HQ Distribution / PBR</td><td class="mono">172.27.27.12</td><td class="mono">10.27.255.2/32</td><td><span class="zone trust">Trust</span></td></tr>
+              <tr><td class="mono">hq-edge</td><td>cisco_iol</td><td>HQ Edge / QoS(LLQ)/NAT/ACL/BGP</td><td class="mono">172.27.27.13</td><td class="mono">10.27.255.254/32</td><td><span class="zone untrust">Untrust境界</span></td></tr>
+              <tr><td class="mono">hq-dmz</td><td>cisco_iol</td><td>DMZ GW / Zone ACL</td><td class="mono">172.27.27.14</td><td class="mono">10.27.255.3/32</td><td><span class="zone dmz">DMZ</span></td></tr>
+              <tr><td class="mono">br-core</td><td>cisco_iol</td><td>Branch Core / OSPF Area 1</td><td class="mono">172.27.27.21</td><td class="mono">10.27.255.11/32</td><td><span class="zone trust">Trust</span></td></tr>
+              <tr><td class="mono">br-edge</td><td>cisco_iol</td><td>Branch Edge / BGP Filter</td><td class="mono">172.27.27.22</td><td class="mono">10.27.255.12/32</td><td><span class="zone wan">WAN</span></td></tr>
+              <tr><td class="mono">isp</td><td>cisco_iol</td><td>ISP Router</td><td class="mono">172.27.27.100</td><td class="mono">10.27.255.100/32</td><td><span class="zone untrust">Untrust</span></td></tr>
+              <tr><td class="mono">hq-pc</td><td>linux</td><td>データ端末 VLAN10</td><td class="mono">172.27.27.101</td><td class="mono">10.27.10.10/24</td><td><span class="zone trust">Trust</span></td></tr>
+              <tr><td class="mono">hq-voip</td><td>linux</td><td>音声端末 VLAN50</td><td class="mono">172.27.27.104</td><td class="mono">10.27.50.10/24</td><td><span class="zone trust">Trust</span></td></tr>
+              <tr><td class="mono">br-pc</td><td>linux</td><td>支社端末 VLAN20</td><td class="mono">172.27.27.102</td><td class="mono">10.27.20.10/24</td><td><span class="zone trust">Trust</span></td></tr>
+              <tr><td class="mono">dmz-srv</td><td>linux</td><td>Webサーバ VLAN30</td><td class="mono">172.27.27.103</td><td class="mono">10.27.30.10/24</td><td><span class="zone dmz">DMZ</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p>物理・論理構成、および全アドレス割当の詳細は以下の関連文書を参照。</p>
+      <ul class="plain">
+        <li><a href="ネットワーク構成図.html">ネットワーク構成図（物理/論理タブ切替・クリックで詳細表示）</a></li>
+        <li><a href="IPアドレス管理表.html">IPアドレス管理表</a></li>
+      </ul>
+    </section>
+
+    <section id="sec3">
+      <h2>3. ルーティング設計<a class="anchor" href="#sec3">#</a></h2>
+      <h3>3.1 OSPF エリア設計</h3>
+      <table class="param-table">
+        <thead><tr><th>拠点</th><th>Area</th><th>該当ノード</th></tr></thead>
+        <tbody>
+          <tr><td class="k">HQ</td><td class="mono">Area 0</td><td class="mono">hq-core, hq-dist, hq-dmz, hq-edge（内側）</td></tr>
+          <tr><td class="k">Branch</td><td class="mono">Area 1</td><td class="mono">br-edge, br-core</td></tr>
+        </tbody>
+      </table>
+      <p class="note">Branch = Area 1 が確定値（README_Lab_Challenge.md準拠）。旧構成図HTMLの「br-core Area 0」表記は誤りとして課題管理表に記録済み（9章参照）。</p>
+      <h3>3.2 BGP AS設計</h3>
+      <table class="param-table">
+        <thead><tr><th>ノード</th><th>AS番号</th><th>備考</th></tr></thead>
+        <tbody>
+          <tr><td class="k">hq-edge</td><td class="mono copyable">AS 65000 <button class="copy-btn" data-copy="65000">コピー</button></td><td>テーマ26の慣習を継承</td></tr>
+          <tr><td class="k">br-edge</td><td class="mono copyable">AS 65001 <button class="copy-btn" data-copy="65001">コピー</button></td><td>27のMDに明記</td></tr>
+          <tr><td class="k">isp</td><td class="mono copyable">AS 65100 <button class="copy-btn" data-copy="65100">コピー</button></td><td>テーマ26の慣習を継承</td></tr>
+        </tbody>
+      </table>
+      <p class="note">isp は各ピア（hq-edge / br-edge）へデフォルトルートを広告する。hq-edge / br-edge は prefix-list により自拠点のサブネットのみをISPへ広告し、意図しない経路漏洩を防ぐ。</p>
+    </section>
+
+    <section id="sec4">
+      <h2>4. アクセス制御(ACL)設計<a class="anchor" href="#sec4">#</a></h2>
+      <p>ACLは各インターフェースのできるだけ「送信元に近い場所（インバウンド）」または「境界ルータのアウトバウンド」に適用する。パケットが不要に内部ネットワークを横断してからdenyされる無駄を避けるための設計方針である。</p>
+      <h3>4.1 hq-edge（Untrust境界）— OUTSIDE-IN</h3>
+      <p>外部インターフェース（ISP側 <span class="mono">Ethernet0/2</span>）のインバウンドに適用する。</p>
+      <table class="param-table">
+        <thead><tr><th>順序</th><th>ルール</th><th>意図</th></tr></thead>
+        <tbody>
+          <tr><td class="k">10</td><td class="mono copyable">permit tcp any host 10.27.30.10 eq 80 <button class="copy-btn" data-copy="permit tcp any host 10.27.30.10 eq 80">コピー</button></td><td>DMZ公開サーバへのHTTP許可</td></tr>
+          <tr><td class="k">20</td><td class="mono copyable">permit tcp any host 10.27.30.10 eq 443 <button class="copy-btn" data-copy="permit tcp any host 10.27.30.10 eq 443">コピー</button></td><td>DMZ公開サーバへのHTTPS許可</td></tr>
+          <tr><td class="k">30</td><td class="mono">permit icmp any any echo-reply</td><td>内部発ICMPの戻り許可（またはestablished句で代用）</td></tr>
+          <tr><td class="k">40</td><td class="mono">deny ip any any</td><td>その他は全拒否（暗黙denyの明示化）</td></tr>
+        </tbody>
+      </table>
+      <h3>4.2 hq-dmz（DMZ境界）— DMZ-OUT</h3>
+      <p>DMZインターフェース（<span class="mono">Ethernet0/2</span>、to dmz-srv）のインバウンドに適用し、DMZからTrust宛てのパケットをdenyする。</p>
+      <table class="param-table">
+        <thead><tr><th>順序</th><th>ルール</th><th>意図</th></tr></thead>
+        <tbody>
+          <tr><td class="k">5</td><td class="mono">permit tcp host 10.27.30.10 eq 80 any</td><td>Webサーバ応答（80番発）を許可。Trust→DMZ 80/443要件の戻りを成立させる（ISS-13）</td></tr>
+          <tr><td class="k">6</td><td class="mono">permit tcp host 10.27.30.10 eq 443 any</td><td>同HTTPS応答</td></tr>
+          <tr><td class="k">7</td><td class="mono">permit icmp host 10.27.30.10 10.27.10.0 0.0.0.255 echo-reply</td><td>PC→srv の ping 返事のみ許可（片方向ping・運用疎通確認用の拡張 ISS-14）</td></tr>
+          <tr><td class="k">10</td><td class="mono">deny ip 10.27.30.0 0.0.0.255 10.27.10.0 0.0.0.255</td><td>DMZ→HQ Trust（VLAN10）拒否</td></tr>
+          <tr><td class="k">20</td><td class="mono">deny ip 10.27.30.0 0.0.0.255 10.27.20.0 0.0.0.255</td><td>DMZ→Branch Trust（VLAN20）拒否</td></tr>
+          <tr><td class="k">25</td><td class="mono">deny ip 10.27.30.0 0.0.0.255 10.27.50.0 0.0.0.255</td><td>DMZ→HQ Trust（VLAN50/VoIP）拒否 ※初版で漏れ、レビューで追補（課題管理表 ISS-12）</td></tr>
+          <tr><td class="k">30</td><td class="mono">permit ip any any</td><td>その他（戻り通信含む）は許可</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="sec5">
+      <h2>5. PBR設計<a class="anchor" href="#sec5">#</a></h2>
+      <p><strong>実装箇所</strong>: hq-dist。<span class="mono">hq-voip</span>（10.27.50.0/24）からのパケットをACLでキャッチし、<span class="mono">route-map</span> で <span class="mono">set ip next-hop</span> を用いて、通常のOSPFで計算された経路とは別の特定のネクストホップへ転送する。</p>
+      <table class="param-table">
+        <thead><tr><th>項目</th><th>設定値</th><th>備考</th></tr></thead>
+        <tbody>
+          <tr><td class="k">対象ACL</td><td class="mono">permit ip 10.27.50.0 0.0.0.255 any</td><td>hq-voipセグメントを抽出</td></tr>
+          <tr><td class="k">route-map</td><td class="mono copyable">route-map PBR_VOICE permit 10 <button class="copy-btn" data-copy="route-map PBR_VOICE permit 10">コピー</button></td><td>PBRポリシー名</td></tr>
+          <tr><td class="k">match</td><td class="mono">match ip address &lt;ACL&gt;</td><td>上記ACLで抽出した通信にマッチ</td></tr>
+          <tr><td class="k">set next-hop</td><td class="mono copyable">set ip next-hop 10.27.1.1 <button class="copy-btn" data-copy="set ip next-hop 10.27.1.1">コピー</button></td><td>hq-core向けIF（学習上の例示値）</td></tr>
+          <tr><td class="k">set dscp</td><td class="mono copyable">set dscp ef <button class="copy-btn" data-copy="set dscp ef">コピー</button></td><td>PBR適用と同時にマーキングも実施</td></tr>
+          <tr><td class="k">適用</td><td class="mono">Ethernet0/3 inbound: ip policy route-map PBR_VOICE</td><td>hq-dist（to hq-voip）</td></tr>
+        </tbody>
+      </table>
+      <p class="note">next-hop 10.27.1.1 は通常経路（OSPF計算結果）のネクストホップと同一であり、「別経路への誘導」というPBR本来の教育効果は限定的だが、学習上の例示値として許容する（課題管理表 課題3: オープン）。</p>
+    </section>
+
+    <section id="sec6">
+      <h2>6. QoS設計<a class="anchor" href="#sec6">#</a></h2>
+      <p>シスコの <strong>MQC（Modular QoS CLI）</strong> フレームワークを使用し、「分類 → マーキング → キューイング（LLQ）」の3段構成で設計する。</p>
+      <ol class="steps">
+        <li><strong>分類（class-map）</strong>ACLで送信元 <span class="mono">10.27.50.0/24</span>（hq-voip）をマッチさせ、<span class="mono">class-map match-all VOICE</span> として定義する。実装箇所は hq-dist（LAN側エッジ）。</li>
+        <li><strong>マーキング（policy-map MARKING）</strong><span class="mono">policy-map MARKING</span> にて VOICEクラスに対し <span class="mono copyable">set dscp ef <button class="copy-btn" data-copy="set dscp ef">コピー</button></span> を設定する。</li>
+        <li><strong>キューイング（policy-map WAN-EDGE / LLQ）</strong>実装箇所は hq-edge のWANインターフェース（アウトバウンド）。<span class="mono">class-map match-any VOICE</span>（match dscp ef）を <span class="mono">policy-map WAN-EDGE</span> に組み込み、<span class="mono copyable">class VOICE: priority 2000 <button class="copy-btn" data-copy="priority 2000">コピー</button></span>（kbps・LLQ）で帯域を絶対保証し、<span class="mono">class class-default: fair-queue</span> で残りを公平配分する。Ethernet0/2 のアウトバウンドに <span class="mono">service-policy output WAN-EDGE</span> を適用する。</li>
+      </ol>
+    </section>
+
+    <section id="sec7">
+      <h2>7. BGP経路フィルタリング設計<a class="anchor" href="#sec7">#</a></h2>
+      <p><strong>実装箇所</strong>: hq-edge, br-edge。<span class="mono">ip prefix-list</span> を定義し、自拠点のサブネットのみを <span class="mono">permit</span> する。BGPの <span class="mono">neighbor &lt;IP&gt; prefix-list &lt;NAME&gt; out</span> コマンドで適用し、意図しない経路漏洩を防ぐ。</p>
+      <table class="param-table">
+        <thead><tr><th>項目</th><th>設定値</th><th>備考</th></tr></thead>
+        <tbody>
+          <tr><td class="k">prefix-list</td><td class="mono copyable">ip prefix-list BRANCH_NET permit 10.27.20.0/24 <button class="copy-btn" data-copy="ip prefix-list BRANCH_NET permit 10.27.20.0/24">コピー</button></td><td>br-edge（AS 65001）が広告してよい自拠点経路</td></tr>
+          <tr><td class="k">適用</td><td class="mono copyable">neighbor 198.51.100.13 prefix-list BRANCH_NET out <button class="copy-btn" data-copy="neighbor 198.51.100.13 prefix-list BRANCH_NET out">コピー</button></td><td>br-edge → isp 方向のBGPネイバー</td></tr>
+          <tr><td class="k">hq-edge側</td><td class="mono">同様に自拠点サブネットのみをprefix-listでisp側へ広告</td><td>意図しない他拠点経路の漏洩防止</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="sec8">
+      <h2>8. NAT設計<a class="anchor" href="#sec8">#</a></h2>
+      <p>実装箇所は hq-edge。インターネット（Untrust）へ抜けるトラフィックのアドレス変換点として機能する。</p>
+      <table class="param-table">
+        <thead><tr><th>インターフェース</th><th>IP</th><th>NAT方向</th></tr></thead>
+        <tbody>
+          <tr><td class="k">Ethernet0/1（to hq-core）</td><td class="mono">10.27.1.6/30</td><td><span class="pill ok">inside</span></td></tr>
+          <tr><td class="k">Ethernet0/2（to isp）</td><td class="mono">198.51.100.9/30</td><td><span class="pill warn">outside</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="sec9">
+      <h2>9. 設計判断の記録<a class="anchor" href="#sec9">#</a></h2>
+      <p>MDに明記がない、または文書間で表記が揺れていた項目について、以下のとおり設計判断を記録する（すべてスタイルガイド決定事項として確定）。</p>
+      <table class="param-table">
+        <thead><tr><th>判断事項</th><th>理由</th><th>日付</th></tr></thead>
+        <tbody>
+          <tr><td class="k">OSPFエリア統一</td><td>README_Lab_Challenge.md「br-core Area 1」を正とし、HQ = Area 0 / Branch = Area 1 に統一する。旧構成図HTMLの「br-core Area 0」表記は誤りであり、課題管理表に記録済みとして扱う。</td><td class="mono">2026-07-08</td></tr>
+          <tr><td class="k">Trust→DMZ許可ポート統一</td><td>要件定義書「80/443」を正とする。README Mission 1の「HTTPS(443)のみ」表記との揺れは課題管理表に記録済みとして扱う。</td><td class="mono">2026-07-08</td></tr>
+          <tr><td class="k">BGP AS番号の継承</td><td>27のMDにはbr-edge = AS 65001のみ明記。hq-edge = AS 65000 / isp = AS 65100はテーマ26の構成慣習を継承する設計判断として採用する。</td><td class="mono">2026-07-08</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <aside class="toc" aria-label="このページの目次">
+    <div class="toc-label">このページ</div>
+    <a href="#sec1" class="active">1. 設計方針</a>
+    <a href="#sec2">2. 全体構成</a>
+    <a href="#sec3">3. ルーティング設計</a>
+    <a href="#sec4">4. アクセス制御(ACL)設計</a>
+    <a href="#sec5">5. PBR設計</a>
+    <a href="#sec6">6. QoS設計</a>
+    <a href="#sec7">7. BGP経路フィルタリング設計</a>
+    <a href="#sec8">8. NAT設計</a>
+    <a href="#sec9">9. 設計判断の記録</a>
+  </aside>
+</div>
+
+<footer class="site-footer">
+  <span>Theme 27 · QoS / ACL / route-map Applied</span>
+  <span>ソース: 02_基本設計/基本設計書.md</span>
+  <span>生成 2026-07-08</span>
+</footer>
+
+<script>
+  "use strict";
+  /* ---- コピー（clipboard API + file:// フォールバック） ---- */
+  function flashDone(btn) {
+    const original = btn.textContent;
+    btn.textContent = "✓ コピーしました";
+    btn.classList.add("done");
+    setTimeout(() => { btn.textContent = original; btn.classList.remove("done"); }, 1500);
+  }
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".copy-btn");
+    if (!btn) return;
+    const text = btn.dataset.copyTarget
+      ? document.getElementById(btn.dataset.copyTarget).textContent
+      : btn.dataset.copy;
+    navigator.clipboard.writeText(text).then(() => flashDone(btn)).catch(() => {
+      const ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta);
+      ta.select(); document.execCommand("copy"); ta.remove();
+      flashDone(btn);
+    });
+  });
+
+  /* ---- 右目次スクロール連動（3ペイン文書のみ） ---- */
+  const tocLinks = [...document.querySelectorAll(".toc a")];
+  if (tocLinks.length) {
+    const sections = [...document.querySelectorAll("main section")];
+    const spy = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        tocLinks.forEach((a) =>
+          a.classList.toggle("active", a.getAttribute("href") === `#${entry.target.id}`));
+      });
+    }, { rootMargin: "-20% 0px -70% 0px" });
+    sections.forEach((s) => spy.observe(s));
+  }
+
+  /* ---- 印刷時に解答編を開く ---- */
+  window.addEventListener("beforeprint", () =>
+    document.querySelectorAll("details.answer").forEach((d) => { d.open = true; }));
+</script>
+</body>
+</html>

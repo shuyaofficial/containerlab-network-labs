@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light">
+<title>単体試験仕様書 | Theme 27 QoS/ACL/PBR</title>
+<style>
+  /* =====================================================
+     Theme 27 ドキュメントスイート 共通デザイントークン
+     基準: UIデザイン案/DESIGN.md（引き算の機能美・ジョブズ基準）
+     この <style> ブロック全体を各文書にコピーして使う。
+     ===================================================== */
+  :root {
+    /* 基調（warm gray ライト） */
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    /* アクセント（スイート全体で1色のみ） */
+    --accent: #635BFF;
+    --accent-soft: #F0EFFF;
+    /* ステータス（意味固定・転用禁止） */
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    /* ゾーン（構成図・表のセマンティック色） */
+    --zone-trust: #16A34A;   --zone-trust-soft: #F0FDF4;
+    --zone-dmz: #D97706;     --zone-dmz-soft: #FFFBEB;
+    --zone-untrust: #DC2626; --zone-untrust-soft: #FEF2F2;
+    --zone-wan: #2563EB;     --zone-wan-soft: #EFF6FF;
+    /* コード */
+    --code-bg: #0F172A;
+    --code-ink: #E2E8F0;
+    /* フォント・形状・動き */
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  body {
+    font-family: var(--sans);
+    font-size: 15px; line-height: 1.8;
+    color: var(--ink); background: var(--surface);
+  }
+
+  /* ===== サイトヘッダ（全文書共通） ===== */
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 16px;
+    height: 56px; padding: 0 24px;
+    background: rgba(250,250,249,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; white-space: nowrap; }
+  .brand span { color: var(--accent); }
+  .phase-badge {
+    padding: 2px 10px; font-size: 11.5px; font-weight: 600; letter-spacing: .04em;
+    color: var(--accent); background: var(--accent-soft);
+    border-radius: var(--r-full); white-space: nowrap;
+  }
+  .header-nav { margin-left: auto; display: flex; gap: 4px; }
+  .header-nav a {
+    padding: 6px 12px; font-size: 13px; color: var(--ink-2);
+    text-decoration: none; border-radius: var(--r-sm);
+    transition: color .12s var(--ease), background .12s var(--ease);
+  }
+  .header-nav a:hover { color: var(--ink); background: #F5F5F4; }
+
+  /* ===== レイアウト =====
+     長文文書: .layout（3ペイン）/ 表・図中心: .container（1カラム） */
+  .layout {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr) 200px;
+    gap: 48px; max-width: 1280px; margin: 0 auto; padding: 0 24px;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
+
+  .nav { padding: 32px 0; }
+  .nav, .toc { position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; }
+  .nav-group { margin-bottom: 24px; }
+  .nav-label {
+    font-size: 11px; font-weight: 600; letter-spacing: .08em;
+    color: var(--ink-3); text-transform: uppercase; margin-bottom: 8px;
+  }
+  .nav a {
+    display: block; padding: 5px 10px; margin-left: -10px;
+    font-size: 13.5px; color: var(--ink-2); text-decoration: none;
+    border-radius: var(--r-sm);
+    transition: color .12s var(--ease), background .12s var(--ease);
+  }
+  .nav a:hover { color: var(--ink); background: #F5F5F4; }
+  .nav a.current { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+
+  .doc { padding: 40px 0 96px; min-width: 0; }
+  .breadcrumb { font-size: 12px; color: var(--ink-3); margin-bottom: 12px; }
+  .breadcrumb a { color: inherit; text-decoration: none; }
+  .breadcrumb a:hover { color: var(--accent); }
+  .kicker {
+    font-size: 11px; font-weight: 600; letter-spacing: .12em;
+    color: var(--accent); text-transform: uppercase; margin-bottom: 6px;
+  }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 40px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; font-size: 12px; font-weight: 500;
+    border-radius: var(--r-full); border: 1px solid var(--border);
+    background: var(--raised); color: var(--ink-2);
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  section { margin-bottom: 56px; scroll-margin-top: 72px; }
+  h2 {
+    font-size: 20px; font-weight: 600; margin-bottom: 16px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--border);
+  }
+  h2 a.anchor { color: var(--ink-3); text-decoration: none; opacity: 0; margin-left: 6px; font-weight: 400; }
+  h2:hover a.anchor { opacity: 1; }
+  h3 { font-size: 16px; font-weight: 600; margin: 24px 0 10px; }
+  p { margin-bottom: 12px; }
+  p.note { font-size: 13.5px; color: var(--ink-2); margin-bottom: 16px; }
+  ul.plain, ol.plain { padding-left: 22px; margin-bottom: 12px; }
+
+  /* ===== テーブル（パラメータ・仕様） ===== */
+  .param-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .param-table th, .param-table td { padding: 10px 12px; text-align: left; vertical-align: top; }
+  .param-table thead th {
+    font-size: 11px; font-weight: 600; letter-spacing: .06em;
+    color: var(--ink-3); text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .param-table tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+  .param-table tbody tr:hover { background: #F5F5F4; }
+  .param-table .k { width: 220px; color: var(--ink-2); font-weight: 500; }
+  .mono { font-family: var(--mono); font-size: 13px; font-feature-settings: "tnum"; }
+  .num { text-align: right; }
+
+  /* ===== グリッド（台帳・一覧: カード内スクロール型） ===== */
+  .grid-card { background: var(--raised); border-radius: var(--r-md); box-shadow: var(--shadow-1); overflow: hidden; margin-bottom: 24px; }
+  .grid-scroll { max-height: 560px; overflow: auto; }
+  .grid-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .grid-table thead th {
+    position: sticky; top: 0; z-index: 2;
+    padding: 10px 14px; text-align: left; white-space: nowrap;
+    font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--ink-3); background: var(--raised);
+    border-bottom: 1px solid var(--border);
+  }
+  .grid-table tbody td { padding: 9px 14px; border-bottom: 1px solid #F5F5F4; white-space: nowrap; }
+  .grid-table tbody tr:hover { background: #FAFAF9; }
+  .grid-table tbody tr:last-child td { border-bottom: none; }
+
+  /* ステータスピル（●=色+形の二重符号） */
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; font-size: 11.5px; font-weight: 600; border-radius: var(--r-full); }
+  .pill::before { content: "●"; font-size: 8px; }
+  .pill.ok    { color: #065F46; background: #ECFDF5; }
+  .pill.warn  { color: #92400E; background: #FFFBEB; }
+  .pill.warn::before { content: "▲"; font-size: 9px; }
+  .pill.error { color: #991B1B; background: #FEF2F2; }
+  .pill.error::before { content: "✕"; font-size: 10px; }
+  .pill.todo  { color: #57534E; background: #F5F5F4; }
+  .pill.todo::before { content: "○"; }
+
+  /* ゾーンチップ */
+  .zone { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; font-size: 11.5px; font-weight: 600; border-radius: var(--r-full); }
+  .zone::before { content: "■"; font-size: 8px; }
+  .zone.trust   { color: #14532D; background: var(--zone-trust-soft); }
+  .zone.trust::before   { color: var(--zone-trust); }
+  .zone.dmz     { color: #78350F; background: var(--zone-dmz-soft); }
+  .zone.dmz::before     { color: var(--zone-dmz); }
+  .zone.untrust { color: #7F1D1D; background: var(--zone-untrust-soft); }
+  .zone.untrust::before { color: var(--zone-untrust); }
+  .zone.wan     { color: #1E3A8A; background: var(--zone-wan-soft); }
+  .zone.wan::before     { color: var(--zone-wan); }
+
+  /* コピー（IP・コマンドの転記ミス防止） */
+  .copyable { display: inline-flex; align-items: center; gap: 8px; }
+  .copy-btn {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px; font-size: 11px; font-family: var(--sans);
+    color: var(--ink-3); background: none;
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    cursor: pointer; opacity: 0;
+    transition: all .12s var(--ease);
+  }
+  tr:hover .copy-btn, .code-head .copy-btn, .copyable:hover .copy-btn { opacity: 1; }
+  .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .copy-btn.done { opacity: 1; color: var(--ok); border-color: var(--ok); }
+
+  /* ===== コードブロック（ライト紙面内でもダーク固定） ===== */
+  .code-block { border-radius: var(--r-md); overflow: hidden; border: 1px solid #1E293B; margin: 16px 0; }
+  .code-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 14px; background: #1E293B;
+    font-size: 12px; color: #94A3B8; font-family: var(--mono);
+  }
+  .code-head .copy-btn { border-color: #334155; color: #94A3B8; }
+  .code-head .copy-btn:hover { color: var(--code-ink); border-color: #64748B; }
+  .code-head .copy-btn.done { color: var(--ok); border-color: var(--ok); }
+  pre {
+    padding: 16px; background: var(--code-bg); color: var(--code-ink);
+    font-family: var(--mono); font-size: 13px; line-height: 1.7;
+    overflow-x: auto;
+  }
+  pre .c { color: #64748B; }  /* コメント */
+  pre .k { color: #7DD3FC; }  /* コマンド */
+  pre .v { color: #FDBA74; }  /* 値 */
+
+  /* ===== コールアウト（左ボーダー3px・枠で囲まない） ===== */
+  .callout {
+    display: flex; gap: 12px; padding: 14px 16px; margin: 16px 0;
+    border-radius: var(--r-sm); font-size: 14px;
+    border-left: 3px solid var(--warn); background: #FFFBEB;
+  }
+  .callout .icon { font-weight: 700; color: var(--warn); font-family: var(--mono); }
+  .callout strong { display: block; font-size: 13px; margin-bottom: 2px; }
+  .callout.info  { border-left-color: var(--info); background: #EFF6FF; }
+  .callout.info .icon { color: var(--info); }
+  .callout.error { border-left-color: var(--error); background: #FEF2F2; }
+  .callout.error .icon { color: var(--error); }
+
+  /* ===== 解答編（details 折りたたみ） ===== */
+  details.answer { margin: 16px 0; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--raised); }
+  details.answer > summary {
+    padding: 12px 16px; cursor: pointer; user-select: none;
+    font-size: 14px; font-weight: 600; color: var(--accent);
+    list-style: none; display: flex; align-items: center; gap: 10px;
+  }
+  details.answer > summary::-webkit-details-marker { display: none; }
+  details.answer > summary::before { content: "▸"; transition: transform .15s var(--ease); }
+  details.answer[open] > summary::before { transform: rotate(90deg); }
+  details.answer > summary .hint { font-weight: 400; font-size: 12px; color: var(--ink-3); }
+  details.answer > .answer-body { padding: 0 16px 16px; }
+
+  /* ===== 手順ステップ ===== */
+  .steps { list-style: none; counter-reset: step; }
+  .steps > li {
+    position: relative; padding: 0 0 24px 44px; counter-increment: step;
+    border-left: 1px solid var(--border); margin-left: 14px;
+  }
+  .steps > li:last-child { border-left-color: transparent; padding-bottom: 0; }
+  .steps > li::before {
+    content: counter(step); position: absolute; left: -15px; top: 0;
+    width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 13px; font-weight: 600;
+    color: var(--accent); background: var(--accent-soft);
+    border: 1px solid var(--accent); border-radius: 50%;
+  }
+  .steps > li > strong { display: block; margin-bottom: 4px; }
+
+  /* ===== 変更履歴 ===== */
+  .changelog { list-style: none; }
+  .changelog li { position: relative; padding: 0 0 20px 24px; border-left: 1px solid var(--border); margin-left: 6px; }
+  .changelog li:last-child { padding-bottom: 0; }
+  .changelog li::before {
+    content: ""; position: absolute; left: -5px; top: 7px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--surface); border: 2px solid var(--ink-3);
+  }
+  .changelog li:first-child::before { border-color: var(--accent); background: var(--accent); }
+  .changelog .date { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+  .changelog .desc { font-size: 14px; }
+
+  /* ===== 右目次 ===== */
+  .toc { padding: 40px 0; font-size: 12.5px; }
+  .toc-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--ink-3); margin-bottom: 10px; }
+  .toc a {
+    display: block; padding: 4px 0 4px 12px;
+    color: var(--ink-3); text-decoration: none;
+    border-left: 2px solid var(--border);
+    transition: color .12s var(--ease), border-color .12s var(--ease);
+  }
+  .toc a:hover { color: var(--ink); }
+  .toc a.active { color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+
+  /* ===== フッタ ===== */
+  .site-footer {
+    max-width: 1280px; margin: 0 auto; padding: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--ink-3);
+    display: flex; flex-wrap: wrap; gap: 8px 24px;
+  }
+
+  /* ===== レスポンシブ / 印刷 / モーション ===== */
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 220px minmax(0, 1fr); }
+    .toc { display: none; }
+  }
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; gap: 0; }
+    .nav { position: static; height: auto; padding: 20px 0 0; display: flex; gap: 20px; overflow-x: auto; }
+    .nav-group { margin: 0; white-space: nowrap; }
+    .param-table .k { width: 130px; }
+    .doc section, .container section { overflow-x: auto; }
+  }
+  @media print {
+    .site-header, .nav, .toc, .copy-btn { display: none !important; }
+    .layout { display: block; }
+    body { background: #fff; font-size: 12px; }
+    .grid-scroll { max-height: none; overflow: visible; }
+    details.answer { border: none; }
+    details.answer > summary { display: none; }
+    details.answer > .answer-body { padding: 0; }
+    section, .grid-card, .code-block, tr { break-inside: avoid; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    html { scroll-behavior: auto; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand">Theme 27 <span>·</span> QoS / ACL / PBR</div>
+  <span class="phase-badge">05 試験</span>
+  <nav class="header-nav" aria-label="文書ナビゲーション">
+    <a href="../index.html">文書一覧</a>
+  </nav>
+</header>
+
+<div class="container">
+  <div class="breadcrumb"><a href="../index.html">Theme 27</a> / 05_試験 / 単体試験仕様書</div>
+  <div class="kicker">Theme 27 · QoS / ACL / route-map Applied</div>
+  <h1>単体試験仕様書</h1>
+  <div class="doc-meta">
+    <span class="badge ver">v1.0</span>
+    <span class="badge"><span class="dot"></span>承認済み</span>
+    <span class="badge">最終更新 2026-07-08</span>
+    <span class="badge">ソース: 試験計画書.md</span>
+  </div>
+  <p class="note">関連文書: <a href="結合試験仕様書.html">結合試験仕様書</a> ・ <a href="正常性障害試験仕様書.html">正常性障害試験仕様書</a> ・ <a href="../index.html">Theme 27 文書一覧</a></p>
+
+  <section id="sec1">
+    <h2>1. 試験方針<a class="anchor" href="#sec1">#</a></h2>
+    <h3>1.1 目的</h3>
+    <p>Theme 27（QoS/ACL/route-map応用）ラボを構成する各ノードが、単体で正しく構築されていることを検証する。プロトコル隣接やエンドツーエンド疎通など複数ノードにまたがる確認は<a href="結合試験仕様書.html">結合試験仕様書</a>で、ポリシー動作や障害時挙動は<a href="正常性障害試験仕様書.html">正常性障害試験仕様書</a>で扱う。</p>
+    <h3>1.2 範囲</h3>
+    <ul class="plain">
+      <li>Cisco IOL 7台（hq-core / hq-dist / hq-edge / hq-dmz / br-core / br-edge / isp）のコンテナ起動状態・起動ログ・hostname・インターフェースIP/状態・Loopback・設定保存</li>
+      <li>Linux端末 4台（hq-pc / hq-voip / br-pc / dmz-srv）のeth1アドレス設定・デフォルトルート</li>
+    </ul>
+    <h3>1.3 前提条件</h3>
+    <ul class="plain">
+      <li><span class="mono">04_構築/deploy.sh deploy</span> が完了し、全11ノードが投入済みであること</li>
+      <li>作業は OrbStack Linux VM <span class="mono">clab</span>（<span class="mono">ssh clab@orb</span>）上で実施すること</li>
+      <li>IOL機器は起動に約2分を要するため、投入直後は起動完了を待ってから試験を開始すること</li>
+      <li>各機器へのACL/QoS/PBR/BGP設定投入は本試験の対象外（<a href="結合試験仕様書.html">結合試験仕様書</a>・<a href="正常性障害試験仕様書.html">正常性障害試験仕様書</a>実施前に完了していればよい）</li>
+    </ul>
+  </section>
+
+  <section id="sec2">
+    <h2>2. 試験環境<a class="anchor" href="#sec2">#</a></h2>
+    <p>実施場所: OrbStack Linux VM <span class="mono">clab</span>（<span class="mono">ssh clab@orb</span>）。対象ノードは以下の11台。コンテナ名はすべて <span class="mono">clab-qos-acl-policy-lab-&lt;ノード名&gt;</span>。</p>
+    <table class="param-table">
+      <thead><tr><th>ノード</th><th>種別</th><th>役割</th><th>mgmt IP</th><th>ゾーン</th></tr></thead>
+      <tbody>
+        <tr><td class="k mono">hq-core</td><td>cisco_iol</td><td>HQ Core / OSPF Area 0</td><td class="mono">172.27.27.11</td><td><span class="zone trust">Trust</span></td></tr>
+        <tr><td class="k mono">hq-dist</td><td>cisco_iol</td><td>HQ Distribution / PBR</td><td class="mono">172.27.27.12</td><td><span class="zone trust">Trust</span></td></tr>
+        <tr><td class="k mono">hq-edge</td><td>cisco_iol</td><td>HQ Edge / QoS(LLQ)/NAT/ACL/BGP</td><td class="mono">172.27.27.13</td><td><span class="zone untrust">Untrust境界</span></td></tr>
+        <tr><td class="k mono">hq-dmz</td><td>cisco_iol</td><td>DMZ GW / Zone ACL</td><td class="mono">172.27.27.14</td><td><span class="zone dmz">DMZ</span></td></tr>
+        <tr><td class="k mono">br-core</td><td>cisco_iol</td><td>Branch Core / OSPF Area 1</td><td class="mono">172.27.27.21</td><td><span class="zone trust">Trust</span></td></tr>
+        <tr><td class="k mono">br-edge</td><td>cisco_iol</td><td>Branch Edge / BGP Filter</td><td class="mono">172.27.27.22</td><td><span class="zone wan">WAN</span></td></tr>
+        <tr><td class="k mono">isp</td><td>cisco_iol</td><td>ISP Router</td><td class="mono">172.27.27.100</td><td><span class="zone untrust">Untrust</span></td></tr>
+        <tr><td class="k mono">hq-pc</td><td>linux</td><td>データ端末 VLAN10</td><td class="mono">172.27.27.101</td><td><span class="zone trust">Trust</span></td></tr>
+        <tr><td class="k mono">hq-voip</td><td>linux</td><td>音声端末 VLAN50</td><td class="mono">172.27.27.104</td><td><span class="zone trust">Trust</span></td></tr>
+        <tr><td class="k mono">br-pc</td><td>linux</td><td>支社端末 VLAN20</td><td class="mono">172.27.27.102</td><td><span class="zone trust">Trust</span></td></tr>
+        <tr><td class="k mono">dmz-srv</td><td>linux</td><td>Webサーバ VLAN30</td><td class="mono">172.27.27.103</td><td><span class="zone dmz">DMZ</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="sec3">
+    <h2>3. 試験項目<a class="anchor" href="#sec3">#</a></h2>
+    <p class="note">IOL機器はCLI確認に <span class="mono">sudo docker attach --sig-proxy=false clab-qos-acl-policy-lab-&lt;name&gt;</span> でログインする（離脱は Ctrl-p → Ctrl-q）。Linux端末は <span class="mono">sudo docker exec -it clab-qos-acl-policy-lab-&lt;name&gt; bash</span>。判定は実施後に ● 合格 / ▲ 条件付き / ✕ 不合格 のいずれかへ更新する。</p>
+    <div class="grid-card">
+      <div class="grid-scroll">
+        <table class="grid-table">
+          <thead><tr><th>試験ID</th><th>分類</th><th>試験項目</th><th>手順</th><th>期待結果</th><th>判定</th><th>備考</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">UT-01</td><td>起動</td><td>hq-core: コンテナ起動・起動ログ確認</td><td class="mono">sudo docker ps --filter name=clab-qos-acl-policy-lab-hq-core --format 'table {{.Names}}\t{{.Status}}'<br>sudo docker logs --tail 50 clab-qos-acl-policy-lab-hq-core</td><td>Status が Up。ログに error/crash 等の異常なし</td><td><span class="pill todo">未実施</span></td><td>起動まで約2分</td></tr>
+            <tr><td class="mono">UT-02</td><td>設定</td><td>hq-core: hostname・インターフェース確認</td><td class="mono">show running-config | include hostname<br>show ip interface brief</td><td>hostname <span class="mono">hq-core</span>。E0/1 <span class="mono">10.27.1.1</span> up/up、E0/2 <span class="mono">10.27.1.5</span> up/up、E0/3 <span class="mono">10.27.1.9</span> up/up</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-03</td><td>保存</td><td>hq-core: Loopback・設定保存確認</td><td class="mono">show ip interface brief | include Loopback0<br>show startup-config | include hostname</td><td>Loopback0 <span class="mono">10.27.255.1/32</span> up/up。startup-config が running-config と一致</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-04</td><td>起動</td><td>hq-dist: コンテナ起動・起動ログ確認</td><td class="mono">sudo docker ps --filter name=clab-qos-acl-policy-lab-hq-dist --format 'table {{.Names}}\t{{.Status}}'<br>sudo docker logs --tail 50 clab-qos-acl-policy-lab-hq-dist</td><td>Status が Up。ログに error/crash 等の異常なし</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-05</td><td>設定</td><td>hq-dist: hostname・インターフェース確認</td><td class="mono">show running-config | include hostname<br>show ip interface brief</td><td>hostname <span class="mono">hq-dist</span>。E0/1 <span class="mono">10.27.1.2</span> up/up、E0/2 <span class="mono">10.27.10.1</span> up/up、E0/3 <span class="mono">10.27.50.1</span> up/up</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-06</td><td>保存</td><td>hq-dist: Loopback・設定保存確認</td><td class="mono">show ip interface brief | include Loopback0<br>show startup-config | include hostname</td><td>Loopback0 <span class="mono">10.27.255.2/32</span> up/up。startup-config が running-config と一致</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-07</td><td>起動</td><td>hq-edge: コンテナ起動・起動ログ確認</td><td class="mono">sudo docker ps --filter name=clab-qos-acl-policy-lab-hq-edge --format 'table {{.Names}}\t{{.Status}}'<br>sudo docker logs --tail 50 clab-qos-acl-policy-lab-hq-edge</td><td>Status が Up。ログに error/crash 等の異常なし</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-08</td><td>設定</td><td>hq-edge: hostname・インターフェース確認</td><td class="mono">show running-config | include hostname<br>show ip interface brief</td><td>hostname <span class="mono">hq-edge</span>。E0/1 <span class="mono">10.27.1.6</span> up/up（NAT inside）、E0/2 <span class="mono">198.51.100.9</span> up/up（NAT outside）</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-09</td><td>保存</td><td>hq-edge: Loopback・設定保存確認</td><td class="mono">show ip interface brief | include Loopback0<br>show startup-config | include hostname</td><td>Loopback0 <span class="mono">10.27.255.254/32</span> up/up。startup-config が running-config と一致</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-10</td><td>起動</td><td>hq-dmz: コンテナ起動・起動ログ確認</td><td class="mono">sudo docker ps --filter name=clab-qos-acl-policy-lab-hq-dmz --format 'table {{.Names}}\t{{.Status}}'<br>sudo docker logs --tail 50 clab-qos-acl-policy-lab-hq-dmz</td><td>Status が Up。ログに error/crash 等の異常なし</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-11</td><td>設定</td><td>hq-dmz: hostname・インターフェース確認</td><td class="mono">show running-config | include hostname<br>show ip interface brief</td><td>hostname <span class="mono">hq-dmz</span>。E0/1 <span class="mono">10.27.1.10</span> up/up、E0/2 <span class="mono">10.27.30.1</span> up/up</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-12</td><td>保存</td><td>hq-dmz: Loopback・設定保存確認</td><td class="mono">show ip interface brief | include Loopback0<br>show startup-config | include hostname</td><td>Loopback0 <span class="mono">10.27.255.3/32</span> up/up。startup-config が running-config と一致</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-13</td><td>起動</td><td>br-core: コンテナ起動・起動ログ確認</td><td class="mono">sudo docker ps --filter name=clab-qos-acl-policy-lab-br-core --format 'table {{.Names}}\t{{.Status}}'<br>sudo docker logs --tail 50 clab-qos-acl-policy-lab-br-core</td><td>Status が Up。ログに error/crash 等の異常なし</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-14</td><td>設定</td><td>br-core: hostname・インターフェース確認</td><td class="mono">show running-config | include hostname<br>show ip interface brief</td><td>hostname <span class="mono">br-core</span>。E0/1 <span class="mono">10.27.2.2</span> up/up、E0/2 <span class="mono">10.27.20.1</span> up/up</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-15</td><td>保存</td><td>br-core: Loopback・設定保存確認</td><td class="mono">show ip interface brief | include Loopback0<br>show startup-config | include hostname</td><td>Loopback0 <span class="mono">10.27.255.11/32</span> up/up。startup-config が running-config と一致</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-16</td><td>起動</td><td>br-edge: コンテナ起動・起動ログ確認</td><td class="mono">sudo docker ps --filter name=clab-qos-acl-policy-lab-br-edge --format 'table {{.Names}}\t{{.Status}}'<br>sudo docker logs --tail 50 clab-qos-acl-policy-lab-br-edge</td><td>Status が Up。ログに error/crash 等の異常なし</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-17</td><td>設定</td><td>br-edge: hostname・インターフェース確認</td><td class="mono">show running-config | include hostname<br>show ip interface brief</td><td>hostname <span class="mono">br-edge</span>。E0/1 <span class="mono">198.51.100.14</span> up/up、E0/2 <span class="mono">10.27.2.1</span> up/up</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-18</td><td>保存</td><td>br-edge: Loopback・設定保存確認</td><td class="mono">show ip interface brief | include Loopback0<br>show startup-config | include hostname</td><td>Loopback0 <span class="mono">10.27.255.12/32</span> up/up。startup-config が running-config と一致</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-19</td><td>起動</td><td>isp: コンテナ起動・起動ログ確認</td><td class="mono">sudo docker ps --filter name=clab-qos-acl-policy-lab-isp --format 'table {{.Names}}\t{{.Status}}'<br>sudo docker logs --tail 50 clab-qos-acl-policy-lab-isp</td><td>Status が Up。ログに error/crash 等の異常なし</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-20</td><td>設定</td><td>isp: hostname・インターフェース確認</td><td class="mono">show running-config | include hostname<br>show ip interface brief</td><td>hostname <span class="mono">isp</span>。E0/1 <span class="mono">198.51.100.10</span> up/up、E0/2 <span class="mono">198.51.100.13</span> up/up</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-21</td><td>保存</td><td>isp: Loopback・設定保存確認</td><td class="mono">show ip interface brief | include Loopback0<br>show startup-config | include hostname</td><td>Loopback0 <span class="mono">10.27.255.100/32</span> up/up。startup-config が running-config と一致</td><td><span class="pill todo">未実施</span></td><td>&nbsp;</td></tr>
+            <tr><td class="mono">UT-22</td><td>端末</td><td>hq-pc: eth1アドレス・デフォルトルート確認</td><td class="mono">sudo docker exec -it clab-qos-acl-policy-lab-hq-pc ip addr show eth1<br>sudo docker exec -it clab-qos-acl-policy-lab-hq-pc ip route</td><td>eth1 <span class="mono">10.27.10.10/24</span> UP。デフォルトルートが <span class="mono">via 10.27.10.1 dev eth1</span></td><td><span class="pill todo">未実施</span></td><td>campus.clab.yml の exec で自動投入</td></tr>
+            <tr><td class="mono">UT-23</td><td>端末</td><td>hq-voip: eth1アドレス・デフォルトルート確認</td><td class="mono">sudo docker exec -it clab-qos-acl-policy-lab-hq-voip ip addr show eth1<br>sudo docker exec -it clab-qos-acl-policy-lab-hq-voip ip route</td><td>eth1 <span class="mono">10.27.50.10/24</span> UP。デフォルトルートが <span class="mono">via 10.27.50.1 dev eth1</span></td><td><span class="pill todo">未実施</span></td><td>campus.clab.yml の exec で自動投入</td></tr>
+            <tr><td class="mono">UT-24</td><td>端末</td><td>br-pc: eth1アドレス・デフォルトルート確認</td><td class="mono">sudo docker exec -it clab-qos-acl-policy-lab-br-pc ip addr show eth1<br>sudo docker exec -it clab-qos-acl-policy-lab-br-pc ip route</td><td>eth1 <span class="mono">10.27.20.10/24</span> UP。デフォルトルートが <span class="mono">via 10.27.20.1 dev eth1</span></td><td><span class="pill todo">未実施</span></td><td>campus.clab.yml の exec で自動投入</td></tr>
+            <tr><td class="mono">UT-25</td><td>端末</td><td>dmz-srv: eth1アドレス・デフォルトルート確認</td><td class="mono">sudo docker exec -it clab-qos-acl-policy-lab-dmz-srv ip addr show eth1<br>sudo docker exec -it clab-qos-acl-policy-lab-dmz-srv ip route</td><td>eth1 <span class="mono">10.27.30.10/24</span> UP。デフォルトルートが <span class="mono">via 10.27.30.1 dev eth1</span></td><td><span class="pill todo">未実施</span></td><td>campus.clab.yml の exec で自動投入</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="sec4">
+    <h2>4. 合格基準<a class="anchor" href="#sec4">#</a></h2>
+    <ul class="plain">
+      <li>本書の全25項目が <span class="pill ok">合格</span> であること。</li>
+      <li><span class="pill error">不合格</span> が1件でもある場合、該当ノードの設定を是正し再試験を実施する。是正内容は <span class="mono">04_構築/構築ログ_テンプレート.md</span> に記録する。</li>
+      <li>Linux端末のIP/デフォルトルートは <span class="mono">campus.clab.yml</span> の exec ブロックにより自動投入されるため、不合格の場合はコンテナ再作成（<span class="mono">./deploy.sh destroy && ./deploy.sh deploy</span>）で切り分ける。</li>
+      <li>本試験に合格したのち、<a href="結合試験仕様書.html">結合試験仕様書</a>に進む。</li>
+    </ul>
+  </section>
+
+  <section id="sec5">
+    <h2>5. 結果記録欄<a class="anchor" href="#sec5">#</a></h2>
+    <table class="param-table">
+      <thead><tr><th>項目</th><th>記入欄</th></tr></thead>
+      <tbody>
+        <tr><td class="k">実施日</td><td>&nbsp;</td></tr>
+        <tr><td class="k">実施者</td><td>&nbsp;</td></tr>
+        <tr><td class="k">実施環境</td><td class="mono">OrbStack VM clab</td></tr>
+        <tr><td class="k">合格項目数 / 全25項目</td><td>&nbsp;</td></tr>
+        <tr><td class="k">総合判定</td><td><span class="pill todo">未実施</span></td></tr>
+        <tr><td class="k">特記事項</td><td>&nbsp;</td></tr>
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<footer class="site-footer">
+  <span>Theme 27 · QoS / ACL / route-map Applied</span>
+  <span>ソース: 05_試験/試験計画書.md</span>
+  <span>生成 2026-07-08</span>
+</footer>
+
+<script>
+  "use strict";
+  /* ---- コピー（clipboard API + file:// フォールバック） ---- */
+  function flashDone(btn) {
+    const original = btn.textContent;
+    btn.textContent = "✓ コピーしました";
+    btn.classList.add("done");
+    setTimeout(() => { btn.textContent = original; btn.classList.remove("done"); }, 1500);
+  }
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".copy-btn");
+    if (!btn) return;
+    const text = btn.dataset.copyTarget
+      ? document.getElementById(btn.dataset.copyTarget).textContent
+      : btn.dataset.copy;
+    navigator.clipboard.writeText(text).then(() => flashDone(btn)).catch(() => {
+      const ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta);
+      ta.select(); document.execCommand("copy"); ta.remove();
+      flashDone(btn);
+    });
+  });
+
+  /* ---- 右目次スクロール連動（3ペイン文書のみ） ---- */
+  const tocLinks = [...document.querySelectorAll(".toc a")];
+  if (tocLinks.length) {
+    const sections = [...document.querySelectorAll("main section")];
+    const spy = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        tocLinks.forEach((a) =>
+          a.classList.toggle("active", a.getAttribute("href") === `#${entry.target.id}`));
+      });
+    }, { rootMargin: "-20% 0px -70% 0px" });
+    sections.forEach((s) => spy.observe(s));
+  }
+
+  /* ---- 印刷時に解答編を開く ---- */
+  window.addEventListener("beforeprint", () =>
+    document.querySelectorAll("details.answer").forEach((d) => { d.open = true; }));
+</script>
+</body>
+</html>
