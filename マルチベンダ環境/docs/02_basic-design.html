@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>基本設計書 | マルチベンダ環境ラボ</title>
+<style>
+  :root {
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    --accent: #BE185D;
+    --accent-soft: #FDF2F8;
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    --neutral: #94A3B8;
+    --code-bg: #0F172A;
+    --code-ink: #E2E8F0;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  body { font-family: var(--sans); font-size: 15px; line-height: 1.8; color: var(--ink); background: var(--surface); }
+  .mono { font-family: var(--mono); font-feature-settings: "tnum"; }
+  .num { text-align: right; }
+
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 20px;
+    height: 56px; padding: 0 24px;
+    background: rgba(250,250,249,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .site-header .back { font-size: 13px; color: var(--ink-2); text-decoration: none; transition: color .15s var(--ease); }
+  .site-header .back:hover { color: var(--accent); }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .brand span { color: var(--accent); }
+  .phase-chip {
+    padding: 3px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+    color: var(--accent); background: var(--accent-soft); border-radius: var(--r-full);
+  }
+  .header-meta { margin-left: auto; font-size: 12px; color: var(--ink-2); }
+  @media (max-width: 768px) { .header-meta, .phase-chip { display: none; } }
+
+  .layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+  .nav { position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; padding: 32px 0; }
+  .nav-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--ink-3); text-transform: uppercase; margin-bottom: 8px; }
+  .nav a {
+    display: block; padding: 7px 10px; margin-left: -10px; margin-bottom: 2px;
+    font-size: 13.5px; color: var(--ink-2); text-decoration: none; border-radius: var(--r-sm);
+    transition: color .12s var(--ease), background .12s var(--ease);
+  }
+  .nav a:hover { color: var(--ink); background: #F5F5F4; }
+  .nav a.current { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+
+  .doc { padding: 40px 0 96px; min-width: 0; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 20px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; font-size: 12px; font-weight: 500;
+    border-radius: var(--r-full); border: 1px solid var(--border);
+    background: var(--raised); color: var(--ink-2);
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  p.lead { font-size: 14.5px; color: var(--ink-2); max-width: 72ch; margin-bottom: 20px; }
+  .callout { display: flex; gap: 12px; padding: 14px 16px; margin: 0 0 40px; border-radius: var(--r-sm); font-size: 13.5px; border-left: 3px solid var(--info); background: #EFF6FF; }
+  .callout .icon { font-weight: 700; color: var(--info); font-family: var(--mono); }
+  .callout strong { display: block; font-size: 13px; margin-bottom: 2px; }
+
+  section { margin-bottom: 56px; scroll-margin-top: 72px; }
+  h2 { font-size: 20px; font-weight: 600; margin-bottom: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  h2 a { color: var(--ink-3); text-decoration: none; opacity: 0; margin-left: 6px; font-weight: 400; }
+  h2:hover a { opacity: 1; }
+  p.note { font-size: 13.5px; color: var(--ink-2); margin: 10px 0 16px; }
+
+  .design-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 8px; }
+  .design-table th, .design-table td { padding: 10px 12px; text-align: left; vertical-align: top; }
+  .design-table thead th { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--ink-3); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  .design-table tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; scroll-margin-top: 72px; }
+  .design-table tbody tr:hover { background: #F5F5F4; }
+  .design-table th:nth-child(1), .design-table td:nth-child(1) { width: 54px; }
+  .design-table th:nth-child(2), .design-table td:nth-child(2) { width: 190px; font-weight: 500; color: var(--ink); }
+  .design-table th:nth-child(4), .design-table td:nth-child(4) { width: 150px; }
+  .design-table td:nth-child(3) { color: var(--ink-2); }
+
+  /* node table (全体構成) */
+  .node-table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 640px; }
+  .node-table th, .node-table td { padding: 9px 11px; text-align: left; vertical-align: top; }
+  .node-table thead th { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--ink-3); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  .node-table tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+  .node-table tbody tr:hover { background: #F5F5F4; }
+  .zone-pill { display: inline-block; padding: 1px 8px; font-size: 11px; font-weight: 600; border-radius: var(--r-full); border: 1px solid; }
+  .zone-pill.untrust { color: #059669; background: #ECFDF5; border-color: #6EE7B7; }
+  .zone-pill.wan { color: #DC2626; background: #FEF2F2; border-color: #FCA5A5; }
+  .zone-pill.trust { color: #2563EB; background: #EFF6FF; border-color: #93C5FD; }
+  .zone-pill.dc { color: #4F46E5; background: #EEF2FF; border-color: #A5B4FC; }
+  .zone-pill.branch { color: #EA580C; background: #FFF7ED; border-color: #FDBA74; }
+
+  .req-chip {
+    display: inline-flex; align-items: center; margin: 2px 4px 2px 0;
+    padding: 2px 8px; font-family: var(--mono); font-size: 11px;
+    color: var(--accent); background: var(--accent-soft); border-radius: var(--r-full);
+    text-decoration: none; transition: background .12s var(--ease);
+  }
+  .req-chip:hover { background: #FCE7F3; }
+
+  .compare-wrap { margin: 4px 0 24px; overflow-x: auto; }
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 13.5px; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; min-width: 640px; }
+  .compare-table th, .compare-table td { padding: 10px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+  .compare-table thead th { font-size: 12px; font-weight: 600; color: var(--ink); background: var(--raised); border-bottom: 1px solid var(--border); }
+  .compare-table thead th:first-child { color: var(--ink-3); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; font-weight: 600; }
+  .compare-table tbody td:first-child { color: var(--ink-3); font-size: 12px; font-weight: 500; width: 150px; }
+  .compare-table tbody tr:last-child td { border-bottom: none; }
+  .adopt-badge { display: inline-block; margin-left: 8px; padding: 2px 9px; font-size: 11px; font-weight: 600; color: #fff; background: var(--accent); border-radius: var(--r-full); }
+  .compare-table[data-adopt="a"] th:nth-child(2), .compare-table[data-adopt="a"] td:nth-child(2) { background: var(--accent-soft); }
+  .compare-table[data-adopt="b"] th:nth-child(3), .compare-table[data-adopt="b"] td:nth-child(3) { background: var(--accent-soft); }
+  .compare-table tr.reason-row td { background: var(--accent-soft); font-size: 13px; color: var(--ink); }
+  .compare-table tr.reason-row td:first-child { color: var(--accent); font-weight: 600; }
+
+  .doc-footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); }
+  .doc-footer a {
+    display: block; padding: 14px 18px; min-width: 200px;
+    border: 1px solid var(--border); border-radius: var(--r-md);
+    text-decoration: none; color: var(--ink); font-weight: 600; font-size: 14px;
+    background: var(--raised); transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease);
+  }
+  .doc-footer a:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--accent); }
+  .doc-footer a small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-3); letter-spacing: .06em; }
+  .doc-footer .next { text-align: right; margin-left: auto; }
+  .data-note { margin-top: 24px; font-size: 11.5px; color: var(--ink-2); padding: 10px 14px; border-left: 3px solid var(--ok); background: #ECFDF5; border-radius: var(--r-sm); }
+
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 190px minmax(0, 1fr); gap: 32px; }
+  }
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; gap: 0; }
+    .nav { position: static; height: auto; padding: 20px 0 0; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+    .nav-label { width: 100%; }
+    section { overflow-x: auto; }
+    .design-table th:nth-child(2), .design-table td:nth-child(2) { width: 130px; }
+    .compare-table tbody td:first-child { width: 100px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    html { scroll-behavior: auto; }
+  }
+  @media (max-width: 480px) {
+    .doc-footer { flex-direction: column; }
+    .doc-footer a { min-width: 0; }
+    .doc-footer .next { margin-left: 0; }
+  }
+  @media print {
+    .site-header, .nav, .doc-footer, .data-note { display: none !important; }
+    body { background: #FFFFFF; }
+    .layout { display: block; }
+    section, .compare-wrap { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a class="back" href="00_document-map.html">&larr; ドキュメントマップ</a>
+  <div class="brand">マルチベンダ環境<span>ラボ</span></div>
+  <span class="phase-chip">PHASE 2 基本設計</span>
+  <div class="header-meta">mvlab / 5ベンダー13ノード</div>
+</header>
+
+<div class="layout">
+
+  <nav class="nav" aria-label="章ナビゲーション">
+    <div class="nav-label">目次</div>
+    <a href="#p1" class="current" data-sec="p1">1. 設計方針</a>
+    <a href="#p2" data-sec="p2">2. 全体構成（5ゾーン）</a>
+    <a href="#p3" data-sec="p3">3. アドレス設計</a>
+    <a href="#p4" data-sec="p4">4. 冗長性・拡張性</a>
+    <a href="#p5" data-sec="p5">5. セキュリティ方針</a>
+    <a href="#p6" data-sec="p6">6. 設計判断（方式比較）</a>
+  </nav>
+
+  <main class="doc">
+    <h1>基本設計書</h1>
+    <div class="doc-meta">
+      <span class="badge ver">v1.0</span>
+      <span class="badge"><span class="dot"></span>確定</span>
+      <span class="badge">最終更新 2026-07-17</span>
+      <span class="badge">実機グリーン PASS=28/28</span>
+    </div>
+    <p class="lead">要件定義書で定義した要件を、ゾーンごとのベンダー割当・論理設計・アドレス設計・冗長性・セキュリティ方針に落とし込む。各行の「対応要件ID」チップは<a href="01_requirements.html">要件定義書</a>の該当要件へのリンク。</p>
+    <div class="callout">
+      <span class="icon">i</span>
+      <div><strong>設計の主眼</strong>同じ設計意図（冗長化・経路制御・VLAN分離・NAT境界）を、5ベンダーの異なるCLI/APIでどう実現するかを比較できることを最優先する。決定の妥当性は<a href="05_test-report.html">試験結果報告書</a>（PASS=28/28）で検証済み。</div>
+    </div>
+
+    <section id="p1">
+      <h2>1. 設計方針<a href="#p1">#</a></h2>
+      <table class="design-table">
+        <thead><tr><th>項番</th><th>設計項目</th><th>決定方針</th><th>対応要件ID</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">1.1</td><td>ベンダー割当</td><td>Untrust=FRR／WANエッジ=RouterOS／キャンパス=Cisco IOL／DC=Nokia SR Linux／ブランチCPE=OpenWrt を意図的に割り当てる。</td><td><a class="req-chip" href="01_requirements.html#REQ-MV01">REQ-MV01</a></td></tr>
+          <tr><td class="mono">1.2</td><td>ルーティング階層</td><td>「外側はBGP、内側はOSPF、DCは再びBGP」の企業ネットワーク階層化を踏襲。hq-coreがOSPFとeBGPの再配信境界（ASBR相当）となる。</td><td><a class="req-chip" href="01_requirements.html#REQ-MV03">REQ-MV03</a></td></tr>
+          <tr><td class="mono">1.3</td><td>API-first</td><td>RouterOS（REST）とSR Linux（JSON-RPC/gNMI）は、CLIと同じ情報をAPI経由でも取得・変更できることを前提とする。</td><td><a class="req-chip" href="01_requirements.html#REQ-MV06">REQ-MV06</a></td></tr>
+          <tr><td class="mono">1.4</td><td>制約の織り込み</td><td>IOLはSSH不可・OpenWrt(rootfs)はnetifd不動作という環境実測に基づく制約を設計へ織り込み、「本来の流儀」と「本ラボでの実現方法」を区別して記述する。</td><td><a class="req-chip" href="01_requirements.html#REQ-MV07">REQ-MV07</a></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="p2">
+      <h2>2. 全体構成（5ゾーン）<a href="#p2">#</a></h2>
+      <p class="note">1社の企業ネットワークを5ゾーン・13ノードで再現する。論理構成の全体像は<a href="03_topology.html">トポロジ図</a>を正とする。</p>
+      <table class="node-table">
+        <thead><tr><th>ノード</th><th>役割</th><th>ゾーン</th><th>ベンダー / イメージ</th><th>AS</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">isp-a</td><td>ISP1（インターネット役）</td><td><span class="zone-pill untrust">Untrust</span></td><td>FRR 10.2.1</td><td class="mono">65001</td></tr>
+          <tr><td class="mono">isp-b</td><td>ISP2（インターネット役）</td><td><span class="zone-pill untrust">Untrust</span></td><td>FRR 10.2.1</td><td class="mono">65002</td></tr>
+          <tr><td class="mono">hq-edge</td><td>HQ WANエッジ（デュアルホームeBGP）</td><td><span class="zone-pill wan">WANエッジ</span></td><td>MikroTik RouterOS CHR 7.21.4</td><td class="mono">65010</td></tr>
+          <tr><td class="mono">hq-core</td><td>HQキャンパスコア（OSPF/eBGP境界）</td><td><span class="zone-pill trust">Trust</span></td><td>Cisco IOL 15.7.3M2</td><td class="mono">65011</td></tr>
+          <tr><td class="mono">hq-sw</td><td>HQキャンパスSW（VLAN10/20 SVI）</td><td><span class="zone-pill trust">Trust</span></td><td>Cisco IOL L2-advipservices-2017</td><td class="mono">&mdash;</td></tr>
+          <tr><td class="mono">dc-leaf1</td><td>DCリーフ1（srv-web収容）</td><td><span class="zone-pill dc">DC</span></td><td>Nokia SR Linux v26.3.3</td><td class="mono">65021</td></tr>
+          <tr><td class="mono">dc-leaf2</td><td>DCリーフ2（srv-db収容）</td><td><span class="zone-pill dc">DC</span></td><td>Nokia SR Linux v26.3.3</td><td class="mono">65022</td></tr>
+          <tr><td class="mono">br-edge</td><td>ブランチCPE（static+NAT）</td><td><span class="zone-pill branch">ブランチ</span></td><td>OpenWrt 24.10.7（rootfs）</td><td class="mono">&mdash;</td></tr>
+          <tr><td class="mono">hq-pc1 / hq-pc2</td><td>HQ端末（VLAN10 / VLAN20）</td><td><span class="zone-pill trust">Trust</span></td><td>multitool</td><td class="mono">&mdash;</td></tr>
+          <tr><td class="mono">srv-web / srv-db</td><td>DCサーバ（dc-leaf1 / dc-leaf2配下）</td><td><span class="zone-pill dc">DC</span></td><td>multitool</td><td class="mono">&mdash;</td></tr>
+          <tr><td class="mono">br-pc</td><td>ブランチ端末（NAT裏）</td><td><span class="zone-pill branch">ブランチ</span></td><td>multitool</td><td class="mono">&mdash;</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="p3">
+      <h2>3. アドレス設計<a href="#p3">#</a></h2>
+      <table class="design-table">
+        <thead><tr><th>項番</th><th>設計項目</th><th>決定方針</th><th>対応要件ID</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">3.1</td><td>管理ネットワーク</td><td><code class="mono">mvlab-mgmt</code>（172.20.50.0/24）。router系.11〜.16／ISP系.21〜.22／端末系.101〜.105の採番慣行に合わせる。</td><td><a class="req-chip" href="01_requirements.html#REQ-MV07">REQ-MV07</a></td></tr>
+          <tr><td class="mono">3.2</td><td>P2Pリンク</td><td>すべて<code class="mono">/30</code>で統一し、<code class="mono">10.50.255.0/24</code>をP2Pリンク専用プールとして予約する。</td><td><a class="req-chip" href="01_requirements.html#REQ-MV01">REQ-MV01</a></td></tr>
+          <tr><td class="mono">3.3</td><td>LANセグメント</td><td>VLAN10=10.50.10.0/24・VLAN20=10.50.20.0/24・DC1=10.50.30.0/24・DC2=10.50.31.0/24、ブランチLANのみプライベート裏側の192.168.40.0/24。</td><td><a class="req-chip" href="01_requirements.html#REQ-MV04">REQ-MV04</a></td></tr>
+          <tr><td class="mono">3.4</td><td>集約広報</td><td>hq-edgeは自社アドレス空間<code class="mono">10.50.0.0/16</code>をISPへ集約広報し、blackhole経路を併用。ブランチはBGP不参加でNAT隠蔽するためISPへの経路広報は不要。</td><td><a class="req-chip" href="01_requirements.html#REQ-MV02">REQ-MV02</a></td></tr>
+          <tr><td class="mono">3.5</td><td>Router ID（識別子専用）</td><td>ループバック未使用。経路上に現れない識別子専用の値（<code class="mono">10.50.255.101</code>〜<code class="mono">.105</code>）を明示設定。ISPのループバック（198.51.100.1/2）だけは「インターネット上のサービス役」の意図的な例外。</td><td><a class="req-chip" href="01_requirements.html#REQ-MV01">REQ-MV01</a></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="p4">
+      <h2>4. 冗長性・拡張性<a href="#p4">#</a></h2>
+      <table class="design-table">
+        <thead><tr><th>項番</th><th>設計項目</th><th>決定方針</th><th>対応要件ID</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">4.1</td><td>WAN冗長化</td><td>hq-edgeはisp-a・isp-bの2社に対してeBGPデュアルホームを組む。片方の回線・BGPセッションが落ちても、残るISPからのデフォルトルートで継続到達できる。</td><td><a class="req-chip" href="01_requirements.html#REQ-MV02">REQ-MV02</a></td></tr>
+          <tr><td class="mono">4.2</td><td>キャンパス内冗長</td><td>本ラボの対象外。hq-core・hq-swは各1台構成（HSRP/STP二重化は組まない）。ベンダー間の操作比較に主眼を置くため将来課題とする。</td><td><a class="req-chip" href="01_requirements.html#REQ-MV01">REQ-MV01</a></td></tr>
+          <tr><td class="mono">4.3</td><td>拡張性</td><td>DCリーフはeBGPで自LANを広報するだけのシンプル構成のため、dc-leaf3以降の追加はhq-core側にeBGPセッションを1本追加するだけで対応できる。</td><td><a class="req-chip" href="01_requirements.html#REQ-MV03">REQ-MV03</a></td></tr>
+        </tbody>
+      </table>
+      <p class="note">デュアルホーム切替の状態遷移は『ネットワーク・デザインパターン』p095「メイン回線がダウンした場合…ISP#2から受け取ったデフォルトルートをベストパスにして、ルーティングテーブルに載せます」の記述に沿う。isp-a向けリンク断での切替は<a href="05_test-report.html">試験結果報告書</a>の冗長試験で検証済み。</p>
+    </section>
+
+    <section id="p5">
+      <h2>5. セキュリティ方針<a href="#p5">#</a></h2>
+      <table class="design-table">
+        <thead><tr><th>項番</th><th>設計項目</th><th>決定方針</th><th>対応要件ID</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">5.1</td><td>広報範囲による制御</td><td>ゾーン境界は広報範囲で制御する（広報しない経路は届かない、を一次防御とする）。ACL/FWルールそのものは本テーマ対象外（27番テーマが担当）。</td><td><a class="req-chip" href="01_requirements.html#REQ-MV01">REQ-MV01</a></td></tr>
+          <tr><td class="mono">5.2</td><td>ブランチNAT境界</td><td>br-edgeのNAT/masqueradeで、ブランチLAN（192.168.40.0/24）はISPへ広報せずアドレス変換で隠蔽する（実質的なUntrust境界の防御）。</td><td><a class="req-chip" href="01_requirements.html#REQ-MV05">REQ-MV05</a></td></tr>
+          <tr><td class="mono">5.3</td><td>SR Linuxの安全側既定</td><td>SR Linuxはexport/importポリシーを明示しない限り経路を広報・受理しない既定挙動のため、意図しない経路漏洩が起きにくい。DCリーフ設計はこの既定を積極利用する。</td><td><a class="req-chip" href="01_requirements.html#REQ-MV03">REQ-MV03</a></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="p6">
+      <h2>6. 設計判断（方式比較）<a href="#p6">#</a></h2>
+      <p class="note">実機のスモークテストで得た知見から、当初設計を変更した2つの重要な判断を記録する。</p>
+
+      <h3 style="font-size:14px;font-weight:600;color:var(--ink-2);margin:20px 0 8px;">6.1 VLANゲートウェイ方式（router-on-a-stick からの変更） <a class="req-chip" href="01_requirements.html#REQ-MV04">REQ-MV04</a></h3>
+      <div class="compare-wrap">
+        <table class="compare-table" data-adopt="a">
+          <thead><tr><th>比較観点</th><th>案A: hq-sw SVI方式<span class="adopt-badge">採用</span></th><th>案B: router-on-a-stick（dot1QサブIF）</th></tr></thead>
+          <tbody>
+            <tr><td>安定性</td><td>hq-sw側にVLAN10/20のSVIを置き、hq-core⇔hq-sw間はルーテッドリンク。IOL＋containerlab veth環境で安定動作を確認</td><td>hq-core側でdot1Qサブインターフェース終端＋hq-sw側L2トランク。スモークテストで不安定</td></tr>
+            <tr><td>実績</td><td>23番ラボ<code class="mono">23_campus_collapsed_core</code>の実績方式を踏襲</td><td>本環境ではdot1Qサブインターフェース側の相性問題が疑われる</td></tr>
+            <tr><td>ネイティブVLAN整合</td><td>ルーテッドリンクのためタグ整合の依存が少ない</td><td>タグVLAN/ネイティブVLANの整合が接続機器間で必須（不一致で通信不可）</td></tr>
+            <tr class="reason-row"><td>採用理由</td><td colspan="2">router-on-a-stick方式はスモークテストで不安定と判明したため、23番collapsed coreで実績のあるSVI方式（hq-sw側SVI＋hq-core⇔hq-sw間ルーテッドリンク）を採用した。原因の切り分けは構築ログ側の課題とし、本書ではSVI方式を確定値とする。</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 style="font-size:14px;font-weight:600;color:var(--ink-2);margin:28px 0 8px;">6.2 config投入方式 <a class="req-chip" href="01_requirements.html#REQ-MV07">REQ-MV07</a></h3>
+      <div class="compare-wrap">
+        <table class="compare-table" data-adopt="b">
+          <thead><tr><th>比較観点</th><th>案A: clab startup-config</th><th>案B: ブート後にssh／sr_cliで後投入<span class="adopt-badge">採用</span></th></tr></thead>
+          <tbody>
+            <tr><td>RouterOS (hq-edge)</td><td>FTP自動投入がエラー行でimportを丸ごと中断し、IP設定すら入らなかった</td><td>ブート完了をポーリング待ちし、<code class="mono">hq-edge.rsc</code>を1行ずつssh実行</td></tr>
+            <tr><td>SR Linux (dc-leaf1/2)</td><td>clabバインドがコンテナに届かず未適用だった</td><td><code class="mono">dc-leafX.cli</code>のset行をcandidateモードで一括commit（stdinパイプ）</td></tr>
+            <tr><td>IOL / FRR</td><td>startup-config／binds は正常動作（変更不要）</td><td>IOL/FRRは案Aのまま。後投入は不要</td></tr>
+            <tr class="reason-row"><td>採用理由</td><td colspan="2">RouterOS・SR Linuxのstartup-configは実機でFTP中断／未達により全滅したため、両ベンダーのみ「ブート後にコンテナ外からconfigを後投入」する方式（<code class="mono">deploy.sh config</code>）へ変更した。確実にconfigが届く後投入方式を採用する。IOL/FRRは従来どおりstartup-config/bindsを継続。</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <nav class="doc-footer" aria-label="前後のドキュメント">
+      <a class="prev" href="01_requirements.html"><small>前の工程</small>要件定義書</a>
+      <a class="next" href="03_topology.html"><small>次の工程</small>トポロジ図</a>
+    </nav>
+    <p class="data-note">本ドキュメントは mvlab 実機（2026-07-17 <span class="mono">verify.sh</span> PASS=28/28）に基づく。全体構成・アドレス・方式判断は基本設計書（<span class="mono">02_基本設計/</span>）の実値を反映。</p>
+  </main>
+</div>
+
+<script>
+  "use strict";
+  const navLinks = [...document.querySelectorAll(".nav a[data-sec]")];
+  const sections = navLinks.map((a) => document.getElementById(a.dataset.sec)).filter(Boolean);
+  const spy = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      navLinks.forEach((a) => a.classList.toggle("current", a.dataset.sec === entry.target.id));
+    });
+  }, { rootMargin: "-10% 0px -70% 0px" });
+  sections.forEach((s) => spy.observe(s));
+</script>
+</body>
+</html>

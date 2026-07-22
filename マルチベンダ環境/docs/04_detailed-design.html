@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>詳細設計書 | マルチベンダ環境ラボ</title>
+<style>
+  :root {
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    --accent: #BE185D;
+    --accent-soft: #FDF2F8;
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    --neutral: #94A3B8;
+    --code-bg: #0F172A;
+    --code-ink: #E2E8F0;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  body { font-family: var(--sans); font-size: 15px; line-height: 1.8; color: var(--ink); background: var(--surface); }
+  .mono { font-family: var(--mono); font-feature-settings: "tnum"; }
+
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 20px;
+    height: 56px; padding: 0 24px;
+    background: rgba(250,250,249,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .site-header .back { font-size: 13px; color: var(--ink-2); text-decoration: none; transition: color .15s var(--ease); }
+  .site-header .back:hover { color: var(--accent); }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .brand span { color: var(--accent); }
+  .phase-chip {
+    padding: 3px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+    color: var(--accent); background: var(--accent-soft); border-radius: var(--r-full);
+  }
+  .header-meta { margin-left: auto; font-size: 12px; color: var(--ink-2); }
+  @media (max-width: 768px) { .header-meta, .phase-chip { display: none; } }
+
+  .layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 48px; max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+  .nav { position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; padding: 32px 0; }
+  .nav-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--ink-3); text-transform: uppercase; margin-bottom: 8px; }
+  .nav a {
+    display: block; padding: 7px 10px; margin-left: -10px; margin-bottom: 2px;
+    font-size: 13.5px; color: var(--ink-2); text-decoration: none; border-radius: var(--r-sm);
+    transition: color .12s var(--ease), background .12s var(--ease);
+  }
+  .nav a:hover { color: var(--ink); background: #F5F5F4; }
+  .nav a.current { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+
+  .doc { padding: 40px 0 96px; min-width: 0; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 20px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; font-size: 12px; font-weight: 500;
+    border-radius: var(--r-full); border: 1px solid var(--border);
+    background: var(--raised); color: var(--ink-2);
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  p.lead { font-size: 14.5px; color: var(--ink-2); max-width: 72ch; margin-bottom: 20px; }
+  .callout { display: flex; gap: 12px; padding: 14px 16px; margin: 0 0 40px; border-radius: var(--r-sm); font-size: 13.5px; border-left: 3px solid var(--info); background: #EFF6FF; }
+  .callout .icon { font-weight: 700; color: var(--info); font-family: var(--mono); }
+  .callout strong { display: block; font-size: 13px; margin-bottom: 2px; }
+
+  section { margin-bottom: 56px; scroll-margin-top: 72px; }
+  h2 { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 600; margin-bottom: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  h2 .vtag { font-size: 11px; font-weight: 600; font-family: var(--mono); padding: 2px 8px; border-radius: var(--r-full); border: 1px solid; }
+  .vtag.frr { color: #059669; background: #ECFDF5; border-color: #6EE7B7; }
+  .vtag.ros { color: #DC2626; background: #FEF2F2; border-color: #FCA5A5; }
+  .vtag.iol { color: #2563EB; background: #EFF6FF; border-color: #93C5FD; }
+  .vtag.srl { color: #4F46E5; background: #EEF2FF; border-color: #A5B4FC; }
+  .vtag.owrt { color: #EA580C; background: #FFF7ED; border-color: #FDBA74; }
+  .vtag.common { color: var(--ink-2); background: #F5F5F4; border-color: var(--border); }
+  h2 a.perma { color: var(--ink-3); text-decoration: none; opacity: 0; margin-left: auto; font-weight: 400; font-size: 15px; }
+  h2:hover a.perma { opacity: 1; }
+  p.note { font-size: 13.5px; color: var(--ink-2); margin: 10px 0 16px; }
+
+  .req-chip {
+    display: inline-flex; align-items: center; margin: 0 4px; padding: 2px 8px;
+    font-family: var(--mono); font-size: 11px; font-weight: 400;
+    color: var(--accent); background: var(--accent-soft); border-radius: var(--r-full);
+    text-decoration: none; transition: background .12s var(--ease);
+  }
+  .req-chip:hover { background: #FCE7F3; }
+
+  .spec-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 16px; }
+  .spec-table th, .spec-table td { padding: 10px 12px; text-align: left; vertical-align: top; }
+  .spec-table thead th { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--ink-3); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  .spec-table tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+  .spec-table tbody tr:hover { background: #F5F5F4; }
+  .spec-table td:first-child { width: 200px; color: var(--ink-2); font-weight: 500; }
+
+  .code-block { border-radius: var(--r-md); overflow: hidden; border: 1px solid #1E293B; margin: 16px 0; }
+  .code-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; background: #1E293B; font-size: 12px; color: #94A3B8; font-family: var(--mono); }
+  .copy-btn {
+    display: inline-flex; align-items: center; padding: 2px 8px; font-size: 11px; font-family: var(--sans);
+    color: var(--ink-3); background: none; border: 1px solid var(--border); border-radius: var(--r-sm);
+    cursor: pointer; transition: all .12s var(--ease);
+  }
+  .code-head .copy-btn { border-color: #334155; color: #94A3B8; }
+  .code-head .copy-btn:hover { color: var(--code-ink); border-color: #64748B; }
+  .code-head .copy-btn.done { color: var(--ok); border-color: var(--ok); }
+  pre { padding: 16px; background: var(--code-bg); color: var(--code-ink); font-family: var(--mono); font-size: 13px; line-height: 1.7; overflow-x: auto; }
+  pre .c { color: #64748B; }
+  pre .k { color: #7DD3FC; }
+  pre .v { color: #FDBA74; }
+
+  .doc-footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); }
+  .doc-footer a {
+    display: block; padding: 14px 18px; min-width: 200px;
+    border: 1px solid var(--border); border-radius: var(--r-md);
+    text-decoration: none; color: var(--ink); font-weight: 600; font-size: 14px;
+    background: var(--raised); transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease);
+  }
+  .doc-footer a:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--accent); }
+  .doc-footer a small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-3); letter-spacing: .06em; }
+  .doc-footer .next { text-align: right; margin-left: auto; }
+  .data-note { margin-top: 24px; font-size: 11.5px; color: var(--ink-2); padding: 10px 14px; border-left: 3px solid var(--ok); background: #ECFDF5; border-radius: var(--r-sm); }
+
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 180px minmax(0, 1fr); gap: 32px; }
+  }
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; gap: 0; }
+    .nav { position: static; height: auto; padding: 20px 0 0; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+    .nav-label { width: 100%; }
+    section { overflow-x: auto; }
+    .spec-table td:first-child { width: 140px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    html { scroll-behavior: auto; }
+  }
+  @media (max-width: 480px) {
+    .doc-footer { flex-direction: column; }
+    .doc-footer a { min-width: 0; }
+    .doc-footer .next { margin-left: 0; }
+  }
+  @media print {
+    .site-header, .nav, .doc-footer, .data-note, .copy-btn { display: none !important; }
+    body { background: #FFFFFF; }
+    .layout { display: block; }
+    section, .code-block { break-inside: avoid; }
+    pre { white-space: pre-wrap; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a class="back" href="00_document-map.html">&larr; ドキュメントマップ</a>
+  <div class="brand">マルチベンダ環境<span>ラボ</span></div>
+  <span class="phase-chip">PHASE 3 詳細設計</span>
+  <div class="header-meta">mvlab / 5ベンダー13ノード</div>
+</header>
+
+<div class="layout">
+
+  <nav class="nav" aria-label="機器ナビゲーション">
+    <div class="nav-label">機器別</div>
+    <a href="#hq-edge" class="current" data-sec="hq-edge">hq-edge (RouterOS)</a>
+    <a href="#hq-core" data-sec="hq-core">hq-core (Cisco IOL)</a>
+    <a href="#hq-sw" data-sec="hq-sw">hq-sw (IOL SVI)</a>
+    <a href="#dc-leaf" data-sec="dc-leaf">dc-leaf1/2 (SR Linux)</a>
+    <a href="#isp" data-sec="isp">isp-a/b (FRR)</a>
+    <a href="#br-edge" data-sec="br-edge">br-edge (OpenWrt)</a>
+    <a href="#common" data-sec="common">共通・5流儀比較</a>
+  </nav>
+
+  <main class="doc">
+    <h1>詳細設計書</h1>
+    <div class="doc-meta">
+      <span class="badge ver">v1.0</span>
+      <span class="badge"><span class="dot"></span>確定</span>
+      <span class="badge">最終更新 2026-07-17</span>
+      <span class="badge">実機グリーン PASS=28/28</span>
+    </div>
+    <p class="lead"><a href="02_basic-design.html">基本設計書</a>の方針を、機器ごとの動作仕様に展開する。各機器のconfigスニペットは実機に投入した設定（<code class="mono">04_構築/configs/</code>）からの抜粋で、コピーボタンで取得できる。</p>
+    <div class="callout">
+      <span class="icon">i</span>
+      <div><strong>config投入方式</strong>IOL/FRRはstartup-config/binds、RouterOS/SR Linuxはブート後の後投入（<code class="mono">deploy.sh config</code>）、OpenWrtは<code class="mono">exec</code>直叩き。RouterOS/SR Linuxのstartup-configは実機で不達・構文エラーとなったため後投入へ変更した（<a href="02_basic-design.html#p6">基本設計 §6.2</a>）。</div>
+    </div>
+
+    <section id="hq-edge">
+      <h2><span class="vtag ros">RouterOS</span>hq-edge<a class="perma" href="#hq-edge">#</a></h2>
+      <p class="note">MikroTik RouterOS CHR 7.21.4、AS65010。isp-a／isp-bとeBGPデュアルホーム、hq-coreとOSPF area0。BGP学習defaultをOSPFへ配布する。 <a class="req-chip" href="01_requirements.html#REQ-MV02">REQ-MV02</a><a class="req-chip" href="01_requirements.html#REQ-MV06">REQ-MV06</a></p>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>仕様</th></tr></thead>
+        <tbody>
+          <tr><td>インターフェース</td><td class="mono">ether2=10.50.255.6/30(isp-a) / ether3=10.50.255.10/30(isp-b) / ether4=10.50.255.17/30(hq-core)</td></tr>
+          <tr><td>BGP AS / Router ID</td><td class="mono">65010 / 10.50.255.101（instance mv）</td></tr>
+          <tr><td>eBGP peer</td><td>isp-a=10.50.255.5(AS65001) / isp-b=10.50.255.9(AS65002)。両ISP対等、通常のベストパス選択に委ねる</td></tr>
+          <tr><td>広報</td><td class="mono">10.50.0.0/16（address-list bgp-nets + blackhole経路）</td></tr>
+          <tr><td>OSPF</td><td>area0、ether4のみ参加。<code class="mono">originate-default=always</code>でdefaultをHQ内へ配布</td></tr>
+          <tr><td>API</td><td class="mono">/ip service set www disabled=no（REST http有効化）</td></tr>
+          <tr><td>投入時の注意</td><td>connectionは<code class="mono">instance=</code>と<code class="mono">local.role=ebgp</code>が必須。1行=1 sshセッションで投入、インラインコメント厳禁</td></tr>
+        </tbody>
+      </table>
+      <div class="code-block">
+        <div class="code-head"><span>configs/hq-edge.rsc（抜粋）</span><button class="copy-btn" data-copy-target="cfgEdge">コピー</button></div>
+        <pre id="cfgEdge"><span class="c"># インターフェースIP（clab eth割当: eth1=ether2 / eth2=ether3 / eth3=ether4）</span>
+/ip address add address=10.50.255.6/30 interface=ether2 comment=to-isp-a
+/ip address add address=10.50.255.10/30 interface=ether3 comment=to-isp-b
+/ip address add address=10.50.255.17/30 interface=ether4 comment=to-hq-core
+<span class="c"># OSPF area0（ether4=hq-core向け。default経路をHQ内へ配布）</span>
+/routing/ospf/instance add name=v2 version=2 router-id=10.50.255.101 originate-default=always
+/routing/ospf/area add name=backbone area-id=0.0.0.0 instance=v2
+/routing/ospf/interface-template add interfaces=ether4 area=backbone
+<span class="c"># BGP広報用の自社集約（10.50.0.0/16。blackholeで経路存在を担保）</span>
+/ip firewall address-list add list=bgp-nets address=10.50.0.0/16
+/ip route add dst-address=10.50.0.0/16 blackhole comment=bgp-aggregate
+<span class="c"># BGPインスタンス（v7.21はconnectionがinstance必須）＋ eBGPデュアルホーム</span>
+/routing/bgp/instance add name=mv as=65010 router-id=10.50.255.101
+/routing/bgp/connection add name=to-isp-a instance=mv remote.address=10.50.255.5 remote.as=65001 local.role=ebgp output.network=bgp-nets
+/routing/bgp/connection add name=to-isp-b instance=mv remote.address=10.50.255.9 remote.as=65002 local.role=ebgp output.network=bgp-nets
+<span class="c"># REST API（API試験用。http有効化のみ）</span>
+/ip service set www disabled=no</pre>
+      </div>
+    </section>
+
+    <section id="hq-core">
+      <h2><span class="vtag iol">Cisco IOL</span>hq-core<a class="perma" href="#hq-core">#</a></h2>
+      <p class="note">Cisco IOL 15.7.3M2、AS65011。OSPF（hq-edge/hq-sw）とeBGP（dc-leaf1/2）の再配信境界。DCからeBGPで学んだ/24をOSPFへ再配信し、DCリーフへはdefaultをdefault-originate。SSH不可・console運用のためaaa/ssh設定は入れない。 <a class="req-chip" href="01_requirements.html#REQ-MV03">REQ-MV03</a></p>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>仕様</th></tr></thead>
+        <tbody>
+          <tr><td>インターフェース</td><td class="mono">Et0/1=.18(hq-edge) / Et0/2=.21(dc-leaf1) / Et0/3=.25(dc-leaf2) / Et1/0=.29(hq-sw)（すべて/30）</td></tr>
+          <tr><td>OSPF Router ID</td><td class="mono">10.50.255.102（area0: Et0/1・Et1/0が参加）</td></tr>
+          <tr><td>再配信</td><td class="mono">redistribute bgp 65011 subnets（DCの/24をOSPFへ）。DC向け/30はOSPFに載せない</td></tr>
+          <tr><td>BGP AS / Router ID</td><td class="mono">65011 / 10.50.255.102</td></tr>
+          <tr><td>eBGP peer</td><td>dc-leaf1=.22(AS65021) / dc-leaf2=.26(AS65022)。両者へdefault-originateのみ</td></tr>
+        </tbody>
+      </table>
+      <div class="code-block">
+        <div class="code-head"><span>configs/hq-core.cfg（抜粋）</span><button class="copy-btn" data-copy-target="cfgCore">コピー</button></div>
+        <pre id="cfgCore">interface Ethernet0/1
+ description to-hq-edge
+ ip address 10.50.255.18 255.255.255.252
+interface Ethernet1/0
+ description to-hq-sw
+ ip address 10.50.255.29 255.255.255.252
+<span class="c">! OSPF: DCから eBGP で学んだ /24 を OSPF へ再配信し HQ内へ伝える</span>
+router ospf 1
+ router-id 10.50.255.102
+ redistribute bgp 65011 subnets
+ network 10.50.255.16 0.0.0.3 area 0
+ network 10.50.255.28 0.0.0.3 area 0
+<span class="c">! eBGP: 両 DC リーフへ default-originate のみ</span>
+router bgp 65011
+ bgp router-id 10.50.255.102
+ neighbor 10.50.255.22 remote-as 65021
+ neighbor 10.50.255.26 remote-as 65022
+ address-family ipv4
+  neighbor 10.50.255.22 activate
+  neighbor 10.50.255.22 default-originate
+  neighbor 10.50.255.26 activate
+  neighbor 10.50.255.26 default-originate
+ exit-address-family</pre>
+      </div>
+    </section>
+
+    <section id="hq-sw">
+      <h2><span class="vtag iol">Cisco IOL</span>hq-sw（SVIゲートウェイ）<a class="perma" href="#hq-sw">#</a></h2>
+      <p class="note">Cisco IOL L2-advipservices-2017。<code class="mono">ip routing</code>有効＋VLAN10/20 SVI＋OSPF area0参加（23番ラボ実績のSVIルーティング方式）。hq-core向けアップリンクも専用トランジットVLAN99+SVIでL3化し、L2イメージでも確実に動作させる。 <a class="req-chip" href="01_requirements.html#REQ-MV04">REQ-MV04</a></p>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>仕様</th></tr></thead>
+        <tbody>
+          <tr><td>SVI（GW）</td><td class="mono">Vlan10=10.50.10.1/24 / Vlan20=10.50.20.1/24 / Vlan99=10.50.255.30/30(hq-core transit)</td></tr>
+          <tr><td>アクセスポート</td><td class="mono">Et0/1=VLAN99(hq-core) / Et0/2=VLAN10(hq-pc1) / Et0/3=VLAN20(hq-pc2)</td></tr>
+          <tr><td>OSPF Router ID</td><td class="mono">10.50.255.105（area0）</td></tr>
+          <tr><td>OSPF参加</td><td>Vlan10/Vlan20は<code class="mono">passive-interface</code>（端末へHelloを流さない）、Vlan99はアクティブ</td></tr>
+        </tbody>
+      </table>
+      <div class="code-block">
+        <div class="code-head"><span>configs/hq-sw.cfg（抜粋）</span><button class="copy-btn" data-copy-target="cfgSw">コピー</button></div>
+        <pre id="cfgSw"><span class="c">! ip routing 有効 + VLAN10/20 SVI + VLAN99 transit（hq-core向けをL3化）</span>
+ip routing
+vlan 10
+ name HQ-VLAN10
+vlan 20
+ name HQ-VLAN20
+vlan 99
+ name TRANSIT-HQCORE
+interface Vlan10
+ ip address 10.50.10.1 255.255.255.0
+interface Vlan20
+ ip address 10.50.20.1 255.255.255.0
+interface Vlan99
+ ip address 10.50.255.30 255.255.255.252
+interface Ethernet0/1
+ switchport access vlan 99
+ switchport mode access
+<span class="c">! OSPF: VLAN10/20 と hq-core向けトランジットを area0 で広報（端末側はpassive）</span>
+router ospf 1
+ router-id 10.50.255.105
+ passive-interface Vlan10
+ passive-interface Vlan20
+ network 10.50.10.0 0.0.0.255 area 0
+ network 10.50.20.0 0.0.0.255 area 0
+ network 10.50.255.28 0.0.0.3 area 0</pre>
+      </div>
+    </section>
+
+    <section id="dc-leaf">
+      <h2><span class="vtag srl">SR Linux</span>dc-leaf1 / dc-leaf2<a class="perma" href="#dc-leaf">#</a></h2>
+      <p class="note">Nokia SR Linux v26.3.3。dc-leaf1=AS65021(srv-web)／dc-leaf2=AS65022(srv-db)。hq-coreとeBGP。SR LinuxはRFC8212既定で無広報・無受理のため、export（自prefix accept）/import（accept-all）ポリシーを必ず明示する。JSON-RPCをAPI試験用に有効化。 <a class="req-chip" href="01_requirements.html#REQ-MV03">REQ-MV03</a><a class="req-chip" href="01_requirements.html#REQ-MV06">REQ-MV06</a></p>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>仕様（dc-leaf1 / dc-leaf2）</th></tr></thead>
+        <tbody>
+          <tr><td>インターフェース</td><td class="mono">e1-1=10.50.255.22 or .26 /30(hq-core) / e1-2=10.50.30.1 or 10.50.31.1 /24(GW)</td></tr>
+          <tr><td>BGP AS / Router ID</td><td class="mono">65021 / .103（leaf1） · 65022 / .104（leaf2）</td></tr>
+          <tr><td>eBGP peer</td><td class="mono">10.50.255.21 or .25（AS65011 hq-core）</td></tr>
+          <tr><td>export-policy</td><td>自LAN（10.50.30.0/24 or 10.50.31.0/24）のみ広報（RFC8212対策で必須）</td></tr>
+          <tr><td>import-policy</td><td>hq-coreからのdefault route含む全受理（accept-all）</td></tr>
+          <tr><td>API</td><td class="mono">system json-rpc-server（mgmt VRF上でhttp有効化）</td></tr>
+        </tbody>
+      </table>
+      <div class="code-block">
+        <div class="code-head"><span>configs/dc-leaf1.cli（抜粋）</span><button class="copy-btn" data-copy-target="cfgLeaf">コピー</button></div>
+        <pre id="cfgLeaf"><span class="c"># インターフェース（e1-1=hq-core向け / e1-2=srv-web向けGW）</span>
+set / interface ethernet-1/1 subinterface 0 ipv4 address 10.50.255.22/30
+set / interface ethernet-1/2 subinterface 0 ipv4 address 10.50.30.1/24
+<span class="c"># routing-policy（RFC8212対策: export=自LANのみ / import=全許可）</span>
+set / routing-policy prefix-set lan-prefix prefix 10.50.30.0/24 mask-length-range exact
+set / routing-policy policy export-lan statement 10 match prefix prefix-set lan-prefix
+set / routing-policy policy export-lan statement 10 action policy-result accept
+set / routing-policy policy import-all default-action policy-result accept
+<span class="c"># BGP（AS65021、対 hq-core eBGP）</span>
+set / network-instance default protocols bgp autonomous-system 65021
+set / network-instance default protocols bgp router-id 10.50.255.103
+set / network-instance default protocols bgp group ebgp-hq peer-as 65011
+set / network-instance default protocols bgp group ebgp-hq export-policy [ export-lan ]
+set / network-instance default protocols bgp group ebgp-hq import-policy [ import-all ]
+set / network-instance default protocols bgp neighbor 10.50.255.21 peer-group ebgp-hq
+<span class="c"># JSON-RPC サーバ（API試験用。mgmt VRF上で http 有効化）</span>
+set / system json-rpc-server admin-state enable
+set / system json-rpc-server network-instance mgmt http admin-state enable</pre>
+      </div>
+    </section>
+
+    <section id="isp">
+      <h2><span class="vtag frr">FRR</span>isp-a / isp-b<a class="perma" href="#isp">#</a></h2>
+      <p class="note">FRRouting 10.2.1。isp-a=AS65001／isp-b=AS65002。互いをeBGPでピアし、hq-edgeともeBGP。ループバック（198.51.100.1/2）を「インターネット上のサービス役」として広報する。isp-bはbr-edge向けP2P（10.50.255.12/30）も広報し、ブランチNAT復路の到達性を確保する。 <a class="req-chip" href="01_requirements.html#REQ-MV01">REQ-MV01</a></p>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>仕様</th></tr></thead>
+        <tbody>
+          <tr><td>Loopback</td><td class="mono">isp-a=198.51.100.1/32 / isp-b=198.51.100.2/32（インターネット役）</td></tr>
+          <tr><td>eBGP peer</td><td>相互（.1⇔.2）＋ hq-edge（isp-a=.6 / isp-b=.10、AS65010）</td></tr>
+          <tr><td>広報</td><td class="mono">lo/32・自ISPのP2Pセグメント。isp-bは10.50.255.12/30も広報（NAT復路）</td></tr>
+          <tr><td>RFC8212</td><td><code class="mono">no bgp ebgp-requires-policy</code>でFRR9+のポリシー必須既定を無効化（ラボ簡素化）</td></tr>
+          <tr><td>br-edge向け</td><td>eBGPは張らない（isp-b:eth3 は connected のみ、static+NAT運用）</td></tr>
+        </tbody>
+      </table>
+      <div class="code-block">
+        <div class="code-head"><span>configs/isp-a.frr.conf（抜粋）</span><button class="copy-btn" data-copy-target="cfgIsp">コピー</button></div>
+        <pre id="cfgIsp"><span class="c">! インターフェース（zebra がIP付与）</span>
+interface lo
+ ip address 198.51.100.1/32
+interface eth2
+ description to-hq-edge
+ ip address 10.50.255.5/30
+<span class="c">! eBGP（AS65001）</span>
+router bgp 65001
+ bgp router-id 198.51.100.1
+ no bgp ebgp-requires-policy
+ neighbor 10.50.255.2 remote-as 65002
+ neighbor 10.50.255.6 remote-as 65010
+ address-family ipv4 unicast
+  network 198.51.100.1/32
+  network 10.50.255.0/30
+  network 10.50.255.4/30
+  neighbor 10.50.255.2 activate
+  neighbor 10.50.255.6 activate
+ exit-address-family</pre>
+      </div>
+    </section>
+
+    <section id="br-edge">
+      <h2><span class="vtag owrt">OpenWrt</span>br-edge<a class="perma" href="#br-edge">#</a></h2>
+      <p class="note">OpenWrt 24.10.7（rootfs）。BGP/OSPF不参加。isp-bへの静的デフォルトルート＋masquerade（source-NAT）でブランチLANを外部到達させる。netifd不動作のため<code class="mono">ip</code>／<code class="mono">nft</code>を直接投入する（<code class="mono">uci</code>は閲覧デモのみ）。 <a class="req-chip" href="01_requirements.html#REQ-MV05">REQ-MV05</a></p>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>仕様</th></tr></thead>
+        <tbody>
+          <tr><td>インターフェース</td><td class="mono">eth1(WAN)=10.50.255.14/30(GW .13) / eth2(LAN)=192.168.40.1/24</td></tr>
+          <tr><td>デフォルトルート</td><td class="mono">ip route replace default via 10.50.255.13（addはmgmt側defaultと競合するためreplace）</td></tr>
+          <tr><td>NAT</td><td class="mono">192.168.40.0/24 → eth1へ masquerade（nft -f で読み込み）</td></tr>
+          <tr><td>uciの扱い</td><td>閲覧デモのみ。<code class="mono">ip</code>/<code class="mono">nft</code>直接投入のためコンテナ再起動で揮発</td></tr>
+        </tbody>
+      </table>
+      <div class="code-block">
+        <div class="code-head"><span>multivendor.clab.yml exec + configs/br-edge-nat.nft（抜粋）</span><button class="copy-btn" data-copy-target="cfgBr">コピー</button></div>
+        <pre id="cfgBr"><span class="c"># exec 直叩き（IP付与 → default経路 → ip_forward → masquerade）</span>
+ip address add 10.50.255.14/30 dev eth1
+ip address add 192.168.40.1/24 dev eth2
+ip route replace default via 10.50.255.13
+sysctl -w net.ipv4.ip_forward=1
+nft -f /etc/br-edge-nat.nft
+<span class="c"># --- br-edge-nat.nft（波括弧を含むためファイルで読み込む） ---</span>
+table ip nat {
+  chain postrouting {
+    type nat hook postrouting priority 100; policy accept;
+    oifname "eth1" masquerade
+  }
+}</pre>
+      </div>
+    </section>
+
+    <section id="common">
+      <h2><span class="vtag common">共通</span>共通設計 ・ 同じ操作の5流儀<a class="perma" href="#common">#</a></h2>
+      <p class="note">全機器に共通する設計方針と、5ベンダーで「同じ目的の操作」がどう異なるかの対比（一次資料・実測に基づく）。 <a class="req-chip" href="01_requirements.html#REQ-MV06">REQ-MV06</a><a class="req-chip" href="01_requirements.html#REQ-MV07">REQ-MV07</a></p>
+      <table class="spec-table">
+        <thead><tr><th>項目</th><th>値</th></tr></thead>
+        <tbody>
+          <tr><td>IGP</td><td>OSPF単一エリア0（hq-edge／hq-core／hq-swの3台のみ参加）</td></tr>
+          <tr><td>EGP</td><td>eBGPのみ（iBGP不使用。各ASは1台構成）</td></tr>
+          <tr><td>Router ID方針</td><td>ループバック未使用。経路上に現れない識別子専用の値（10.50.255.101〜.105）を明示設定</td></tr>
+          <tr><td>MTU</td><td class="mono">全P2Pリンクに mtu 1500 を明示（clab既定9500によるOSPF/BGP MTUミスマッチ回避）</td></tr>
+          <tr><td>管理アクセス</td><td>RouterOS=SSH+REST / IOL=console（SSH不可） / SR Linux=SSH+JSON-RPC / FRR=docker exec+vtysh / OpenWrt=docker exec+ip/nft</td></tr>
+        </tbody>
+      </table>
+      <p class="note" style="margin-top:24px;">同じ目的の操作を5流儀で対比（<code class="mono">03_詳細設計/ベンダー比較_同じ操作5流儀.md</code> 実測ベース）</p>
+      <table class="spec-table">
+        <thead><tr><th>操作</th><th>各ベンダーの流儀</th></tr></thead>
+        <tbody>
+          <tr><td>ルーティングテーブル</td><td class="mono">RouterOS: /ip route print · IOL: show ip route · SR Linux: show network-instance default route-table · FRR: vtysh -c "show ip route" · OpenWrt: ip route show</td></tr>
+          <tr><td>BGPピア状態</td><td class="mono">RouterOS: /routing/bgp/session print · IOL: show ip bgp summary · SR Linux: show ... bgp neighbor · FRR: vtysh -c "show ip bgp summary"</td></tr>
+          <tr><td>設定変更のロールバック</td><td>RouterOS=Safe Mode（切断で自動破棄） · SR Linux=commit confirmed（タイマー式自動ロールバック） · IOS/FRR=手動(no系) · OpenWrt=imperative（手動）</td></tr>
+          <tr><td>保存</td><td class="mono">RouterOS: 即時自動 · IOL: copy run start · SR Linux: commit save · FRR: write memory · OpenWrt: ip/nft直投入は揮発</td></tr>
+          <tr><td>APIでの取得</td><td>RouterOS=REST（実証済み） · SR Linux=JSON-RPC（実証済み） · IOL=console限定（SSH不可） · FRR=vtysh JSON出力 · OpenWrt=netifd不動作で対象外</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <nav class="doc-footer" aria-label="前後のドキュメント">
+      <a class="prev" href="03_topology.html"><small>前の工程</small>トポロジ図</a>
+      <a class="next" href="05_test-report.html"><small>次の工程</small>試験結果報告書</a>
+    </nav>
+    <p class="data-note">本ドキュメントは mvlab 実機（2026-07-17 <span class="mono">verify.sh</span> PASS=28/28）に基づく。configスニペットは実投入ファイル（<span class="mono">04_構築/configs/</span>）からの抜粋。</p>
+  </main>
+</div>
+
+<script>
+  "use strict";
+  function flashDone(btn) {
+    const original = btn.textContent;
+    btn.textContent = "✓ コピーしました";
+    btn.classList.add("done");
+    setTimeout(() => { btn.textContent = original; btn.classList.remove("done"); }, 1500);
+  }
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".copy-btn");
+    if (!btn) return;
+    const text = btn.dataset.copyTarget
+      ? document.getElementById(btn.dataset.copyTarget).textContent
+      : btn.dataset.copy;
+    navigator.clipboard.writeText(text).then(() => flashDone(btn)).catch(() => {
+      const ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta);
+      ta.select(); document.execCommand("copy"); ta.remove();
+      flashDone(btn);
+    });
+  });
+
+  const navLinks = [...document.querySelectorAll(".nav a[data-sec]")];
+  const sections = navLinks.map((a) => document.getElementById(a.dataset.sec)).filter(Boolean);
+  const spy = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      navLinks.forEach((a) => a.classList.toggle("current", a.dataset.sec === entry.target.id));
+    });
+  }, { rootMargin: "-10% 0px -70% 0px" });
+  sections.forEach((s) => spy.observe(s));
+</script>
+</body>
+</html>

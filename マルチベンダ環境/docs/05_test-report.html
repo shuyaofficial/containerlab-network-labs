@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>試験結果報告書 | マルチベンダ環境ラボ</title>
+<style>
+  :root {
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    --accent: #BE185D;
+    --accent-soft: #FDF2F8;
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    --neutral: #94A3B8;
+    --code-bg: #0F172A;
+    --code-ink: #E2E8F0;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--sans); font-size: 15px; line-height: 1.8; color: var(--ink); background: var(--surface); }
+  .mono { font-family: var(--mono); font-feature-settings: "tnum"; }
+
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 20px;
+    height: 56px; padding: 0 24px;
+    background: rgba(250,250,249,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .site-header .back { font-size: 13px; color: var(--ink-2); text-decoration: none; transition: color .15s var(--ease); }
+  .site-header .back:hover { color: var(--accent); }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .brand span { color: var(--accent); }
+  .phase-chip { padding: 3px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--accent); background: var(--accent-soft); border-radius: var(--r-full); }
+  .header-meta { margin-left: auto; font-size: 12px; color: var(--ink-2); }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 40px 24px 64px; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+  p.lede { font-size: 14.5px; color: var(--ink-2); max-width: 72ch; margin: 14px 0 28px; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 28px; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; font-size: 12px; font-weight: 500; border-radius: var(--r-full); border: 1px solid var(--border); background: var(--raised); color: var(--ink-2); }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  section { margin-bottom: 48px; }
+  h2 { font-size: 20px; font-weight: 600; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+
+  /* ===== Summary stat tiles ===== */
+  .stats-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+  .stat-tile { flex: 1; min-width: 110px; background: var(--raised); border: 1px solid var(--border); border-radius: var(--r-md); padding: 14px 16px; box-shadow: var(--shadow-1); }
+  .stat-tile .num { font-family: var(--mono); font-size: 32px; font-weight: 600; font-feature-settings: "tnum"; line-height: 1.1; color: var(--ink); }
+  .stat-tile .label { font-size: 12px; color: var(--ink-2); margin-top: 4px; }
+  .stat-tile.ok .num { color: var(--ok); }
+  .stat-tile.ng .num { color: var(--error); }
+  .stat-tile.hold .num { color: var(--warn); }
+  .stat-tile.none .num { color: var(--neutral); }
+  .progress { height: 8px; border-radius: var(--r-full); overflow: hidden; display: flex; background: var(--border); margin-bottom: 8px; }
+  .progress span { height: 100%; }
+  .p-ok { background: var(--ok); } .p-ng { background: var(--error); } .p-hold { background: var(--warn); } .p-none { background: var(--neutral); }
+  .progress-note { font-size: 12px; color: var(--ink-3); }
+
+  /* ===== Container grid ===== */
+  .cont-head { font-size: 13px; font-weight: 600; color: var(--ink-2); margin: 24px 0 10px; }
+  .cont-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .cont-chip { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--raised); border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 12.5px; }
+  .cont-chip .cdot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex-shrink: 0; }
+  .cont-chip .cname { font-family: var(--mono); font-weight: 600; }
+  .cont-chip .cstat { margin-left: auto; font-size: 11px; color: var(--ok); font-weight: 600; }
+
+  /* ===== Tabs ===== */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 24px; flex-wrap: wrap; }
+  .tab-btn { padding: 10px 16px; font: inherit; font-size: 14px; font-weight: 600; color: var(--ink-2); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: color .15s var(--ease), border-color .15s var(--ease); }
+  .tab-btn[aria-selected="true"] { color: var(--accent); border-color: var(--accent); }
+  .tab-btn:hover { color: var(--ink); }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .tab-panel:not([hidden]) { animation: fadeIn .25s var(--ease); }
+
+  /* ===== Test card ===== */
+  .test-card { background: var(--raised); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-1); padding: 18px 20px; margin-bottom: 14px; transition: transform .18s var(--ease), box-shadow .18s var(--ease); }
+  .test-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
+  .test-card.info { border-left: 3px solid var(--info); }
+  .test-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; font-size: 12.5px; color: var(--ink-2); padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .test-meta .tid { font-weight: 700; color: var(--accent); font-size: 13px; font-family: var(--mono); }
+  .test-cmd { font-family: var(--mono); font-size: 12.5px; color: var(--code-ink); background: var(--code-bg); border-radius: var(--r-sm); padding: 9px 12px; overflow-x: auto; white-space: pre; }
+  .test-expect { font-size: 13px; color: var(--ink-2); margin-top: 10px; }
+  .test-expect b { color: var(--ink); font-weight: 600; }
+  .test-result { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; }
+  .rst { font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+  .rst::before { font-size: 11px; }
+  .rst.ok { color: var(--ok); } .rst.ok::before { content: "\25CF"; }
+  .rst.ng { color: var(--error); } .rst.ng::before { content: "\2715"; }
+  .rst.hold { color: var(--warn); } .rst.hold::before { content: "\25B2"; }
+  .rst.info { color: var(--info); } .rst.info::before { content: "\24D8"; }
+  .rmeta { color: var(--ink-2); }
+  .req-chips { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+  .req-chip { font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: var(--r-full); background: var(--accent-soft); color: var(--accent); text-decoration: none; transition: background .15s var(--ease); }
+  .req-chip:hover { background: #FBCFE8; }
+  .info-note { font-size: 12.5px; color: var(--ink-2); margin-top: 8px; }
+
+  /* ===== Redundancy timeline ===== */
+  .redu { background: var(--raised); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-1); padding: 20px 22px; }
+  .redu p.desc { font-size: 13.5px; color: var(--ink-2); margin-bottom: 18px; }
+  .timeline { display: flex; flex-wrap: wrap; gap: 0; align-items: stretch; }
+  .tl-step { flex: 1; min-width: 150px; position: relative; padding: 0 14px; }
+  .tl-step:not(:last-child)::after { content: "\2192"; position: absolute; right: -6px; top: 22px; color: var(--ink-3); font-size: 14px; }
+  .tl-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: var(--r-full); }
+  .tl-badge.ok { color: var(--ok); background: #ECFDF5; }
+  .tl-badge.act { color: var(--accent); background: var(--accent-soft); }
+  .tl-step h4 { font-size: 13px; font-weight: 600; margin: 10px 0 4px; }
+  .tl-step p { font-size: 12px; color: var(--ink-2); line-height: 1.6; }
+  .tl-step .cmd { font-family: var(--mono); font-size: 11px; color: var(--ink-3); margin-top: 6px; word-break: break-all; }
+
+  .doc-footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); }
+  .doc-footer a { display: block; padding: 14px 18px; min-width: 200px; border: 1px solid var(--border); border-radius: var(--r-md); text-decoration: none; color: var(--ink); font-weight: 600; font-size: 14px; background: var(--raised); transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease); }
+  .doc-footer a:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--accent); }
+  .doc-footer a small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-3); letter-spacing: .06em; }
+  .doc-footer .next { text-align: right; margin-left: auto; }
+  .data-note { margin-top: 24px; font-size: 11.5px; color: var(--ink-2); padding: 10px 14px; border-left: 3px solid var(--ok); background: #ECFDF5; border-radius: var(--r-sm); }
+
+  @media (max-width: 768px) {
+    .header-meta, .phase-chip { display: none; }
+    .stats-row { gap: 8px; }
+    .stat-tile { min-width: 90px; padding: 10px 12px; }
+    .stat-tile .num { font-size: 24px; }
+    .test-meta { gap: 4px 10px; }
+    .req-chips { margin-left: 0; width: 100%; }
+    .tl-step:not(:last-child)::after { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+  @media (max-width: 480px) {
+    .doc-footer { flex-direction: column; }
+    .doc-footer a { min-width: 0; }
+    .doc-footer .next { margin-left: 0; }
+  }
+  @media print {
+    .site-header, .doc-footer, .data-note, .tabs { display: none !important; }
+    body { background: #FFFFFF; }
+    .tab-panel[hidden] { display: block !important; }
+    .test-card { break-inside: avoid; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a class="back" href="00_document-map.html">&larr; ドキュメントマップ</a>
+  <div class="brand">マルチベンダ環境<span>ラボ</span></div>
+  <span class="phase-chip">PHASE 5 試験</span>
+  <div class="header-meta">mvlab / 5ベンダー13ノード</div>
+</header>
+
+<div class="wrap">
+  <main>
+    <h1>試験結果報告書</h1>
+    <div class="doc-meta">
+      <span class="badge ver">v1.0</span>
+      <span class="badge"><span class="dot"></span>グリーン PASS=28/28</span>
+      <span class="badge">試験日 2026-07-17</span>
+      <span class="badge">verify.sh（OrbStack VM上）</span>
+    </div>
+    <p class="lede">要件定義書 §7 の受け入れ基準をそのまま試験項目に転記し、<code class="mono">05_試験/verify.sh</code> をOrbStack VM上で実行して自動確認した。コンテナ稼働13・疎通7・ルーティング（BGP・OSPF）6・API 2 の計28項目がすべてOK（<code class="mono">SUMMARY PASS=28 FAIL=0</code>）。各カードは実行コマンドと実測結果、要件IDへのトレースを示す。</p>
+
+    <section id="summary" aria-label="結果サマリ">
+      <h2>結果サマリ</h2>
+      <div class="stats-row" id="statsRow"></div>
+      <div class="progress" id="progressBar"></div>
+      <p class="progress-note" id="progressNote"></p>
+
+      <div class="cont-head">コンテナ稼働（13ノード / verify.sh CATEGORY=container）</div>
+      <div class="cont-grid" id="contGrid"></div>
+    </section>
+
+    <section aria-label="試験項目">
+      <div class="tabs" role="tablist" aria-label="試験区分">
+        <button class="tab-btn" role="tab" id="tabbtn-reach" aria-controls="panel-reach" aria-selected="true" data-tab="reach">疎通（7）</button>
+        <button class="tab-btn" role="tab" id="tabbtn-route" aria-controls="panel-route" aria-selected="false" data-tab="route">ルーティング（BGP・OSPF）</button>
+        <button class="tab-btn" role="tab" id="tabbtn-api" aria-controls="panel-api" aria-selected="false" data-tab="api">API（2）</button>
+      </div>
+      <div class="tab-panel" id="panel-reach" role="tabpanel" aria-labelledby="tabbtn-reach"></div>
+      <div class="tab-panel" id="panel-route" role="tabpanel" aria-labelledby="tabbtn-route" hidden></div>
+      <div class="tab-panel" id="panel-api" role="tabpanel" aria-labelledby="tabbtn-api" hidden></div>
+    </section>
+
+    <section id="redundancy" aria-label="冗長試験">
+      <h2>冗長試験（デュアルホーム切替）</h2>
+      <div class="redu">
+        <p class="desc">hq-edge は isp-a / isp-b の2本でインターネット側へデュアルホームしている。isp-a向けリンク（ether2）を落とし、経路が isp-b 側へ切り替わって疎通が維持されることを確認する（試験計画書 §3 の手動手順。verify.sh の自動28項目には含まない参考検証）。198.51.100.1 は isp-b が eBGPで再広報しているため、ether2 断でも到達は維持される。</p>
+        <div class="timeline">
+          <div class="tl-step">
+            <span class="tl-badge ok">3-1 障害前 OK</span>
+            <h4>基準の確認</h4>
+            <p>hq-pc1 → 198.51.100.1 が到達。</p>
+            <div class="cmd">docker exec clab-mvlab-hq-pc1 ping -c2 198.51.100.1</div>
+          </div>
+          <div class="tl-step">
+            <span class="tl-badge act">3-2 リンク断</span>
+            <h4>isp-a向け遮断</h4>
+            <p>ether2 を disable。to-isp-a BGPセッションが断。</p>
+            <div class="cmd">ssh admin@172.20.50.11 "/interface disable ether2"</div>
+          </div>
+          <div class="tl-step">
+            <span class="tl-badge ok">3-3 切替後 OK</span>
+            <h4>疎通維持</h4>
+            <p>hq-pc1 → 198.51.100.1 が到達を維持（isp-b→isp-a 経由へ迂回）。</p>
+            <div class="cmd">docker exec clab-mvlab-hq-pc1 ping -c4 198.51.100.1</div>
+          </div>
+          <div class="tl-step">
+            <span class="tl-badge ok">3-4 迂回 OK</span>
+            <h4>経路の迂回確認</h4>
+            <p>to-isp-b のみ表示（to-isp-a は消える）。</p>
+            <div class="cmd">ssh admin@172.20.50.11 "/routing/bgp/session print"</div>
+          </div>
+          <div class="tl-step">
+            <span class="tl-badge ok">3-5 復旧 OK</span>
+            <h4>切戻し</h4>
+            <p>ether2 enable。to-isp-a BGP再確立、両セッションestablished。</p>
+            <div class="cmd">ssh admin@172.20.50.11 "/interface enable ether2"</div>
+          </div>
+        </div>
+        <p class="info-note" style="margin-top:16px;">※ ダウンタイムの秒数は本試験の測定対象外（verify.sh は到達可否を判定し、切替所要時間の実測値は取得していない）。切替・復旧ともに疎通維持を確認済み。 <a class="req-chip" href="01_requirements.html#REQ-MV02">REQ-MV02</a></p>
+      </div>
+    </section>
+  </main>
+
+  <nav class="doc-footer" aria-label="前後のドキュメント">
+    <a class="prev" href="04_detailed-design.html"><small>前の工程</small>詳細設計書</a>
+    <a class="next" href="00_document-map.html"><small>戻る</small>ドキュメントマップ</a>
+  </nav>
+  <p class="data-note">本ドキュメントは mvlab 実機（2026-07-17 <span class="mono">verify.sh</span> PASS=28/28）に基づく。全コマンド・実測結果は <span class="mono">05_試験/verify.sh</span> と試験計画書の実値を反映（架空値・推測値は含まない）。</p>
+</div>
+
+<script>
+"use strict";
+
+/* verify.sh（2026-07-17 実行、SUMMARY PASS=28 FAIL=0）の集計に一致。
+   28 = コンテナ13 + 疎通7 + BGP5 + OSPF1(hq-edge) + API2。
+   OSPF hq-core/hq-sw はconsole運用のためINFO（集計対象外）。 */
+const SUMMARY = { total: 28, ok: 28, ng: 0, hold: 0, none: 0 };
+
+const CONTAINERS = ["isp-a","isp-b","hq-edge","hq-core","hq-sw","dc-leaf1","dc-leaf2","br-edge","hq-pc1","hq-pc2","srv-web","srv-db","br-pc"];
+
+const TESTS = [
+  /* ===== 疎通（ping。verify.sh CATEGORY=ping） ===== */
+  { id: "疎通 1-1", cat: "reach", target: "hq-pc1 → hq-pc2（VLAN10→VLAN20）",
+    cmd: 'docker exec clab-mvlab-hq-pc1 ping -c 2 -W 2 10.50.20.102',
+    expect: "到達（hq-sw内SVI間ルーティング）", reqs: ["REQ-MV04"],
+    result: { status: "ok", detail: "hq-pc1->10.50.20.102 到達" } },
+  { id: "疎通 1-2", cat: "reach", target: "hq-pc1 → srv-web（DC1）",
+    cmd: 'docker exec clab-mvlab-hq-pc1 ping -c 2 -W 2 10.50.30.103',
+    expect: "到達（OSPF↔eBGP再配信経由）", reqs: ["REQ-MV03","REQ-MV01"],
+    result: { status: "ok", detail: "hq-pc1->10.50.30.103 到達" } },
+  { id: "疎通 1-3", cat: "reach", target: "hq-pc1 → srv-db（DC2）",
+    cmd: 'docker exec clab-mvlab-hq-pc1 ping -c 2 -W 2 10.50.31.104',
+    expect: "到達（dc-leaf2側、同上）", reqs: ["REQ-MV03","REQ-MV01"],
+    result: { status: "ok", detail: "hq-pc1->10.50.31.104 到達" } },
+  { id: "疎通 1-4", cat: "reach", target: "hq-pc1 → isp-a ループバック",
+    cmd: 'docker exec clab-mvlab-hq-pc1 ping -c 2 -W 2 198.51.100.1',
+    expect: "到達（OSPF学習default→hq-edge→BGP）", reqs: ["REQ-MV01","REQ-MV02"],
+    result: { status: "ok", detail: "hq-pc1->198.51.100.1 到達" } },
+  { id: "疎通 1-5", cat: "reach", target: "hq-pc1 → isp-b ループバック",
+    cmd: 'docker exec clab-mvlab-hq-pc1 ping -c 2 -W 2 198.51.100.2',
+    expect: "到達（同上）", reqs: ["REQ-MV01","REQ-MV02"],
+    result: { status: "ok", detail: "hq-pc1->198.51.100.2 到達" } },
+  { id: "疎通 1-6", cat: "reach", target: "br-pc → isp-b ループバック（ブランチNAT）",
+    cmd: 'docker exec clab-mvlab-br-pc ping -c 2 -W 2 198.51.100.2',
+    expect: "到達（br-edgeでmasquerade、src=10.50.255.14）", reqs: ["REQ-MV05"],
+    result: { status: "ok", detail: "br-pc->198.51.100.2 到達" } },
+  { id: "疎通 1-7", cat: "reach", target: "br-pc → hq-pc1（NAT越しでHQへ）",
+    cmd: 'docker exec clab-mvlab-br-pc ping -c 2 -W 2 10.50.10.101',
+    expect: "到達（NAT src、ISPが10.50.0.0/16をhq-edgeへ保持）", reqs: ["REQ-MV05"],
+    result: { status: "ok", detail: "br-pc->10.50.10.101 到達" } },
+
+  /* ===== ルーティング: BGP（5） ===== */
+  { id: "BGP isp-a", cat: "route", target: "isp-a（FRR / 対 isp-b・hq-edge）",
+    cmd: 'docker exec clab-mvlab-isp-a vtysh -c "show bgp ipv4 unicast summary json"',
+    expect: "2ピア Established（state==Established を数える）", reqs: ["REQ-MV01"],
+    result: { status: "ok", detail: "established=2 (>=2)" } },
+  { id: "BGP isp-b", cat: "route", target: "isp-b（FRR / 対 isp-a・hq-edge）",
+    cmd: 'docker exec clab-mvlab-isp-b vtysh -c "show bgp ipv4 unicast summary json"',
+    expect: "2ピア Established", reqs: ["REQ-MV01"],
+    result: { status: "ok", detail: "established=2 (>=2)" } },
+  { id: "BGP hq-edge", cat: "route", target: "hq-edge（RouterOS / 対 isp-a・isp-b）",
+    cmd: 'sshpass -p admin ssh admin@172.20.50.11 "/routing/bgp/session print count-only"',
+    expect: "2セッション established（デュアルホーム）", reqs: ["REQ-MV02"],
+    result: { status: "ok", detail: "established=2 (>=2: isp-a/isp-b)" } },
+  { id: "BGP dc-leaf1", cat: "route", target: "dc-leaf1（SR Linux / 対 hq-core）",
+    cmd: 'docker exec clab-mvlab-dc-leaf1 sr_cli "show network-instance default protocols bgp neighbor"',
+    expect: "neighbor established", reqs: ["REQ-MV03"],
+    result: { status: "ok", detail: "neighbor established" } },
+  { id: "BGP dc-leaf2", cat: "route", target: "dc-leaf2（SR Linux / 対 hq-core）",
+    cmd: 'docker exec clab-mvlab-dc-leaf2 sr_cli "show network-instance default protocols bgp neighbor"',
+    expect: "neighbor established", reqs: ["REQ-MV03"],
+    result: { status: "ok", detail: "neighbor established" } },
+
+  /* ===== ルーティング: OSPF（1 counted + 1 INFO） ===== */
+  { id: "OSPF hq-edge", cat: "route", target: "hq-edge（RouterOS / 対 hq-core）",
+    cmd: 'sshpass -p admin ssh admin@172.20.50.11 "/routing/ospf/neighbor print count-only"',
+    expect: "neighbor >= 1（hq-core と隣接）", reqs: ["REQ-MV03"],
+    result: { status: "ok", detail: "neighbor=1 (>=1: hq-core)" } },
+  { id: "OSPF hq-core/hq-sw", cat: "route", info: true, target: "hq-core / hq-sw（Cisco IOL / console運用）",
+    cmd: 'docker attach clab-mvlab-hq-core → show ip ospf neighbor',
+    expect: "hq-core に hq-edge/hq-sw の2隣接FULL、hq-sw に hq-core隣接FULL（目視）", reqs: ["REQ-MV03"],
+    result: { status: "info", detail: "console運用のため自動集計は不可（INFO・28集計対象外）。目視でFULLを確認。間接確認: hq-edge OSPF隣接=OK かつ HQ↔DC/ISP ping到達で担保。" } },
+
+  /* ===== API（2） ===== */
+  { id: "API hq-edge REST", cat: "api", target: "hq-edge（RouterOS REST / http）",
+    cmd: 'curl -s -u admin:admin http://172.20.50.11/rest/system/resource',
+    expect: 'JSONで "version" 等が返る', reqs: ["REQ-MV06"],
+    result: { status: "ok", detail: 'system/resource取得OK（"version"を確認）' } },
+  { id: "API dc-leaf1 JSON-RPC", cat: "api", target: "dc-leaf1（SR Linux JSON-RPC / http）",
+    cmd: 'curl -s -u admin:\'NokiaSrl1!\' http://172.20.50.13/jsonrpc -d \'{"jsonrpc":"2.0","id":1,"method":"get","params":{"commands":[{"path":"/system/information/version","datastore":"state"}]}}\'',
+    expect: "JSONで version が返る", reqs: ["REQ-MV06"],
+    result: { status: "ok", detail: "system/information/version取得OK" } },
+];
+
+const STATUS_LABEL = { ok: "OK", ng: "NG", hold: "保留", info: "INFO", none: "未実施" };
+
+function renderReqChips(reqs) {
+  if (!reqs || !reqs.length) return "";
+  return `<div class="req-chips">${reqs.map(r => `<a class="req-chip" href="01_requirements.html#${r}">${r}</a>`).join("")}</div>`;
+}
+
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+function renderCard(t) {
+  return `<article class="test-card${t.info ? " info" : ""}">
+    <header class="test-meta">
+      <span class="tid">${esc(t.id)}</span>
+      <span>対象: ${esc(t.target)}</span>
+    </header>
+    <div class="test-cmd">${esc(t.cmd)}</div>
+    <div class="test-expect"><b>期待値:</b> ${esc(t.expect)}</div>
+    <footer class="test-result">
+      <span class="rst ${t.result.status}">${STATUS_LABEL[t.result.status]}</span>
+      <span class="rmeta">実測: ${esc(t.result.detail)}</span>
+      ${renderReqChips(t.reqs)}
+    </footer>
+  </article>`;
+}
+
+const panels = { reach: document.getElementById("panel-reach"), route: document.getElementById("panel-route"), api: document.getElementById("panel-api") };
+Object.keys(panels).forEach(key => {
+  panels[key].innerHTML = TESTS.filter(t => t.cat === key).map(renderCard).join("");
+});
+
+const tabButtons = [...document.querySelectorAll(".tab-btn")];
+tabButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    tabButtons.forEach(b => b.setAttribute("aria-selected", "false"));
+    btn.setAttribute("aria-selected", "true");
+    Object.values(panels).forEach(p => { p.hidden = true; });
+    panels[btn.dataset.tab].hidden = false;
+  });
+});
+
+/* ---- 結果サマリ ---- */
+const statsRow = document.getElementById("statsRow");
+const tiles = [
+  { key: "total", cls: "", label: "総項目数" },
+  { key: "ok", cls: "ok", label: "OK" },
+  { key: "ng", cls: "ng", label: "NG" },
+  { key: "hold", cls: "hold", label: "保留" },
+  { key: "none", cls: "none", label: "未実施" }
+];
+statsRow.innerHTML = tiles.map(t => `<div class="stat-tile ${t.cls}"><div class="num mono">${SUMMARY[t.key]}</div><div class="label">${t.label}</div></div>`).join("");
+
+const progressBar = document.getElementById("progressBar");
+["ok", "ng", "hold", "none"].forEach(key => {
+  const pct = (SUMMARY[key] / SUMMARY.total * 100).toFixed(1);
+  if (SUMMARY[key] > 0) progressBar.insertAdjacentHTML("beforeend", `<span class="p-${key}" style="width:${pct}%"></span>`);
+});
+document.getElementById("progressNote").textContent = `${SUMMARY.total}項目中 OK ${SUMMARY.ok}・NG ${SUMMARY.ng}・保留 ${SUMMARY.hold}・未実施 ${SUMMARY.none}（2026-07-17 verify.sh PASS=28 FAIL=0）。別途 OSPF hq-core/hq-sw を INFO（目視）で確認。`;
+
+/* ---- コンテナ稼働グリッド ---- */
+const contGrid = document.getElementById("contGrid");
+contGrid.innerHTML = CONTAINERS.map(n => `<div class="cont-chip"><span class="cdot"></span><span class="cname">${n}</span><span class="cstat">running</span></div>`).join("");
+</script>
+</body>
+</html>

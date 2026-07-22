@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>トポロジ図 | マルチベンダ環境ラボ</title>
+<style>
+  :root {
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    --accent: #BE185D;
+    --accent-soft: #FDF2F8;
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    --neutral: #94A3B8;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  body { font-family: var(--sans); font-size: 15px; line-height: 1.8; color: var(--ink); background: var(--surface); }
+  .mono { font-family: var(--mono); font-feature-settings: "tnum"; }
+
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 20px;
+    height: 56px; padding: 0 24px;
+    background: rgba(250,250,249,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .site-header .back { font-size: 13px; color: var(--ink-2); text-decoration: none; transition: color .15s var(--ease); }
+  .site-header .back:hover { color: var(--accent); }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .brand span { color: var(--accent); }
+  .phase-chip { padding: 3px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--accent); background: var(--accent-soft); border-radius: var(--r-full); }
+  .header-meta { margin-left: auto; font-size: 12px; color: var(--ink-2); }
+  @media (max-width: 768px) { .header-meta, .phase-chip { display: none; } }
+
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 40px 24px 96px; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 20px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; font-size: 12px; font-weight: 500;
+    border-radius: var(--r-full); border: 1px solid var(--border);
+    background: var(--raised); color: var(--ink-2);
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  p.lead { font-size: 14.5px; color: var(--ink-2); max-width: 78ch; margin-bottom: 24px; }
+
+  h2 { font-size: 18px; font-weight: 600; margin: 40px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
+  /* ===== Diagram ===== */
+  .diagram-wrap { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--raised); padding: 16px; box-shadow: var(--shadow-1); overflow-x: auto; }
+  svg.topo { width: 100%; min-width: 900px; height: auto; display: block; }
+
+  .band { fill-opacity: .4; stroke-width: 1; stroke-dasharray: 4 4; }
+  .band.untrust { fill: #ECFDF5; stroke: #6EE7B7; }
+  .band.wan { fill: #FEF2F2; stroke: #FCA5A5; }
+  .band.trust { fill: #EFF6FF; stroke: #93C5FD; }
+  .band.dc { fill: #EEF2FF; stroke: #A5B4FC; }
+  .band.branch { fill: #FFF7ED; stroke: #FDBA74; }
+  .zlabel { font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: .04em; }
+  .zlabel.untrust { fill: #059669; } .zlabel.wan { fill: #DC2626; } .zlabel.trust { fill: #2563EB; }
+  .zlabel.dc { fill: #4F46E5; } .zlabel.branch { fill: #EA580C; }
+
+  .node rect { stroke-width: 1.4; }
+  .node.n-frr rect { fill: #ECFDF5; stroke: #6EE7B7; }
+  .node.n-ros rect { fill: #FEF2F2; stroke: #FCA5A5; }
+  .node.n-iol rect { fill: #EFF6FF; stroke: #93C5FD; }
+  .node.n-srl rect { fill: #EEF2FF; stroke: #A5B4FC; }
+  .node.n-owrt rect { fill: #FFF7ED; stroke: #FDBA74; }
+  .node.n-ep rect { fill: #F5F5F4; stroke: #A8A29E; }
+  .nname { font-size: 13px; font-weight: 700; fill: var(--ink); text-anchor: middle; font-family: var(--mono); }
+  .nsub { font-size: 10.5px; fill: var(--ink-2); text-anchor: middle; }
+  .nname.ep { font-size: 12px; } .nsub.ep { font-size: 10px; }
+
+  .link { fill: none; stroke-width: 1.7; }
+  .link.ebgp { stroke: #BE185D; }
+  .link.ospf { stroke: #2563EB; }
+  .link.nat { stroke: #EA580C; stroke-dasharray: 5 4; }
+  .link.lan { stroke: #94A3B8; stroke-width: 1.4; }
+  .llabel { font-family: var(--mono); font-size: 9.5px; fill: var(--ink-2); }
+
+  /* ===== Legend ===== */
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 20px; margin-top: 16px; font-size: 12.5px; color: var(--ink-2); }
+  .legend .grp { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+  .legend .item { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .sw { width: 22px; height: 14px; border-radius: 3px; border: 1px solid; flex-shrink: 0; }
+  .sw.frr { background: #ECFDF5; border-color: #6EE7B7; }
+  .sw.ros { background: #FEF2F2; border-color: #FCA5A5; }
+  .sw.iol { background: #EFF6FF; border-color: #93C5FD; }
+  .sw.srl { background: #EEF2FF; border-color: #A5B4FC; }
+  .sw.owrt { background: #FFF7ED; border-color: #FDBA74; }
+  .sw.ep { background: #F5F5F4; border-color: #A8A29E; }
+  .legend .lk { width: 24px; height: 0; border-top-width: 2px; border-top-style: solid; flex-shrink: 0; }
+  .lk.ebgp { border-color: #BE185D; }
+  .lk.ospf { border-color: #2563EB; }
+  .lk.nat { border-color: #EA580C; border-top-style: dashed; }
+  .lk.lan { border-color: #94A3B8; }
+
+  /* ===== Tables ===== */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-md); }
+  .topo-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 720px; }
+  .topo-table th, .topo-table td { padding: 9px 11px; text-align: left; vertical-align: top; }
+  .topo-table thead th { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--ink-3); text-transform: uppercase; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--raised); }
+  .topo-table tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+  .topo-table tbody tr:hover { background: #F5F5F4; }
+  .zone-pill { display: inline-block; padding: 1px 8px; font-size: 11px; font-weight: 600; border-radius: var(--r-full); border: 1px solid; white-space: nowrap; }
+  .zone-pill.untrust { color: #059669; background: #ECFDF5; border-color: #6EE7B7; }
+  .zone-pill.wan { color: #DC2626; background: #FEF2F2; border-color: #FCA5A5; }
+  .zone-pill.trust { color: #2563EB; background: #EFF6FF; border-color: #93C5FD; }
+  .zone-pill.dc { color: #4F46E5; background: #EEF2FF; border-color: #A5B4FC; }
+  .zone-pill.branch { color: #EA580C; background: #FFF7ED; border-color: #FDBA74; }
+  .proto-tag { display: inline-block; padding: 1px 7px; font-size: 11px; font-family: var(--mono); border-radius: var(--r-sm); }
+  .proto-tag.ebgp { color: #BE185D; background: var(--accent-soft); }
+  .proto-tag.ospf { color: #2563EB; background: #EFF6FF; }
+  .proto-tag.nat { color: #EA580C; background: #FFF7ED; }
+  .proto-tag.lan { color: #57534E; background: #F5F5F4; }
+
+  .doc-footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); }
+  .doc-footer a {
+    display: block; padding: 14px 18px; min-width: 200px;
+    border: 1px solid var(--border); border-radius: var(--r-md);
+    text-decoration: none; color: var(--ink); font-weight: 600; font-size: 14px;
+    background: var(--raised); transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease);
+  }
+  .doc-footer a:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--accent); }
+  .doc-footer a small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-3); letter-spacing: .06em; }
+  .doc-footer .next { text-align: right; margin-left: auto; }
+  .data-note { margin-top: 24px; font-size: 11.5px; color: var(--ink-2); padding: 10px 14px; border-left: 3px solid var(--ok); background: #ECFDF5; border-radius: var(--r-sm); }
+
+  @media (max-width: 768px) { .header-meta { display: none; } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } html { scroll-behavior: auto; } }
+  @media (max-width: 480px) {
+    .doc-footer { flex-direction: column; }
+    .doc-footer a { min-width: 0; }
+    .doc-footer .next { margin-left: 0; }
+  }
+  @media print {
+    .site-header, .doc-footer, .data-note { display: none !important; }
+    body { background: #FFFFFF; }
+    .diagram-wrap { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a class="back" href="00_document-map.html">&larr; ドキュメントマップ</a>
+  <div class="brand">マルチベンダ環境<span>ラボ</span></div>
+  <span class="phase-chip">PHASE 2 トポロジ</span>
+  <div class="header-meta">mvlab / 5ベンダー13ノード</div>
+</header>
+
+<main class="wrap">
+  <h1>トポロジ図（論理構成）</h1>
+  <div class="doc-meta">
+    <span class="badge ver">v1.0</span>
+    <span class="badge"><span class="dot"></span>確定</span>
+    <span class="badge">最終更新 2026-07-17</span>
+    <span class="badge">mgmt 172.20.50.0/24 / データ 10.50.0.0/16</span>
+  </div>
+  <p class="lead">5ゾーン・5ベンダー・13ノードの論理構成を色分けで示す。外側はeBGP（Untrust）、内側はOSPF area0（Trust）、DCは再びeBGP、ブランチは静的経路+NATという企業ネットワークの階層化を1枚で表す。ノードの色はベンダー区分、リンクの色は経路プロトコルを表す（凡例参照）。管理ネットワーク（<code class="mono">mvlab-mgmt</code> 172.20.50.0/24）は各ノードに接続するが図では省略。</p>
+
+  <div class="diagram-wrap">
+    <svg class="topo" viewBox="0 0 1140 660" role="img" aria-label="mvlab 論理トポロジ図。Untrust(FRR isp-a/isp-b)、WANエッジ(RouterOS hq-edge)、Trust(Cisco IOL hq-core/hq-sw)、DC(SR Linux dc-leaf1/2)、ブランチ(OpenWrt br-edge)を eBGP/OSPF/NAT で接続。">
+      <!-- ===== Zone bands ===== -->
+      <rect class="band untrust" x="32" y="44" width="172" height="258" rx="12"/>
+      <text class="zlabel untrust" x="44" y="62">UNTRUST · FRR</text>
+      <rect class="band branch" x="32" y="430" width="172" height="196" rx="12"/>
+      <text class="zlabel branch" x="44" y="448">ブランチ · OpenWrt</text>
+      <rect class="band wan" x="270" y="130" width="168" height="94" rx="12"/>
+      <text class="zlabel wan" x="282" y="148">WANエッジ · RouterOS</text>
+      <rect class="band trust" x="456" y="44" width="252" height="392" rx="12"/>
+      <text class="zlabel trust" x="468" y="62">TRUST / HQキャンパス · Cisco IOL</text>
+      <rect class="band dc" x="780" y="44" width="332" height="250" rx="12"/>
+      <text class="zlabel dc" x="792" y="62">DC · Nokia SR Linux</text>
+
+      <!-- ===== Links (drawn under nodes) ===== -->
+      <line class="link ebgp" x1="118" y1="118" x2="118" y2="228"/>
+      <line class="link ebgp" x1="184" y1="91" x2="286" y2="177"/>
+      <line class="link ebgp" x1="184" y1="255" x2="286" y2="177"/>
+      <line class="link nat"  x1="118" y1="282" x2="118" y2="452"/>
+      <line class="link ospf" x1="418" y1="177" x2="520" y2="91"/>
+      <line class="link ospf" x1="586" y1="118" x2="586" y2="236"/>
+      <line class="link ebgp" x1="652" y1="91"  x2="800" y2="91"/>
+      <line class="link ebgp" x1="652" y1="104" x2="800" y2="263"/>
+      <line class="link lan"  x1="558" y1="290" x2="528" y2="372"/>
+      <line class="link lan"  x1="614" y1="290" x2="650" y2="372"/>
+      <line class="link lan"  x1="932" y1="91"  x2="996" y2="91"/>
+      <line class="link lan"  x1="932" y1="263" x2="996" y2="263"/>
+      <line class="link lan"  x1="118" y1="506" x2="118" y2="572"/>
+
+      <!-- ===== Link labels ===== -->
+      <text class="llabel" x="124" y="177">10.50.255.0/30 eBGP</text>
+      <text class="llabel" x="236" y="122" text-anchor="middle">eBGP ·.4/30</text>
+      <text class="llabel" x="236" y="238" text-anchor="middle">eBGP ·.8/30</text>
+      <text class="llabel" x="124" y="372">static+NAT ·.12/30</text>
+      <text class="llabel" x="470" y="120" text-anchor="middle">OSPF ·.16/30</text>
+      <text class="llabel" x="594" y="182">OSPF ·.28/30 (VLAN99)</text>
+      <text class="llabel" x="726" y="83" text-anchor="middle">eBGP ·.20/30</text>
+      <text class="llabel" x="702" y="210" text-anchor="middle">eBGP ·.24/30</text>
+      <text class="llabel" x="514" y="336" text-anchor="end">VLAN10</text>
+      <text class="llabel" x="666" y="336" text-anchor="start">VLAN20</text>
+      <text class="llabel" x="964" y="83" text-anchor="middle">10.50.30.0/24</text>
+      <text class="llabel" x="964" y="255" text-anchor="middle">10.50.31.0/24</text>
+      <text class="llabel" x="124" y="544">192.168.40.0/24</text>
+
+      <!-- ===== Nodes ===== -->
+      <g class="node n-frr"><rect x="52" y="64" width="132" height="54" rx="7"/><text class="nname" x="118" y="88">isp-a</text><text class="nsub" x="118" y="104">FRR · AS65001 · lo .1</text></g>
+      <g class="node n-frr"><rect x="52" y="228" width="132" height="54" rx="7"/><text class="nname" x="118" y="252">isp-b</text><text class="nsub" x="118" y="268">FRR · AS65002 · lo .2</text></g>
+      <g class="node n-owrt"><rect x="52" y="452" width="132" height="54" rx="7"/><text class="nname" x="118" y="476">br-edge</text><text class="nsub" x="118" y="492">OpenWrt · NAT</text></g>
+      <g class="node n-ros"><rect x="286" y="150" width="132" height="54" rx="7"/><text class="nname" x="352" y="174">hq-edge</text><text class="nsub" x="352" y="190">RouterOS · AS65010</text></g>
+      <g class="node n-iol"><rect x="520" y="64" width="132" height="54" rx="7"/><text class="nname" x="586" y="88">hq-core</text><text class="nsub" x="586" y="104">Cisco IOL · AS65011</text></g>
+      <g class="node n-iol"><rect x="520" y="236" width="132" height="54" rx="7"/><text class="nname" x="586" y="260">hq-sw</text><text class="nsub" x="586" y="276">Cisco IOL · SVI</text></g>
+      <g class="node n-srl"><rect x="800" y="64" width="132" height="54" rx="7"/><text class="nname" x="866" y="88">dc-leaf1</text><text class="nsub" x="866" y="104">SR Linux · AS65021</text></g>
+      <g class="node n-srl"><rect x="800" y="236" width="132" height="54" rx="7"/><text class="nname" x="866" y="260">dc-leaf2</text><text class="nsub" x="866" y="276">SR Linux · AS65022</text></g>
+
+      <!-- ===== Endpoints ===== -->
+      <g class="node n-ep"><rect x="474" y="372" width="108" height="42" rx="6"/><text class="nname ep" x="528" y="390">hq-pc1</text><text class="nsub ep" x="528" y="405">10.50.10.101</text></g>
+      <g class="node n-ep"><rect x="596" y="372" width="108" height="42" rx="6"/><text class="nname ep" x="650" y="390">hq-pc2</text><text class="nsub ep" x="650" y="405">10.50.20.102</text></g>
+      <g class="node n-ep"><rect x="996" y="70" width="108" height="42" rx="6"/><text class="nname ep" x="1050" y="88">srv-web</text><text class="nsub ep" x="1050" y="103">10.50.30.103</text></g>
+      <g class="node n-ep"><rect x="996" y="242" width="108" height="42" rx="6"/><text class="nname ep" x="1050" y="260">srv-db</text><text class="nsub ep" x="1050" y="275">10.50.31.104</text></g>
+      <g class="node n-ep"><rect x="64" y="572" width="108" height="42" rx="6"/><text class="nname ep" x="118" y="590">br-pc</text><text class="nsub ep" x="118" y="605">192.168.40.100</text></g>
+    </svg>
+  </div>
+
+  <div class="legend" aria-label="凡例">
+    <div class="grp">
+      <span class="item"><span class="sw frr"></span>FRR（ISP）</span>
+      <span class="item"><span class="sw ros"></span>RouterOS（WANエッジ）</span>
+      <span class="item"><span class="sw iol"></span>Cisco IOL（キャンパス）</span>
+      <span class="item"><span class="sw srl"></span>SR Linux（DC）</span>
+      <span class="item"><span class="sw owrt"></span>OpenWrt（ブランチ）</span>
+      <span class="item"><span class="sw ep"></span>端末（multitool）</span>
+    </div>
+    <div class="grp">
+      <span class="item"><span class="lk ebgp"></span>eBGP</span>
+      <span class="item"><span class="lk ospf"></span>OSPF area0</span>
+      <span class="item"><span class="lk nat"></span>静的経路+NAT</span>
+      <span class="item"><span class="lk lan"></span>LAN / アクセス</span>
+    </div>
+  </div>
+
+  <h2>ノード一覧</h2>
+  <div class="table-scroll">
+    <table class="topo-table">
+      <thead><tr><th>ノード</th><th>役割</th><th>ゾーン</th><th>ベンダー / イメージ</th><th>mgmt-ipv4</th><th>AS</th><th>Router ID</th><th>Loopback</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">isp-a</td><td>ISP1（インターネット役）</td><td><span class="zone-pill untrust">Untrust</span></td><td>FRR 10.2.1</td><td class="mono">172.20.50.21</td><td class="mono">65001</td><td class="mono">198.51.100.1</td><td class="mono">198.51.100.1/32</td></tr>
+        <tr><td class="mono">isp-b</td><td>ISP2（インターネット役）</td><td><span class="zone-pill untrust">Untrust</span></td><td>FRR 10.2.1</td><td class="mono">172.20.50.22</td><td class="mono">65002</td><td class="mono">198.51.100.2</td><td class="mono">198.51.100.2/32</td></tr>
+        <tr><td class="mono">hq-edge</td><td>HQ WANエッジ</td><td><span class="zone-pill wan">WANエッジ</span></td><td>MikroTik RouterOS CHR 7.21.4</td><td class="mono">172.20.50.11</td><td class="mono">65010</td><td class="mono">10.50.255.101</td><td class="mono">&mdash;</td></tr>
+        <tr><td class="mono">hq-core</td><td>HQキャンパスコア</td><td><span class="zone-pill trust">Trust</span></td><td>Cisco IOL 15.7.3M2</td><td class="mono">172.20.50.12</td><td class="mono">65011</td><td class="mono">10.50.255.102</td><td class="mono">&mdash;</td></tr>
+        <tr><td class="mono">hq-sw</td><td>HQキャンパスSW（VLAN10/20 SVI）</td><td><span class="zone-pill trust">Trust</span></td><td>Cisco IOL L2-advipservices-2017</td><td class="mono">172.20.50.15</td><td class="mono">&mdash;</td><td class="mono">10.50.255.105</td><td class="mono">&mdash;</td></tr>
+        <tr><td class="mono">dc-leaf1</td><td>DCリーフ1（srv-web収容）</td><td><span class="zone-pill dc">DC</span></td><td>Nokia SR Linux v26.3.3</td><td class="mono">172.20.50.13</td><td class="mono">65021</td><td class="mono">10.50.255.103</td><td class="mono">&mdash;</td></tr>
+        <tr><td class="mono">dc-leaf2</td><td>DCリーフ2（srv-db収容）</td><td><span class="zone-pill dc">DC</span></td><td>Nokia SR Linux v26.3.3</td><td class="mono">172.20.50.14</td><td class="mono">65022</td><td class="mono">10.50.255.104</td><td class="mono">&mdash;</td></tr>
+        <tr><td class="mono">br-edge</td><td>ブランチCPE（static+NAT）</td><td><span class="zone-pill branch">ブランチ</span></td><td>OpenWrt 24.10.7（rootfs）</td><td class="mono">172.20.50.16</td><td class="mono">&mdash;</td><td class="mono">&mdash;</td><td class="mono">&mdash;</td></tr>
+        <tr><td class="mono">hq-pc1</td><td>HQ端末（VLAN10）</td><td><span class="zone-pill trust">Trust</span></td><td>multitool</td><td class="mono">172.20.50.101</td><td class="mono">&mdash;</td><td class="mono">&mdash;</td><td class="mono">&mdash;</td></tr>
+        <tr><td class="mono">hq-pc2</td><td>HQ端末（VLAN20）</td><td><span class="zone-pill trust">Trust</span></td><td>multitool</td><td class="mono">172.20.50.102</td><td class="mono">&mdash;</td><td class="mono">&mdash;</td><td class="mono">&mdash;</td></tr>
+        <tr><td class="mono">srv-web</td><td>DCサーバ（dc-leaf1配下）</td><td><span class="zone-pill dc">DC</span></td><td>multitool</td><td class="mono">172.20.50.103</td><td class="mono">&mdash;</td><td class="mono">&mdash;</td><td class="mono">&mdash;</td></tr>
+        <tr><td class="mono">srv-db</td><td>DCサーバ（dc-leaf2配下）</td><td><span class="zone-pill dc">DC</span></td><td>multitool</td><td class="mono">172.20.50.104</td><td class="mono">&mdash;</td><td class="mono">&mdash;</td><td class="mono">&mdash;</td></tr>
+        <tr><td class="mono">br-pc</td><td>ブランチ端末（NAT裏）</td><td><span class="zone-pill branch">ブランチ</span></td><td>multitool</td><td class="mono">172.20.50.105</td><td class="mono">&mdash;</td><td class="mono">&mdash;</td><td class="mono">&mdash;</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>P2Pリンク一覧（すべて /30）</h2>
+  <div class="table-scroll">
+    <table class="topo-table">
+      <thead><tr><th>リンク</th><th>サブネット</th><th>Aエンド</th><th>Bエンド</th><th>プロトコル</th></tr></thead>
+      <tbody>
+        <tr><td>isp-a ⇔ isp-b</td><td class="mono">10.50.255.0/30</td><td class="mono">isp-a: .1</td><td class="mono">isp-b: .2</td><td><span class="proto-tag ebgp">eBGP 65001⇔65002</span></td></tr>
+        <tr><td>isp-a ⇔ hq-edge</td><td class="mono">10.50.255.4/30</td><td class="mono">isp-a: .5</td><td class="mono">hq-edge: .6</td><td><span class="proto-tag ebgp">eBGP 65001⇔65010</span></td></tr>
+        <tr><td>isp-b ⇔ hq-edge</td><td class="mono">10.50.255.8/30</td><td class="mono">isp-b: .9</td><td class="mono">hq-edge: .10</td><td><span class="proto-tag ebgp">eBGP 65002⇔65010</span></td></tr>
+        <tr><td>isp-b ⇔ br-edge</td><td class="mono">10.50.255.12/30</td><td class="mono">isp-b: .13</td><td class="mono">br-edge: .14</td><td><span class="proto-tag nat">静的経路 + NAT</span></td></tr>
+        <tr><td>hq-edge ⇔ hq-core</td><td class="mono">10.50.255.16/30</td><td class="mono">hq-edge: .17</td><td class="mono">hq-core: .18</td><td><span class="proto-tag ospf">OSPF area0</span></td></tr>
+        <tr><td>hq-core ⇔ dc-leaf1</td><td class="mono">10.50.255.20/30</td><td class="mono">hq-core: .21</td><td class="mono">dc-leaf1: .22</td><td><span class="proto-tag ebgp">eBGP 65011⇔65021</span></td></tr>
+        <tr><td>hq-core ⇔ dc-leaf2</td><td class="mono">10.50.255.24/30</td><td class="mono">hq-core: .25</td><td class="mono">dc-leaf2: .26</td><td><span class="proto-tag ebgp">eBGP 65011⇔65022</span></td></tr>
+        <tr><td>hq-core ⇔ hq-sw</td><td class="mono">10.50.255.28/30</td><td class="mono">hq-core: .29</td><td class="mono">hq-sw: .30</td><td><span class="proto-tag ospf">OSPF area0（VLAN99 SVI）</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>LANセグメント一覧</h2>
+  <div class="table-scroll">
+    <table class="topo-table">
+      <thead><tr><th>セグメント</th><th>サブネット</th><th>GW（.1）</th><th>提供機器</th><th>収容端末</th></tr></thead>
+      <tbody>
+        <tr><td>VLAN10（HQ）</td><td class="mono">10.50.10.0/24</td><td class="mono">10.50.10.1</td><td>hq-sw（SVI Vlan10）</td><td class="mono">hq-pc1: 10.50.10.101</td></tr>
+        <tr><td>VLAN20（HQ）</td><td class="mono">10.50.20.0/24</td><td class="mono">10.50.20.1</td><td>hq-sw（SVI Vlan20）</td><td class="mono">hq-pc2: 10.50.20.102</td></tr>
+        <tr><td>DC1</td><td class="mono">10.50.30.0/24</td><td class="mono">10.50.30.1</td><td>dc-leaf1</td><td class="mono">srv-web: 10.50.30.103</td></tr>
+        <tr><td>DC2</td><td class="mono">10.50.31.0/24</td><td class="mono">10.50.31.1</td><td>dc-leaf2</td><td class="mono">srv-db: 10.50.31.104</td></tr>
+        <tr><td>ブランチLAN</td><td class="mono">192.168.40.0/24</td><td class="mono">192.168.40.1</td><td>br-edge（masquerade）</td><td class="mono">br-pc: 192.168.40.100</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <nav class="doc-footer" aria-label="前後のドキュメント">
+    <a class="prev" href="02_basic-design.html"><small>前の工程</small>基本設計書</a>
+    <a class="next" href="04_detailed-design.html"><small>次の工程</small>詳細設計書</a>
+  </nav>
+  <p class="data-note">本ドキュメントは mvlab 実機（2026-07-17 <span class="mono">verify.sh</span> PASS=28/28）に基づく。IP/AS/Router ID は IPアドレス管理表（<span class="mono">02_基本設計/IPアドレス管理表.md</span>）の実値を反映。</p>
+</main>
+
+</body>
+</html>

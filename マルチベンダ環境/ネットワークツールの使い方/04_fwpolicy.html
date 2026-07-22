@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FWポリシー管理の使い方 | マルチベンダ環境ラボ</title>
+<meta name="description" content="04_fwpolicy（FWポリシー表管理・shadow/重複検出、:8604）をmvlabラボでどう使うか。ゾーンポリシー設計のモデリング用途。">
+<style>
+  :root {
+    --surface:#FAFAF9; --raised:#FFFFFF; --ink:#1C1917; --ink-2:#57534E; --ink-3:#A8A29E; --border:#E7E5E4;
+    --accent:#BE185D; --accent-soft:#FDF2F8;
+    --ok:#10B981; --warn:#F59E0B; --error:#EF4444; --info:#3B82F6; --neutral:#94A3B8;
+    --code-bg:#0F172A; --code-ink:#E2E8F0;
+    --mono:"SF Mono",Menlo,Consolas,monospace; --sans:"Hiragino Sans","Noto Sans JP",sans-serif;
+    --r-sm:6px; --r-md:10px; --r-full:999px;
+    --shadow-1:0 1px 3px rgba(0,0,0,.06); --shadow-2:0 8px 30px rgba(0,0,0,.12);
+    --ease:cubic-bezier(0.16,1,0.3,1);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; scroll-padding-top:72px; }
+  body { font-family:var(--sans); font-size:15px; line-height:1.8; color:var(--ink); background:var(--surface); }
+  .mono { font-family:var(--mono); font-feature-settings:"tnum"; }
+  .site-header { position:sticky; top:0; z-index:50; display:flex; align-items:center; gap:20px; height:56px; padding:0 24px; background:rgba(250,250,249,.85); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); }
+  .site-header .back { font-size:13px; color:var(--ink-2); text-decoration:none; transition:color .15s var(--ease); }
+  .site-header .back:hover { color:var(--accent); }
+  .brand { font-weight:700; font-size:15px; letter-spacing:-.01em; }
+  .brand span { color:var(--accent); }
+  .phase-chip { padding:3px 12px; font-family:var(--mono); font-size:11px; letter-spacing:.08em; color:var(--accent); background:var(--accent-soft); border-radius:var(--r-full); }
+  .header-meta { margin-left:auto; font-size:12px; color:var(--ink-2); }
+  .layout { display:grid; grid-template-columns:220px minmax(0,1fr); gap:48px; max-width:1100px; margin:0 auto; padding:0 24px; }
+  .nav { position:sticky; top:56px; height:calc(100vh - 56px); overflow-y:auto; padding:40px 0; }
+  .nav-label { font-size:11px; font-weight:600; letter-spacing:.08em; color:var(--ink-3); text-transform:uppercase; margin-bottom:10px; }
+  .nav a { display:block; padding:6px 10px; margin-left:-10px; font-size:13.5px; color:var(--ink-2); text-decoration:none; border-radius:var(--r-sm); transition:color .12s var(--ease),background .12s var(--ease); }
+  .nav a:hover { color:var(--ink); background:#F5F5F4; }
+  .nav a.current { color:var(--accent); background:var(--accent-soft); font-weight:600; }
+  .doc { padding:40px 0 96px; min-width:0; }
+  .breadcrumb { font-size:12px; color:var(--ink-3); margin-bottom:12px; }
+  .breadcrumb a { color:inherit; text-decoration:none; }
+  .breadcrumb a:hover { color:var(--accent); }
+  h1 { font-size:28px; font-weight:700; letter-spacing:-.01em; line-height:1.3; }
+  .doc-meta { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 40px; }
+  .badge { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; font-size:12px; font-weight:500; border-radius:var(--r-full); border:1px solid var(--border); background:var(--raised); color:var(--ink-2); }
+  .badge .dot { width:7px; height:7px; border-radius:50%; background:var(--ok); }
+  .badge.ver { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); font-family:var(--mono); }
+  .badge.st-main { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); } .badge.st-main .dot { background:var(--accent); }
+  .badge.st-sub { border-color:var(--info); color:#1D4ED8; background:#EFF6FF; } .badge.st-sub .dot { background:var(--info); }
+  .badge.st-limited { border-color:var(--warn); color:#B45309; background:#FFFBEB; } .badge.st-limited .dot { background:var(--warn); }
+  section { margin-bottom:56px; scroll-margin-top:72px; }
+  h2 { font-size:20px; font-weight:600; margin-bottom:8px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+  h2 a { color:var(--ink-3); text-decoration:none; opacity:0; margin-left:6px; font-weight:400; }
+  h2:hover a { opacity:1; }
+  h3.sub { font-size:14px; font-weight:600; color:var(--ink-2); margin:22px 0 8px; }
+  p.note { font-size:13.5px; color:var(--ink-2); margin-bottom:12px; }
+  ul, ol { padding-left:20px; font-size:14px; line-height:1.9; color:var(--ink-2); }
+  ol li, ul li { margin-bottom:4px; }
+  ul code, ol code, p code, td code { font-family:var(--mono); font-size:12.5px; color:var(--accent); background:var(--accent-soft); padding:1px 6px; border-radius:5px; }
+  .op-table { width:100%; border-collapse:collapse; font-size:13.5px; margin:12px 0; }
+  .op-table th, .op-table td { padding:10px 12px; text-align:left; vertical-align:top; }
+  .op-table thead th { font-size:11px; font-weight:600; letter-spacing:.06em; color:var(--ink-3); text-transform:uppercase; border-bottom:1px solid var(--border); }
+  .op-table tbody tr { border-bottom:1px solid var(--border); }
+  .op-table tbody tr:hover { background:#F5F5F4; }
+  .code-block { position:relative; margin:14px 0; }
+  .code-block pre { background:var(--code-bg); color:var(--code-ink); border-radius:var(--r-md); padding:16px 18px; overflow-x:auto; font-family:var(--mono); font-size:13px; line-height:1.7; }
+  .code-block .copy-btn { position:absolute; top:10px; right:10px; font-size:11px; font-family:var(--mono); color:var(--code-ink); background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:var(--r-sm); padding:3px 10px; cursor:pointer; transition:background .12s; }
+  .code-block .copy-btn:hover { background:rgba(255,255,255,.18); }
+  .callout { margin:16px 0; padding:12px 16px; border-radius:var(--r-md); border-left:3px solid var(--info); background:var(--raised); font-size:14px; color:var(--ink-2); }
+  .callout.warn { border-left-color:var(--warn); }
+  .callout.ok { border-left-color:var(--ok); }
+  .callout strong { color:var(--ink); }
+  .doc-footer { display:flex; justify-content:space-between; gap:16px; margin-top:64px; padding-top:24px; border-top:1px solid var(--border); }
+  .doc-footer a { display:block; padding:14px 18px; min-width:200px; border:1px solid var(--border); border-radius:var(--r-md); text-decoration:none; color:var(--ink); font-weight:600; font-size:14px; background:var(--raised); transition:transform .18s var(--ease),box-shadow .18s var(--ease),border-color .18s var(--ease); }
+  .doc-footer a:hover { transform:translateY(-2px); box-shadow:var(--shadow-2); border-color:var(--accent); }
+  .doc-footer a small { display:block; font-size:11px; font-weight:500; color:var(--ink-3); letter-spacing:.06em; }
+  .doc-footer .next { text-align:right; margin-left:auto; }
+  .mock-note { margin-top:24px; font-size:11px; color:var(--ink-3); }
+  @media (max-width:1100px) { .layout { grid-template-columns:190px minmax(0,1fr); gap:32px; } }
+  @media (max-width:768px) {
+    .header-meta, .phase-chip { display:none; }
+    .layout { grid-template-columns:1fr; gap:0; }
+    .nav { position:static; height:auto; padding:20px 0 0; display:flex; gap:16px; overflow-x:auto; }
+    .nav-label { display:none; }
+  }
+  @media (prefers-reduced-motion:reduce) { * { transition:none !important; animation:none !important; } html { scroll-behavior:auto; } }
+  @media (max-width:480px) { .doc-footer { flex-direction:column; } .doc-footer a { min-width:0; } .doc-footer .next { margin-left:0; } }
+  @media print {
+    .site-header, .nav, .doc-footer, .mock-note { display:none !important; }
+    body { background:#FFFFFF; }
+    .layout { display:block; }
+    section { break-inside:avoid; }
+  }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <a class="back" href="index.html">← ツールガイド トップ</a>
+  <div class="brand">マルチベンダ環境<span>ラボ</span></div>
+  <span class="phase-chip">TOOLS GUIDE</span>
+  <div class="header-meta">mvlab / 13ノード / OrbStack VM(arm64)</div>
+</header>
+<div class="layout">
+  <nav class="nav" aria-label="目次">
+    <div class="nav-label">目次</div>
+    <a href="#position" class="current">位置づけ</a>
+    <a href="#setup">セットアップ</a>
+    <a href="#steps">使い方ステップ</a>
+    <a href="#constraints">制約と注意</a>
+  </nav>
+  <main class="doc">
+    <div class="breadcrumb"><a href="index.html">ネットワークツールの使い方</a> / FWポリシー管理</div>
+    <h1>04. FWポリシー管理</h1>
+    <div class="doc-meta">
+      <span class="badge ver mono">:8604</span>
+      <span class="badge st-sub"><span class="dot"></span>補助</span>
+      <span class="badge">最終更新 2026-07-17</span>
+    </div>
+
+    <p class="note">ベンダー中立のFWポリシー表を管理し、「この通信はどのルールに当たるか」に即答するツール。到達不能（shadow）・冗長（redundant）・重複（duplicate）ルールを検出し、Cisco ASA / FortiGate構文への書き出しにも対応する。</p>
+    <div class="code-block">
+      <button class="copy-btn" aria-label="コピー">copy</button>
+      <pre>cd /Users/shuya/Documents/claude/ネットワークツール/04_fwpolicy && bash start.sh</pre>
+    </div>
+
+    <section id="position">
+      <h2>このラボでの位置づけ<a href="#position">#</a></h2>
+      <p class="note"><span class="badge st-sub"><span class="dot"></span>補助</span> 機器接続なし。mvlabの実機（RouterOS / IOL / SR Linux）へポリシーを直接投入する機能はない。ゾーン間（HQ・DC・Branch・Internet）の通信ポリシーを設計・可視化するモデリング用途として使う。</p>
+    </section>
+
+    <section id="setup">
+      <h2>セットアップ（登録する値）<a href="#setup">#</a></h2>
+      <p class="note">機器への接続設定は不要。ポリシー設計のインプットとして使うmvlabのセグメント一覧（<a href="index.html#nodes">index.html#nodes</a>参照）。</p>
+      <table class="op-table">
+        <thead><tr><th>ゾーン</th><th>セグメント</th><th>代表ホスト</th></tr></thead>
+        <tbody>
+          <tr><td>HQ</td><td class="mono">10.50.10.0/24, 10.50.20.0/24</td><td>hq-pc1 (10.50.10.101), hq-pc2 (10.50.20.102)</td></tr>
+          <tr><td>DC</td><td class="mono">10.50.30.0/24, 10.50.31.0/24</td><td>srv-web (10.50.30.103), srv-db (10.50.31.104)</td></tr>
+          <tr><td>Branch</td><td class="mono">192.168.40.0/24</td><td>br-pc (192.168.40.100、NAT裏)</td></tr>
+          <tr><td>Internet</td><td class="mono">198.51.100.0/24</td><td>isp-a (.1), isp-b (.2)</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="steps">
+      <h2>使い方ステップ<a href="#steps">#</a></h2>
+      <ol>
+        <li><code>bash start.sh</code>で起動し、<code>http://127.0.0.1:8604</code> を開く。</li>
+        <li><b>ルール追加</b>で、HQ→DCの通信ポリシーをモデリングする（例: 名前 <code>HQ-to-DC-web</code>、送信元 <code>10.50.10.0/24</code>、宛先 <code>10.50.30.103/32</code>、プロトコル tcp、ポート 80、アクション permit）。</li>
+        <li>同様にDC→HQのdeny、Branch→Internetのpermitなど、ラボのゾーン設計に沿ったルールを積み上げる。</li>
+        <li>上部の送信元IP・宛先IP・プロトコル・ポートを入力して<b>検索</b>し、「この通信はどのルールに当たるか」をパケットマッチ検索で即答させる。</li>
+        <li>右上の分析バッジ（「問題n件」）を開き、shadowed/redundant/duplicate/overlapの指摘を確認して整理する。</li>
+        <li>設計が固まったら<b>エクスポート ▾</b>からCisco ASA構文またはFortiGate構文を書き出し、設計ドキュメントとして保存する。</li>
+      </ol>
+    </section>
+
+    <section id="constraints">
+      <h2>制約と注意<a href="#constraints">#</a></h2>
+      <div class="callout warn">
+        <strong>実機への直接投入は不可:</strong> 生成されるASA/FortiGate構文はいずれもmvlabの実機（RouterOS / IOL / SR Linux）とは構文体系が異なり、そのまま投入することはできない。あくまで設計・可視化・レビュー用のドキュメントとして使う。
+      </div>
+      <div class="callout">
+        <strong>src/dstの制約:</strong> 単一CIDRまたは<code>any</code>のみ対応（IPv4のみ）。複数CIDRのグループ化はできない。
+      </div>
+    </section>
+
+    <div class="doc-footer">
+      <a class="prev" href="03_log.html"><small>← 前のツール</small>03. ログ取得・差分</a>
+      <a class="next" href="05_config.html"><small>次のツール →</small>05. コンフィグ管理</a>
+    </div>
+    <p class="mock-note">本ガイドはマルチベンダ環境ラボ(mvlab)の実データに基づく。</p>
+  </main>
+</div>
+<script>
+"use strict";
+const navLinks = [...document.querySelectorAll(".nav a")];
+const sections = [...document.querySelectorAll("main section")];
+const spy = new IntersectionObserver((entries) => {
+  entries.forEach((entry) => {
+    if (!entry.isIntersecting) return;
+    navLinks.forEach((a) => a.classList.toggle("current", a.getAttribute("href") === `#${entry.target.id}`));
+  });
+}, { rootMargin: "-20% 0px -70% 0px" });
+sections.forEach((s) => spy.observe(s));
+document.querySelectorAll(".code-block").forEach((b) => {
+  const btn = b.querySelector(".copy-btn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const t = b.querySelector("pre").innerText;
+    if (navigator.clipboard) navigator.clipboard.writeText(t);
+    btn.textContent = "copied";
+    setTimeout(() => (btn.textContent = "copy"), 1200);
+  });
+});
+</script>
+</body>
+</html>

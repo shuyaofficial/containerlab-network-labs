@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>マクロ作成の使い方 | マルチベンダ環境ラボ</title>
+<meta name="description" content="01_macro（Cisco IOS投入コマンド生成、:8601）をmvlabラボでどう使うか。IOL機器のconsoleへの貼付運用を解説。">
+<style>
+  :root {
+    --surface:#FAFAF9; --raised:#FFFFFF; --ink:#1C1917; --ink-2:#57534E; --ink-3:#A8A29E; --border:#E7E5E4;
+    --accent:#BE185D; --accent-soft:#FDF2F8;
+    --ok:#10B981; --warn:#F59E0B; --error:#EF4444; --info:#3B82F6; --neutral:#94A3B8;
+    --code-bg:#0F172A; --code-ink:#E2E8F0;
+    --mono:"SF Mono",Menlo,Consolas,monospace; --sans:"Hiragino Sans","Noto Sans JP",sans-serif;
+    --r-sm:6px; --r-md:10px; --r-full:999px;
+    --shadow-1:0 1px 3px rgba(0,0,0,.06); --shadow-2:0 8px 30px rgba(0,0,0,.12);
+    --ease:cubic-bezier(0.16,1,0.3,1);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; scroll-padding-top:72px; }
+  body { font-family:var(--sans); font-size:15px; line-height:1.8; color:var(--ink); background:var(--surface); }
+  .mono { font-family:var(--mono); font-feature-settings:"tnum"; }
+  .site-header { position:sticky; top:0; z-index:50; display:flex; align-items:center; gap:20px; height:56px; padding:0 24px; background:rgba(250,250,249,.85); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); }
+  .site-header .back { font-size:13px; color:var(--ink-2); text-decoration:none; transition:color .15s var(--ease); }
+  .site-header .back:hover { color:var(--accent); }
+  .brand { font-weight:700; font-size:15px; letter-spacing:-.01em; }
+  .brand span { color:var(--accent); }
+  .phase-chip { padding:3px 12px; font-family:var(--mono); font-size:11px; letter-spacing:.08em; color:var(--accent); background:var(--accent-soft); border-radius:var(--r-full); }
+  .header-meta { margin-left:auto; font-size:12px; color:var(--ink-2); }
+  .layout { display:grid; grid-template-columns:220px minmax(0,1fr); gap:48px; max-width:1100px; margin:0 auto; padding:0 24px; }
+  .nav { position:sticky; top:56px; height:calc(100vh - 56px); overflow-y:auto; padding:40px 0; }
+  .nav-label { font-size:11px; font-weight:600; letter-spacing:.08em; color:var(--ink-3); text-transform:uppercase; margin-bottom:10px; }
+  .nav a { display:block; padding:6px 10px; margin-left:-10px; font-size:13.5px; color:var(--ink-2); text-decoration:none; border-radius:var(--r-sm); transition:color .12s var(--ease),background .12s var(--ease); }
+  .nav a:hover { color:var(--ink); background:#F5F5F4; }
+  .nav a.current { color:var(--accent); background:var(--accent-soft); font-weight:600; }
+  .doc { padding:40px 0 96px; min-width:0; }
+  .breadcrumb { font-size:12px; color:var(--ink-3); margin-bottom:12px; }
+  .breadcrumb a { color:inherit; text-decoration:none; }
+  .breadcrumb a:hover { color:var(--accent); }
+  h1 { font-size:28px; font-weight:700; letter-spacing:-.01em; line-height:1.3; }
+  .doc-meta { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 40px; }
+  .badge { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; font-size:12px; font-weight:500; border-radius:var(--r-full); border:1px solid var(--border); background:var(--raised); color:var(--ink-2); }
+  .badge .dot { width:7px; height:7px; border-radius:50%; background:var(--ok); }
+  .badge.ver { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); font-family:var(--mono); }
+  .badge.st-main { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); } .badge.st-main .dot { background:var(--accent); }
+  .badge.st-sub { border-color:var(--info); color:#1D4ED8; background:#EFF6FF; } .badge.st-sub .dot { background:var(--info); }
+  .badge.st-limited { border-color:var(--warn); color:#B45309; background:#FFFBEB; } .badge.st-limited .dot { background:var(--warn); }
+  section { margin-bottom:56px; scroll-margin-top:72px; }
+  h2 { font-size:20px; font-weight:600; margin-bottom:8px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+  h2 a { color:var(--ink-3); text-decoration:none; opacity:0; margin-left:6px; font-weight:400; }
+  h2:hover a { opacity:1; }
+  h3.sub { font-size:14px; font-weight:600; color:var(--ink-2); margin:22px 0 8px; }
+  p.note { font-size:13.5px; color:var(--ink-2); margin-bottom:12px; }
+  ul, ol { padding-left:20px; font-size:14px; line-height:1.9; color:var(--ink-2); }
+  ol li, ul li { margin-bottom:4px; }
+  ul code, ol code, p code, td code { font-family:var(--mono); font-size:12.5px; color:var(--accent); background:var(--accent-soft); padding:1px 6px; border-radius:5px; }
+  .op-table { width:100%; border-collapse:collapse; font-size:13.5px; margin:12px 0; }
+  .op-table th, .op-table td { padding:10px 12px; text-align:left; vertical-align:top; }
+  .op-table thead th { font-size:11px; font-weight:600; letter-spacing:.06em; color:var(--ink-3); text-transform:uppercase; border-bottom:1px solid var(--border); }
+  .op-table tbody tr { border-bottom:1px solid var(--border); }
+  .op-table tbody tr:hover { background:#F5F5F4; }
+  .code-block { position:relative; margin:14px 0; }
+  .code-block pre { background:var(--code-bg); color:var(--code-ink); border-radius:var(--r-md); padding:16px 18px; overflow-x:auto; font-family:var(--mono); font-size:13px; line-height:1.7; }
+  .code-block .copy-btn { position:absolute; top:10px; right:10px; font-size:11px; font-family:var(--mono); color:var(--code-ink); background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:var(--r-sm); padding:3px 10px; cursor:pointer; transition:background .12s; }
+  .code-block .copy-btn:hover { background:rgba(255,255,255,.18); }
+  .callout { margin:16px 0; padding:12px 16px; border-radius:var(--r-md); border-left:3px solid var(--info); background:var(--raised); font-size:14px; color:var(--ink-2); }
+  .callout.warn { border-left-color:var(--warn); }
+  .callout.ok { border-left-color:var(--ok); }
+  .callout strong { color:var(--ink); }
+  .doc-footer { display:flex; justify-content:space-between; gap:16px; margin-top:64px; padding-top:24px; border-top:1px solid var(--border); }
+  .doc-footer a { display:block; padding:14px 18px; min-width:200px; border:1px solid var(--border); border-radius:var(--r-md); text-decoration:none; color:var(--ink); font-weight:600; font-size:14px; background:var(--raised); transition:transform .18s var(--ease),box-shadow .18s var(--ease),border-color .18s var(--ease); }
+  .doc-footer a:hover { transform:translateY(-2px); box-shadow:var(--shadow-2); border-color:var(--accent); }
+  .doc-footer a small { display:block; font-size:11px; font-weight:500; color:var(--ink-3); letter-spacing:.06em; }
+  .doc-footer .next { text-align:right; margin-left:auto; }
+  .mock-note { margin-top:24px; font-size:11px; color:var(--ink-3); }
+  @media (max-width:1100px) { .layout { grid-template-columns:190px minmax(0,1fr); gap:32px; } }
+  @media (max-width:768px) {
+    .header-meta, .phase-chip { display:none; }
+    .layout { grid-template-columns:1fr; gap:0; }
+    .nav { position:static; height:auto; padding:20px 0 0; display:flex; gap:16px; overflow-x:auto; }
+    .nav-label { display:none; }
+  }
+  @media (prefers-reduced-motion:reduce) { * { transition:none !important; animation:none !important; } html { scroll-behavior:auto; } }
+  @media (max-width:480px) { .doc-footer { flex-direction:column; } .doc-footer a { min-width:0; } .doc-footer .next { margin-left:0; } }
+  @media print {
+    .site-header, .nav, .doc-footer, .mock-note { display:none !important; }
+    body { background:#FFFFFF; }
+    .layout { display:block; }
+    section { break-inside:avoid; }
+  }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <a class="back" href="index.html">← ツールガイド トップ</a>
+  <div class="brand">マルチベンダ環境<span>ラボ</span></div>
+  <span class="phase-chip">TOOLS GUIDE</span>
+  <div class="header-meta">mvlab / 13ノード / OrbStack VM(arm64)</div>
+</header>
+<div class="layout">
+  <nav class="nav" aria-label="目次">
+    <div class="nav-label">目次</div>
+    <a href="#position" class="current">位置づけ</a>
+    <a href="#setup">セットアップ</a>
+    <a href="#steps">使い方ステップ</a>
+    <a href="#constraints">制約と注意</a>
+  </nav>
+  <main class="doc">
+    <div class="breadcrumb"><a href="index.html">ネットワークツールの使い方</a> / マクロ作成</div>
+    <h1>01. マクロ作成</h1>
+    <div class="doc-meta">
+      <span class="badge ver mono">:8601</span>
+      <span class="badge st-sub"><span class="dot"></span>補助</span>
+      <span class="badge">最終更新 2026-07-17</span>
+    </div>
+
+    <p class="note">Cisco IOSへ投入するコマンド列を、テンプレートと変数フォームから機械的に生成するアプリ。VLAN・インターフェース・OSPF・BGP・ACLの5テンプレートを収録し、コピー／.txt／TeraTerm用.ttlのいずれでも取り出せる。機器へは直接投入せず、生成したコマンドを手元でコピーして使う。</p>
+    <div class="code-block">
+      <button class="copy-btn" aria-label="コピー">copy</button>
+      <pre>cd /Users/shuya/Documents/claude/ネットワークツール/01_macro && bash start.sh</pre>
+    </div>
+
+    <section id="position">
+      <h2>このラボでの位置づけ<a href="#position">#</a></h2>
+      <p class="note"><span class="badge st-sub"><span class="dot"></span>補助</span> 機器接続なし。生成はローカルで完結し、投入は人間が手作業でconsoleに貼り付ける。mvlabで唯一のCisco系機器であるhq-core（コア）・hq-sw（L2スイッチ）向けのコマンド下書き作成に使う。</p>
+    </section>
+
+    <section id="setup">
+      <h2>セットアップ（登録する値）<a href="#setup">#</a></h2>
+      <p class="note">機器への接続設定は不要。生成したコマンドの貼付先は以下の2台（いずれもconsole専用）。</p>
+      <table class="op-table">
+        <thead><tr><th>ノード</th><th>役割</th><th>貼付方法</th></tr></thead>
+        <tbody>
+          <tr><td>hq-core</td><td>HQキャンパスコア（OSPF/eBGP境界）</td><td class="mono">ssh clab@orb → docker attach --sig-proxy=false clab-mvlab-hq-core</td></tr>
+          <tr><td>hq-sw</td><td>HQキャンパススイッチ（VLAN10/20 SVI）</td><td class="mono">ssh clab@orb → docker attach --sig-proxy=false clab-mvlab-hq-sw</td></tr>
+        </tbody>
+      </table>
+      <div class="code-block">
+        <button class="copy-btn" aria-label="コピー">copy</button>
+        <pre>ssh clab@orb
+docker attach --sig-proxy=false clab-mvlab-hq-sw</pre>
+      </div>
+      <p class="note">離脱は <code>Ctrl-P</code> → <code>Ctrl-Q</code>。<code>Ctrl-C</code>はコンテナごと終了するため使わない。</p>
+    </section>
+
+    <section id="steps">
+      <h2>使い方ステップ<a href="#steps">#</a></h2>
+      <ol>
+        <li>上記コマンドで起動し、<code>http://127.0.0.1:8601</code> を開く。</li>
+        <li>サイドバーからテンプレートを選ぶ（例: hq-swのVLAN10/20を作り直す場合は<b>L2 → VLAN作成</b>）。</li>
+        <li>変数フォームに値を入力する（例: 「VLAN一覧」に <code>10 SALES</code> と <code>20 DEV</code> を1行ずつ）。入力するたびに右側のプレビューが自動更新される。</li>
+        <li>インターフェース設定テンプレートでhq-swのSVIを作る場合は、IPアドレスに <code>10.50.10.1/24</code>（VLAN10）や <code>10.50.20.1/24</code>（VLAN20）を指定する（実データは<a href="index.html#nodes">index.html#nodes</a>参照）。</li>
+        <li>プレビューを確認し<b>コピー</b>（または<b>.txtダウンロード</b>）で取り出す。</li>
+        <li><code>ssh clab@orb</code> → <code>docker attach --sig-proxy=false clab-mvlab-hq-sw</code> で接続し、コピーしたコマンドを貼り付けて投入する。</li>
+        <li>投入後は <code>Ctrl-P</code> → <code>Ctrl-Q</code> で離脱（コンテナは起動したまま）。</li>
+      </ol>
+    </section>
+
+    <section id="constraints">
+      <h2>制約と注意<a href="#constraints">#</a></h2>
+      <div class="callout warn">
+        <strong>既知の制限:</strong> トランクの許可VLAN（<code>switchport trunk allowed vlan</code>）は単一VLANのみ指定できる（カンマ区切りの複数VLANには非対応）。拡張ACLのエントリ行は構文チェックをせずそのまま投入されるため、貼り付け前に必ず目視確認すること。
+      </div>
+      <div class="callout">
+        <strong>投入機能はない:</strong> このツールは生成専用で、機器への直接投入（SSH/API経由の自動投入）は行わない。貼付作業は必ず人間が行う。
+      </div>
+    </section>
+
+    <div class="doc-footer">
+      <a class="prev" href="index.html"><small>← ハブ</small>ツールガイド トップ</a>
+      <a class="next" href="02_ping.html"><small>次のツール →</small>02. Ping実行・確認</a>
+    </div>
+    <p class="mock-note">本ガイドはマルチベンダ環境ラボ(mvlab)の実データに基づく。</p>
+  </main>
+</div>
+<script>
+"use strict";
+const navLinks = [...document.querySelectorAll(".nav a")];
+const sections = [...document.querySelectorAll("main section")];
+const spy = new IntersectionObserver((entries) => {
+  entries.forEach((entry) => {
+    if (!entry.isIntersecting) return;
+    navLinks.forEach((a) => a.classList.toggle("current", a.getAttribute("href") === `#${entry.target.id}`));
+  });
+}, { rootMargin: "-20% 0px -70% 0px" });
+sections.forEach((s) => spy.observe(s));
+document.querySelectorAll(".code-block").forEach((b) => {
+  const btn = b.querySelector(".copy-btn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const t = b.querySelector("pre").innerText;
+    if (navigator.clipboard) navigator.clipboard.writeText(t);
+    btn.textContent = "copied";
+    setTimeout(() => (btn.textContent = "copy"), 1200);
+  });
+});
+</script>
+</body>
+</html>

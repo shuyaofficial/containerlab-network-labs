@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ドキュメントマップ | マルチベンダ環境ラボ</title>
+<style>
+  :root {
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    --accent: #BE185D;
+    --accent-soft: #FDF2F8;
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    --neutral: #94A3B8;
+    --code-bg: #0F172A;
+    --code-ink: #E2E8F0;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--sans); font-size: 15px; line-height: 1.8;
+    color: var(--ink); background: var(--surface);
+  }
+  .mono { font-family: var(--mono); font-feature-settings: "tnum"; }
+
+  /* ===== Header ===== */
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 20px;
+    height: 56px; padding: 0 24px;
+    background: rgba(250,250,249,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .brand span { color: var(--accent); }
+  .phase-chip {
+    padding: 3px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+    color: var(--accent); background: var(--accent-soft); border-radius: var(--r-full);
+  }
+  .header-meta { margin-left: auto; font-size: 12px; color: var(--ink-2); }
+
+  /* ===== Layout ===== */
+  .hub { max-width: 1180px; margin: 0 auto; padding: 48px 24px 96px; }
+
+  /* ---- Hero ---- */
+  .hero h1 { font-size: 32px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; max-width: 24ch; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 20px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; font-size: 12px; font-weight: 500;
+    border-radius: var(--r-full); border: 1px solid var(--border);
+    background: var(--raised); color: var(--ink-2);
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .badge .dot.accent { background: var(--accent); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); font-family: var(--mono); }
+  .hero .lead { max-width: 78ch; font-size: 15px; color: var(--ink-2); }
+
+  /* ---- Phase progress ---- */
+  .phase-progress { margin-top: 64px; }
+  .ph-head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 4px; }
+  .ph-head h2 { font-size: 20px; font-weight: 600; }
+  .ph-head .asof { font-size: 12px; color: var(--ink-3); font-family: var(--mono); }
+  .ph-legend { display: flex; gap: 16px; margin: 6px 0 24px; font-size: 12px; color: var(--ink-2); }
+  .ph-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .lg-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .lg-dot.ok { background: var(--ok); }
+  .lg-dot.active { background: var(--accent); }
+  .lg-dot.todo { background: var(--border); border: 1px solid var(--ink-3); }
+
+  .phase-wrap { position: relative; padding-top: 22px; }
+  .today-marker { position: absolute; top: 22px; bottom: 20px; width: 0; border-left: 2px dashed var(--accent); z-index: 2; }
+  .today-flag {
+    position: absolute; top: -22px; left: 0; transform: translateX(-50%);
+    font-size: 10px; font-family: var(--mono); color: var(--accent);
+    background: var(--accent-soft); padding: 2px 8px; border-radius: var(--r-full); white-space: nowrap;
+  }
+  .phase-steps { display: flex; gap: 14px; }
+  .phase-step { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .ps-head { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+  .ps-icon { font-size: 10px; }
+  .phase-step.done .ps-icon { color: var(--ok); }
+  .phase-step.active .ps-icon { color: var(--accent); }
+  .ps-date { font-size: 11px; color: var(--ink-3); }
+  .ps-track { height: 6px; border-radius: 4px; background: var(--border); overflow: hidden; }
+  .ps-fill { height: 100%; border-radius: 4px; background: var(--ok); transition: width .3s var(--ease); }
+  .phase-step.active .ps-fill { background: var(--accent); }
+
+  .cross-phase { margin-top: 28px; padding-top: 18px; border-top: 1px dashed var(--border); }
+  .cross-label { font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin-bottom: 8px; }
+  .cross-track { height: 6px; border-radius: 4px; background: var(--border); }
+  .cross-fill { height: 100%; border-radius: 4px; background: var(--ok); opacity: .55; }
+
+  /* ---- Document groups ---- */
+  .doc-groups { margin-top: 64px; }
+  .group { margin-bottom: 40px; }
+  .group-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  .group-head h3 { font-size: 16px; font-weight: 700; }
+  .group-date { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .group-status { margin-left: auto; font-size: 11.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+  .group-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; }
+  .group-status.done { color: var(--ok); } .group-status.done::before { background: var(--ok); }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .doc-card {
+    display: block; padding: 20px; min-width: 0;
+    background: var(--raised); border: 1px solid var(--border); border-radius: var(--r-md);
+    box-shadow: var(--shadow-1); text-decoration: none; color: inherit;
+    transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease);
+  }
+  .doc-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--accent); }
+  .card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .card-ver { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .doc-card h4 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .doc-card p { font-size: 13px; color: var(--ink-2); line-height: 1.6; }
+
+  .data-note { margin-top: 48px; font-size: 11.5px; color: var(--ink-2); padding: 10px 14px; border-left: 3px solid var(--ok); background: #ECFDF5; border-radius: var(--r-sm); }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 1100px) {
+    .hub { padding: 40px 20px 80px; }
+    .phase-steps { gap: 10px; }
+  }
+  @media (max-width: 768px) {
+    .header-meta, .phase-chip { display: none; }
+    .hero h1 { font-size: 26px; }
+    .phase-steps { flex-direction: column; gap: 18px; }
+    .today-marker { display: none; }
+    .ph-legend { flex-wrap: wrap; }
+    .group-status { margin-left: 0; }
+    .cards { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+  @media print {
+    .site-header, .data-note { display: none !important; }
+    body { background: #FFFFFF; }
+    .group, .phase-progress { break-inside: avoid; }
+    .doc-card { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand">マルチベンダ環境<span>ラボ</span></div>
+  <span class="phase-chip">DOCUMENT MAP</span>
+  <div class="header-meta">mvlab / 5ベンダー13ノード</div>
+</header>
+
+<main class="hub">
+
+  <section class="hero" aria-label="ラボ概要">
+    <h1>1社のネットワークを、5ベンダーで再現する。</h1>
+    <div class="doc-meta">
+      <span class="badge ver">mvlab</span>
+      <span class="badge"><span class="dot"></span>実機グリーン PASS=28/28</span>
+      <span class="badge">検証日 2026-07-17</span>
+      <span class="badge">arm64 + OrbStack / containerlab</span>
+    </div>
+    <p class="lead">マルチベンダ環境ラボ（mvlab）は、1社の企業ネットワークをゾーンごとに実務で採用されやすいベンダーで構成し、<strong>同じ目的の操作（経路確認・ピア状態確認・設定投入・API取得）がベンダーによってどれだけ流儀・コマンド体系・自動化しやすさで異なるか</strong>を実機（containerlabコンテナ）で体感するラボ。ISP（FRR）／WANエッジ（MikroTik RouterOS）／HQキャンパス（Cisco IOL）／DC（Nokia SR Linux）／ブランチCPE（OpenWrt）の5ベンダー13ノードを、eBGP・OSPF・VLAN/SVI・NATで相互接続する。2026-07-17の実機試験で <code class="mono">verify.sh</code> が全項目グリーン（PASS=28/28）を達成した。</p>
+  </section>
+
+  <section class="phase-progress" aria-label="工程進行状況">
+    <div class="ph-head">
+      <h2>ラボ工程</h2>
+      <span class="asof">2026-07-17 時点（全工程完了・実機グリーン）</span>
+    </div>
+    <div class="ph-legend">
+      <span><i class="lg-dot ok"></i>完了</span>
+      <span><i class="lg-dot active"></i>直近マイルストーン</span>
+    </div>
+    <div class="phase-wrap">
+      <div class="today-marker" style="left:100%"><span class="today-flag">検証 07-17</span></div>
+      <div class="phase-steps">
+        <div class="phase-step done">
+          <div class="ps-head"><span class="ps-icon">&#9679;</span>要件定義</div>
+          <div class="ps-date mono">受け入れ基準の確定</div>
+          <div class="ps-track"><div class="ps-fill" style="width:100%"></div></div>
+        </div>
+        <div class="phase-step done">
+          <div class="ps-head"><span class="ps-icon">&#9679;</span>基本設計</div>
+          <div class="ps-date mono">5ゾーン / 方式判断</div>
+          <div class="ps-track"><div class="ps-fill" style="width:100%"></div></div>
+        </div>
+        <div class="phase-step done">
+          <div class="ps-head"><span class="ps-icon">&#9679;</span>詳細設計</div>
+          <div class="ps-date mono">機器別パラメータ</div>
+          <div class="ps-track"><div class="ps-fill" style="width:100%"></div></div>
+        </div>
+        <div class="phase-step done">
+          <div class="ps-head"><span class="ps-icon">&#9679;</span>構築</div>
+          <div class="ps-date mono">deploy.sh / config後投入</div>
+          <div class="ps-track"><div class="ps-fill" style="width:100%"></div></div>
+        </div>
+        <div class="phase-step active">
+          <div class="ps-head"><span class="ps-icon">&#9679;</span>試験</div>
+          <div class="ps-date mono">verify.sh PASS=28/28</div>
+          <div class="ps-track"><div class="ps-fill" style="width:100%"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="cross-phase">
+      <div class="cross-label">受け入れ基準の充足（要件定義書 §7 の全項目を試験で検証済み）</div>
+      <div class="cross-track"><div class="cross-fill" style="width:100%"></div></div>
+    </div>
+  </section>
+
+  <section class="doc-groups" aria-label="工程別ドキュメント">
+
+    <div class="group">
+      <div class="group-head"><h3>要件定義</h3><span class="group-date mono">受け入れ基準</span><span class="group-status done">完了</span></div>
+      <div class="cards">
+        <a class="doc-card" href="01_requirements.html">
+          <div class="card-top"><span class="badge"><span class="dot"></span>確定</span><span class="card-ver">REQ-MV01〜07</span></div>
+          <h4>要件定義書</h4>
+          <p>背景・対象範囲・機能/非機能要件・ゾーン設計方針・制約・受け入れ基準。REQ-IDとトレーサビリティ表を起点とする。</p>
+        </a>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head"><h3>基本設計</h3><span class="group-date mono">5ゾーン / 方式判断</span><span class="group-status done">完了</span></div>
+      <div class="cards">
+        <a class="doc-card" href="02_basic-design.html">
+          <div class="card-top"><span class="badge"><span class="dot"></span>確定</span><span class="card-ver">v1.0</span></div>
+          <h4>基本設計書</h4>
+          <p>ゾーンごとのベンダー割当・アドレス設計・冗長性・方式比較（SVI採用・config後投入採用）を確定。</p>
+        </a>
+        <a class="doc-card" href="03_topology.html">
+          <div class="card-top"><span class="badge"><span class="dot"></span>確定</span><span class="card-ver">v1.0</span></div>
+          <h4>トポロジ図</h4>
+          <p>5ベンダーを色分けした論理構成図（SVG）とノード一覧・P2Pリンク表を正とする。</p>
+        </a>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head"><h3>詳細設計</h3><span class="group-date mono">機器別パラメータ</span><span class="group-status done">完了</span></div>
+      <div class="cards">
+        <a class="doc-card" href="04_detailed-design.html">
+          <div class="card-top"><span class="badge"><span class="dot"></span>確定</span><span class="card-ver">v1.0</span></div>
+          <h4>詳細設計書</h4>
+          <p>機器ごとの動作仕様と、実機に投入したconfigの抜粋（コピー可）。RouterOS/IOL/SR Linux/FRR/OpenWrtの5流儀。</p>
+        </a>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head"><h3>試験</h3><span class="group-date mono">verify.sh</span><span class="group-status done">完了 PASS=28/28</span></div>
+      <div class="cards">
+        <a class="doc-card" href="05_test-report.html">
+          <div class="card-top"><span class="badge"><span class="dot"></span>グリーン</span><span class="card-ver">v1.0</span></div>
+          <h4>試験結果報告書</h4>
+          <p>疎通7・ルーティング（BGP・OSPF）・API・コンテナ稼働の28項目を実機で検証。全項目OK。</p>
+        </a>
+      </div>
+    </div>
+
+  </section>
+
+  <p class="data-note">本ドキュメントは mvlab 実機（2026-07-17 <span class="mono">verify.sh</span> PASS=28/28）に基づく。IPアドレス・AS番号・試験結果はすべて実機確定値（推測値・架空値は含まない）。</p>
+</main>
+
+</body>
+</html>

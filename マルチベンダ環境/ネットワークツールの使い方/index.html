@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ネットワークツールの使い方 | マルチベンダ環境ラボ</title>
+<meta name="description" content="mvlab（マルチベンダcontainerlabラボ）で自作FastAPI製ネットワークツール7本をどう使うかをまとめたハブページ。">
+<style>
+  :root {
+    --surface:#FAFAF9; --raised:#FFFFFF; --ink:#1C1917; --ink-2:#57534E; --ink-3:#A8A29E; --border:#E7E5E4;
+    --accent:#BE185D; --accent-soft:#FDF2F8;
+    --ok:#10B981; --warn:#F59E0B; --error:#EF4444; --info:#3B82F6; --neutral:#94A3B8;
+    --code-bg:#0F172A; --code-ink:#E2E8F0;
+    --mono:"SF Mono",Menlo,Consolas,monospace; --sans:"Hiragino Sans","Noto Sans JP",sans-serif;
+    --r-sm:6px; --r-md:10px; --r-full:999px;
+    --shadow-1:0 1px 3px rgba(0,0,0,.06); --shadow-2:0 8px 30px rgba(0,0,0,.12);
+    --ease:cubic-bezier(0.16,1,0.3,1);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; scroll-padding-top:72px; }
+  body { font-family:var(--sans); font-size:15px; line-height:1.8; color:var(--ink); background:var(--surface); }
+  .mono { font-family:var(--mono); font-feature-settings:"tnum"; }
+
+  .site-header { position:sticky; top:0; z-index:50; display:flex; align-items:center; gap:20px; height:56px; padding:0 24px; background:rgba(250,250,249,.85); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); }
+  .site-header .back { font-size:13px; color:var(--ink-2); text-decoration:none; transition:color .15s var(--ease); }
+  .site-header .back:hover { color:var(--accent); }
+  .brand { font-weight:700; font-size:15px; letter-spacing:-.01em; }
+  .brand span { color:var(--accent); }
+  .phase-chip { padding:3px 12px; font-family:var(--mono); font-size:11px; letter-spacing:.08em; color:var(--accent); background:var(--accent-soft); border-radius:var(--r-full); }
+  .header-meta { margin-left:auto; font-size:12px; color:var(--ink-2); }
+
+  .hub { max-width:1180px; margin:0 auto; padding:48px 24px 96px; }
+
+  .hero h1 { font-size:32px; font-weight:700; letter-spacing:-.01em; line-height:1.3; max-width:22ch; }
+  .doc-meta { display:flex; flex-wrap:wrap; gap:8px; margin:18px 0 20px; }
+  .badge { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; font-size:12px; font-weight:500; border-radius:var(--r-full); border:1px solid var(--border); background:var(--raised); color:var(--ink-2); }
+  .badge .dot { width:7px; height:7px; border-radius:50%; background:var(--ok); }
+  .badge.ver { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); font-family:var(--mono); }
+  .badge.st-main { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+  .badge.st-main .dot { background:var(--accent); }
+  .badge.st-sub { border-color:var(--info); color:#1D4ED8; background:#EFF6FF; }
+  .badge.st-sub .dot { background:var(--info); }
+  .badge.st-limited { border-color:var(--warn); color:#B45309; background:#FFFBEB; }
+  .badge.st-limited .dot { background:var(--warn); }
+  .hero .lead { max-width:74ch; font-size:15px; color:var(--ink-2); }
+
+  section { margin-bottom:64px; scroll-margin-top:72px; }
+  .sec-head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+  .sec-head h2 { font-size:20px; font-weight:600; }
+  h3.sub { font-size:14px; font-weight:600; color:var(--ink-2); margin:22px 0 8px; }
+  p.note { font-size:13.5px; color:var(--ink-2); margin-bottom:16px; max-width:80ch; }
+
+  .op-table { width:100%; border-collapse:collapse; font-size:13.5px; }
+  .op-table th, .op-table td { padding:10px 12px; text-align:left; vertical-align:top; }
+  .op-table thead th { font-size:11px; font-weight:600; letter-spacing:.06em; color:var(--ink-3); text-transform:uppercase; border-bottom:1px solid var(--border); }
+  .op-table tbody tr { border-bottom:1px solid var(--border); transition:background .12s; }
+  .op-table tbody tr:hover { background:#F5F5F4; }
+  .op-table td code, .op-table td.mono { font-family:var(--mono); font-size:12.5px; }
+
+  .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:16px; }
+  .doc-card { display:block; padding:20px; min-width:0; background:var(--raised); border:1px solid var(--border); border-radius:var(--r-md); box-shadow:var(--shadow-1); text-decoration:none; color:inherit; transition:transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease); }
+  .doc-card:hover { transform:translateY(-2px); box-shadow:var(--shadow-2); border-color:var(--accent); }
+  .card-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .card-port { font-family:var(--mono); font-size:11px; color:var(--ink-3); }
+  .doc-card h4 { font-size:15px; font-weight:600; margin-bottom:6px; }
+  .doc-card p { font-size:13px; color:var(--ink-2); line-height:1.6; margin-bottom:8px; }
+
+  .code-block { position:relative; margin:14px 0; }
+  .code-block pre { background:var(--code-bg); color:var(--code-ink); border-radius:var(--r-md); padding:16px 18px; overflow-x:auto; font-family:var(--mono); font-size:13px; line-height:1.7; }
+  .code-block .copy-btn { position:absolute; top:10px; right:10px; font-size:11px; font-family:var(--mono); color:var(--code-ink); background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:var(--r-sm); padding:3px 10px; cursor:pointer; transition:background .12s; }
+  .code-block .copy-btn:hover { background:rgba(255,255,255,.18); }
+
+  .callout { margin:16px 0; padding:12px 16px; border-radius:var(--r-md); border-left:3px solid var(--info); background:var(--raised); font-size:14px; color:var(--ink-2); }
+  .callout.warn { border-left-color:var(--warn); }
+  .callout.ok { border-left-color:var(--ok); }
+  .callout strong { color:var(--ink); }
+
+  ul.plain { padding-left:20px; font-size:14px; line-height:1.9; color:var(--ink-2); }
+  ul.plain code, p code { font-family:var(--mono); font-size:12.5px; color:var(--accent); background:var(--accent-soft); padding:1px 6px; border-radius:5px; }
+
+  .flow-wrap { overflow-x:auto; background:var(--raised); border:1px solid var(--border); border-radius:var(--r-md); box-shadow:var(--shadow-1); padding:8px; }
+  .flow-svg text { font-family:var(--sans); }
+  .fnode-rect { fill:var(--raised); stroke:var(--border); stroke-width:1.5; }
+  .fnode-rect.terminal-ok { fill:#ECFDF5; stroke:var(--ok); }
+  .fnode-diamond { fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.5; }
+  .flabel { font-size:12.5px; fill:var(--ink); }
+  .flabel-cmd { font-family:var(--mono); font-size:11px; fill:var(--ink-2); }
+  .fbranch-label { font-size:11px; fill:var(--ink-2); font-weight:600; }
+  .fedge { fill:none; stroke:var(--ink-3); stroke-width:1.5; }
+  .flegend { display:flex; flex-wrap:wrap; gap:18px; font-size:12px; color:var(--ink-2); margin-top:12px; }
+  .flegend span { display:inline-flex; align-items:center; gap:6px; }
+  .flegend i { width:14px; height:14px; display:inline-block; border:1.5px solid var(--accent); background:var(--accent-soft); }
+  .flegend i.rect { border-radius:3px; border-color:var(--border); background:var(--raised); }
+
+  .doc-footer { display:flex; justify-content:space-between; gap:16px; margin-top:16px; padding-top:24px; border-top:1px solid var(--border); }
+  .doc-footer a { display:block; padding:14px 18px; min-width:200px; border:1px solid var(--border); border-radius:var(--r-md); text-decoration:none; color:var(--ink); font-weight:600; font-size:14px; background:var(--raised); transition:transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease); }
+  .doc-footer a:hover { transform:translateY(-2px); box-shadow:var(--shadow-2); border-color:var(--accent); }
+  .doc-footer a small { display:block; font-size:11px; font-weight:500; color:var(--ink-3); letter-spacing:.06em; }
+  .doc-footer .next { text-align:right; margin-left:auto; }
+  .mock-note { margin-top:32px; font-size:11px; color:var(--ink-3); }
+
+  @media (max-width:1100px) { .hub { padding:40px 20px 80px; } }
+  @media (max-width:768px) {
+    .header-meta, .phase-chip { display:none; }
+    .hero h1 { font-size:26px; }
+    .cards { grid-template-columns:1fr; }
+    section { overflow-x:auto; }
+  }
+  @media (prefers-reduced-motion:reduce) { * { transition:none !important; animation:none !important; } html { scroll-behavior:auto; } }
+  @media (max-width:480px) { .doc-footer { flex-direction:column; } .doc-footer a { min-width:0; } .doc-footer .next { margin-left:0; } }
+  @media print {
+    .site-header, .doc-footer, .mock-note { display:none !important; }
+    body { background:#FFFFFF; }
+    section { break-inside:avoid; }
+    .doc-card { box-shadow:none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a class="back" href="../README_Lab_Challenge.md">← マルチベンダ環境ラボ</a>
+  <div class="brand">マルチベンダ環境<span>ラボ</span></div>
+  <span class="phase-chip">TOOLS GUIDE</span>
+  <div class="header-meta">mvlab / 13ノード / OrbStack VM(arm64)</div>
+</header>
+
+<main class="hub">
+
+  <section class="hero" aria-label="概要">
+    <h1>ネットワークツールの使い方</h1>
+    <div class="doc-meta">
+      <span class="badge ver">v1.0</span>
+      <span class="badge"><span class="dot"></span>公開済み</span>
+      <span class="badge">最終更新 2026-07-17</span>
+      <span class="badge">対象ラボ: mvlab（マルチベンダ環境）</span>
+    </div>
+    <p class="lead">自作のFastAPI製ネットワークツール7本（<code>01_macro</code>〜<code>07_triage</code>、いずれもポート8601〜8607）を、このマルチベンダcontainerlabラボ（RouterOS / Cisco IOL / Nokia SR Linux / FRR / OpenWrt の6ベンダー構成）でどう使うかをまとめたガイド。各ツールは<code>bash start.sh</code>で個別に起動し、すべて127.0.0.1固定・CDN不使用で完結する。ベンダーによって接続方式（SSH／console専用／REST／JSON-RPC）が異なるため、ツールごとに「このラボでの位置づけ」を明記した。</p>
+  </section>
+
+  <section id="nodes" aria-label="mvlabノード一覧">
+    <div class="sec-head"><h2>0. mvlabノード一覧（実データ）</h2></div>
+    <p class="note">mgmtサブネットは <code>172.20.50.0/24</code>。全13ノードの接続方法と認証情報。各ツールページではこの表の該当部分だけを抜粋して掲載する。</p>
+    <table class="op-table">
+      <thead><tr><th>ノード</th><th>IP</th><th>ベンダー</th><th>アクセス</th><th>認証</th></tr></thead>
+      <tbody>
+        <tr><td>hq-edge</td><td class="mono">172.20.50.11</td><td>MikroTik RouterOS 7.21.4</td><td>SSH + REST（https）</td><td class="mono">admin / admin</td></tr>
+        <tr><td>hq-core</td><td class="mono">172.20.50.12</td><td>Cisco IOL 15.7.3M2</td><td><strong>console専用</strong>（SSH不可）</td><td class="mono">docker attach（下記参照）</td></tr>
+        <tr><td>dc-leaf1</td><td class="mono">172.20.50.13</td><td>Nokia SR Linux v26.3.3</td><td>SSH + JSON-RPC（http/https）</td><td class="mono">admin / NokiaSrl1!</td></tr>
+        <tr><td>dc-leaf2</td><td class="mono">172.20.50.14</td><td>Nokia SR Linux v26.3.3</td><td>SSH + JSON-RPC（http/https）</td><td class="mono">admin / NokiaSrl1!</td></tr>
+        <tr><td>hq-sw</td><td class="mono">172.20.50.15</td><td>Cisco IOL L2</td><td>console専用（<code>clab-mvlab-hq-sw</code>）</td><td>—</td></tr>
+        <tr><td>br-edge</td><td class="mono">172.20.50.16</td><td>OpenWrt 24.10.7</td><td class="mono">docker exec -it clab-mvlab-br-edge sh</td><td>—</td></tr>
+        <tr><td>isp-a</td><td class="mono">172.20.50.21</td><td>FRR 10.2.1</td><td class="mono">docker exec -it clab-mvlab-isp-a vtysh</td><td>—</td></tr>
+        <tr><td>isp-b</td><td class="mono">172.20.50.22</td><td>FRR 10.2.1</td><td class="mono">docker exec -it clab-mvlab-isp-b vtysh</td><td>—</td></tr>
+        <tr><td>hq-pc1 / hq-pc2</td><td class="mono">172.20.50.101 / .102</td><td>multitool</td><td class="mono">docker exec -it clab-mvlab-hq-pc{1,2} sh</td><td>—</td></tr>
+        <tr><td>srv-web / srv-db</td><td class="mono">172.20.50.103 / .104</td><td>multitool</td><td class="mono">docker exec -it clab-mvlab-srv-{web,db} sh</td><td>—</td></tr>
+        <tr><td>br-pc</td><td class="mono">172.20.50.105</td><td>multitool</td><td class="mono">docker exec -it clab-mvlab-br-pc sh</td><td>—</td></tr>
+      </tbody>
+    </table>
+    <p class="note">hq-core / hq-swのIOLはSSH鍵生成ができないため<code>docker attach --sig-proxy=false clab-mvlab-hq-core</code>のみで運用する（離脱は <code>Ctrl-P</code> → <code>Ctrl-Q</code>。<code>Ctrl-C</code>はコンテナごと終了するため使わない）。</p>
+  </section>
+
+  <section id="tools" aria-label="ツール一覧">
+    <div class="sec-head"><h2>1. ツール一覧</h2></div>
+    <p class="note">全ツール共通: 各フォルダで <code>bash start.sh</code>（初回はvenv構築で要ネット接続）。127.0.0.1固定。<code>NT_NO_OPEN=1</code>でブラウザ自動オープンを抑止できる。</p>
+    <div class="cards">
+      <a class="doc-card" href="01_macro.html">
+        <div class="card-top"><span class="badge st-sub"><span class="dot"></span>補助</span><span class="card-port">:8601</span></div>
+        <h4>01. マクロ作成</h4>
+        <p>Cisco IOS投入コマンドの変数展開生成（.txt / TeraTerm .ttl出力）</p>
+        <p class="note" style="margin:0">機器接続なし。生成→IOLのconsoleへ貼付</p>
+      </a>
+      <a class="doc-card" href="02_ping.html">
+        <div class="card-top"><span class="badge st-main"><span class="dot"></span>主力</span><span class="card-port">:8602</span></div>
+        <h4>02. Ping実行・確認</h4>
+        <p>マルチターゲット死活監視・断イベント記録・障害試験レポート・CSV</p>
+        <p class="note" style="margin:0">MacのICMP。要ルート追加（setup_mac.sh）</p>
+      </a>
+      <a class="doc-card" href="03_log.html">
+        <div class="card-top"><span class="badge st-limited"><span class="dot"></span>限定的</span><span class="card-port">:8603</span></div>
+        <h4>03. ログ取得・差分</h4>
+        <p>SSHでshow系一括取得（before/after差分）。device_type固定</p>
+        <p class="note" style="margin:0">本ラボでは限定的（IOLはSSH不可）。参考記載</p>
+      </a>
+      <a class="doc-card" href="04_fwpolicy.html">
+        <div class="card-top"><span class="badge st-sub"><span class="dot"></span>補助</span><span class="card-port">:8604</span></div>
+        <h4>04. FWポリシー管理</h4>
+        <p>FWポリシー表管理・shadow/重複検出・パケットマッチ検索</p>
+        <p class="note" style="margin:0">機器接続なし。ゾーンポリシー設計のモデリング</p>
+      </a>
+      <a class="doc-card" href="05_config.html">
+        <div class="card-top"><span class="badge st-main"><span class="dot"></span>主力</span><span class="card-port">:8605</span></div>
+        <h4>05. コンフィグ管理</h4>
+        <p>running-config版管理・diff・全文検索。貼付インポート対応</p>
+        <p class="note" style="margin:0">全ベンダー貼付インポート運用が正</p>
+      </a>
+      <a class="doc-card" href="06_terminal.html">
+        <div class="card-top"><span class="badge st-main"><span class="dot"></span>主力</span><span class="card-port">:8606</span></div>
+        <h4>06. ターミナル</h4>
+        <p>Webターミナル（タブ/SSH/telnet/シリアル/自動ログ/マクロ送信）</p>
+        <p class="note" style="margin:0">mv-*エイリアスで直接SSH。~/.ssh/configが有効</p>
+      </a>
+      <a class="doc-card" href="07_triage.html">
+        <div class="card-top"><span class="badge st-sub"><span class="dot"></span>補助</span><span class="card-port">:8607</span></div>
+        <h4>07. 障害トリアージAI</h4>
+        <p>症状+show出力貼付→AI原因仮説+読み取り専用確認コマンド</p>
+        <p class="note" style="margin:0">要ANTHROPIC_API_KEY。貼付のみ・全ベンダー対応</p>
+      </a>
+    </div>
+  </section>
+
+  <section id="setup" aria-label="セットアップ状況">
+    <div class="sec-head"><h2>2. セットアップ状況</h2></div>
+
+    <h3 class="sub">2-1. 到達性の前提</h3>
+    <table class="op-table">
+      <thead><tr><th>項目</th><th>状態</th><th>内容</th></tr></thead>
+      <tbody>
+        <tr><td>VM側 iptables（DOCKER-USER）</td><td><span class="badge st-main"><span class="dot"></span>設定済み</span></td><td>172.20.50.0/24 のmgmt通信を許可済み</td></tr>
+        <tr><td>Mac側 <code>~/.ssh/config</code>（mv-*）</td><td><span class="badge st-main"><span class="dot"></span>設定済み</span></td><td><code>mv-hq-edge</code> / <code>mv-dc-leaf1</code> / <code>mv-dc-leaf2</code> のProxyJumpエイリアス登録済み</td></tr>
+        <tr><td>Mac側 ルート追加（02_pingや直接curl用）</td><td><span class="badge st-limited"><span class="dot"></span>ユーザー実行が必要</span></td><td><code>setup_mac.sh</code>を実行（sudo 1回）。ルート先VM IPは自動検出（<code>192.168.139.215</code>はDHCPのため変動可能性あり）</td></tr>
+      </tbody>
+    </table>
+    <div class="callout ok">
+      <strong>ルート追加なしで使えるツール:</strong> <code>06_terminal</code>（ProxyJump経由）・<code>05_config</code>（貼付インポート）・<code>07_triage</code>（貼付のみ）・<code>01_macro</code>（機器接続なし）・<code>04_fwpolicy</code>（機器接続なし）。<code>02_ping</code>の直接ICMP監視や、Macから直接curlする場合のみ下記のルート追加が必要。
+    </div>
+
+    <h3 class="sub">2-2. setup_mac.sh の実行</h3>
+    <p class="note">02_pingの死活監視や、Macから直接<code>curl</code>する場合に、mgmtサブネットへのルートを追加するワンショットスクリプト。sudoで1回だけ実行する（Mac再起動で消えるため、必要時に再実行する）。</p>
+    <div class="code-block">
+      <button class="copy-btn" aria-label="コピー">copy</button>
+      <pre>cd "/Users/shuya/Documents/claude/Mac仮想環境構築/マルチベンダ環境/ネットワークツールの使い方"
+./setup_mac.sh</pre>
+    </div>
+
+    <h3 class="sub">2-3. 参考: API実例（VM内から実行）</h3>
+    <p class="note">いずれも<code>ssh clab@orb</code>でログインしたVM内のシェルから実行する。Mac側から直接<code>curl</code>する場合は2-2のルート追加が前提。</p>
+    <p class="note" style="margin-bottom:4px">RouterOS REST（hq-edge）</p>
+    <div class="code-block">
+      <button class="copy-btn" aria-label="コピー">copy</button>
+      <pre>curl -sk -u admin:admin https://172.20.50.11/rest/system/resource</pre>
+    </div>
+    <p class="note" style="margin-bottom:4px">Nokia SR Linux JSON-RPC（dc-leaf1）</p>
+    <div class="code-block">
+      <button class="copy-btn" aria-label="コピー">copy</button>
+      <pre>curl -s -u admin:'NokiaSrl1!' http://172.20.50.13/jsonrpc \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":0,"method":"get","params":{"commands":[{"path":"/system/information/version","datastore":"state"}]}}'</pre>
+    </div>
+    <p class="note" style="margin-bottom:4px">FRR（isp-a、vtysh非対話実行）</p>
+    <div class="code-block">
+      <button class="copy-btn" aria-label="コピー">copy</button>
+      <pre>ssh clab@orb "docker exec clab-mvlab-isp-a vtysh -c 'show bgp summary'"</pre>
+    </div>
+  </section>
+
+  <section id="workflow" aria-label="推奨ワークフロー">
+    <div class="sec-head"><h2>3. 推奨ワークフロー</h2></div>
+    <p class="note">障害調査から復旧・記録までの推奨手順。矢印は実施順、ひし形は判断を表す。</p>
+    <div class="flow-wrap">
+      <svg class="flow-svg" viewBox="-12 0 724 400" role="img" aria-label="02_ping→06_terminal→07_triage→05_configの推奨ワークフロー">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#A8A29E"></path>
+          </marker>
+        </defs>
+
+        <rect class="fnode-rect" x="210" y="10" width="280" height="50" rx="8"></rect>
+        <text class="flabel" x="350" y="32" text-anchor="middle">02_ping — 到達性確認・監視</text>
+        <text class="flabel-cmd" x="350" y="47" text-anchor="middle">13ノードの監視グループを作成</text>
+
+        <path class="fedge" d="M350,60 L350,84" marker-end="url(#arrow)"></path>
+
+        <rect class="fnode-rect" x="210" y="84" width="280" height="50" rx="8"></rect>
+        <text class="flabel" x="350" y="106" text-anchor="middle">06_terminal — 採取</text>
+        <text class="flabel-cmd" x="350" y="121" text-anchor="middle">mv-*プロファイル＋スニペットでshow一括取得</text>
+
+        <path class="fedge" d="M350,134 L350,158" marker-end="url(#arrow)"></path>
+
+        <rect class="fnode-rect" x="210" y="158" width="280" height="50" rx="8"></rect>
+        <text class="flabel" x="350" y="180" text-anchor="middle">07_triage — AIで切り分け</text>
+        <text class="flabel-cmd" x="350" y="195" text-anchor="middle">症状＋show出力を貼って解析</text>
+
+        <path class="fedge" d="M350,208 L350,232" marker-end="url(#arrow)"></path>
+
+        <polygon class="fnode-diamond" points="350,232 460,287 350,342 240,287"></polygon>
+        <text class="flabel" x="350" y="282" text-anchor="middle">原因を特定</text>
+        <text class="flabel" x="350" y="298" text-anchor="middle">できたか？</text>
+
+        <path class="fedge" d="M460,287 L570,287" marker-end="url(#arrow)"></path>
+        <text class="fbranch-label" x="470" y="278">特定できた</text>
+        <rect class="fnode-rect terminal-ok" x="570" y="262" width="128" height="50" rx="8"></rect>
+        <text class="flabel" x="634" y="284" text-anchor="middle">05_config</text>
+        <text class="flabel" x="634" y="300" text-anchor="middle">変更を反映し版管理</text>
+
+        <path class="fedge" d="M240,287 L120,287 L120,109 L210,109" marker-end="url(#arrow)"></path>
+        <text class="fbranch-label" x="122" y="278">特定できない</text>
+      </svg>
+    </div>
+    <div class="flegend">
+      <span><i class="rect"></i>実行ステップ</span>
+      <span><i style="border-radius:2px;transform:rotate(45deg)"></i>判断（ひし形）</span>
+      <span><i class="rect" style="background:#ECFDF5;border-color:var(--ok)"></i>版管理で完了</span>
+    </div>
+    <p class="note" style="margin-top:12px">「特定できない」の場合は06_terminalへ戻り、07_triageが提示した確認コマンドの結果を追加採取して再度AIに貼る（相棒ループ）。01_macro・04_fwpolicyはこのループの外側で、投入コマンドの事前生成やポリシー設計に随時使う。</p>
+  </section>
+
+  <div style="max-width:1180px;margin:0 auto;">
+    <p class="mock-note">本ガイドはマルチベンダ環境ラボ(mvlab)の実データに基づく。</p>
+  </div>
+</main>
+
+<script>
+"use strict";
+document.querySelectorAll(".code-block").forEach((b) => {
+  const btn = b.querySelector(".copy-btn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const t = b.querySelector("pre").innerText;
+    if (navigator.clipboard) navigator.clipboard.writeText(t);
+    btn.textContent = "copied";
+    setTimeout(() => (btn.textContent = "copy"), 1200);
+  });
+});
+</script>
+</body>
+</html>

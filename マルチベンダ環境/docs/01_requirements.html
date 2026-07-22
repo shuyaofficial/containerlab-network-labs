@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>要件定義書 | マルチベンダ環境ラボ</title>
+<style>
+  :root {
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    --accent: #BE185D;
+    --accent-soft: #FDF2F8;
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    --neutral: #94A3B8;
+    --code-bg: #0F172A;
+    --code-ink: #E2E8F0;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  body {
+    font-family: var(--sans); font-size: 15px; line-height: 1.8;
+    color: var(--ink); background: var(--surface);
+  }
+  .mono { font-family: var(--mono); font-feature-settings: "tnum"; }
+  .num { text-align: right; }
+
+  /* ===== Header ===== */
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 20px;
+    height: 56px; padding: 0 24px;
+    background: rgba(250,250,249,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .site-header .back { font-size: 13px; color: var(--ink-2); text-decoration: none; transition: color .15s var(--ease); }
+  .site-header .back:hover { color: var(--accent); }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .brand span { color: var(--accent); }
+  .phase-chip {
+    padding: 3px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+    color: var(--accent); background: var(--accent-soft); border-radius: var(--r-full);
+  }
+  .header-meta { margin-left: auto; font-size: 12px; color: var(--ink-2); }
+
+  /* ===== Layout ===== */
+  .layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+  .nav { position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto; padding: 40px 0; }
+  .nav-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--ink-3); text-transform: uppercase; margin-bottom: 10px; }
+  .nav a {
+    display: block; padding: 6px 10px; margin-left: -10px;
+    font-size: 13.5px; color: var(--ink-2); text-decoration: none; border-radius: var(--r-sm);
+    transition: color .12s var(--ease), background .12s var(--ease);
+  }
+  .nav a:hover { color: var(--ink); background: #F5F5F4; }
+  .nav a.current { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+
+  .doc { padding: 40px 0 96px; min-width: 0; }
+  .breadcrumb { font-size: 12px; color: var(--ink-3); margin-bottom: 12px; }
+  .breadcrumb a { color: inherit; text-decoration: none; }
+  .breadcrumb a:hover { color: var(--accent); }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 40px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; font-size: 12px; font-weight: 500;
+    border-radius: var(--r-full); border: 1px solid var(--border);
+    background: var(--raised); color: var(--ink-2);
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); font-family: var(--mono); }
+
+  section { margin-bottom: 56px; scroll-margin-top: 72px; overflow-x: auto; }
+  h2 { font-size: 20px; font-weight: 600; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  h2 a { color: var(--ink-3); text-decoration: none; opacity: 0; margin-left: 6px; font-weight: 400; }
+  h2:hover a { opacity: 1; }
+  h3.sub { font-size: 14px; font-weight: 600; color: var(--ink-2); margin: 24px 0 10px; }
+  p.note { font-size: 13.5px; color: var(--ink-2); margin-bottom: 12px; }
+
+  .goal-list, .assump-list { padding-left: 20px; font-size: 14.5px; line-height: 1.9; }
+
+  /* ---- Scope 2-column ---- */
+  .scope-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .scope { padding: 16px 18px; border-radius: var(--r-md); border: 1px solid var(--border); background: var(--raised); }
+  .scope.in { border-left: 3px solid var(--ok); }
+  .scope.out { border-left: 3px solid var(--ink-3); }
+  .scope h3 { font-size: 13px; color: var(--ink-2); margin-bottom: 8px; }
+  .scope ul { padding-left: 18px; font-size: 14px; line-height: 1.8; }
+
+  /* ---- Requirement tables ---- */
+  .req-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 620px; }
+  .req-table th, .req-table td { padding: 12px; text-align: left; vertical-align: top; }
+  .req-table thead th { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--ink-3); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  .req-table tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; scroll-margin-top: 72px; }
+  .req-table tbody tr:hover { background: #F5F5F4; }
+  .req-table tbody tr:target { background: var(--accent-soft); }
+  .req-id {
+    display: inline-block; font-family: var(--mono); font-weight: 700; font-size: 12.5px;
+    color: var(--accent); background: var(--accent-soft); padding: 2px 8px; border-radius: var(--r-sm); white-space: nowrap;
+  }
+  .ref-chip {
+    display: inline-block; font-family: var(--mono); font-size: 11.5px;
+    padding: 2px 8px; margin: 2px 4px 2px 0; border: 1px solid var(--border); border-radius: var(--r-full);
+    color: var(--ink-2); text-decoration: none; transition: border-color .12s var(--ease), color .12s var(--ease);
+  }
+  .ref-chip:hover { border-color: var(--accent); color: var(--accent); }
+
+  .doc-footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); }
+  .doc-footer a {
+    display: block; padding: 14px 18px; min-width: 200px;
+    border: 1px solid var(--border); border-radius: var(--r-md);
+    text-decoration: none; color: var(--ink); font-weight: 600; font-size: 14px;
+    background: var(--raised); transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease);
+  }
+  .doc-footer a:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--accent); }
+  .doc-footer a small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-3); letter-spacing: .06em; }
+  .doc-footer .next { text-align: right; margin-left: auto; }
+  .data-note { margin-top: 24px; font-size: 11.5px; color: var(--ink-2); padding: 10px 14px; border-left: 3px solid var(--ok); background: #ECFDF5; border-radius: var(--r-sm); }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 190px minmax(0, 1fr); gap: 32px; }
+  }
+  @media (max-width: 768px) {
+    .header-meta, .phase-chip { display: none; }
+    .layout { grid-template-columns: 1fr; gap: 0; }
+    .nav { position: static; height: auto; padding: 20px 0 0; display: flex; gap: 16px; overflow-x: auto; }
+    .nav-label { display: none; }
+    .scope-grid { grid-template-columns: 1fr; }
+    .doc section { overflow-x: auto; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    html { scroll-behavior: auto; }
+  }
+  @media (max-width: 480px) {
+    .doc-footer { flex-direction: column; }
+    .doc-footer a { min-width: 0; }
+    .doc-footer .next { margin-left: 0; }
+  }
+  @media print {
+    .site-header, .nav, .doc-footer, .data-note { display: none !important; }
+    body { background: #FFFFFF; }
+    .layout { display: block; }
+    section { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a class="back" href="00_document-map.html">&larr; ドキュメントマップ</a>
+  <div class="brand">マルチベンダ環境<span>ラボ</span></div>
+  <span class="phase-chip">PHASE 1 要件定義</span>
+  <div class="header-meta">mvlab / 5ベンダー13ノード</div>
+</header>
+
+<div class="layout">
+
+  <nav class="nav" aria-label="要件定義書 目次">
+    <div class="nav-label">目次</div>
+    <a href="#s1" class="current" data-target="s1">1. 背景・目的</a>
+    <a href="#s2" data-target="s2">2. 対象範囲</a>
+    <a href="#s3" data-target="s3">3. 機能要件</a>
+    <a href="#s4" data-target="s4">4. 非機能要件</a>
+    <a href="#s5" data-target="s5">5. ゾーン設計方針</a>
+    <a href="#s6" data-target="s6">6. 制約・前提</a>
+    <a href="#s7" data-target="s7">7. 受け入れ基準</a>
+    <a href="#s8" data-target="s8">8. トレーサビリティ</a>
+  </nav>
+
+  <main class="doc">
+    <div class="breadcrumb"><a href="00_document-map.html">ドキュメントマップ</a> / 要件定義書</div>
+    <h1>要件定義書</h1>
+    <div class="doc-meta">
+      <span class="badge ver">REQ-MV01〜07</span>
+      <span class="badge"><span class="dot"></span>確定</span>
+      <span class="badge">最終更新 2026-07-17</span>
+      <span class="badge">実機グリーン PASS=28/28</span>
+    </div>
+
+    <section id="s1">
+      <h2>1. 背景・目的<a href="#s1">#</a></h2>
+      <p class="note">実務のネットワークは1社であっても単一ベンダーで統一されているとは限らない。ISP接続・WANエッジ・キャンパス・DC・ブランチCPEといったゾーンごとに、コスト・機能・運用性の観点で異なるベンダーが選定される。本ラボは「1社の企業ネットワークを、ゾーンごとに最適ベンダーで構成する」という前提をラボ化する。</p>
+      <ol class="goal-list">
+        <li>ゾーンごとに実務で採用されやすいベンダーを意図的に割り当て、相互接続する</li>
+        <li>同じ目的の操作（経路確認・ピア状態確認・設定投入・API取得）の流儀差を実機で体感する</li>
+        <li>外側はeBGP・内側はOSPF・DCは再びeBGPという企業ネットワークの階層化を踏襲する</li>
+        <li>API-firstな機器（RouterOS REST／SR Linux JSON-RPC）での状態取得・可逆変更を実証する</li>
+      </ol>
+    </section>
+
+    <section id="s2">
+      <h2>2. 対象範囲<a href="#s2">#</a></h2>
+      <div class="scope-grid">
+        <div class="scope in">
+          <h3>対象</h3>
+          <ul>
+            <li>5ゾーン: Untrust（ISP2社）／WANエッジ／Trust（HQキャンパス）／DC（リーフ×2）／ブランチ（CPE+NAT）</li>
+            <li>プロトコル: eBGP（AS間）・OSPF（HQ内 area0）・VLAN/SVI・静的経路+NAT（ブランチ）</li>
+            <li>5ベンダー: FRR 10.2.1／RouterOS CHR 7.21.4／Cisco IOL 15.7.3M2＋L2-advipservices-2017／Nokia SR Linux v26.3.3／OpenWrt 24.10.7</li>
+            <li>8操作の横断比較（IF一覧／経路表／BGP／OSPF／設定表示／変更・ロールバック／保存／API）</li>
+          </ul>
+        </div>
+        <div class="scope out">
+          <h3>対象外</h3>
+          <ul>
+            <li>ACL/ファイアウォールルール（27番テーマが別途担当）</li>
+            <li>実トラフィック負荷試験・SNMP/監視基盤の統合</li>
+            <li>キャンパス内の機器冗長（HSRP/STP二重化。将来課題）</li>
+            <li>NX-OSノード拡張・VM版OpenWrtへの切替（README拡張案のみ）</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="s3">
+      <h2>3. 機能要件<a href="#s3">#</a></h2>
+      <table class="req-table">
+        <thead><tr><th>ID</th><th>要件</th><th>目標値</th><th>検証方法</th></tr></thead>
+        <tbody>
+          <tr id="REQ-MV01"><td><span class="req-id">REQ-MV01</span></td><td>5ベンダーをゾーンごとに配置し、eBGP／OSPF／再配信で相互接続する（マルチベンダ相互接続）</td><td class="mono">5ベンダー13ノードが相互到達</td><td>疎通試験（HQ↔DC・HQ↔ISP）とBGP/OSPFピア状態で確認</td></tr>
+          <tr id="REQ-MV02"><td><span class="req-id">REQ-MV02</span></td><td>hq-edgeがisp-a・isp-bとeBGPデュアルホームを組み、片系障害時も残るデフォルトルートで継続到達する</td><td class="mono">eBGP 2セッションestablished</td><td>hq-edgeの2セッション確立確認＋isp-a向けリンク断での切替確認</td></tr>
+          <tr id="REQ-MV03"><td><span class="req-id">REQ-MV03</span></td><td>Untrust=eBGP／Trust=OSPF area0／DC=eBGP の階層構成とし、hq-coreを再配信境界（ASBR相当）とする</td><td class="mono">DC経路をOSPFへ・defaultをDCへ配布</td><td>hq-swでDC /24（OSPF external）と0.0.0.0/0の学習を確認</td></tr>
+          <tr id="REQ-MV04"><td><span class="req-id">REQ-MV04</span></td><td>hq-swのSVI（VLAN10／VLAN20）で端末セグメントを分離しGWを提供、経路をOSPFで広報する</td><td class="mono">VLAN10/20をSVIで分離・広報</td><td>hq-pc1（VLAN10）↔hq-pc2（VLAN20）のVLAN間ルーティング疎通</td></tr>
+          <tr id="REQ-MV05"><td><span class="req-id">REQ-MV05</span></td><td>br-edgeが静的デフォルトルート＋masqueradeでブランチLANを隠蔽し外部到達させる（BGP/OSPF不参加）</td><td class="mono">192.168.40.0/24をNATで隠蔽</td><td>br-pc→ISPループバックへのNAT越し疎通</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="s4">
+      <h2>4. 非機能要件<a href="#s4">#</a></h2>
+      <table class="req-table">
+        <thead><tr><th>ID</th><th>要件</th><th>目標値</th><th>検証方法</th></tr></thead>
+        <tbody>
+          <tr id="REQ-MV06"><td><span class="req-id">REQ-MV06</span></td><td>API-firstな機器はAPI経由での状態取得を実証する（RouterOS REST／SR Linux JSON-RPC）</td><td class="mono">REST／JSON-RPCで構造化応答</td><td>curlでhq-edge REST・dc-leaf1 JSON-RPCのversion取得を確認</td></tr>
+          <tr id="REQ-MV07"><td><span class="req-id">REQ-MV07</span></td><td>全13ノードが起動し、IOL・RouterOS CHRの起動時間の目安（デプロイ全体で約2〜3分）をREADMEに明記する</td><td class="mono">13ノード running</td><td>verify.shでコンテナ13台のStatus=runningを確認</td></tr>
+        </tbody>
+      </table>
+      <p class="note">IOL・RouterOS CHRはx86 QEMUエミュレーション経由で起動に約1.5〜2分を要する。SR Linux・FRR・OpenWrtはarm64ネイティブで数秒〜十数秒。IOLはSSH不可のためconsole（<code class="mono">docker attach</code>）運用手順を明文化する。</p>
+    </section>
+
+    <section id="s5">
+      <h2>5. ゾーン設計方針<a href="#s5">#</a></h2>
+      <p class="note">『ネットワーク・デザインパターン』のゾーン区分を次のように適用する。詳細な設計根拠は<a href="02_basic-design.html">基本設計書</a>を参照。</p>
+      <table class="req-table">
+        <thead><tr><th>ゾーン</th><th>本ラボでの対応</th><th>ベンダー</th></tr></thead>
+        <tbody>
+          <tr><td>Untrust</td><td>isp-a／isp-b（インターネット役、ループバックを保持）</td><td>FRR 10.2.1</td></tr>
+          <tr><td>WANエッジ（Untrust/Trust境界）</td><td>hq-edge（デュアルホームeBGP冗長）</td><td>MikroTik RouterOS CHR 7.21.4</td></tr>
+          <tr><td>Trust</td><td>hq-core／hq-sw／hq-pc1／hq-pc2（HQキャンパス）</td><td>Cisco IOL 15.7.3M2</td></tr>
+          <tr><td>DC（Trust内の別セグメント）</td><td>dc-leaf1／dc-leaf2／srv-web／srv-db</td><td>Nokia SR Linux v26.3.3</td></tr>
+          <tr><td>ブランチ（簡易WANゾーン）</td><td>br-edge／br-pc（NAT配下、BGP/OSPF不参加）</td><td>OpenWrt 24.10.7</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="s6">
+      <h2>6. 制約・前提<a href="#s6">#</a></h2>
+      <ul class="assump-list">
+        <li>arm64（Apple Silicon + OrbStack）+ KVMなし環境。x86 VM型イメージ（RouterOS CHR）はQEMU TCG完全エミュレーションとなり、起動に<code class="mono">QEMU_CPU=max</code>が必須。</li>
+        <li>Cisco IOL（hq-core／hq-sw）はGNS3世代イメージのためSSH不可。<code class="mono">docker attach --sig-proxy=false</code>のコンソール運用のみで、離脱は<code class="mono">Ctrl-p</code>→<code class="mono">Ctrl-q</code>。</li>
+        <li>OpenWrt（rootfs）コンテナはnetifdが動作しないため、<code class="mono">uci</code>による設定変更はネットワークスタックに反映されない。<code class="mono">uci show</code>等の閲覧デモに限定し、IP付与・NATは<code class="mono">ip</code>／<code class="mono">nft</code>を直接投入する。</li>
+        <li>IOL 2台構成は当初router-on-a-stick（dot1QサブIF＋トランク）で設計したが、スモークテストで不安定と判明したため、SVI方式（23番ラボ collapsed core の実績方式）へ変更した。</li>
+        <li>RouterOS／SR Linuxのstartup-config（FTP自動投入／clabバインド）は実機で不達・構文エラーとなったため不採用とし、ブート後にssh／sr_cliで後投入する方式へ変更した。</li>
+      </ul>
+    </section>
+
+    <section id="s7">
+      <h2>7. 受け入れ基準<a href="#s7">#</a></h2>
+      <table class="req-table">
+        <thead><tr><th>基準</th><th>内容</th><th>結果</th></tr></thead>
+        <tbody>
+          <tr><td>全ノード稼働</td><td>全13ノードが<code class="mono">deploy.sh inspect</code>でrunningになる</td><td class="mono">OK（13/13）</td></tr>
+          <tr><td>デュアルホームeBGP</td><td>hq-edgeがisp-a・isp-b双方とeBGPを確立（Established）</td><td class="mono">OK（2セッション）</td></tr>
+          <tr><td>OSPF隣接</td><td>hq-core⇔hq-sw／hq-edge⇔hq-coreのOSPF隣接がFULL、VLAN10/20がhq-edge側に現れる</td><td class="mono">OK</td></tr>
+          <tr><td>DC到達性</td><td>dc-leaf1・dc-leaf2の自LANサブネットがhq-core経由でHQ側から到達できる</td><td class="mono">OK</td></tr>
+          <tr><td>ブランチNAT</td><td>br-pcからインターネット役へNAT経由で疎通できる</td><td class="mono">OK</td></tr>
+          <tr><td>API実証</td><td>RouterOS REST・SR Linux JSON-RPCで状態取得ができる</td><td class="mono">OK</td></tr>
+        </tbody>
+      </table>
+      <p class="note">上記受け入れ基準はそのまま試験項目に転記し、<code class="mono">verify.sh</code>で自動確認する（<a href="05_test-report.html">試験結果報告書</a>：PASS=28/28）。</p>
+    </section>
+
+    <section id="s8">
+      <h2>8. トレーサビリティ<a href="#s8">#</a></h2>
+      <p class="note">要件は必ず設計と試験に着地する。全要件IDについて、対応する基本設計の章と検証する試験項目を示す。</p>
+      <table class="req-table">
+        <thead><tr><th>ID</th><th>要件概要</th><th>基本設計</th><th>試験</th></tr></thead>
+        <tbody>
+          <tr><td><span class="req-id">REQ-MV01</span></td><td>マルチベンダ相互接続</td><td><a class="ref-chip" href="02_basic-design.html#p2">§2 全体構成</a></td><td><a class="ref-chip" href="05_test-report.html">疎通</a><a class="ref-chip" href="05_test-report.html">BGP</a><a class="ref-chip" href="05_test-report.html">OSPF</a></td></tr>
+          <tr><td><span class="req-id">REQ-MV02</span></td><td>デュアルホーム冗長</td><td><a class="ref-chip" href="02_basic-design.html#p4">§4 冗長性・拡張性</a></td><td><a class="ref-chip" href="05_test-report.html">BGP hq-edge=2</a><a class="ref-chip" href="05_test-report.html">冗長試験</a></td></tr>
+          <tr><td><span class="req-id">REQ-MV03</span></td><td>階層ルーティング（再配信境界）</td><td><a class="ref-chip" href="02_basic-design.html#p1">§1 設計方針</a></td><td><a class="ref-chip" href="05_test-report.html">DC再配信</a><a class="ref-chip" href="05_test-report.html">BGP</a><a class="ref-chip" href="05_test-report.html">OSPF</a></td></tr>
+          <tr><td><span class="req-id">REQ-MV04</span></td><td>VLAN分離（SVI）</td><td><a class="ref-chip" href="02_basic-design.html#p6">§6 設計判断（SVI）</a></td><td><a class="ref-chip" href="05_test-report.html">VLAN間ping</a></td></tr>
+          <tr><td><span class="req-id">REQ-MV05</span></td><td>ブランチNAT</td><td><a class="ref-chip" href="02_basic-design.html#p5">§5 セキュリティ方針</a></td><td><a class="ref-chip" href="05_test-report.html">ブランチ→ISP</a></td></tr>
+          <tr><td><span class="req-id">REQ-MV06</span></td><td>API運用性（REST/JSON-RPC）</td><td><a class="ref-chip" href="02_basic-design.html#p1">§1 設計方針</a></td><td><a class="ref-chip" href="05_test-report.html">API 2項目</a></td></tr>
+          <tr><td><span class="req-id">REQ-MV07</span></td><td>全13ノード稼働</td><td><a class="ref-chip" href="02_basic-design.html#p2">§2 全体構成</a></td><td><a class="ref-chip" href="05_test-report.html">コンテナ13台</a></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <nav class="doc-footer" aria-label="前後のドキュメント">
+      <a class="prev" href="00_document-map.html"><small>前の工程</small>ドキュメントマップ</a>
+      <a class="next" href="02_basic-design.html"><small>次の工程</small>基本設計書</a>
+    </nav>
+    <p class="data-note">本ドキュメントは mvlab 実機（2026-07-17 <span class="mono">verify.sh</span> PASS=28/28）に基づく。要件・受け入れ基準は要件定義書（<span class="mono">01_要件定義/要件定義書.md</span>）の実値を反映。</p>
+  </main>
+</div>
+
+<script>
+  "use strict";
+  const navLinks = [...document.querySelectorAll(".nav a")];
+  const sections = [...document.querySelectorAll("main section")];
+  const spy = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      navLinks.forEach((a) =>
+        a.classList.toggle("current", a.getAttribute("href") === `#${entry.target.id}`));
+    });
+  }, { rootMargin: "-20% 0px -70% 0px" });
+  sections.forEach((s) => spy.observe(s));
+</script>
+</body>
+</html>

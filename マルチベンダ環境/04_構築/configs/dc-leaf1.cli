@@ -1,0 +1,55 @@
+# =====================================================================
+# dc-leaf1 — Nokia SR Linux / DCリーフ1 / AS65021 / Router ID 10.50.255.103
+# 投入方式: deploy.sh の "config" サブコマンドがブート後にsr_cli経由で投入する
+#   （clab startup-configはコンテナに届かず未適用だったため2026-07-17に不採用へ
+#    変更。本ファイルの#始まり行・空行はdeploy.shが除去し、setコマンド本体のみを
+#    candidateモードでcommitする＝"enter candidate"→set行群→"commit stay"）。
+# 収容: srv-web(10.50.30.0/24)。上流: hq-core(10.50.255.21)と eBGP。
+# ★RFC8212対策: export(自prefix accept)/import(accept-all)ポリシー必須。
+#   これが無いと eBGP で経路が広報/受信されない。
+# =====================================================================
+
+# ===== インターフェース（e1-1=hq-core向け / e1-2=srv-web向けGW） =====
+set / interface ethernet-1/1 mtu 9000
+set / interface ethernet-1/1 admin-state enable
+set / interface ethernet-1/1 subinterface 0 admin-state enable
+set / interface ethernet-1/1 subinterface 0 ip-mtu 1500
+set / interface ethernet-1/1 subinterface 0 ipv4 admin-state enable
+set / interface ethernet-1/1 subinterface 0 ipv4 address 10.50.255.22/30
+set / interface ethernet-1/2 mtu 9000
+set / interface ethernet-1/2 admin-state enable
+set / interface ethernet-1/2 subinterface 0 admin-state enable
+set / interface ethernet-1/2 subinterface 0 ip-mtu 1500
+set / interface ethernet-1/2 subinterface 0 ipv4 admin-state enable
+set / interface ethernet-1/2 subinterface 0 ipv4 address 10.50.30.1/24
+
+# ===== default network-instance へ収容 =====
+set / network-instance default type default
+set / network-instance default admin-state enable
+set / network-instance default interface ethernet-1/1.0
+set / network-instance default interface ethernet-1/2.0
+
+# ===== routing-policy（RFC8212対策） =====
+# export-lan: 自LAN 10.50.30.0/24（direct経路）のみ広報。
+# import-all: 受信は全許可（default含む）。
+set / routing-policy prefix-set lan-prefix prefix 10.50.30.0/24 mask-length-range exact
+set / routing-policy policy export-lan default-action policy-result reject
+set / routing-policy policy export-lan statement 10 match prefix prefix-set lan-prefix
+set / routing-policy policy export-lan statement 10 action policy-result accept
+set / routing-policy policy import-all default-action policy-result accept
+
+# ===== BGP（AS65021、対 hq-core eBGP） =====
+set / network-instance default protocols bgp admin-state enable
+set / network-instance default protocols bgp autonomous-system 65021
+set / network-instance default protocols bgp router-id 10.50.255.103
+set / network-instance default protocols bgp afi-safi ipv4-unicast admin-state enable
+set / network-instance default protocols bgp group ebgp-hq admin-state enable
+set / network-instance default protocols bgp group ebgp-hq peer-as 65011
+set / network-instance default protocols bgp group ebgp-hq afi-safi ipv4-unicast admin-state enable
+set / network-instance default protocols bgp group ebgp-hq export-policy [ export-lan ]
+set / network-instance default protocols bgp group ebgp-hq import-policy [ import-all ]
+set / network-instance default protocols bgp neighbor 10.50.255.21 peer-group ebgp-hq
+
+# ===== JSON-RPC サーバ（API試験用。mgmt VRF上で http 有効化。既定は無効） =====
+set / system json-rpc-server admin-state enable
+set / system json-rpc-server network-instance mgmt http admin-state enable

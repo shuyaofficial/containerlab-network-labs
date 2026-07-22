@@ -1,0 +1,191 @@
+name: mvlab
+
+# ---------------------------------------------------------------------------
+# マルチベンダ環境（1社を5ベンダーで再現する統合キャンパス+DC+WANラボ）
+#   ISP(FRR) / WANエッジ(MikroTik) / キャンパス(Cisco IOL) /
+#   DCリーフ(Nokia SR Linux) / ブランチCPE(OpenWrt)
+# IP設計は 02_基本設計/IPアドレス管理表.md を正とする。
+#   - 全ベンダー間P2Pリンクに mtu:1500 を明示（clab既定9500による
+#     OSPF/BGPのMTUミスマッチを回避）。端末リンクも1500で統一。
+#   - IOL(hq-core/hq-sw)はSSH不可・console運用。deploy.sh経由で
+#     /opt/clab/.iourc を用意してからデプロイすること。
+#   - RouterOS(hq-edge)とSR Linux(dc-leaf1/2)はstartup-config(FTP自動投入/
+#     clabバインド)が実機で不達・構文エラーを起こすため不採用。IPは付与せず、
+#     deploy.sh の "config" サブコマンドがブート後にssh/sr_cliで後投入する
+#     （configs/hq-edge.rsc・configs/dc-leafN.cli をそのまま使用）。
+# ---------------------------------------------------------------------------
+
+mgmt:
+  network: mvlab-mgmt
+  ipv4-subnet: 172.20.50.0/24
+
+topology:
+  nodes:
+    # ===== Untrust: ISP 2社（FRR / eBGP） =====
+    isp-a:
+      kind: linux
+      image: quay.io/frrouting/frr:10.2.1
+      mgmt-ipv4: 172.20.50.21
+      binds:
+        - configs/isp-a.daemons:/etc/frr/daemons
+        - configs/isp-a.frr.conf:/etc/frr/frr.conf
+    isp-b:
+      kind: linux
+      image: quay.io/frrouting/frr:10.2.1
+      mgmt-ipv4: 172.20.50.22
+      binds:
+        - configs/isp-b.daemons:/etc/frr/daemons
+        - configs/isp-b.frr.conf:/etc/frr/frr.conf
+
+    # ===== HQ WANエッジ（MikroTik RouterOS CHR） =====
+    hq-edge:
+      kind: mikrotik_ros
+      image: vrnetlab/mikrotik_routeros:7.21.4
+      mgmt-ipv4: 172.20.50.11
+      env:
+        # KVM無しホストでは既定の -cpu host がqemu即死を招くため必須
+        QEMU_CPU: max
+      # startup-config不採用（実機でFTP自動投入が構文エラーで丸ごと中断）。
+      # deploy.sh deploy がブート後に configs/hq-edge.rsc をssh経由で後投入する。
+
+    # ===== HQキャンパス（Cisco IOL） =====
+    hq-core:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+      mgmt-ipv4: 172.20.50.12
+      startup-config: configs/hq-core.cfg
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+        # IOL実ライセンス（deploy.shがVM内イメージから/opt/clab/.iourcへ自動抽出。git管理外）
+        - /opt/clab/.iourc:/iol/.iourc:ro
+    hq-sw:
+      kind: cisco_iol
+      type: l2
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      mgmt-ipv4: 172.20.50.15
+      startup-config: configs/hq-sw.cfg
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+        - /opt/clab/.iourc:/iol/.iourc:ro
+
+    # ===== DCリーフ（Nokia SR Linux） =====
+    dc-leaf1:
+      kind: nokia_srlinux
+      image: ghcr.io/nokia/srlinux:latest
+      mgmt-ipv4: 172.20.50.13
+      # startup-config不採用（実機でclabバインドがコンテナに届かず未適用だった）。
+      # deploy.sh deploy がブート後に configs/dc-leaf1.cli をsr_cli経由で後投入する。
+    dc-leaf2:
+      kind: nokia_srlinux
+      image: ghcr.io/nokia/srlinux:latest
+      mgmt-ipv4: 172.20.50.14
+      # startup-config不採用（同上）。deploy.sh deploy が configs/dc-leaf2.cli を後投入する。
+
+    # ===== ブランチCPE（OpenWrt / NAT。netifd不動作のためexec直叩き） =====
+    br-edge:
+      kind: linux
+      image: openwrt/rootfs:armsr-armv8-24.10.7
+      mgmt-ipv4: 172.20.50.16
+      binds:
+        # NATルールセット（nft -f で読み込む。波括弧をexecで直接渡すと壊れるため）
+        - configs/br-edge-nat.nft:/etc/br-edge-nat.nft:ro
+      exec:
+        - ip link set eth1 up
+        - ip link set eth2 up
+        - ip address add 10.50.255.14/30 dev eth1
+        - ip address add 192.168.40.1/24 dev eth2
+        # clabがmgmt側にdefault(172.20.50.1)を先に入れているため add ではなく
+        # replace を使う（2026-07-17実機確認: addは競合して失敗しWAN向け経路が
+        # 入らなかった。端末multitoolと同じreplace方式に統一）。
+        - ip route replace default via 10.50.255.13
+        - sysctl -w net.ipv4.ip_forward=1
+        # source-NAT(masquerade)。openwrt/rootfsはnftを同梱。base chainのhook宣言に
+        # 必須の波括弧を clab exec で直接渡すと "unexpected }" になるため、ルールセットは
+        # bindした .nft ファイルを nft -f で読み込む（2026-07-17実機で確認）。
+        - nft -f /etc/br-edge-nat.nft
+
+    # ===== 端末（multitool。IPは 02_基本設計/IPアドレス管理表.md §4 準拠） =====
+    hq-pc1:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.20.50.101
+      exec:
+        - ip link set eth1 up
+        - ip link set eth1 mtu 1500
+        - ip address add 10.50.10.101/24 dev eth1
+        - ip route replace default via 10.50.10.1 dev eth1
+    hq-pc2:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.20.50.102
+      exec:
+        - ip link set eth1 up
+        - ip link set eth1 mtu 1500
+        - ip address add 10.50.20.102/24 dev eth1
+        - ip route replace default via 10.50.20.1 dev eth1
+    srv-web:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.20.50.103
+      exec:
+        - ip link set eth1 up
+        - ip link set eth1 mtu 1500
+        - ip address add 10.50.30.103/24 dev eth1
+        - ip route replace default via 10.50.30.1 dev eth1
+    srv-db:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.20.50.104
+      exec:
+        - ip link set eth1 up
+        - ip link set eth1 mtu 1500
+        - ip address add 10.50.31.104/24 dev eth1
+        - ip route replace default via 10.50.31.1 dev eth1
+    br-pc:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.20.50.105
+      exec:
+        - ip link set eth1 up
+        - ip link set eth1 mtu 1500
+        - ip address add 192.168.40.100/24 dev eth1
+        - ip route replace default via 192.168.40.1 dev eth1
+
+  links:
+    # ---- ISP間 eBGP（10.50.255.0/30） ----
+    - endpoints: ["isp-a:eth1", "isp-b:eth1"]
+      mtu: 1500
+    # ---- isp-a ⇔ hq-edge eBGP（10.50.255.4/30。hq-edge:eth1=ether2） ----
+    - endpoints: ["isp-a:eth2", "hq-edge:eth1"]
+      mtu: 1500
+    # ---- isp-b ⇔ hq-edge eBGP（10.50.255.8/30。hq-edge:eth2=ether3） ----
+    - endpoints: ["isp-b:eth2", "hq-edge:eth2"]
+      mtu: 1500
+    # ---- isp-b ⇔ br-edge 静的+NAT（10.50.255.12/30） ----
+    - endpoints: ["isp-b:eth3", "br-edge:eth1"]
+      mtu: 1500
+    # ---- hq-edge ⇔ hq-core OSPF area0（10.50.255.16/30。hq-edge:eth3=ether4 / hq-core:eth1=Et0/1） ----
+    - endpoints: ["hq-edge:eth3", "hq-core:eth1"]
+      mtu: 1500
+    # ---- hq-core ⇔ dc-leaf1 eBGP（10.50.255.20/30。hq-core:eth2=Et0/2 / dc-leaf1:e1-1） ----
+    - endpoints: ["hq-core:eth2", "dc-leaf1:e1-1"]
+      mtu: 1500
+    # ---- hq-core ⇔ dc-leaf2 eBGP（10.50.255.24/30。hq-core:eth3=Et0/3 / dc-leaf2:e1-1） ----
+    - endpoints: ["hq-core:eth3", "dc-leaf2:e1-1"]
+      mtu: 1500
+    # ---- hq-core ⇔ hq-sw ルーテッドOSPF area0（10.50.255.28/30。hq-core:eth4=Et1/0 / hq-sw:eth1=Et0/1） ----
+    - endpoints: ["hq-core:eth4", "hq-sw:eth1"]
+      mtu: 1500
+    # ---- hq-sw ⇔ 端末（VLANアクセス。hq-sw:eth2=Et0/2 VLAN10 / eth3=Et0/3 VLAN20） ----
+    - endpoints: ["hq-sw:eth2", "hq-pc1:eth1"]
+      mtu: 1500
+    - endpoints: ["hq-sw:eth3", "hq-pc2:eth1"]
+      mtu: 1500
+    # ---- DCリーフ ⇔ サーバ（dc-leafN:e1-2） ----
+    - endpoints: ["dc-leaf1:e1-2", "srv-web:eth1"]
+      mtu: 1500
+    - endpoints: ["dc-leaf2:e1-2", "srv-db:eth1"]
+      mtu: 1500
+    # ---- ブランチLAN（br-edge:eth2） ----
+    - endpoints: ["br-edge:eth2", "br-pc:eth1"]
+      mtu: 1500

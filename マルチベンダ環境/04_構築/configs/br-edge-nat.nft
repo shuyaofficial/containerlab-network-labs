@@ -1,0 +1,10 @@
+# br-edge(OpenWrt) ブランチCPEのsource-NAT(masquerade)。
+# clab exec で `nft add chain ... { ... }` を直接渡すと波括弧がシェルに
+# 解釈され "unexpected }" になるため、ルールセットをファイルにして
+# `nft -f` で読み込む方式にした(2026-07-17実機で確認)。
+table ip nat {
+  chain postrouting {
+    type nat hook postrouting priority 100; policy accept;
+    oifname "eth1" masquerade
+  }
+}
