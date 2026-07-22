@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>構築ログ | ゼロトラスト_ネットワーク特化</title>
+<style>
+:root {
+  --surface:#FAFAF9; --raised:#FFFFFF; --ink:#1C1917; --ink-2:#57534E; --ink-3:#A8A29E; --border:#E7E5E4;
+  --accent:#BE185D; --accent-soft:#FDF2F8;
+  --ok:#10B981; --warn:#F59E0B; --error:#EF4444; --info:#3B82F6; --neutral:#94A3B8;
+  --code-bg:#0F172A; --code-ink:#E2E8F0;
+  --mono:"SF Mono",Menlo,Consolas,monospace; --sans:"Hiragino Sans","Noto Sans JP",sans-serif;
+  --r-sm:6px; --r-md:10px; --r-full:999px;
+  --shadow-1:0 1px 3px rgba(0,0,0,.06); --shadow-2:0 8px 30px rgba(0,0,0,.12);
+  --ease:cubic-bezier(0.16,1,0.3,1);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; scroll-padding-top:72px; }
+body { font-family:var(--sans); font-size:15px; line-height:1.8; color:var(--ink); background:var(--surface); }
+.mono { font-family:var(--mono); font-feature-settings:"tnum"; }
+.num { text-align:right; }
+.site-header { position:sticky; top:0; z-index:50; display:flex; align-items:center; gap:20px; height:56px; padding:0 24px; background:rgba(250,250,249,.85); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); }
+.site-header .back { font-size:13px; color:var(--ink-2); text-decoration:none; transition:color .15s var(--ease); }
+.site-header .back:hover { color:var(--accent); }
+.brand { font-weight:700; font-size:15px; letter-spacing:-.01em; }
+.brand span { color:var(--accent); }
+.phase-chip { padding:3px 12px; font-family:var(--mono); font-size:11px; letter-spacing:.08em; color:var(--accent); background:var(--accent-soft); border-radius:var(--r-full); }
+.header-meta { margin-left:auto; font-size:12px; color:var(--ink-2); }
+.layout { display:grid; grid-template-columns:220px minmax(0,1fr); gap:48px; max-width:1100px; margin:0 auto; padding:0 24px; }
+.nav { position:sticky; top:56px; height:calc(100vh - 56px); overflow-y:auto; padding:40px 0; }
+.nav-label { font-size:11px; font-weight:600; letter-spacing:.08em; color:var(--ink-3); text-transform:uppercase; margin-bottom:10px; }
+.nav a { display:block; padding:6px 10px; margin-left:-10px; font-size:13.5px; color:var(--ink-2); text-decoration:none; border-radius:var(--r-sm); transition:color .12s var(--ease),background .12s var(--ease); }
+.nav a:hover { color:var(--ink); background:#F5F5F4; }
+.nav a.current { color:var(--accent); background:var(--accent-soft); font-weight:600; }
+.doc { padding:40px 0 96px; min-width:0; }
+.breadcrumb { font-size:12px; color:var(--ink-3); margin-bottom:12px; }
+.breadcrumb a { color:inherit; text-decoration:none; }
+.breadcrumb a:hover { color:var(--accent); }
+h1 { font-size:28px; font-weight:700; letter-spacing:-.01em; line-height:1.3; }
+.doc-meta { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 40px; }
+.badge { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; font-size:12px; font-weight:500; border-radius:var(--r-full); border:1px solid var(--border); background:var(--raised); color:var(--ink-2); }
+.badge .dot { width:7px; height:7px; border-radius:50%; background:var(--ok); }
+.badge.ver { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); font-family:var(--mono); }
+/* status badge: ✅→ok, ◐→warn, ⬜→neutral */
+.badge.st-ok .dot { background:var(--ok); } .badge.st-ok { color:var(--ok); border-color:var(--ok); }
+.badge.st-warn .dot { background:var(--warn); } .badge.st-warn { color:#B45309; border-color:var(--warn); }
+.badge.st-neutral .dot { background:var(--neutral); } .badge.st-neutral { color:var(--ink-2); }
+section { margin-bottom:56px; scroll-margin-top:72px; overflow-x:auto; }
+h2 { font-size:20px; font-weight:600; margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+h2 a { color:var(--ink-3); text-decoration:none; opacity:0; margin-left:6px; font-weight:400; }
+h2:hover a { opacity:1; }
+h3.sub { font-size:14px; font-weight:600; color:var(--ink-2); margin:24px 0 10px; }
+p.note { font-size:13.5px; color:var(--ink-2); margin-bottom:12px; }
+ul, ol { padding-left:20px; font-size:14.5px; line-height:1.9; }
+/* tables */
+.req-table { width:100%; border-collapse:collapse; font-size:14px; min-width:620px; }
+.req-table th, .req-table td { padding:12px; text-align:left; vertical-align:top; }
+.req-table thead th { font-size:11px; font-weight:600; letter-spacing:.06em; color:var(--ink-3); text-transform:uppercase; border-bottom:1px solid var(--border); }
+.req-table tbody tr { border-bottom:1px solid var(--border); transition:background .12s; scroll-margin-top:72px; }
+.req-table tbody tr:hover { background:#F5F5F4; }
+.req-table tbody tr:target { background:var(--accent-soft); }
+.req-id { display:inline-block; font-family:var(--mono); font-weight:700; font-size:12.5px; color:var(--accent); background:var(--accent-soft); padding:2px 8px; border-radius:var(--r-sm); white-space:nowrap; }
+.ref-chip { display:inline-block; font-family:var(--mono); font-size:11.5px; padding:2px 8px; margin:2px 4px 2px 0; border:1px solid var(--border); border-radius:var(--r-full); color:var(--ink-2); text-decoration:none; transition:border-color .12s var(--ease),color .12s var(--ease); }
+.ref-chip:hover { border-color:var(--accent); color:var(--accent); }
+/* code block (dark, with copy) */
+.code-block { position:relative; margin:16px 0; }
+.code-block pre { background:var(--code-bg); color:var(--code-ink); border-radius:var(--r-md); padding:16px 18px; overflow-x:auto; font-family:var(--mono); font-size:13px; line-height:1.7; }
+.code-block .copy-btn { position:absolute; top:10px; right:10px; font-size:11px; font-family:var(--mono); color:var(--code-ink); background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:var(--r-sm); padding:3px 10px; cursor:pointer; transition:background .12s; }
+.code-block .copy-btn:hover { background:rgba(255,255,255,.18); }
+/* callout */
+.callout { margin:16px 0; padding:12px 16px; border-radius:var(--r-md); border-left:3px solid var(--info); background:var(--raised); font-size:14px; color:var(--ink-2); }
+.callout.warn { border-left-color:var(--warn); } .callout.error { border-left-color:var(--error); } .callout.ok { border-left-color:var(--ok); }
+.callout strong { color:var(--ink); }
+/* scope grid (対象/対象外) */
+.scope-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.scope { padding:16px 18px; border-radius:var(--r-md); border:1px solid var(--border); background:var(--raised); }
+.scope.in { border-left:3px solid var(--ok); } .scope.out { border-left:3px solid var(--ink-3); }
+.scope h3 { font-size:13px; color:var(--ink-2); margin-bottom:8px; }
+.scope ul { padding-left:18px; font-size:14px; line-height:1.8; }
+/* footer prev/next */
+.doc-footer { display:flex; justify-content:space-between; gap:16px; margin-top:64px; padding-top:24px; border-top:1px solid var(--border); }
+.doc-footer a { display:block; padding:14px 18px; min-width:200px; border:1px solid var(--border); border-radius:var(--r-md); text-decoration:none; color:var(--ink); font-weight:600; font-size:14px; background:var(--raised); transition:transform .18s var(--ease),box-shadow .18s var(--ease),border-color .18s var(--ease); }
+.doc-footer a:hover { transform:translateY(-2px); box-shadow:var(--shadow-2); border-color:var(--accent); }
+.doc-footer a small { display:block; font-size:11px; font-weight:500; color:var(--ink-3); letter-spacing:.06em; }
+.doc-footer .next { text-align:right; margin-left:auto; }
+@media (max-width:1100px) { .layout { grid-template-columns:190px minmax(0,1fr); gap:32px; } }
+@media (max-width:768px) {
+  .header-meta, .phase-chip { display:none; }
+  .layout { grid-template-columns:1fr; gap:0; }
+  .nav { position:static; height:auto; padding:20px 0 0; display:flex; gap:16px; overflow-x:auto; }
+  .nav-label { display:none; } .scope-grid { grid-template-columns:1fr; }
+}
+@media (prefers-reduced-motion:reduce) { * { transition:none !important; animation:none !important; } html { scroll-behavior:auto; } }
+@media (max-width:480px) { .doc-footer { flex-direction:column; } .doc-footer a { min-width:0; } .doc-footer .next { margin-left:0; } }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <a class="back" href="../00_ドキュメントマップ.html">← ドキュメントマップ</a>
+  <div class="brand">ZT-NW<span>特化</span></div>
+  <span class="phase-chip">PHASE 4 構築</span>
+  <div class="header-meta">nwzt-lan / OrbStack VM(arm64)</div>
+</header>
+<div class="layout">
+  <nav class="nav" aria-label="構築ログ 目次">
+    <div class="nav-label">目次</div>
+    <a href="#s1" class="current">1. 事前判断</a>
+    <a href="#s2">2. 詰まりどころと対処</a>
+    <a href="#s3">3. リソース共存</a>
+    <a href="#s4">4. 結果</a>
+  </nav>
+  <main class="doc">
+    <div class="breadcrumb"><a href="../00_ドキュメントマップ.html">ドキュメントマップ</a> / 構築ログ</div>
+    <h1>構築ログ 2026-07-08 — 統合ラボ実デプロイ</h1>
+    <div class="doc-meta">
+      <span class="badge">build-log</span>
+      <span class="badge st-ok"><span class="dot"></span>done</span>
+      <span class="badge">最終更新 2026-07-08</span>
+    </div>
+    <p class="note">OrbStack VM <span class="mono">clab</span>（arm64）へ統合ラボ（N1+N4 を単一 IOL clab、N2+N3 を docker 併走）を実デプロイし、B1〜B6 を検証した際の記録と詰まりどころ。</p>
+    <div class="callout">
+      分担方針の注記: 通常このワークスペースでは「構築はユーザー本人、Claude は設計書・部材担当」だが、本テーマはユーザーの明示指示により Claude が実デプロイ検証まで実施した（今回限りの上書き）。
+    </div>
+
+    <section id="s1">
+      <h2>1. 事前判断: IOL の 802.1X 受理を probe<a href="#s1">#</a></h2>
+      <ul>
+        <li>L2-advipservices-2017（N4 で L3 SVI+ACL 実績）が 802.1X も受理するかを probe/dot1x_probe.exp で確認。</li>
+        <li>結果: 全 dot1x コマンド受理、show dot1x all で PAE=AUTHENTICATOR。</li>
+      </ul>
+      <div class="callout ok"><strong>確定。</strong> 単一 IOL に 802.1X + L3 SVI + inter-VLAN ACL を集約（案B）を確定。IOL 2台構成は回避。</div>
+    </section>
+
+    <section id="s2">
+      <h2>2. 詰まりどころと対処<a href="#s2">#</a></h2>
+
+      <h3 class="sub">1. IOL のインターフェース採番（最重要）</h3>
+      <div class="callout error">
+        <p><strong>症状。</strong> 静的ポートの Vlan20/30（pc-dev/guest-pc）は疎通するのに、radius・サーバ室ブリッジ・pc-unauth が全断。pc-sales の 802.1X が EAP=FAILURE（RADIUS 到達不能）。</p>
+        <p><strong>原因。</strong> IOL はスロットあたり4ポート。/iol/NETMAP は 0/0 0/1 0/2 0/3 1/0 1/1 1/2 を持ち、Et0/4・Et0/5・Et0/6 は存在しない。clab の eth4/eth5/eth6 は Et1/0・Et1/1・Et1/2 にマップされる。初版 cfg が Et0/4/0/5/0/6 を設定していたため、radius(eth5)/bridge(eth6)/pc-unauth(eth4) が無設定のまま → Vlan100 SVI down → RADIUS 到達不能 → 認証失敗の連鎖。</p>
+        <p><strong>対処。</strong> core_sw_merged.cfg の当該インターフェースを Et1/0・Et1/1・Et1/2 に修正。nwzt.clab.yml にも採番の注記を追記。修正後 RADIUS 到達回復 → 802.1X 認証成功。</p>
+      </div>
+      <div class="code-block">
+        <button class="copy-btn">copy</button>
+        <pre>docker exec &lt;node&gt; cat /iol/NETMAP</pre>
+      </div>
+      <p class="note">教訓: clab cisco_iol で eth4 以降を使う場合、IOL 側は Et1/0 から始まる。cfg のインターフェース名は上記コマンドで確認するのが確実。</p>
+
+      <h3 class="sub">2. iouyap 未起動でデータプレーン全断</h3>
+      <div class="callout warn">
+        <p><strong>症状／原因。</strong> 既知（テーマ22/26/31/microseg 共通）の問題。iouyap が起動していないとデータプレーンが全断する。</p>
+        <p><strong>対処。</strong> deploy-all.sh の start_iouyap() が下記コマンドを deploy 直後に実行して回避。</p>
+      </div>
+      <div class="code-block">
+        <button class="copy-btn">copy</button>
+        <pre>docker exec -d -w /iol clab-nwzt-lan-core-sw /usr/bin/iouyap 513</pre>
+      </div>
+
+      <h3 class="sub">3. docker attach（コンソール）の競合</h3>
+      <div class="callout warn">
+        <p><strong>症状。</strong> expect の docker attach が多重・残留するとコンソールが詰まり、以後の投入が無反応化する。</p>
+        <p><strong>注意。</strong> <span class="mono">pkill -f "docker attach"</span> は自分の親シェル（コマンド行に "docker attach" を含む）まで kill してしまう。下記のように comm=docker に限定して kill する。</p>
+      </div>
+      <div class="code-block">
+        <button class="copy-btn">copy</button>
+        <pre>ps -eo pid,comm,args | awk '$2=="docker" &amp;&amp; /attach/'</pre>
+      </div>
+
+      <h3 class="sub">4. ZTNA ダークサービス性の担保</h3>
+      <div class="callout ok">
+        <p><strong>症状。</strong> overlay 経由（HTTP 200）は成立するが、clienttun からの直接アクセスも 200 になり「ダーク」でない。</p>
+        <p><strong>原因。</strong> サーバ室ブリッジ nwzt-srv0 を docker network で作ると ホスト GW（172.31.50.254）が付き、docker ホストが zn-ziti→VLAN50 を L3 転送してしまう。</p>
+        <p><strong>対処。</strong> apptun を docker network connect した後、下記コマンドでホスト GW を除去。apptun は同一ブリッジ L2 で srv-app1 到達を維持、リモート client の直接経路のみ遮断。→ 直接 = HTTP 000（unreachable）、overlay = 200 を両立。deploy-all.sh ziti に恒久化。</p>
+      </div>
+      <div class="code-block">
+        <button class="copy-btn">copy</button>
+        <pre>ip addr del 172.31.50.254/24 dev nwzt-srv0</pre>
+      </div>
+    </section>
+
+    <section id="s3">
+      <h2>3. リソース共存<a href="#s3">#</a></h2>
+      <p class="note">検証時は theme27（clab-qos-acl-policy-lab-*、IOL 7台）が稼働中だったが、本ラボは IOL 1台に集約したため共存できた（メモリ 15Gi、IOL コールドスタートは競合で延伸するが完走）。lab名 nwzt-lan・mgmt 172.20.40.0/24・bridge nwzt-srv0/zn-ziti で既存テーマと分離。</p>
+    </section>
+
+    <section id="s4">
+      <h2>4. 結果<a href="#s4">#</a></h2>
+      <div class="callout ok">
+        <strong>B1〜B6 合格</strong>（B2b 未認証→VLAN99 自動割当のみ ◐ 残課題）。詳細は <a class="ref-chip" href="../05_試験/08_試験結果報告書.html">08_試験結果報告書</a> を参照。
+      </div>
+    </section>
+
+    <div class="doc-footer">
+      <a class="prev" href="../05_試験/08_試験結果報告書.html"><small>← 前工程</small>試験結果報告書</a>
+      <a class="next" href="../05_試験/10_切り分けシート.html"><small>次工程 →</small>切り分けシート</a>
+    </div>
+  </main>
+</div>
+<script>
+"use strict";
+document.querySelectorAll('.code-block').forEach(b=>{const btn=b.querySelector('.copy-btn');if(!btn)return;btn.addEventListener('click',()=>{const t=b.querySelector('pre').innerText;navigator.clipboard&&navigator.clipboard.writeText(t);btn.textContent='copied';setTimeout(()=>btn.textContent='copy',1200);});});
+const navLinks = [...document.querySelectorAll(".nav a")];
+const sections = [...document.querySelectorAll("main section")];
+const spy = new IntersectionObserver((entries) => {
+  entries.forEach((entry) => {
+    if (!entry.isIntersecting) return;
+    navLinks.forEach((a) => a.classList.toggle("current", a.getAttribute("href") === `#${entry.target.id}`));
+  });
+}, { rootMargin: "-20% 0px -70% 0px" });
+sections.forEach((s) => spy.observe(s));
+</script>
+</body>
+</html>

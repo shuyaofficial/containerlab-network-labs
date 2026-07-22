@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ドキュメントマップ | ZT-NW特化</title>
+<style>
+  :root {
+    --surface: #FAFAF9;
+    --raised: #FFFFFF;
+    --ink: #1C1917;
+    --ink-2: #57534E;
+    --ink-3: #A8A29E;
+    --border: #E7E5E4;
+    --accent: #BE185D;
+    --accent-soft: #FDF2F8;
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    --neutral: #94A3B8;
+    --code-bg: #0F172A;
+    --code-ink: #E2E8F0;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Hiragino Sans", "Noto Sans JP", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06);
+    --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--sans); font-size: 15px; line-height: 1.8;
+    color: var(--ink); background: var(--surface);
+  }
+  .mono { font-family: var(--mono); font-feature-settings: "tnum"; }
+
+  /* ===== Header ===== */
+  .site-header {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 20px;
+    height: 56px; padding: 0 24px;
+    background: rgba(250,250,249,.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .site-header .back { font-size: 13px; color: var(--ink-2); text-decoration: none; transition: color .15s var(--ease); }
+  .site-header .back:hover { color: var(--accent); }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .brand span { color: var(--accent); }
+  .phase-chip {
+    padding: 3px 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+    color: var(--accent); background: var(--accent-soft); border-radius: var(--r-full);
+  }
+  .header-meta { margin-left: auto; font-size: 12px; color: var(--ink-2); }
+
+  /* ===== Layout ===== */
+  .hub { max-width: 1180px; margin: 0 auto; padding: 48px 24px 96px; }
+
+  /* ---- Hero ---- */
+  .hero h1 { font-size: 32px; font-weight: 700; letter-spacing: -.01em; line-height: 1.3; max-width: 24ch; }
+  .doc-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 20px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; font-size: 12px; font-weight: 500;
+    border-radius: var(--r-full); border: 1px solid var(--border);
+    background: var(--raised); color: var(--ink-2);
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .badge .dot.accent { background: var(--accent); }
+  .badge.ver { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); font-family: var(--mono); }
+  .hero .lead { max-width: 74ch; font-size: 15px; color: var(--ink-2); }
+
+  /* ---- Phase progress ---- */
+  .phase-progress { margin-top: 64px; }
+  .ph-head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 4px; }
+  .ph-head h2 { font-size: 20px; font-weight: 600; }
+  .ph-head .asof { font-size: 12px; color: var(--ink-3); font-family: var(--mono); }
+  .ph-legend { display: flex; gap: 16px; margin: 6px 0 24px; font-size: 12px; color: var(--ink-2); }
+  .ph-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .lg-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .lg-dot.ok { background: var(--ok); }
+  .lg-dot.active { background: var(--accent); }
+  .lg-dot.todo { background: var(--border); border: 1px solid var(--ink-3); }
+
+  .phase-wrap { position: relative; padding-top: 22px; }
+  .phase-steps { display: flex; gap: 14px; }
+  .phase-step { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .ps-head { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+  .ps-icon { font-size: 10px; }
+  .phase-step.done .ps-icon { color: var(--ok); }
+  .phase-step.active .ps-icon { color: var(--accent); }
+  .phase-step.todo .ps-icon { color: var(--ink-3); }
+  .ps-date { font-size: 11px; color: var(--ink-3); }
+  .ps-track { height: 6px; border-radius: 4px; background: var(--border); overflow: hidden; }
+  .ps-fill { height: 100%; border-radius: 4px; background: var(--ok); transition: width .3s var(--ease); }
+  .phase-step.active .ps-fill { background: var(--accent); }
+  .phase-step.todo .ps-fill { width: 0 !important; }
+
+  .cross-phase { margin-top: 28px; padding-top: 18px; border-top: 1px dashed var(--border); }
+  .cross-label { font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin-bottom: 8px; }
+  .cross-track { height: 6px; border-radius: 4px; background: var(--border); }
+  .cross-fill { height: 100%; border-radius: 4px; background: var(--accent); opacity: .55; }
+
+  /* ---- Document groups ---- */
+  .doc-groups { margin-top: 64px; }
+  .group { margin-bottom: 40px; }
+  .group-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  .group-head h3 { font-size: 16px; font-weight: 700; }
+  .group-date { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .group-status { margin-left: auto; font-size: 11.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+  .group-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; }
+  .group-status.done { color: var(--ok); } .group-status.done::before { background: var(--ok); }
+  .group-status.active { color: var(--accent); } .group-status.active::before { background: var(--accent); }
+  .group-status.todo { color: var(--ink-3); } .group-status.todo::before { background: var(--border); border: 1px solid var(--ink-3); }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .doc-card {
+    display: block; padding: 20px; min-width: 0;
+    background: var(--raised); border: 1px solid var(--border); border-radius: var(--r-md);
+    box-shadow: var(--shadow-1); text-decoration: none; color: inherit;
+    transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s var(--ease);
+  }
+  .doc-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--accent); }
+  .card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .card-ver { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .doc-card h4 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .doc-card p { font-size: 13px; color: var(--ink-2); line-height: 1.6; }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 1100px) {
+    .hub { padding: 40px 20px 80px; }
+    .phase-steps { gap: 10px; }
+  }
+  @media (max-width: 768px) {
+    .header-meta, .phase-chip { display: none; }
+    .hero h1 { font-size: 26px; }
+    .phase-steps { flex-direction: column; gap: 18px; }
+    .ph-legend { flex-wrap: wrap; }
+    .group-status { margin-left: 0; }
+    .cards { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand">ZT-NW<span>特化</span></div>
+  <span class="phase-chip">DOCUMENT MAP</span>
+  <div class="header-meta">nwzt-lan / OrbStack VM(arm64)</div>
+</header>
+
+<main class="hub">
+
+  <section class="hero" aria-label="ラボ概要">
+    <h1>設計から実機検証まで、迷わない。</h1>
+    <div class="doc-meta">
+      <span class="badge ver">nwzt-lan</span>
+      <span class="badge"><span class="dot accent"></span>実機検証 B1〜B6 完了（残課題1件 ◐）</span>
+      <span class="badge">現在日 2026-07-08</span>
+      <span class="badge">実行基盤 OrbStack VM(arm64) / containerlab + docker併走</span>
+    </div>
+    <p class="lead">「ゼロトラスト_ネットワーク特化」は、<b>ゼロトラスト完全版</b>が設計した仮想企業（1拠点・従業員約100名）の全社アーキテクチャのうち、ネットワーク層 N1〜N4（NAC・ZTNA・NDR・μセグ）だけを単一の実在する社内LAN <span class="mono">nwzt-lan</span> に統合し、実デプロイまで行った実装テーマである。完全版が「◐ 設計のみ（接続は未接続）」としていた統合ポイント（I-2 認証→セグメント／I-3 常時監視／I-5 サーバ非公開化）とE2Eフロー（F-A/F-C/F-D/F-E）を、2026-07-08にB1〜B6ゲートで実機検証した。唯一 B2b（未認証端末のVLAN99自動割当）のみ残課題として ◐ のまま。L7層（Keycloak/IAP/SIEM/mTLS等 P0-P6）は本テーマのスコープ外とし、完全版の設計のままとする。</p>
+  </section>
+
+  <section class="phase-progress" aria-label="フェーズ進行状況">
+    <div class="ph-head">
+      <h2>ラボ構築進行状況</h2>
+      <span class="asof">現在日 2026-07-08 時点（単一セッションで全フェーズ完了）</span>
+    </div>
+    <div class="ph-legend">
+      <span><i class="lg-dot ok"></i>完了</span>
+      <span><i class="lg-dot active"></i>進行中</span>
+      <span><i class="lg-dot todo"></i>未着手</span>
+    </div>
+    <div class="phase-wrap">
+      <div class="phase-steps">
+        <div class="phase-step done">
+          <div class="ps-head"><span class="ps-icon">●</span>要件定義</div>
+          <div class="ps-date mono">2026-07-08</div>
+          <div class="ps-track"><div class="ps-fill" style="width:100%"></div></div>
+        </div>
+        <div class="phase-step done">
+          <div class="ps-head"><span class="ps-icon">●</span>基本設計</div>
+          <div class="ps-date mono">2026-07-08</div>
+          <div class="ps-track"><div class="ps-fill" style="width:100%"></div></div>
+        </div>
+        <div class="phase-step done">
+          <div class="ps-head"><span class="ps-icon">●</span>詳細設計</div>
+          <div class="ps-date mono">2026-07-08</div>
+          <div class="ps-track"><div class="ps-fill" style="width:100%"></div></div>
+        </div>
+        <div class="phase-step done">
+          <div class="ps-head"><span class="ps-icon">●</span>構築</div>
+          <div class="ps-date mono">2026-07-08</div>
+          <div class="ps-track"><div class="ps-fill" style="width:100%"></div></div>
+        </div>
+        <div class="phase-step done">
+          <div class="ps-head"><span class="ps-icon">●</span>試験</div>
+          <div class="ps-date mono">2026-07-08</div>
+          <div class="ps-track"><div class="ps-fill" style="width:100%"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="cross-phase">
+      <div class="cross-label">横断（構築ログ・切り分けシート／継続利用）</div>
+      <div class="cross-track"><div class="cross-fill" style="width:100%"></div></div>
+    </div>
+  </section>
+
+  <section class="doc-groups" aria-label="ドキュメント一覧">
+
+    <div class="group">
+      <div class="group-head"><h3>環境準備</h3><span class="group-date mono">00_ログイン</span><span class="group-status done">完了</span></div>
+      <div class="cards">
+        <a class="doc-card" href="00_ログイン/11_ログインコマンド.html">
+          <div class="card-top"><span class="badge"><span class="dot" style="background:var(--warn)"></span>draft</span><span class="card-ver">—</span></div>
+          <h4>ログインコマンド</h4>
+          <p>VM接続（ssh clab@orb）・ノード別ログイン・deploy-all.shサブコマンド一覧</p>
+        </a>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head"><h3>要件定義</h3><span class="group-date mono">01_要件定義</span><span class="group-status done">完了</span></div>
+      <div class="cards">
+        <a class="doc-card" href="01_要件定義/01_要件定義書.html">
+          <div class="card-top"><span class="badge"><span class="dot" style="background:var(--warn)"></span>draft</span><span class="card-ver">v1.0</span></div>
+          <h4>要件定義書</h4>
+          <p>背景・対象範囲・機能/非機能要件・ゾーン設計方針・制約・受け入れ基準を定義</p>
+        </a>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head"><h3>基本設計</h3><span class="group-date mono">02_基本設計</span><span class="group-status done">完了</span></div>
+      <div class="cards">
+        <a class="doc-card" href="02_基本設計/02_基本設計書.html">
+          <div class="card-top"><span class="badge"><span class="dot" style="background:var(--warn)"></span>draft</span><span class="card-ver">v1.0</span></div>
+          <h4>基本設計書</h4>
+          <p>完全版統合ポイントの実装対応・全体構成・アドレス設計方針・設計判断（D-1〜D-5）</p>
+        </a>
+        <a class="doc-card" href="02_基本設計/03_IPアドレス管理表.html">
+          <div class="card-top"><span class="badge"><span class="dot" style="background:var(--warn)"></span>draft</span><span class="card-ver">v1.0</span></div>
+          <h4>IPアドレス管理表</h4>
+          <p>172.31.0.0/16セグメント表・clab/docker併走ノードのIP対応</p>
+        </a>
+        <a class="doc-card" href="02_基本設計/04_物理・論理構成図.html">
+          <div class="card-top"><span class="badge"><span class="dot" style="background:var(--warn)"></span>draft</span><span class="card-ver">v1.0</span></div>
+          <h4>物理・論理構成図</h4>
+          <p>core-sw中心の物理結線とVLAN論理構成のトポロジ図</p>
+        </a>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head"><h3>詳細設計</h3><span class="group-date mono">03_詳細設計</span><span class="group-status done">完了</span></div>
+      <div class="cards">
+        <a class="doc-card" href="03_詳細設計/05_パラメータシート.html">
+          <div class="card-top"><span class="badge"><span class="dot" style="background:var(--warn)"></span>draft</span><span class="card-ver">v1.0</span></div>
+          <h4>パラメータシート</h4>
+          <p>core-sw設定値の設計値整理（AAA/802.1X/ACL/SVI）</p>
+        </a>
+        <a class="doc-card" href="03_詳細設計/06_CLI投入コマンド.html">
+          <div class="card-top"><span class="badge"><span class="dot" style="background:var(--warn)"></span>draft</span><span class="card-ver">v1.0</span></div>
+          <h4>CLI投入コマンド</h4>
+          <p>core_sw_merged.cfgと一致する投入コマンド列（Phase別）</p>
+        </a>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head"><h3>試験</h3><span class="group-date mono">05_試験</span><span class="group-status done">完了（残課題1件）</span></div>
+      <div class="cards">
+        <a class="doc-card" href="05_試験/07_試験計画書.html">
+          <div class="card-top"><span class="badge"><span class="dot" style="background:var(--warn)"></span>draft</span><span class="card-ver">v1.0</span></div>
+          <h4>試験計画書</h4>
+          <p>B1〜B6ゲートの手順・期待結果の定義</p>
+        </a>
+        <a class="doc-card" href="05_試験/08_試験結果報告書.html">
+          <div class="card-top"><span class="badge"><span class="dot"></span>done ✅</span><span class="card-ver">2026-07-08</span></div>
+          <h4>試験結果報告書</h4>
+          <p>2026-07-08実機検証の判定結果とエビデンス（B1〜B6、B2bのみ◐）</p>
+        </a>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-head"><h3>横断（構築ログ・切り分け）</h3><span class="group-date mono">04_構築 / 05_試験</span><span class="group-status active">継続利用</span></div>
+      <div class="cards">
+        <a class="doc-card" href="04_構築/09_構築ログ.html">
+          <div class="card-top"><span class="badge"><span class="dot"></span>done ✅</span><span class="card-ver">2026-07-08</span></div>
+          <h4>構築ログ</h4>
+          <p>実デプロイ時の詰まりどころと対処の記録（2026-07-08）</p>
+        </a>
+        <a class="doc-card" href="05_試験/10_切り分けシート.html">
+          <div class="card-top"><span class="badge"><span class="dot" style="background:var(--neutral)"></span>テンプレ</span><span class="card-ver">原本</span></div>
+          <h4>切り分けシート</h4>
+          <p>障害発生時に複製して使う切り分け手順の原本テンプレート</p>
+        </a>
+      </div>
+    </div>
+
+  </section>
+
+</main>
+
+</body>
+</html>

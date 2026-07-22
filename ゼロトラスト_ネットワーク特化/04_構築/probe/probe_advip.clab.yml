@@ -1,0 +1,7 @@
+name: nwzt-probe
+topology:
+  nodes:
+    sw1:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      type: l2

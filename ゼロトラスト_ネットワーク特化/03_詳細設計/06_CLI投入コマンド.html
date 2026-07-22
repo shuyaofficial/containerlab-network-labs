@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CLI投入コマンド | ゼロトラスト_ネットワーク特化</title>
+<meta name="description" content="ゼロトラスト_ネットワーク特化ラボの core-sw 投入コマンド（core_sw_merged.cfg と一致）と deploy-all.sh オーケストレーション順。外部依存ゼロ・コピー可能なコードブロック。">
+<style>
+  :root {
+    --surface:#FAFAF9; --raised:#FFFFFF; --ink:#1C1917; --ink-2:#57534E; --ink-3:#A8A29E; --border:#E7E5E4;
+    --accent:#BE185D; --accent-soft:#FDF2F8;
+    --ok:#10B981; --warn:#F59E0B; --error:#EF4444; --info:#3B82F6; --neutral:#94A3B8;
+    --code-bg:#0F172A; --code-ink:#E2E8F0;
+    --mono:"SF Mono",Menlo,Consolas,monospace; --sans:"Hiragino Sans","Noto Sans JP",sans-serif;
+    --r-sm:6px; --r-md:10px; --r-full:999px;
+    --shadow-1:0 1px 3px rgba(0,0,0,.06); --shadow-2:0 8px 30px rgba(0,0,0,.12);
+    --ease:cubic-bezier(0.16,1,0.3,1);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; scroll-padding-top:72px; }
+  body { font-family:var(--sans); font-size:15px; line-height:1.8; color:var(--ink); background:var(--surface); }
+  .mono { font-family:var(--mono); font-feature-settings:"tnum"; }
+  .site-header { position:sticky; top:0; z-index:50; display:flex; align-items:center; gap:20px; height:56px; padding:0 24px; background:rgba(250,250,249,.85); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); }
+  .site-header .back { font-size:13px; color:var(--ink-2); text-decoration:none; transition:color .15s var(--ease); }
+  .site-header .back:hover { color:var(--accent); }
+  .brand { font-weight:700; font-size:15px; letter-spacing:-.01em; }
+  .brand span { color:var(--accent); }
+  .phase-chip { padding:3px 12px; font-family:var(--mono); font-size:11px; letter-spacing:.08em; color:var(--accent); background:var(--accent-soft); border-radius:var(--r-full); }
+  .header-meta { margin-left:auto; font-size:12px; color:var(--ink-2); }
+  .layout { display:grid; grid-template-columns:220px minmax(0,1fr); gap:48px; max-width:1100px; margin:0 auto; padding:0 24px; }
+  .nav { position:sticky; top:56px; height:calc(100vh - 56px); overflow-y:auto; padding:40px 0; }
+  .nav-label { font-size:11px; font-weight:600; letter-spacing:.08em; color:var(--ink-3); text-transform:uppercase; margin-bottom:10px; }
+  .nav a { display:block; padding:6px 10px; margin-left:-10px; font-size:13.5px; color:var(--ink-2); text-decoration:none; border-radius:var(--r-sm); transition:color .12s var(--ease),background .12s var(--ease); }
+  .nav a:hover { color:var(--ink); background:#F5F5F4; }
+  .nav a.current { color:var(--accent); background:var(--accent-soft); font-weight:600; }
+  .doc { padding:40px 0 96px; min-width:0; }
+  .breadcrumb { font-size:12px; color:var(--ink-3); margin-bottom:12px; }
+  .breadcrumb a { color:inherit; text-decoration:none; }
+  .breadcrumb a:hover { color:var(--accent); }
+  h1 { font-size:28px; font-weight:700; letter-spacing:-.01em; line-height:1.3; }
+  .doc-meta { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 40px; }
+  .badge { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; font-size:12px; font-weight:500; border-radius:var(--r-full); border:1px solid var(--border); background:var(--raised); color:var(--ink-2); }
+  .badge .dot { width:7px; height:7px; border-radius:50%; background:var(--ok); }
+  .badge.ver { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); font-family:var(--mono); }
+  .badge.st-ok .dot { background:var(--ok); } .badge.st-ok { color:var(--ok); border-color:var(--ok); }
+  .badge.st-warn .dot { background:var(--warn); } .badge.st-warn { color:#B45309; border-color:var(--warn); }
+  section { margin-bottom:56px; scroll-margin-top:72px; }
+  h2 { font-size:20px; font-weight:600; margin-bottom:8px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+  h2 a { color:var(--ink-3); text-decoration:none; opacity:0; margin-left:6px; font-weight:400; }
+  h2:hover a { opacity:1; }
+  h3.sub { font-size:14px; font-weight:600; color:var(--ink-2); margin:22px 0 8px; }
+  p.note { font-size:13.5px; color:var(--ink-2); margin-bottom:12px; }
+  ul { padding-left:20px; font-size:14px; line-height:1.9; color:var(--ink-2); }
+  ul code, p code { font-family:var(--mono); font-size:12.5px; color:var(--accent); background:var(--accent-soft); padding:1px 6px; border-radius:5px; }
+  .code-block { position:relative; margin:14px 0; }
+  .code-block pre { background:var(--code-bg); color:var(--code-ink); border-radius:var(--r-md); padding:16px 18px; overflow-x:auto; font-family:var(--mono); font-size:13px; line-height:1.7; }
+  .code-block .copy-btn { position:absolute; top:10px; right:10px; font-size:11px; font-family:var(--mono); color:var(--code-ink); background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:var(--r-sm); padding:3px 10px; cursor:pointer; transition:background .12s; }
+  .code-block .copy-btn:hover { background:rgba(255,255,255,.18); }
+  .callout { margin:16px 0; padding:12px 16px; border-radius:var(--r-md); border-left:3px solid var(--info); background:var(--raised); font-size:14px; color:var(--ink-2); }
+  .callout.warn { border-left-color:var(--warn); }
+  .callout strong { color:var(--ink); }
+  .doc-footer { display:flex; justify-content:space-between; gap:16px; margin-top:64px; padding-top:24px; border-top:1px solid var(--border); }
+  .doc-footer a { display:block; padding:14px 18px; min-width:200px; border:1px solid var(--border); border-radius:var(--r-md); text-decoration:none; color:var(--ink); font-weight:600; font-size:14px; background:var(--raised); transition:transform .18s var(--ease),box-shadow .18s var(--ease),border-color .18s var(--ease); }
+  .doc-footer a:hover { transform:translateY(-2px); box-shadow:var(--shadow-2); border-color:var(--accent); }
+  .doc-footer a small { display:block; font-size:11px; font-weight:500; color:var(--ink-3); letter-spacing:.06em; }
+  .doc-footer .next { text-align:right; margin-left:auto; }
+  @media (max-width:1100px) { .layout { grid-template-columns:190px minmax(0,1fr); gap:32px; } }
+  @media (max-width:768px) {
+    .header-meta, .phase-chip { display:none; }
+    .layout { grid-template-columns:1fr; gap:0; }
+    .nav { position:static; height:auto; padding:20px 0 0; display:flex; gap:16px; overflow-x:auto; }
+    .nav-label { display:none; }
+  }
+  @media (prefers-reduced-motion:reduce) { * { transition:none !important; animation:none !important; } html { scroll-behavior:auto; } }
+  @media (max-width:480px) { .doc-footer { flex-direction:column; } .doc-footer a { min-width:0; } .doc-footer .next { margin-left:0; } }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <a class="back" href="../00_ドキュメントマップ.html">← ドキュメントマップ</a>
+  <div class="brand">ZT-NW<span>特化</span></div>
+  <span class="phase-chip">PHASE 3 詳細設計</span>
+  <div class="header-meta">nwzt-lan / OrbStack VM(arm64)</div>
+</header>
+<div class="layout">
+  <nav class="nav" aria-label="目次">
+    <div class="nav-label">目次</div>
+    <a href="#s1" class="current">1. AAA / RADIUS 基盤</a>
+    <a href="#s2">2. VLAN定義</a>
+    <a href="#s3">3. SVI と ACL適用</a>
+    <a href="#s4">4. インターフェース</a>
+    <a href="#s5">5. inter-VLAN ACL</a>
+    <a href="#s6">6. 投入後の確認</a>
+    <a href="#s7">7. deploy-all.sh</a>
+    <a href="#s8">8. つまずいた点</a>
+  </nav>
+  <main class="doc">
+    <div class="breadcrumb"><a href="../00_ドキュメントマップ.html">ドキュメントマップ</a> / CLI投入コマンド</div>
+    <h1>CLI投入コマンド</h1>
+    <div class="doc-meta">
+      <span class="badge ver">v1.0</span>
+      <span class="badge st-ok"><span class="dot"></span>✅ 実機投入済</span>
+      <span class="badge">最終更新 2026-07-08</span>
+      <span class="badge">原本: core_sw_merged.cfg</span>
+    </div>
+
+    <div class="callout">
+      <strong>投入方式：</strong>core-sw への投入は <code>run_nwzt.exp</code> が <code>core_sw_merged.cfg</code> を 1行ずつ流し込みます（<code>docker attach</code> の多重起動は禁止のため 1 attach 直列で完結）。以下の Phase 分けは投入順の意図を示すもので、実際は expect が一括で行います。<strong>本ページのコマンドは実ファイルと一致します。</strong>
+    </div>
+
+    <section id="s1">
+      <h2>Phase 1. AAA / RADIUS 基盤<a href="#s1">#</a></h2>
+      <h3 class="sub">core-sw</h3>
+      <div class="code-block">
+        <button class="copy-btn" aria-label="コピー">copy</button>
+        <pre>aaa new-model
+aaa authentication dot1x default group radius
+aaa authorization network default group radius
+dot1x system-auth-control
+ip routing
+radius server RAD
+ address ipv4 172.31.0.10 auth-port 1812 acct-port 1813
+ key [共有鍵]
+ exit</pre>
+      </div>
+    </section>
+
+    <section id="s2">
+      <h2>Phase 2. VLAN定義<a href="#s2">#</a></h2>
+      <h3 class="sub">core-sw</h3>
+      <div class="code-block">
+        <button class="copy-btn" aria-label="コピー">copy</button>
+        <pre>vlan 10
+ name SALES
+ exit
+vlan 20
+ name DEV
+ exit
+vlan 30
+ name GUEST
+ exit
+vlan 50
+ name SERVER
+ exit
+vlan 99
+ name QUARANTINE
+ exit
+vlan 100
+ name MGMT
+ exit</pre>
+      </div>
+    </section>
+
+    <section id="s3">
+      <h2>Phase 3. SVI（L3）と ACL適用<a href="#s3">#</a></h2>
+      <h3 class="sub">core-sw</h3>
+      <div class="code-block">
+        <button class="copy-btn" aria-label="コピー">copy</button>
+        <pre>interface Vlan10
+ ip address 172.31.10.1 255.255.255.0
+ ip access-group SEG10-OUT in
+ no shutdown
+ exit
+interface Vlan20
+ ip address 172.31.20.1 255.255.255.0
+ no shutdown
+ exit
+interface Vlan30
+ ip address 172.31.30.1 255.255.255.0
+ no shutdown
+ exit
+interface Vlan50
+ ip address 172.31.50.1 255.255.255.0
+ no shutdown
+ exit
+interface Vlan99
+ ip address 172.31.99.1 255.255.255.0
+ no shutdown
+ exit
+interface Vlan100
+ ip address 172.31.0.1 255.255.255.0
+ no shutdown
+ exit
+ip radius source-interface Vlan100</pre>
+      </div>
+    </section>
+
+    <section id="s4">
+      <h2>Phase 4. インターフェース（802.1X / アクセスVLAN）<a href="#s4">#</a></h2>
+      <p class="note">IOL は 1スロット 4ポート。clab の <code>eth4/5/6</code> は <code>Et1/0 / Et1/1 / Et1/2</code> にマップされる（初版で <code>Et0/4-0/6</code> を設定して全断した経緯は Phase 8 参照）。</p>
+      <h3 class="sub">core-sw</h3>
+      <div class="code-block">
+        <button class="copy-btn" aria-label="コピー">copy</button>
+        <pre>interface Ethernet0/1
+ switchport mode access
+ authentication port-control auto
+ authentication event no-response action authorize vlan 99
+ dot1x pae authenticator
+ dot1x timeout tx-period 10
+ dot1x max-reauth-req 2
+ spanning-tree portfast
+ exit
+interface Ethernet0/2
+ switchport mode access
+ switchport access vlan 20
+ spanning-tree portfast
+ exit
+interface Ethernet0/3
+ switchport mode access
+ switchport access vlan 30
+ spanning-tree portfast
+ exit
+interface Ethernet1/0
+ switchport mode access
+ authentication port-control auto
+ authentication event no-response action authorize vlan 99
+ dot1x pae authenticator
+ dot1x timeout tx-period 10
+ dot1x max-reauth-req 2
+ spanning-tree portfast
+ exit
+interface Ethernet1/1
+ switchport mode access
+ switchport access vlan 100
+ exit
+interface Ethernet1/2
+ switchport mode access
+ switchport access vlan 50
+ exit</pre>
+      </div>
+    </section>
+
+    <section id="s5">
+      <h2>Phase 5. inter-VLAN ACL（N4層1）<a href="#s5">#</a></h2>
+      <h3 class="sub">core-sw</h3>
+      <div class="code-block">
+        <button class="copy-btn" aria-label="コピー">copy</button>
+        <pre>ip access-list extended SEG10-OUT
+ permit tcp 172.31.10.0 0.0.0.255 host 172.31.50.11 eq 80
+ permit icmp 172.31.10.0 0.0.0.255 172.31.50.0 0.0.0.255
+ deny tcp 172.31.10.0 0.0.0.255 host 172.31.50.11 eq 22
+ permit ip any any
+ exit</pre>
+      </div>
+    </section>
+
+    <section id="s6">
+      <h2>Phase 6. 投入後の確認<a href="#s6">#</a></h2>
+      <p class="note"><code>run_nwzt.exp</code> が自動実行する。</p>
+      <div class="code-block">
+        <button class="copy-btn" aria-label="コピー">copy</button>
+        <pre>write memory
+show authentication sessions
+show ip interface brief | include Vlan</pre>
+      </div>
+      <p class="note">検証専用（設定投入なし）は <code>verify_nwzt.exp</code> が以下を追加で採取する。</p>
+      <div class="code-block">
+        <button class="copy-btn" aria-label="コピー">copy</button>
+        <pre>show dot1x all summary
+show ip access-lists SEG10-OUT
+show vlan brief</pre>
+      </div>
+    </section>
+
+    <section id="s7">
+      <h2>Phase 7. 運用オーケストレーション（deploy-all.sh）<a href="#s7">#</a></h2>
+      <p class="note">core-sw 以外（N2/N3/N4層2・端末サービス）の投入は <code>deploy-all.sh</code> が担う。実行順は以下の通り。</p>
+      <div class="code-block">
+        <button class="copy-btn" aria-label="コピー">copy</button>
+        <pre>./deploy-all.sh deploy   # prep_net(nwzt-srv0作成) → clab deploy → iouyap → データプレーン補正
+./deploy-all.sh config   # run_nwzt.exp で core_sw_merged.cfg を投入（Phase 1-6）
+./deploy-all.sh auth     # pc-sales サプリカント起動 + データIP付与 + srv-app1/host-infected サービス起動
+./deploy-all.sh ziti     # N2: ziti/apptun/clienttun 起動 + setup_ziti.sh
+./deploy-all.sh ndr      # N3: suricata + loki + promtail + grafana 起動
+./deploy-all.sh nft      # N4層2: srv-app1 に host-infected 拒否ルールを投入
+./deploy-all.sh scan     # host-infected → srv-app1 へ SYN スキャン（N3トリガ）
+./deploy-all.sh eve      # eve.json の alert/flow 抜粋
+./deploy-all.sh verify   # B2/B3 の到達性確認</pre>
+      </div>
+    </section>
+
+    <section id="s8">
+      <h2>Phase 8. メモ・つまずいた点<a href="#s8">#</a></h2>
+      <ul>
+        <li>iouyap 未起動だと IOL は全断になる。<code>deploy-all.sh deploy</code> が自動起動するが、失敗時は <code>./deploy-all.sh iouyap</code> で個別再実行する。</li>
+        <li><code>docker attach</code> の多重起動は NG。<code>config_switch()</code> は投入前後で <code>pkill -f 'docker attach'</code> している。</li>
+        <li>サーバ室ブリッジ <code>nwzt-srv0</code> は <code>containerlab deploy</code> より前に存在している必要がある（<code>kind:bridge</code> が既存ブリッジを要求するため）。</li>
+      </ul>
+      <div class="callout warn"><strong>◐ 最重要の教訓：</strong>IOL はスロットあたり 4ポート（<code>/iol/NETMAP</code> に <code>0/0 0/1 0/2 0/3 1/0 1/1 1/2</code>）。<code>Et0/4-0/6</code> は存在せず、clab の <code>eth4/5/6</code> は <code>Et1/0 / Et1/1 / Et1/2</code> にマップされる。初版が <code>Et0/4-0/6</code> を設定したため radius / bridge / pc-unauth が無設定 → Vlan100 SVI down → RADIUS 到達不能 → 認証失敗の連鎖が起きた。</div>
+    </section>
+
+    <div class="doc-footer">
+      <a class="prev" href="05_パラメータシート.html"><small>← 前工程</small>パラメータシート</a>
+      <a class="next" href="../05_試験/07_試験計画書.html"><small>次工程 →</small>試験計画書</a>
+    </div>
+  </main>
+</div>
+<script>
+  "use strict";
+  const navLinks = [...document.querySelectorAll(".nav a")];
+  const sections = [...document.querySelectorAll("main section")];
+  const spy = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      navLinks.forEach((a) => a.classList.toggle("current", a.getAttribute("href") === `#${entry.target.id}`));
+    });
+  }, { rootMargin: "-20% 0px -70% 0px" });
+  sections.forEach((s) => spy.observe(s));
+  document.querySelectorAll(".code-block").forEach((b) => {
+    const btn = b.querySelector(".copy-btn");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      const t = b.querySelector("pre").innerText;
+      if (navigator.clipboard) navigator.clipboard.writeText(t);
+      btn.textContent = "copied";
+      setTimeout(() => (btn.textContent = "copy"), 1200);
+    });
+  });
+</script>
+</body>
+</html>

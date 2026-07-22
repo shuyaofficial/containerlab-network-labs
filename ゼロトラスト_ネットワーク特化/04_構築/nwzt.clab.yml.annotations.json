@@ -1,0 +1,76 @@
+{
+  "freeTextAnnotations": [],
+  "freeShapeAnnotations": [],
+  "trafficRateAnnotations": [],
+  "groupStyleAnnotations": [],
+  "networkNodeAnnotations": [],
+  "nodeAnnotations": [
+    {
+      "id": "core-sw",
+      "interfacePattern": "e0/{n}",
+      "position": {
+        "x": 380,
+        "y": 340
+      }
+    },
+    {
+      "id": "radius",
+      "position": {
+        "x": 240,
+        "y": 420
+      }
+    },
+    {
+      "id": "pc-sales",
+      "position": {
+        "x": 460,
+        "y": 480
+      }
+    },
+    {
+      "id": "pc-dev",
+      "position": {
+        "x": 260,
+        "y": 220
+      }
+    },
+    {
+      "id": "guest-pc",
+      "position": {
+        "x": 340,
+        "y": 500
+      }
+    },
+    {
+      "id": "pc-unauth",
+      "position": {
+        "x": 420,
+        "y": 180
+      }
+    },
+    {
+      "id": "nwzt-srv0",
+      "position": {
+        "x": 560,
+        "y": 340
+      }
+    },
+    {
+      "id": "srv-app1",
+      "position": {
+        "x": 700,
+        "y": 260
+      }
+    },
+    {
+      "id": "host-infected",
+      "position": {
+        "x": 700,
+        "y": 420
+      }
+    }
+  ],
+  "edgeAnnotations": [],
+  "aliasEndpointAnnotations": [],
+  "viewerSettings": {}
+}

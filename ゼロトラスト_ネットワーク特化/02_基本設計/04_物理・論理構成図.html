@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>物理・論理構成図 | ゼロトラスト_ネットワーク特化</title>
+<meta name="description" content="ゼロトラスト_ネットワーク特化ラボの物理構成図・論理構成図（タブ切替）。core-sw(Cisco IOL)中核・802.1X動的VLAN・inter-VLAN ACL・OpenZiti overlay・Suricata監視。手描きインラインSVG・外部依存ゼロ。">
+<style>
+  :root {
+    --surface:#FAFAF9; --raised:#FFFFFF; --ink:#1C1917; --ink-2:#57534E; --ink-3:#A8A29E; --border:#E7E5E4;
+    --accent:#BE185D; --accent-soft:#FDF2F8;
+    --ok:#10B981; --warn:#F59E0B; --error:#EF4444; --info:#3B82F6; --neutral:#94A3B8;
+    --code-bg:#0F172A; --code-ink:#E2E8F0;
+    --mono:"SF Mono",Menlo,Consolas,monospace; --sans:"Hiragino Sans","Noto Sans JP",sans-serif;
+    --r-sm:6px; --r-md:10px; --r-full:999px;
+    --shadow-1:0 1px 3px rgba(0,0,0,.06); --shadow-2:0 8px 30px rgba(0,0,0,.12);
+    --ease:cubic-bezier(0.16,1,0.3,1);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; scroll-padding-top:72px; }
+  body { font-family:var(--sans); font-size:15px; line-height:1.8; color:var(--ink); background:var(--surface); }
+  .mono { font-family:var(--mono); font-feature-settings:"tnum"; }
+  .site-header { position:sticky; top:0; z-index:50; display:flex; align-items:center; gap:20px; height:56px; padding:0 24px; background:rgba(250,250,249,.85); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); }
+  .site-header .back { font-size:13px; color:var(--ink-2); text-decoration:none; transition:color .15s var(--ease); }
+  .site-header .back:hover { color:var(--accent); }
+  .brand { font-weight:700; font-size:15px; letter-spacing:-.01em; }
+  .brand span { color:var(--accent); }
+  .phase-chip { padding:3px 12px; font-family:var(--mono); font-size:11px; letter-spacing:.08em; color:var(--accent); background:var(--accent-soft); border-radius:var(--r-full); }
+  .header-meta { margin-left:auto; font-size:12px; color:var(--ink-2); }
+  .wrap { max-width:1120px; margin:0 auto; padding:40px 24px 96px; }
+  .breadcrumb { font-size:12px; color:var(--ink-3); margin-bottom:12px; }
+  .breadcrumb a { color:inherit; text-decoration:none; }
+  .breadcrumb a:hover { color:var(--accent); }
+  h1 { font-size:28px; font-weight:700; letter-spacing:-.01em; line-height:1.3; }
+  .doc-meta { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 24px; }
+  .badge { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; font-size:12px; font-weight:500; border-radius:var(--r-full); border:1px solid var(--border); background:var(--raised); color:var(--ink-2); }
+  .badge .dot { width:7px; height:7px; border-radius:50%; background:var(--ok); }
+  .badge.ver { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); font-family:var(--mono); }
+  .badge.st-ok .dot { background:var(--ok); } .badge.st-ok { color:var(--ok); border-color:var(--ok); }
+  .badge.st-warn .dot { background:var(--warn); } .badge.st-warn { color:#B45309; border-color:var(--warn); }
+  .badge.st-neutral .dot { background:var(--neutral); } .badge.st-neutral { color:var(--ink-2); }
+  .callout { margin:0 0 28px; padding:12px 16px; border-radius:var(--r-md); border-left:3px solid var(--info); background:var(--raised); font-size:14px; color:var(--ink-2); box-shadow:var(--shadow-1); }
+  .callout strong { color:var(--ink); }
+  /* tabs */
+  .tabbar { display:flex; gap:4px; border-bottom:1px solid var(--border); margin-bottom:20px; }
+  .tab { padding:10px 18px; margin-bottom:-1px; font:inherit; font-size:14px; font-weight:600; color:var(--ink-2); background:none; border:none; border-bottom:2px solid transparent; cursor:pointer; transition:color .15s var(--ease),border-color .15s var(--ease); }
+  .tab:hover { color:var(--ink); }
+  .tab[aria-selected="true"] { color:var(--accent); border-bottom-color:var(--accent); }
+  .panel { opacity:0; transform:translateY(6px); transition:opacity .2s var(--ease),transform .2s var(--ease); }
+  .panel.show { opacity:1; transform:translateY(0); }
+  .panel[hidden] { display:none; }
+  .diagram-wrap { position:relative; border:1px solid var(--border); border-radius:var(--r-md); background:var(--raised); padding:16px; box-shadow:var(--shadow-1); }
+  .figwrap { overflow-x:auto; }
+  svg.diagram { display:block; width:100%; min-width:900px; height:auto; }
+  /* SVG nodes */
+  .dnode rect { transition:stroke .15s var(--ease),filter .15s var(--ease); }
+  .dnode:hover rect, .dnode:focus rect { stroke:var(--accent); filter:drop-shadow(0 4px 10px rgba(28,25,23,.18)); outline:none; }
+  .n-ok { fill:#ECFDF5; stroke:#10B981; stroke-width:1.4; }
+  .n-warn { fill:#FFFBEB; stroke:#F59E0B; stroke-width:1.4; }
+  .n-plan { fill:#F5F5F4; stroke:#A8A29E; stroke-width:1.3; stroke-dasharray:4 3; }
+  .n-zone { fill:rgba(28,25,23,.028); stroke:#E7E5E4; stroke-width:1; }
+  .t-name { font-size:12px; font-weight:700; fill:var(--ink); }
+  .t-sub { font-size:9.5px; fill:var(--ink-2); font-family:var(--mono); }
+  .t-zone { font-size:11px; font-weight:700; fill:var(--ink-2); letter-spacing:.03em; }
+  .t-plane { font-size:12px; font-weight:800; fill:var(--ink-3); letter-spacing:.05em; }
+  .t-lnk { font-size:9.5px; fill:var(--ink-2); font-family:var(--mono); }
+  .t-note { font-size:9.5px; fill:var(--ink-3); }
+  .lk { fill:none; stroke:var(--ink-2); stroke-width:1.6; }
+  .lk-d { fill:none; stroke:var(--ink-3); stroke-width:1.4; stroke-dasharray:5 4; }
+  .lk-o { fill:none; stroke:var(--ink-3); stroke-width:1.4; stroke-dasharray:2 3; }
+  .fbadge circle { fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.4; }
+  .fbadge text { font-size:10px; font-weight:800; fill:var(--accent); text-anchor:middle; }
+  .legend-diagram { display:flex; flex-wrap:wrap; gap:16px; margin-top:14px; font-size:12.5px; color:var(--ink-2); }
+  .legend-diagram .item { display:inline-flex; align-items:center; gap:7px; }
+  .legend-diagram .box { width:20px; height:12px; border-radius:3px; flex-shrink:0; }
+  .lg-ok { background:#ECFDF5; border:1.4px solid #10B981; }
+  .lg-plan { background:#F5F5F4; border:1.3px dashed #A8A29E; }
+  .legend-diagram svg { width:28px; height:10px; flex-shrink:0; }
+  #svgTooltip { position:fixed; pointer-events:none; z-index:100; padding:6px 10px; background:var(--ink); color:#fff; font-size:12px; border-radius:var(--r-sm); box-shadow:var(--shadow-2); opacity:0; transform:translateY(4px); transition:opacity .15s var(--ease),transform .15s var(--ease); white-space:nowrap; }
+  #svgTooltip.show { opacity:1; transform:translateY(0); }
+  #svgTooltip .ip { font-family:var(--mono); color:#E7E5E4; margin-left:8px; }
+  .fignote { margin-top:14px; font-size:12.5px; color:var(--ink-3); }
+  section { margin:44px 0; overflow-x:auto; }
+  h2 { font-size:20px; font-weight:600; margin-bottom:8px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+  p.note { font-size:13.5px; color:var(--ink-2); margin-bottom:16px; }
+  .req-table { width:100%; border-collapse:collapse; font-size:14px; min-width:620px; }
+  .req-table th, .req-table td { padding:12px; text-align:left; vertical-align:top; }
+  .req-table thead th { font-size:11px; font-weight:600; letter-spacing:.06em; color:var(--ink-3); text-transform:uppercase; border-bottom:1px solid var(--border); }
+  .req-table tbody tr { border-bottom:1px solid var(--border); transition:background .12s; }
+  .req-table tbody tr:hover { background:#F5F5F4; }
+  .req-id { display:inline-block; font-family:var(--mono); font-weight:700; font-size:12.5px; color:var(--accent); background:var(--accent-soft); padding:2px 8px; border-radius:var(--r-sm); white-space:nowrap; }
+  code, .mono { font-family:var(--mono); }
+  td code { font-size:12.5px; color:var(--accent); background:var(--accent-soft); padding:1px 6px; border-radius:5px; }
+  .doc-footer { display:flex; justify-content:space-between; gap:16px; margin-top:64px; padding-top:24px; border-top:1px solid var(--border); }
+  .doc-footer a { display:block; padding:14px 18px; min-width:200px; border:1px solid var(--border); border-radius:var(--r-md); text-decoration:none; color:var(--ink); font-weight:600; font-size:14px; background:var(--raised); transition:transform .18s var(--ease),box-shadow .18s var(--ease),border-color .18s var(--ease); }
+  .doc-footer a:hover { transform:translateY(-2px); box-shadow:var(--shadow-2); border-color:var(--accent); }
+  .doc-footer a small { display:block; font-size:11px; font-weight:500; color:var(--ink-3); letter-spacing:.06em; }
+  .doc-footer .next { text-align:right; margin-left:auto; }
+  @media (max-width:768px) { .header-meta, .phase-chip { display:none; } .tab { padding:10px 12px; font-size:13px; } .legend-diagram { font-size:12px; gap:12px; } }
+  @media (prefers-reduced-motion:reduce) { * { transition:none !important; animation:none !important; } html { scroll-behavior:auto; } }
+  @media (max-width:480px) { .doc-footer { flex-direction:column; } .doc-footer a { min-width:0; } .doc-footer .next { margin-left:0; } }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <a class="back" href="../00_ドキュメントマップ.html">← ドキュメントマップ</a>
+  <div class="brand">ZT-NW<span>特化</span></div>
+  <span class="phase-chip">PHASE 2 基本設計</span>
+  <div class="header-meta">nwzt-lan / OrbStack VM(arm64)</div>
+</header>
+
+<main class="wrap">
+  <div class="breadcrumb"><a href="../00_ドキュメントマップ.html">ドキュメントマップ</a> / 物理・論理構成図</div>
+  <h1>物理・論理構成図</h1>
+  <div class="doc-meta">
+    <span class="badge ver">v1.0</span>
+    <span class="badge st-ok"><span class="dot"></span>✅ 実機検証済</span>
+    <span class="badge">最終更新 2026-07-08</span>
+    <span class="badge">lab: nwzt-lan / mgmt 172.20.40.0/24</span>
+  </div>
+
+  <div class="callout">
+    <strong>この図の役割：</strong>単一の <code class="mono">core-sw</code>（Cisco IOL）を中核に、802.1X 動的VLAN・inter-VLAN ACL・OpenZiti overlay・Suricata 監視を束ねた <strong>実デプロイ済みラボ</strong>の構成図です。緑＝実機で成立した部品／接続（B1〜B6 合格）、灰点線＝設計のみ・残課題（◐）。図中のノード名・IP・インターフェース名は <code class="mono">nwzt.clab.yml</code> / <code class="mono">core_sw_merged.cfg</code> と一致します。
+  </div>
+
+  <div class="tabbar" role="tablist" aria-label="構成図の種類">
+    <button class="tab" role="tab" id="tab-phys" aria-controls="panel-phys" aria-selected="true">物理構成図</button>
+    <button class="tab" role="tab" id="tab-logi" aria-controls="panel-logi" aria-selected="false" tabindex="-1">論理構成図（3プレーン）</button>
+  </div>
+
+  <!-- ===== 物理構成図 ===== -->
+  <div class="panel show" id="panel-phys" data-panel="phys" role="tabpanel" aria-labelledby="tab-phys">
+    <div class="diagram-wrap">
+      <div class="figwrap">
+      <svg class="diagram" viewBox="0 0 960 790" role="img" aria-label="物理構成図：core-sw(Cisco IOL)を中核に業務端末・RADIUS・サーバ室ブリッジnwzt-srv0を収容し、監視SOCとZTNA overlayをdocker併走させたトポロジ。">
+        <defs><marker id="ah" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#A8A29E"/></marker></defs>
+
+        <!-- 端末→core-sw リンク -->
+        <line class="lk" x1="124" y1="108" x2="330" y2="286" marker-end="url(#ah)"/>
+        <line class="lk" x1="327" y1="108" x2="390" y2="286" marker-end="url(#ah)"/>
+        <line class="lk" x1="527" y1="108" x2="450" y2="286" marker-end="url(#ah)"/>
+        <line class="lk" x1="756" y1="108" x2="526" y2="286" marker-end="url(#ah)"/>
+        <text class="t-lnk" x="228" y="200">Et0/1</text>
+        <text class="t-lnk" x="352" y="200">Et0/2</text>
+        <text class="t-lnk" x="486" y="200">Et0/3</text>
+        <text class="t-lnk" x="612" y="185">Et1/0</text>
+        <!-- core-sw ↔ radius -->
+        <line class="lk" x1="558" y1="330" x2="724" y2="328" marker-end="url(#ah)"/>
+        <text class="t-lnk" x="586" y="318">Et1/1 · RADIUS 1812/1813</text>
+        <!-- uplink core-sw → サーバ室ブリッジ -->
+        <line class="lk" x1="428" y1="360" x2="428" y2="430" marker-end="url(#ah)"/>
+        <text class="t-lnk" x="436" y="400">Et1/2 · VLAN50</text>
+
+        <!-- 端末（上段） -->
+        <g class="dnode" tabindex="0" data-name="pc-sales" data-ip="172.31.10.101 (mgmt 172.20.40.21)"><rect class="n-ok" x="36" y="56" width="176" height="52" rx="8"/><text class="t-name" x="124" y="80" text-anchor="middle">pc-sales ✅</text><text class="t-sub" x="124" y="97" text-anchor="middle">802.1X→VLAN10 · .10.101</text></g>
+        <g class="dnode" tabindex="0" data-name="pc-dev" data-ip="172.31.20.101 (mgmt 172.20.40.22)"><rect class="n-ok" x="252" y="56" width="150" height="52" rx="8"/><text class="t-name" x="327" y="80" text-anchor="middle">pc-dev ✅</text><text class="t-sub" x="327" y="97" text-anchor="middle">VLAN20 · .20.101</text></g>
+        <g class="dnode" tabindex="0" data-name="guest-pc" data-ip="172.31.30.101 (mgmt 172.20.40.23)"><rect class="n-ok" x="452" y="56" width="150" height="52" rx="8"/><text class="t-name" x="527" y="80" text-anchor="middle">guest-pc ✅</text><text class="t-sub" x="527" y="97" text-anchor="middle">VLAN30 · .30.101</text></g>
+        <g class="dnode" tabindex="0" data-name="pc-unauth" data-ip="割当なし (mgmt 172.20.40.24)"><rect class="n-warn" x="666" y="56" width="180" height="52" rx="8"/><text class="t-name" x="756" y="80" text-anchor="middle">pc-unauth ◐</text><text class="t-sub" x="756" y="97" text-anchor="middle">no-response→VLAN99（自動割当◐）</text></g>
+
+        <!-- core-sw -->
+        <g class="dnode" tabindex="0" data-name="core-sw (Cisco IOL L2-advipservices-2017)" data-ip="mgmt 172.20.40.11 · SVI 172.31.0.1"><rect class="n-ok" x="298" y="286" width="260" height="74" rx="10"/><text class="t-name" x="428" y="314" text-anchor="middle" font-size="13">core-sw（Cisco IOL）✅</text><text class="t-sub" x="428" y="332" text-anchor="middle">802.1X 認証者 + L3 SVI + inter-VLAN ACL</text><text class="t-sub" x="428" y="348" text-anchor="middle">SVI 172.31.0.1 · SEG10-OUT</text></g>
+        <!-- radius -->
+        <g class="dnode" tabindex="0" data-name="radius (FreeRADIUS)" data-ip="172.31.0.10 (mgmt 172.20.40.10)"><rect class="n-ok" x="724" y="300" width="176" height="56" rx="9"/><text class="t-name" x="812" y="324" text-anchor="middle">radius ✅</text><text class="t-sub" x="812" y="341" text-anchor="middle">172.31.0.10 · VLAN100 · [共有鍵]</text></g>
+
+        <!-- サーバ室ブリッジ zone -->
+        <rect class="n-zone" x="250" y="430" width="430" height="210" rx="11"/>
+        <text class="t-zone" x="266" y="452">サーバ室 VLAN50 ｜ docker bridge nwzt-srv0 ｜ 172.31.50.0/24 (GW .254)</text>
+        <g class="dnode" tabindex="0" data-name="host-infected (nmap)" data-ip="172.31.50.31 (mgmt 172.20.40.32)"><rect class="n-ok" x="274" y="496" width="170" height="58" rx="9"/><text class="t-name" x="359" y="521" text-anchor="middle">host-infected ✅</text><text class="t-sub" x="359" y="538" text-anchor="middle">.50.31 · 東西スキャン源</text></g>
+        <g class="dnode" tabindex="0" data-name="srv-app1 (http/80 + ncat/22)" data-ip="172.31.50.11 (mgmt 172.20.40.31)"><rect class="n-ok" x="470" y="496" width="180" height="58" rx="9"/><text class="t-name" x="560" y="521" text-anchor="middle">srv-app1 ✅</text><text class="t-sub" x="560" y="538" text-anchor="middle">.50.11 · http/80 · ダーク対象</text></g>
+        <line class="lk-d" x1="444" y1="525" x2="470" y2="525"/>
+        <text class="t-note" x="457" y="518" text-anchor="middle">東西</text>
+        <text class="t-note" x="266" y="588">N4層1: SVI Vlan10 の SEG10-OUT で srv-app1:80許可・:22拒否 ✅</text>
+        <text class="t-note" x="266" y="606">N4層2: srv-app1 で host-infected(.31) を nft drop ◐（手動投入デモ）</text>
+
+        <!-- 監視SOC zone（左下・host mode） -->
+        <rect class="n-zone" x="30" y="662" width="380" height="108" rx="11"/>
+        <text class="t-zone" x="44" y="683">監視SOC ｜ docker併走 --network host（論理VLAN90）</text>
+        <g class="dnode" tabindex="0" data-name="suricata (NDR sensor)" data-ip="-i nwzt-srv0 · HOME_NET 172.31.50.0/24"><rect class="n-ok" x="44" y="700" width="118" height="54" rx="8"/><text class="t-name" x="103" y="724" text-anchor="middle" font-size="11">suricata ✅</text><text class="t-sub" x="103" y="741" text-anchor="middle">-i nwzt-srv0</text></g>
+        <g class="dnode" tabindex="0" data-name="loki" data-ip="ホスト :3100"><rect class="n-ok" x="176" y="700" width="98" height="54" rx="8"/><text class="t-name" x="225" y="724" text-anchor="middle" font-size="11">loki ✅</text><text class="t-sub" x="225" y="741" text-anchor="middle">:3100</text></g>
+        <g class="dnode" tabindex="0" data-name="grafana" data-ip="ホスト :3000"><rect class="n-ok" x="288" y="700" width="110" height="54" rx="8"/><text class="t-name" x="343" y="724" text-anchor="middle" font-size="11">grafana ✅</text><text class="t-sub" x="343" y="741" text-anchor="middle">:3000</text></g>
+        <!-- SPAN代替（bridge→suricata, promiscuous） -->
+        <polyline class="lk-d" points="300,640 300,676 103,676 103,700" marker-end="url(#ah)"/>
+        <text class="t-note" x="196" y="670" text-anchor="middle">promiscuous 監視（SPAN代替）✅</text>
+
+        <!-- ZTNA overlay zone（右・docker併走） -->
+        <rect class="n-zone" x="700" y="430" width="232" height="310" rx="11"/>
+        <text class="t-zone" x="714" y="452">N2 ZTNA overlay ｜ docker併走（zn-ziti）</text>
+        <g class="dnode" tabindex="0" data-name="ziti controller+router" data-ip="openziti/ziti-cli · edge quickstart"><rect class="n-ok" x="716" y="470" width="200" height="52" rx="9"/><text class="t-name" x="816" y="493" text-anchor="middle">ziti ✅</text><text class="t-sub" x="816" y="510" text-anchor="middle">controller + router</text></g>
+        <g class="dnode" tabindex="0" data-name="apptun (app側tunneler)" data-ip="172.31.50.50 · zn-ziti + nwzt-srv0"><rect class="n-ok" x="716" y="540" width="200" height="52" rx="9"/><text class="t-name" x="816" y="563" text-anchor="middle">apptun ✅</text><text class="t-sub" x="816" y="580" text-anchor="middle">.50 · zn-ziti+nwzt-srv0</text></g>
+        <g class="dnode" tabindex="0" data-name="clienttun (＝リモート社員)" data-ip="zn-ziti のみ · 直接到達不可"><rect class="n-ok" x="716" y="610" width="200" height="56" rx="9"/><text class="t-name" x="816" y="634" text-anchor="middle">clienttun ✅</text><text class="t-sub" x="816" y="651" text-anchor="middle">＝リモート社員（zn-ziti のみ）</text></g>
+        <line class="lk-o" x1="816" y1="522" x2="816" y2="540"/>
+        <line class="lk-o" x1="816" y1="592" x2="816" y2="610"/>
+        <!-- apptun dial → srv-app1 -->
+        <line class="lk-o" x1="716" y1="562" x2="650" y2="528" marker-end="url(#ah)"/>
+        <text class="t-note" x="678" y="700" text-anchor="middle">clienttun→.11 直接=HTTP000</text>
+        <text class="t-note" x="678" y="716" text-anchor="middle">overlay 経由=200 ✅（ダーク成立）</text>
+      </svg>
+      </div>
+      <div class="legend-diagram" aria-hidden="true">
+        <span class="item"><span class="box lg-ok"></span>緑＝実機で成立（✅／B1〜B6合格）</span>
+        <span class="item"><span class="box lg-plan"></span>灰点線＝設計のみ・残課題（◐）</span>
+        <span class="item"><svg><line x1="0" y1="5" x2="28" y2="5" stroke="#57534E" stroke-width="1.6"/></svg>実線＝物理結線（Ethernet）</span>
+        <span class="item"><svg><line x1="0" y1="5" x2="28" y2="5" stroke="#A8A29E" stroke-width="1.4" stroke-dasharray="5 4"/></svg>破線＝監視ミラー</span>
+        <span class="item"><svg><line x1="0" y1="5" x2="28" y2="5" stroke="#A8A29E" stroke-width="1.4" stroke-dasharray="2 3"/></svg>点線＝ziti overlay</span>
+        <span class="item">ノードにホバー/フォーカスで名称・IP</span>
+      </div>
+    </div>
+    <p class="fignote">物理視点＝結線トポロジ。IOL は 1スロット4ポートのため clab の eth4/5/6 が <span class="mono">Et1/0 / Et1/1 / Et1/2</span> にマップされる（<span class="mono">/iol/NETMAP</span> 準拠）。監視SOC と ZTNA overlay は containerlab 管理外の docker 併走で、<span class="mono">deploy-all.sh</span> が一括起動する。</p>
+
+    <section>
+      <h2>設計要素 → 実装の対応</h2>
+      <p class="note">物理図の各要素が、実ファイル上のどの設定・ノードに対応するか。IP・インターフェース名は <code>nwzt.clab.yml</code> / <code>core_sw_merged.cfg</code> が正。</p>
+      <table class="req-table">
+        <thead><tr><th>設計要素</th><th>物理上の位置</th><th>実ファイルの実体</th><th>状態</th></tr></thead>
+        <tbody>
+          <tr><td><span class="req-id">N1</span> 802.1X 動的VLAN</td><td>Et0/1 pc-sales → VLAN10</td><td><code>core_sw_merged.cfg</code> Ethernet0/1（<code>dot1x pae authenticator</code>）＋ radius <code>Tunnel-Private-Group-Id="10"</code></td><td>✅ 実機</td></tr>
+          <tr><td><span class="req-id">N1</span> 未認証→隔離</td><td>Et1/0 pc-unauth → VLAN99</td><td>Ethernet1/0 <code>authentication event no-response action authorize vlan 99</code></td><td>◐ 自動割当は残課題</td></tr>
+          <tr><td><span class="req-id">N4</span> 層1 inter-VLAN ACL</td><td>SVI Vlan10 in</td><td><code>ip access-list extended SEG10-OUT</code>（:80許可 / :22拒否）</td><td>✅ 実機</td></tr>
+          <tr><td><span class="req-id">N4</span> 層2 host nftables</td><td>srv-app1（VLAN50内）</td><td><code>deploy-all.sh nft</code>（host-infected .31 を drop）</td><td>◐ 手動デモ</td></tr>
+          <tr><td><span class="req-id">N3</span> 常時監視</td><td>nwzt-srv0 promiscuous</td><td>suricata <code>-i nwzt-srv0</code> · sid:1000001 · loki/grafana</td><td>✅ 実機</td></tr>
+          <tr><td><span class="req-id">N2</span> サーバ非公開化</td><td>srv-app1 を overlay 限定公開</td><td>ziti / apptun(dial) / clienttun · direct=000 / overlay=200</td><td>✅ 実機</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <!-- ===== 論理構成図（3プレーン） ===== -->
+  <div class="panel" id="panel-logi" data-panel="logi" role="tabpanel" aria-labelledby="tab-logi" hidden>
+    <div class="diagram-wrap">
+      <div class="figwrap">
+      <svg class="diagram" viewBox="0 0 960 760" role="img" aria-label="論理構成図：アイデンティティ/ポリシー・データ・監視の3プレーンとE2EフローF-A/F-C/F-D/F-Eのバッジ。">
+        <defs><marker id="ah2" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#A8A29E"/></marker></defs>
+
+        <!-- ① アイデンティティ/ポリシープレーン -->
+        <text class="t-plane" x="24" y="36">① アイデンティティ / ポリシープレーン</text>
+        <rect class="n-zone" x="20" y="44" width="920" height="150" rx="11"/>
+        <g class="dnode" tabindex="0" data-name="radius (FreeRADIUS)" data-ip="172.31.0.10 · VLAN100"><rect class="n-ok" x="60" y="92" width="200" height="60" rx="10"/><text class="t-name" x="160" y="118" text-anchor="middle">radius ✅</text><text class="t-sub" x="160" y="136" text-anchor="middle">FreeRADIUS · 172.31.0.10</text></g>
+        <g class="dnode" tabindex="0" data-name="core-sw 802.1X" data-ip="動的VLAN割当（Authenticator）"><rect class="n-ok" x="380" y="92" width="220" height="60" rx="10"/><text class="t-name" x="490" y="118" text-anchor="middle">core-sw 802.1X ✅</text><text class="t-sub" x="490" y="136" text-anchor="middle">動的VLAN（Tunnel-Private-Group-Id）</text></g>
+        <g class="dnode" tabindex="0" data-name="μセグ（inter-VLAN ACL + host nft）" data-ip="層1 SEG10-OUT / 層2 nftables"><rect class="n-ok" x="720" y="92" width="200" height="60" rx="10"/><text class="t-name" x="820" y="118" text-anchor="middle">μセグ ✅</text><text class="t-sub" x="820" y="136" text-anchor="middle">ACL層1 + nft層2</text></g>
+        <line class="lk" x1="260" y1="122" x2="380" y2="122" marker-end="url(#ah2)"/>
+        <text class="t-lnk" x="320" y="112" text-anchor="middle">RADIUS 1812</text>
+        <line class="lk" x1="600" y1="122" x2="720" y2="122" marker-end="url(#ah2)"/>
+        <text class="t-lnk" x="660" y="112" text-anchor="middle">SVI ACL / nft</text>
+        <text class="t-note" x="60" y="180">keycloak / IdP 無し ＝ L7認可はスコープ外（本テーマは NW 層に限定）</text>
+
+        <!-- ② データプレーン -->
+        <text class="t-plane" x="24" y="210">② データプレーン ｜ 172.31.0.0/16（第3オクテット＝VLAN ID）</text>
+        <rect class="n-zone" x="20" y="216" width="920" height="316" rx="11"/>
+        <!-- core-sw SVI hub -->
+        <g class="dnode" tabindex="0" data-name="core-sw SVI（inter-VLAN routing）" data-ip="172.31.0.1 · SEG10-OUT"><rect class="n-ok" x="400" y="350" width="180" height="56" rx="10"/><text class="t-name" x="490" y="374" text-anchor="middle">core-sw SVI ✅</text><text class="t-sub" x="490" y="391" text-anchor="middle">.0.1 · inter-VLAN + ACL</text></g>
+        <!-- 業務VLAN（上段） -->
+        <g class="dnode" tabindex="0" data-name="VLAN10 SALES" data-ip="pc-sales 172.31.10.101"><rect class="n-ok" x="70" y="242" width="160" height="50" rx="9"/><text class="t-name" x="150" y="264" text-anchor="middle" font-size="11.5">VLAN10 SALES ✅</text><text class="t-sub" x="150" y="281" text-anchor="middle">pc-sales .10.101</text></g>
+        <g class="dnode" tabindex="0" data-name="VLAN20 DEV" data-ip="pc-dev 172.31.20.101"><rect class="n-ok" x="260" y="242" width="150" height="50" rx="9"/><text class="t-name" x="335" y="264" text-anchor="middle" font-size="11.5">VLAN20 DEV ✅</text><text class="t-sub" x="335" y="281" text-anchor="middle">pc-dev .20.101</text></g>
+        <g class="dnode" tabindex="0" data-name="VLAN30 GUEST" data-ip="guest-pc 172.31.30.101"><rect class="n-ok" x="440" y="242" width="150" height="50" rx="9"/><text class="t-name" x="515" y="264" text-anchor="middle" font-size="11.5">VLAN30 GUEST ✅</text><text class="t-sub" x="515" y="281" text-anchor="middle">guest-pc .30.101</text></g>
+        <g class="dnode" tabindex="0" data-name="VLAN100 コア・認証管理" data-ip="SVI 172.31.0.1 / radius .0.10"><rect class="n-ok" x="740" y="242" width="170" height="50" rx="9"/><text class="t-name" x="825" y="264" text-anchor="middle" font-size="11.5">VLAN100 コア ✅</text><text class="t-sub" x="825" y="281" text-anchor="middle">SVI .0.1 · radius .0.10</text></g>
+        <!-- 下段：隔離/サーバ室/外部 -->
+        <g class="dnode" tabindex="0" data-name="VLAN99 QUARANTINE" data-ip="172.31.99.0/24 · 自動割当は残課題"><rect class="n-warn" x="70" y="452" width="170" height="50" rx="9"/><text class="t-name" x="155" y="474" text-anchor="middle" font-size="11.5">VLAN99 隔離 ◐</text><text class="t-sub" x="155" y="491" text-anchor="middle">172.31.99.0/24</text></g>
+        <g class="dnode" tabindex="0" data-name="clienttun（外部・リモート社員）" data-ip="zn-ziti · 直接到達不可"><rect class="n-ok" x="270" y="452" width="150" height="50" rx="9"/><text class="t-name" x="345" y="474" text-anchor="middle" font-size="11.5">clienttun 外部 ✅</text><text class="t-sub" x="345" y="491" text-anchor="middle">zn-ziti · リモート</text></g>
+        <g class="dnode" tabindex="0" data-name="VLAN50 SERVER" data-ip="srv-app1 .50.11 / host-infected .50.31"><rect class="n-ok" x="600" y="445" width="310" height="58" rx="9"/><text class="t-name" x="755" y="470" text-anchor="middle">VLAN50 SERVER ✅</text><text class="t-sub" x="755" y="487" text-anchor="middle">srv-app1 .50.11 / host-infected .50.31（東西 default-deny）</text></g>
+        <!-- VLAN → hub リンク -->
+        <line class="lk" x1="230" y1="270" x2="400" y2="362" marker-end="url(#ah2)"/>
+        <line class="lk" x1="335" y1="292" x2="440" y2="350" marker-end="url(#ah2)"/>
+        <line class="lk" x1="515" y1="292" x2="520" y2="350" marker-end="url(#ah2)"/>
+        <line class="lk" x1="740" y1="270" x2="580" y2="362" marker-end="url(#ah2)"/>
+        <line class="lk-d" x1="155" y1="452" x2="400" y2="398" marker-end="url(#ah2)"/>
+        <line class="lk" x1="600" y1="470" x2="580" y2="404" marker-end="url(#ah2)"/>
+        <!-- overlay 論理網（clienttun → srv-app1） -->
+        <line class="lk-o" x1="420" y1="477" x2="600" y2="474" marker-end="url(#ah2)"/>
+        <text class="t-note" x="510" y="470" text-anchor="middle">ZTNA overlay（直接不可 / overlay可）</text>
+
+        <!-- ③ 監視プレーン -->
+        <text class="t-plane" x="24" y="548">③ 監視プレーン</text>
+        <rect class="n-zone" x="20" y="554" width="920" height="180" rx="11"/>
+        <g class="dnode" tabindex="0" data-name="suricata NDR" data-ip="eve.json · sid:1000001"><rect class="n-ok" x="300" y="606" width="180" height="54" rx="10"/><text class="t-name" x="390" y="630" text-anchor="middle">suricata NDR ✅</text><text class="t-sub" x="390" y="647" text-anchor="middle">sid:1000001（東西SYN）</text></g>
+        <g class="dnode" tabindex="0" data-name="loki / grafana" data-ip=":3100 / :3000"><rect class="n-ok" x="560" y="606" width="200" height="54" rx="10"/><text class="t-name" x="660" y="630" text-anchor="middle">loki / grafana ✅</text><text class="t-sub" x="660" y="647" text-anchor="middle">:3100 / :3000</text></g>
+        <line class="lk" x1="480" y1="633" x2="560" y2="633" marker-end="url(#ah2)"/>
+        <text class="t-lnk" x="520" y="624" text-anchor="middle">eve.json</text>
+        <!-- SPAN代替（VLAN50 → suricata） -->
+        <polyline class="lk-d" points="755,503 755,580 390,580 390,606" marker-end="url(#ah2)"/>
+        <text class="t-note" x="560" y="574" text-anchor="middle">SPAN代替: nwzt-srv0 promiscuous ✅</text>
+
+        <!-- E2Eフローバッジ -->
+        <g class="fbadge"><circle cx="300" cy="330" r="12"/><text x="300" y="334">A</text></g>
+        <g class="fbadge"><circle cx="700" cy="560" r="12"/><text x="700" y="564">C</text></g>
+        <g class="fbadge"><circle cx="510" cy="500" r="12"/><text x="510" y="504">D</text></g>
+        <g class="fbadge"><circle cx="880" cy="470" r="12"/><text x="880" y="474">E</text></g>
+        <text class="t-note" x="24" y="752">◯ ＝ E2E フロー（下表 F-A / F-C / F-D / F-E）。緑＝実機成立、灰点線＝設計・残課題（◐）。</text>
+      </svg>
+      </div>
+      <div class="legend-diagram" aria-hidden="true">
+        <span class="item"><span class="box lg-ok"></span>緑＝実機で成立（✅）</span>
+        <span class="item"><span class="box" style="background:#FFFBEB;border:1.4px solid #F59E0B"></span>琥珀＝残課題（◐）</span>
+        <span class="item"><svg><line x1="0" y1="5" x2="28" y2="5" stroke="#57534E" stroke-width="1.6"/></svg>実線＝データ経路（SVI）</span>
+        <span class="item"><svg><line x1="0" y1="5" x2="28" y2="5" stroke="#A8A29E" stroke-width="1.4" stroke-dasharray="2 3"/></svg>点線＝ZTNA overlay</span>
+      </div>
+    </div>
+    <p class="fignote">論理視点＝3プレーン（① アイデンティティ/ポリシー ② データ ③ 監視）と E2E フロー。IdP（keycloak）は L7 スコープ外のため置かず、認証は radius の動的VLAN で完結する。<span class="mono">core-sw</span> が SVI で inter-VLAN を集約し、SEG10-OUT で東西を絞る。</p>
+
+    <section>
+      <h2>E2Eフロー F-A / F-C / F-D / F-E</h2>
+      <p class="note">図中バッジに対応。内容は <a href="../00_ドキュメントマップ.html">基本設計書</a> §1 の実装対象フローと一致。</p>
+      <table class="req-table">
+        <thead><tr><th>フロー</th><th>経路概要</th><th>検証ゲート</th><th>状態</th></tr></thead>
+        <tbody>
+          <tr><td><span class="req-id">F-A</span> 社員PC入場</td><td>pc-sales →802.1X(alice)→ VLAN10 →SEG10-OUT ACL→ srv-app1:80 到達</td><td>B2 / B3</td><td>✅ 実機</td></tr>
+          <tr><td><span class="req-id">F-C</span> 感染端末の検知</td><td>host-infected 東西SYN → suricata sid:1000001 検知 → 層2 nft で隔離</td><td>B4</td><td>✅ 検知 / ◐ CoA自動化はスコープ外</td></tr>
+          <tr><td><span class="req-id">F-D</span> ZTNA到達（VPNレス）</td><td>clienttun → overlay(zn-ziti) → apptun → srv-app1（直接 <code>172.31.50.11:80</code> は失敗）</td><td>B5</td><td>✅ 実機（direct=000 / overlay=200）</td></tr>
+          <tr><td><span class="req-id">F-E</span> サーバ間東西μセグ</td><td>inter-VLAN ACL（層1）＋ 同一VLAN内 host nftables（層2）の二層で東西制御</td><td>B3</td><td>✅ 実機</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <nav class="doc-footer" aria-label="前後のドキュメント">
+    <a class="prev" href="03_IPアドレス管理表.html"><small>← 前工程</small>IPアドレス管理表</a>
+    <a class="next" href="../03_詳細設計/05_パラメータシート.html"><small>次工程 →</small>パラメータシート</a>
+  </nav>
+</main>
+
+<div id="svgTooltip" role="status"></div>
+
+<script>
+  "use strict";
+  const tabs = [...document.querySelectorAll(".tab")];
+  const panels = [...document.querySelectorAll(".panel")];
+  function activate(tab, focus) {
+    const target = tab.id === "tab-phys" ? "phys" : "logi";
+    tabs.forEach((t) => { const on = t === tab; t.setAttribute("aria-selected", on ? "true" : "false"); t.tabIndex = on ? 0 : -1; });
+    panels.forEach((p) => {
+      if (p.dataset.panel === target) { p.hidden = false; requestAnimationFrame(() => p.classList.add("show")); }
+      else { p.classList.remove("show"); setTimeout(() => { if (!p.classList.contains("show")) p.hidden = true; }, 200); }
+    });
+    if (focus) tab.focus();
+  }
+  tabs.forEach((t) => {
+    t.addEventListener("click", () => activate(t, false));
+    t.addEventListener("keydown", (e) => {
+      const i = tabs.indexOf(t);
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); activate(tabs[(i + 1) % tabs.length], true); }
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); activate(tabs[(i - 1 + tabs.length) % tabs.length], true); }
+    });
+  });
+  const tip = document.getElementById("svgTooltip");
+  function place(e) { tip.style.left = `${e.clientX + 14}px`; tip.style.top = `${e.clientY + 14}px`; }
+  document.querySelectorAll(".dnode[data-name]").forEach((n) => {
+    n.addEventListener("mouseenter", (e) => { const name = n.dataset.name, ip = n.dataset.ip; tip.innerHTML = ip ? `${name}<span class="ip">${ip}</span>` : name; tip.classList.add("show"); place(e); });
+    n.addEventListener("mousemove", place);
+    n.addEventListener("mouseleave", () => tip.classList.remove("show"));
+    n.addEventListener("focus", () => { const r = n.getBoundingClientRect(); tip.innerHTML = `${n.dataset.name}<span class="ip">${n.dataset.ip || ""}</span>`; tip.style.left = `${r.left}px`; tip.style.top = `${r.bottom + 8}px`; tip.classList.add("show"); });
+    n.addEventListener("blur", () => tip.classList.remove("show"));
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+# ZT-NDR east-west カスタムルール（決定論的検知）
+# HOME_NET = 172.31.50.0/24（サーバ室 VLAN50）。host-infected→srv-app1 の横方向スキャンを確実に発報する。
+
+# SYN スキャン検知: 10秒間に同一送信元から15回以上の SYN（flags:S）で発報
+alert tcp any any -> $HOME_NET any (msg:"ZT-NDR east-west SYN scan"; flags:S; threshold:type both,track by_src,count 15,seconds 10; classtype:attempted-recon; sid:1000001; rev:1;)
+
+# 補助: srv-app1(172.31.50.11) の 80/tcp への直接アクセスを台帳として記録（east-west 通信の可視化補助）
+alert tcp $HOME_NET any -> 172.31.50.11 80 (msg:"ZT-NDR east-west HTTP to srv-app1"; flow:to_server; classtype:not-suspicious; sid:1000002; rev:1;)

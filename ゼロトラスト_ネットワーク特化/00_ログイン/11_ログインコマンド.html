@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ログインコマンド | ゼロトラスト_ネットワーク特化</title>
+<style>
+:root {
+  --surface:#FAFAF9; --raised:#FFFFFF; --ink:#1C1917; --ink-2:#57534E; --ink-3:#A8A29E; --border:#E7E5E4;
+  --accent:#BE185D; --accent-soft:#FDF2F8;
+  --ok:#10B981; --warn:#F59E0B; --error:#EF4444; --info:#3B82F6; --neutral:#94A3B8;
+  --code-bg:#0F172A; --code-ink:#E2E8F0;
+  --mono:"SF Mono",Menlo,Consolas,monospace; --sans:"Hiragino Sans","Noto Sans JP",sans-serif;
+  --r-sm:6px; --r-md:10px; --r-full:999px;
+  --shadow-1:0 1px 3px rgba(0,0,0,.06); --shadow-2:0 8px 30px rgba(0,0,0,.12);
+  --ease:cubic-bezier(0.16,1,0.3,1);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; scroll-padding-top:72px; }
+body { font-family:var(--sans); font-size:15px; line-height:1.8; color:var(--ink); background:var(--surface); }
+.mono { font-family:var(--mono); font-feature-settings:"tnum"; }
+.num { text-align:right; }
+.site-header { position:sticky; top:0; z-index:50; display:flex; align-items:center; gap:20px; height:56px; padding:0 24px; background:rgba(250,250,249,.85); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); }
+.site-header .back { font-size:13px; color:var(--ink-2); text-decoration:none; transition:color .15s var(--ease); }
+.site-header .back:hover { color:var(--accent); }
+.brand { font-weight:700; font-size:15px; letter-spacing:-.01em; }
+.brand span { color:var(--accent); }
+.phase-chip { padding:3px 12px; font-family:var(--mono); font-size:11px; letter-spacing:.08em; color:var(--accent); background:var(--accent-soft); border-radius:var(--r-full); }
+.header-meta { margin-left:auto; font-size:12px; color:var(--ink-2); }
+.layout { display:grid; grid-template-columns:220px minmax(0,1fr); gap:48px; max-width:1100px; margin:0 auto; padding:0 24px; }
+.nav { position:sticky; top:56px; height:calc(100vh - 56px); overflow-y:auto; padding:40px 0; }
+.nav-label { font-size:11px; font-weight:600; letter-spacing:.08em; color:var(--ink-3); text-transform:uppercase; margin-bottom:10px; }
+.nav a { display:block; padding:6px 10px; margin-left:-10px; font-size:13.5px; color:var(--ink-2); text-decoration:none; border-radius:var(--r-sm); transition:color .12s var(--ease),background .12s var(--ease); }
+.nav a:hover { color:var(--ink); background:#F5F5F4; }
+.nav a.current { color:var(--accent); background:var(--accent-soft); font-weight:600; }
+.doc { padding:40px 0 96px; min-width:0; }
+.breadcrumb { font-size:12px; color:var(--ink-3); margin-bottom:12px; }
+.breadcrumb a { color:inherit; text-decoration:none; }
+.breadcrumb a:hover { color:var(--accent); }
+h1 { font-size:28px; font-weight:700; letter-spacing:-.01em; line-height:1.3; }
+.doc-meta { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 40px; }
+.badge { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; font-size:12px; font-weight:500; border-radius:var(--r-full); border:1px solid var(--border); background:var(--raised); color:var(--ink-2); }
+.badge .dot { width:7px; height:7px; border-radius:50%; background:var(--ok); }
+.badge.ver { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); font-family:var(--mono); }
+/* status badge: ✅→ok, ◐→warn, ⬜→neutral */
+.badge.st-ok .dot { background:var(--ok); } .badge.st-ok { color:var(--ok); border-color:var(--ok); }
+.badge.st-warn .dot { background:var(--warn); } .badge.st-warn { color:#B45309; border-color:var(--warn); }
+.badge.st-neutral .dot { background:var(--neutral); } .badge.st-neutral { color:var(--ink-2); }
+section { margin-bottom:56px; scroll-margin-top:72px; overflow-x:auto; }
+h2 { font-size:20px; font-weight:600; margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+h2 a { color:var(--ink-3); text-decoration:none; opacity:0; margin-left:6px; font-weight:400; }
+h2:hover a { opacity:1; }
+h3.sub { font-size:14px; font-weight:600; color:var(--ink-2); margin:24px 0 10px; }
+p.note { font-size:13.5px; color:var(--ink-2); margin-bottom:12px; }
+ul, ol { padding-left:20px; font-size:14.5px; line-height:1.9; }
+/* tables */
+.req-table { width:100%; border-collapse:collapse; font-size:14px; min-width:620px; }
+.req-table th, .req-table td { padding:12px; text-align:left; vertical-align:top; }
+.req-table thead th { font-size:11px; font-weight:600; letter-spacing:.06em; color:var(--ink-3); text-transform:uppercase; border-bottom:1px solid var(--border); }
+.req-table tbody tr { border-bottom:1px solid var(--border); transition:background .12s; scroll-margin-top:72px; }
+.req-table tbody tr:hover { background:#F5F5F4; }
+.req-table tbody tr:target { background:var(--accent-soft); }
+.req-id { display:inline-block; font-family:var(--mono); font-weight:700; font-size:12.5px; color:var(--accent); background:var(--accent-soft); padding:2px 8px; border-radius:var(--r-sm); white-space:nowrap; }
+.ref-chip { display:inline-block; font-family:var(--mono); font-size:11.5px; padding:2px 8px; margin:2px 4px 2px 0; border:1px solid var(--border); border-radius:var(--r-full); color:var(--ink-2); text-decoration:none; transition:border-color .12s var(--ease),color .12s var(--ease); }
+.ref-chip:hover { border-color:var(--accent); color:var(--accent); }
+/* code block (dark, with copy) */
+.code-block { position:relative; margin:16px 0; }
+.code-block pre { background:var(--code-bg); color:var(--code-ink); border-radius:var(--r-md); padding:16px 18px; overflow-x:auto; font-family:var(--mono); font-size:13px; line-height:1.7; }
+.code-block .copy-btn { position:absolute; top:10px; right:10px; font-size:11px; font-family:var(--mono); color:var(--code-ink); background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:var(--r-sm); padding:3px 10px; cursor:pointer; transition:background .12s; }
+.code-block .copy-btn:hover { background:rgba(255,255,255,.18); }
+/* callout */
+.callout { margin:16px 0; padding:12px 16px; border-radius:var(--r-md); border-left:3px solid var(--info); background:var(--raised); font-size:14px; color:var(--ink-2); }
+.callout.warn { border-left-color:var(--warn); } .callout.error { border-left-color:var(--error); } .callout.ok { border-left-color:var(--ok); }
+.callout strong { color:var(--ink); }
+/* scope grid (対象/対象外) */
+.scope-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.scope { padding:16px 18px; border-radius:var(--r-md); border:1px solid var(--border); background:var(--raised); }
+.scope.in { border-left:3px solid var(--ok); } .scope.out { border-left:3px solid var(--ink-3); }
+.scope h3 { font-size:13px; color:var(--ink-2); margin-bottom:8px; }
+.scope ul { padding-left:18px; font-size:14px; line-height:1.8; }
+/* footer prev/next */
+.doc-footer { display:flex; justify-content:space-between; gap:16px; margin-top:64px; padding-top:24px; border-top:1px solid var(--border); }
+.doc-footer a { display:block; padding:14px 18px; min-width:200px; border:1px solid var(--border); border-radius:var(--r-md); text-decoration:none; color:var(--ink); font-weight:600; font-size:14px; background:var(--raised); transition:transform .18s var(--ease),box-shadow .18s var(--ease),border-color .18s var(--ease); }
+.doc-footer a:hover { transform:translateY(-2px); box-shadow:var(--shadow-2); border-color:var(--accent); }
+.doc-footer a small { display:block; font-size:11px; font-weight:500; color:var(--ink-3); letter-spacing:.06em; }
+.doc-footer .next { text-align:right; margin-left:auto; }
+@media (max-width:1100px) { .layout { grid-template-columns:190px minmax(0,1fr); gap:32px; } }
+@media (max-width:768px) {
+  .header-meta, .phase-chip { display:none; }
+  .layout { grid-template-columns:1fr; gap:0; }
+  .nav { position:static; height:auto; padding:20px 0 0; display:flex; gap:16px; overflow-x:auto; }
+  .nav-label { display:none; } .scope-grid { grid-template-columns:1fr; }
+}
+@media (prefers-reduced-motion:reduce) { * { transition:none !important; animation:none !important; } html { scroll-behavior:auto; } }
+@media (max-width:480px) { .doc-footer { flex-direction:column; } .doc-footer a { min-width:0; } .doc-footer .next { margin-left:0; } }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <a class="back" href="../00_ドキュメントマップ.html">← ドキュメントマップ</a>
+  <div class="brand">ZT-NW<span>特化</span></div>
+  <span class="phase-chip">PHASE 0 ログイン</span>
+  <div class="header-meta">nwzt-lan / OrbStack VM(arm64)</div>
+</header>
+<div class="layout">
+  <nav class="nav" aria-label="ログインコマンド 目次">
+    <div class="nav-label">目次</div>
+    <a href="#s1" class="current">1. VM接続</a>
+    <a href="#s2">2. 稼働確認</a>
+    <a href="#s3">3. 機器コンソール</a>
+    <a href="#s4">4. エンドポイント接続</a>
+    <a href="#s5">5. ログインできない場合</a>
+    <a href="#s6">6. 全機器実ログイン確認日</a>
+  </nav>
+  <main class="doc">
+    <div class="breadcrumb"><a href="../00_ドキュメントマップ.html">ドキュメントマップ</a> / ログインコマンド</div>
+    <h1>機器別ログインコマンド</h1>
+    <div class="doc-meta">
+      <span class="badge">login</span>
+      <span class="badge st-warn"><span class="dot"></span>draft</span>
+      <span class="badge">最終更新 2026-07-08</span>
+    </div>
+
+    <section id="s1">
+      <h2>1. VM接続<a href="#s1">#</a></h2>
+      <p class="note">以下はすべて OrbStack Linux VM clab で実行する。</p>
+      <div class="code-block">
+        <button class="copy-btn">copy</button>
+        <pre>ssh clab@orb
+cd /path/to/Mac仮想環境構築/ゼロトラスト_ネットワーク特化/04_構築</pre>
+      </div>
+      <p class="note">上記パスはVM内での作業ディレクトリの例。本文に実際の絶対パスは書かない。</p>
+    </section>
+
+    <section id="s2">
+      <h2>2. 稼働確認<a href="#s2">#</a></h2>
+      <div class="code-block">
+        <button class="copy-btn">copy</button>
+        <pre>./deploy-all.sh inspect</pre>
+      </div>
+      <p class="note">core-sw・radius・pc-sales・pc-dev・guest-pc・pc-unauth・srv-app1・host-infected が running であることを確認する（nwzt-srv0 は clab ノードではなく docker bridge のため inspect には現れない）。</p>
+      <p class="note">N2/N3 は clab 管理外の docker コンテナのため別途確認する。</p>
+      <div class="code-block">
+        <button class="copy-btn">copy</button>
+        <pre>sudo docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E 'ziti|apptun|clienttun|suricata|loki|promtail|grafana'</pre>
+      </div>
+    </section>
+
+    <section id="s3">
+      <h2>3. 機器コンソール（docker attach）<a href="#s3">#</a></h2>
+      <div class="callout warn">IOL コアスイッチのみ対象。抜けるのは <span class="mono">Ctrl-p → Ctrl-q</span>（Ctrl-c は使わない）。</div>
+      <h3 class="sub">core-sw</h3>
+      <div class="code-block">
+        <button class="copy-btn">copy</button>
+        <pre>sudo docker attach --sig-proxy=false clab-nwzt-lan-core-sw</pre>
+      </div>
+    </section>
+
+    <section id="s4">
+      <h2>4. エンドポイント接続（docker exec）<a href="#s4">#</a></h2>
+      <h3 class="sub">clab管理下のLinuxノード（radius / pc-sales / pc-dev / guest-pc / pc-unauth / srv-app1 / host-infected）</h3>
+      <div class="code-block">
+        <button class="copy-btn">copy</button>
+        <pre>sudo docker exec -it clab-nwzt-lan-&lt;node&gt; sh</pre>
+      </div>
+      <p class="note">exit で抜ける。</p>
+      <h3 class="sub">N2 ZTNA（clab管理外・docker run起動）</h3>
+      <div class="code-block">
+        <button class="copy-btn">copy</button>
+        <pre>sudo docker exec -it ziti sh        # controller + router
+sudo docker exec -it apptun sh      # srv-app1側 tunneler（zn-ziti + nwzt-srv0）
+sudo docker exec -it clienttun sh   # リモート社員端末役（zn-zitiのみ）</pre>
+      </div>
+      <h3 class="sub">N3 NDR（clab管理外・docker run起動、--network host）</h3>
+      <div class="code-block">
+        <button class="copy-btn">copy</button>
+        <pre>sudo docker exec -it suricata sh
+sudo docker logs --tail 50 promtail</pre>
+      </div>
+      <p class="note">Grafana UI は VM内 <span class="mono">localhost:3000</span>（匿名Admin有効、<span class="mono">GF_SECURITY_ADMIN_PASSWORD=admin</span>）、Loki API は <span class="mono">localhost:3100</span>。Macから見る場合はVM側でのポート転送を別途行う。</p>
+    </section>
+
+    <section id="s5">
+      <h2>5. ログインできない場合<a href="#s5">#</a></h2>
+      <h3 class="sub">5.1 コンテナ確認</h3>
+      <div class="code-block">
+        <button class="copy-btn">copy</button>
+        <pre>sudo docker ps --format 'table {{.Names}}\t{{.Status}}' | grep clab-nwzt-lan</pre>
+      </div>
+      <h3 class="sub">5.2 起動ログ確認</h3>
+      <div class="code-block">
+        <button class="copy-btn">copy</button>
+        <pre>sudo docker logs --tail 50 clab-nwzt-lan-core-sw</pre>
+      </div>
+      <h3 class="sub">5.3 iouyap未起動を疑う場合</h3>
+      <p class="note">IOL はデータプレーンに iouyap(513) が必須。全断（コンソールは繋がるがpingが通らない）の場合はまずこれを疑う。</p>
+      <div class="code-block">
+        <button class="copy-btn">copy</button>
+        <pre>./deploy-all.sh iouyap</pre>
+      </div>
+      <h3 class="sub">5.4 ラボを作り直す場合</h3>
+      <div class="callout error">保存していない設定は消える。</div>
+      <div class="code-block">
+        <button class="copy-btn">copy</button>
+        <pre>./deploy-all.sh destroy
+./deploy-all.sh deploy</pre>
+      </div>
+    </section>
+
+    <section id="s6">
+      <h2>6. 全機器実ログイン確認日<a href="#s6">#</a></h2>
+      <p class="note">2026-06-30決定事項: 新規テーマは全ノードの実ログインを確認してから完了とする。</p>
+      <table class="req-table">
+        <thead><tr><th>ノード名</th><th>確認日</th><th>確認者</th><th>備考</th></tr></thead>
+        <tbody>
+          <tr><td class="note">（未記入）</td><td class="note">—</td><td class="note">—</td><td class="note">—</td></tr>
+        </tbody>
+      </table>
+      <p class="note"><span class="badge st-neutral"><span class="dot"></span>⬜ 未記入</span> 本表は本ドキュメント作成時点で未記入。</p>
+    </section>
+
+    <div class="doc-footer">
+      <a class="next" href="../01_要件定義/01_要件定義書.html"><small>次工程 →</small>要件定義書</a>
+    </div>
+  </main>
+</div>
+<script>
+"use strict";
+document.querySelectorAll('.code-block').forEach(b=>{const btn=b.querySelector('.copy-btn');if(!btn)return;btn.addEventListener('click',()=>{const t=b.querySelector('pre').innerText;navigator.clipboard&&navigator.clipboard.writeText(t);btn.textContent='copied';setTimeout(()=>btn.textContent='copy',1200);});});
+const navLinks = [...document.querySelectorAll(".nav a")];
+const sections = [...document.querySelectorAll("main section")];
+const spy = new IntersectionObserver((entries) => {
+  entries.forEach((entry) => {
+    if (!entry.isIntersecting) return;
+    navLinks.forEach((a) => a.classList.toggle("current", a.getAttribute("href") === `#${entry.target.id}`));
+  });
+}, { rootMargin: "-20% 0px -70% 0px" });
+sections.forEach((s) => spy.observe(s));
+</script>
+</body>
+</html>

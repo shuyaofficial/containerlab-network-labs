@@ -1,0 +1,83 @@
+name: nwzt-lan
+# ゼロトラスト_ネットワーク特化 統合トポロジ（仮想企業 社内LAN）
+# core-sw(IOL: 802.1X 認証者 + L3 SVI + inter-VLAN ACL) を中核に、
+# 業務端末・RADIUS・サーバ室ブリッジ(nwzt-srv0)を1つのLANに束ねる。
+# サーバ室VLAN50は docker bridge nwzt-srv0 として実体化し N3 Suricata が東西を監視、
+# N2 OpenZiti は別途 docker で併走し srv-app1 をダークサービス化する。
+mgmt:
+  network: clab-nwzt-lan-mgmt
+  ipv4-subnet: 172.20.40.0/24
+
+topology:
+  nodes:
+    core-sw:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      type: l2
+      mgmt-ipv4: 172.20.40.11
+    radius:
+      kind: linux
+      image: nac-freeradius:local
+      mgmt-ipv4: 172.20.40.10
+      exec:
+        - ip addr add 172.31.0.10/24 dev eth1
+    pc-sales:
+      # 営業端末: 802.1X(alice) 認証成功 → 動的VLAN10。データIPは認証後に付与。
+      kind: linux
+      image: nac-client:local
+      mgmt-ipv4: 172.20.40.21
+    pc-dev:
+      # 開発端末: 静的アクセス VLAN20（既にプロビジョン済みの端末を想定）
+      kind: linux
+      image: microseg-endpoint:local
+      mgmt-ipv4: 172.20.40.22
+      exec:
+        - ip addr add 172.31.20.101/24 dev eth1
+        - ip link set eth1 up
+    guest-pc:
+      # ゲスト端末: 静的アクセス VLAN30
+      kind: linux
+      image: microseg-endpoint:local
+      mgmt-ipv4: 172.20.40.23
+      exec:
+        - ip addr add 172.31.30.101/24 dev eth1
+        - ip link set eth1 up
+    pc-unauth:
+      # 未認証端末: サプリカント未起動 → no-response → 隔離VLAN99
+      kind: linux
+      image: nac-client:local
+      mgmt-ipv4: 172.20.40.24
+    nwzt-srv0:
+      # サーバ室VLAN50の実体ブリッジ（deploy-all.sh が事前に ip link で作成する）
+      kind: bridge
+    srv-app1:
+      # 保護対象サーバ: http/80 + 疑似ssh/22。N2ダークサービス対象・N4層2 nft遮断対象。
+      kind: linux
+      image: microseg-endpoint:local
+      mgmt-ipv4: 172.20.40.31
+      exec:
+        - ip addr add 172.31.50.11/24 dev eth1
+        - ip link set eth1 up
+        - ip route replace 172.31.0.0/16 via 172.31.50.1
+    host-infected:
+      # 感染端末（東西スキャン源）: N3検知・N4層2遮断の対象。nmap入り。
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.20.40.32
+      exec:
+        - ip addr add 172.31.50.31/24 dev eth1
+        - ip link set eth1 up
+        - ip route replace 172.31.0.0/16 via 172.31.50.1
+
+  # 注: clab の cisco_iol は ethN を IOL の Ethernet に順にマップするが、IOL は
+  #     スロットあたり4ポート（Et0/0-0/3, Et1/0-1/2…）。eth4/5/6 は Et1/0/Et1/1/Et1/2 に対応する
+  #     （Et0/4/0/5/0/6 は存在しない）。core_sw_merged.cfg の interface 名はこれに整合させている。
+  links:
+    - endpoints: ["core-sw:eth1", "pc-sales:eth1"]     # Et0/1 = 802.1X → 動的VLAN10
+    - endpoints: ["core-sw:eth2", "pc-dev:eth1"]        # Et0/2 = 静的VLAN20
+    - endpoints: ["core-sw:eth3", "guest-pc:eth1"]      # Et0/3 = 静的VLAN30
+    - endpoints: ["core-sw:eth4", "pc-unauth:eth1"]     # Et1/0 = 802.1X → 隔離VLAN99
+    - endpoints: ["core-sw:eth5", "radius:eth1"]        # Et1/1 = VLAN100(RADIUS到達)
+    - endpoints: ["core-sw:eth6", "nwzt-srv0:srv-uplink"]     # Et1/2 = VLAN50 uplink → サーバ室ブリッジ
+    - endpoints: ["srv-app1:eth1", "nwzt-srv0:srv-app1"]      # サーバ室内
+    - endpoints: ["host-infected:eth1", "nwzt-srv0:srv-infected"]  # サーバ室内（東西）

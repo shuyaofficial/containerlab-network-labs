@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>試験計画書 | ゼロトラスト_ネットワーク特化</title>
+<style>
+:root {
+  --surface:#FAFAF9; --raised:#FFFFFF; --ink:#1C1917; --ink-2:#57534E; --ink-3:#A8A29E; --border:#E7E5E4;
+  --accent:#BE185D; --accent-soft:#FDF2F8;
+  --ok:#10B981; --warn:#F59E0B; --error:#EF4444; --info:#3B82F6; --neutral:#94A3B8;
+  --code-bg:#0F172A; --code-ink:#E2E8F0;
+  --mono:"SF Mono",Menlo,Consolas,monospace; --sans:"Hiragino Sans","Noto Sans JP",sans-serif;
+  --r-sm:6px; --r-md:10px; --r-full:999px;
+  --shadow-1:0 1px 3px rgba(0,0,0,.06); --shadow-2:0 8px 30px rgba(0,0,0,.12);
+  --ease:cubic-bezier(0.16,1,0.3,1);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; scroll-padding-top:72px; }
+body { font-family:var(--sans); font-size:15px; line-height:1.8; color:var(--ink); background:var(--surface); }
+.mono { font-family:var(--mono); font-feature-settings:"tnum"; }
+.num { text-align:right; }
+.site-header { position:sticky; top:0; z-index:50; display:flex; align-items:center; gap:20px; height:56px; padding:0 24px; background:rgba(250,250,249,.85); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); }
+.site-header .back { font-size:13px; color:var(--ink-2); text-decoration:none; transition:color .15s var(--ease); }
+.site-header .back:hover { color:var(--accent); }
+.brand { font-weight:700; font-size:15px; letter-spacing:-.01em; }
+.brand span { color:var(--accent); }
+.phase-chip { padding:3px 12px; font-family:var(--mono); font-size:11px; letter-spacing:.08em; color:var(--accent); background:var(--accent-soft); border-radius:var(--r-full); }
+.header-meta { margin-left:auto; font-size:12px; color:var(--ink-2); }
+.layout { display:grid; grid-template-columns:220px minmax(0,1fr); gap:48px; max-width:1100px; margin:0 auto; padding:0 24px; }
+.nav { position:sticky; top:56px; height:calc(100vh - 56px); overflow-y:auto; padding:40px 0; }
+.nav-label { font-size:11px; font-weight:600; letter-spacing:.08em; color:var(--ink-3); text-transform:uppercase; margin-bottom:10px; }
+.nav a { display:block; padding:6px 10px; margin-left:-10px; font-size:13.5px; color:var(--ink-2); text-decoration:none; border-radius:var(--r-sm); transition:color .12s var(--ease),background .12s var(--ease); }
+.nav a:hover { color:var(--ink); background:#F5F5F4; }
+.nav a.current { color:var(--accent); background:var(--accent-soft); font-weight:600; }
+.doc { padding:40px 0 96px; min-width:0; }
+.breadcrumb { font-size:12px; color:var(--ink-3); margin-bottom:12px; }
+.breadcrumb a { color:inherit; text-decoration:none; }
+.breadcrumb a:hover { color:var(--accent); }
+h1 { font-size:28px; font-weight:700; letter-spacing:-.01em; line-height:1.3; }
+.doc-meta { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 40px; }
+.badge { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; font-size:12px; font-weight:500; border-radius:var(--r-full); border:1px solid var(--border); background:var(--raised); color:var(--ink-2); }
+.badge .dot { width:7px; height:7px; border-radius:50%; background:var(--ok); }
+.badge.ver { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); font-family:var(--mono); }
+/* status badge: ✅→ok, ◐→warn, ⬜→neutral */
+.badge.st-ok .dot { background:var(--ok); } .badge.st-ok { color:var(--ok); border-color:var(--ok); }
+.badge.st-warn .dot { background:var(--warn); } .badge.st-warn { color:#B45309; border-color:var(--warn); }
+.badge.st-neutral .dot { background:var(--neutral); } .badge.st-neutral { color:var(--ink-2); }
+section { margin-bottom:56px; scroll-margin-top:72px; overflow-x:auto; }
+h2 { font-size:20px; font-weight:600; margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+h2 a { color:var(--ink-3); text-decoration:none; opacity:0; margin-left:6px; font-weight:400; }
+h2:hover a { opacity:1; }
+h3.sub { font-size:14px; font-weight:600; color:var(--ink-2); margin:24px 0 10px; }
+p.note { font-size:13.5px; color:var(--ink-2); margin-bottom:12px; }
+ul, ol { padding-left:20px; font-size:14.5px; line-height:1.9; }
+/* tables */
+.req-table { width:100%; border-collapse:collapse; font-size:14px; min-width:620px; }
+.req-table th, .req-table td { padding:12px; text-align:left; vertical-align:top; }
+.req-table thead th { font-size:11px; font-weight:600; letter-spacing:.06em; color:var(--ink-3); text-transform:uppercase; border-bottom:1px solid var(--border); }
+.req-table tbody tr { border-bottom:1px solid var(--border); transition:background .12s; scroll-margin-top:72px; }
+.req-table tbody tr:hover { background:#F5F5F4; }
+.req-table tbody tr:target { background:var(--accent-soft); }
+.req-id { display:inline-block; font-family:var(--mono); font-weight:700; font-size:12.5px; color:var(--accent); background:var(--accent-soft); padding:2px 8px; border-radius:var(--r-sm); white-space:nowrap; }
+.ref-chip { display:inline-block; font-family:var(--mono); font-size:11.5px; padding:2px 8px; margin:2px 4px 2px 0; border:1px solid var(--border); border-radius:var(--r-full); color:var(--ink-2); text-decoration:none; transition:border-color .12s var(--ease),color .12s var(--ease); }
+.ref-chip:hover { border-color:var(--accent); color:var(--accent); }
+/* code block (dark, with copy) */
+.code-block { position:relative; margin:16px 0; }
+.code-block pre { background:var(--code-bg); color:var(--code-ink); border-radius:var(--r-md); padding:16px 18px; overflow-x:auto; font-family:var(--mono); font-size:13px; line-height:1.7; }
+.code-block .copy-btn { position:absolute; top:10px; right:10px; font-size:11px; font-family:var(--mono); color:var(--code-ink); background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:var(--r-sm); padding:3px 10px; cursor:pointer; transition:background .12s; }
+.code-block .copy-btn:hover { background:rgba(255,255,255,.18); }
+/* callout */
+.callout { margin:16px 0; padding:12px 16px; border-radius:var(--r-md); border-left:3px solid var(--info); background:var(--raised); font-size:14px; color:var(--ink-2); }
+.callout.warn { border-left-color:var(--warn); } .callout.error { border-left-color:var(--error); } .callout.ok { border-left-color:var(--ok); }
+.callout strong { color:var(--ink); }
+/* scope grid (対象/対象外) */
+.scope-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.scope { padding:16px 18px; border-radius:var(--r-md); border:1px solid var(--border); background:var(--raised); }
+.scope.in { border-left:3px solid var(--ok); } .scope.out { border-left:3px solid var(--ink-3); }
+.scope h3 { font-size:13px; color:var(--ink-2); margin-bottom:8px; }
+.scope ul { padding-left:18px; font-size:14px; line-height:1.8; }
+/* footer prev/next */
+.doc-footer { display:flex; justify-content:space-between; gap:16px; margin-top:64px; padding-top:24px; border-top:1px solid var(--border); }
+.doc-footer a { display:block; padding:14px 18px; min-width:200px; border:1px solid var(--border); border-radius:var(--r-md); text-decoration:none; color:var(--ink); font-weight:600; font-size:14px; background:var(--raised); transition:transform .18s var(--ease),box-shadow .18s var(--ease),border-color .18s var(--ease); }
+.doc-footer a:hover { transform:translateY(-2px); box-shadow:var(--shadow-2); border-color:var(--accent); }
+.doc-footer a small { display:block; font-size:11px; font-weight:500; color:var(--ink-3); letter-spacing:.06em; }
+.doc-footer .next { text-align:right; margin-left:auto; }
+@media (max-width:1100px) { .layout { grid-template-columns:190px minmax(0,1fr); gap:32px; } }
+@media (max-width:768px) {
+  .header-meta, .phase-chip { display:none; }
+  .layout { grid-template-columns:1fr; gap:0; }
+  .nav { position:static; height:auto; padding:20px 0 0; display:flex; gap:16px; overflow-x:auto; }
+  .nav-label { display:none; } .scope-grid { grid-template-columns:1fr; }
+}
+@media (prefers-reduced-motion:reduce) { * { transition:none !important; animation:none !important; } html { scroll-behavior:auto; } }
+@media (max-width:480px) { .doc-footer { flex-direction:column; } .doc-footer a { min-width:0; } .doc-footer .next { margin-left:0; } }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <a class="back" href="../00_ドキュメントマップ.html">← ドキュメントマップ</a>
+  <div class="brand">ZT-NW<span>特化</span></div>
+  <span class="phase-chip">PHASE 5 試験計画</span>
+  <div class="header-meta">nwzt-lan / OrbStack VM(arm64)</div>
+</header>
+<div class="layout">
+  <nav class="nav" aria-label="試験計画書 目次">
+    <div class="nav-label">目次</div>
+    <a href="#s1" class="current">1. 試験方針</a>
+    <a href="#s2">2. 試験項目表（B1〜B6）</a>
+    <a href="#s3">3. 個別チェックリスト</a>
+    <a href="#s4">4. 合格基準</a>
+    <a href="#s5">5. 参照</a>
+  </nav>
+  <main class="doc">
+    <div class="breadcrumb"><a href="../00_ドキュメントマップ.html">ドキュメントマップ</a> / 試験計画書</div>
+    <h1>試験計画書</h1>
+    <div class="doc-meta">
+      <span class="badge">test-plan</span>
+      <span class="badge st-warn"><span class="dot"></span>draft</span>
+      <span class="badge">最終更新 2026-07-08</span>
+    </div>
+
+    <section id="s1">
+      <h2>1. 試験方針<a href="#s1">#</a></h2>
+      <p class="note">N1(NAC)・N4(μセグ)・N3(NDR)・N2(ZTNA) を統合した単一トポロジが、基本設計書の設計通りに実際のデプロイで動作することを、B1〜B6の6ゲートで確認する。検証は次の3階層で構成する。</p>
+      <ol>
+        <li><strong>基盤層（B1）</strong> — clab deploy・iouyap起動・統合config反映など、上位のすべてのゲートが前提とする土台が整っていることを確認する。</li>
+        <li><strong>個別機能ゲート層（B2〜B5）</strong> — N1/N4/N3/N2 それぞれの機能が単独で設計通り動作することを、機能ごとに独立して確認する。</li>
+        <li><strong>統合層（B6）</strong> — B2〜B5を単一トポロジ上で連続実施し、矛盾なく成立することを確認するE2E通し試験。</li>
+      </ol>
+      <div class="callout ok"><strong>実施済み。</strong> 2026-07-08 に実デプロイ検証を実施済み。判定と実測エビデンスは <a class="ref-chip" href="08_試験結果報告書.html">08_試験結果報告書</a> を正とする（B1〜B6 は合格、B2b 未認証→VLAN99 自動割当のみ ◐ 残課題）。本書は各ゲートの手順・期待結果を定義する。</div>
+    </section>
+
+    <section id="s2">
+      <h2>2. 試験項目表（B1〜B6）<a href="#s2">#</a></h2>
+      <table class="req-table">
+        <thead><tr><th>ID</th><th>対象</th><th>項目</th><th>手順概要</th><th>期待結果</th><th>判定</th></tr></thead>
+        <tbody>
+          <tr id="B1"><td><span class="req-id">B1</span></td><td>基盤</td><td>clab deploy + iouyap + config反映</td><td class="mono">deploy-all.sh deploy → config を実行</td><td>全ノードrunning、core-swの全SVIがup/up、write memory完了</td><td><span class="badge st-neutral"><span class="dot"></span>⬜ 実デプロイ後に記録</span></td></tr>
+          <tr id="B2"><td><span class="req-id">B2</span></td><td>N1 NAC</td><td>動的VLAN割当</td><td class="mono">pc-salesでサプリカント起動、pc-unauthは未起動のまま放置</td><td>pc-sales(Et0/1)がAUTHORIZED・VLAN10、pc-unauth(Et1/0)がVLAN99（no-response）</td><td><span class="badge st-neutral"><span class="dot"></span>⬜ 実デプロイ後に記録</span></td></tr>
+          <tr id="B3"><td><span class="req-id">B3</span></td><td>N4 μセグ</td><td>inter-VLAN ACL + ホストnftables</td><td class="mono">deploy-all.sh verify（層1）→ nft適用 → host-infected→srv-app1到達性再確認（層2）</td><td>pc-sales→srv-app1:80=到達(HTTP200)・:22=遮断、nft適用後host-infected→srv-app1=遮断（適用前は到達）</td><td><span class="badge st-neutral"><span class="dot"></span>⬜ 実デプロイ後に記録</span></td></tr>
+          <tr id="B4"><td><span class="req-id">B4</span></td><td>N3 NDR</td><td>east-west検知</td><td class="mono">deploy-all.sh scan → eve</td><td>eve.jsonにsid:1000001のalertが記録され、Loki/Grafanaで確認できる</td><td><span class="badge st-neutral"><span class="dot"></span>⬜ 実デプロイ後に記録</span></td></tr>
+          <tr id="B5"><td><span class="req-id">B5</span></td><td>N2 ZTNA</td><td>overlay到達</td><td class="mono">setup_ziti.sh の実証部分を実行</td><td>clienttun→localhost:8080(overlay)=HTTP200、clienttun→172.31.50.11:80(直接)=到達不能</td><td><span class="badge st-neutral"><span class="dot"></span>⬜ 実デプロイ後に記録</span></td></tr>
+          <tr id="B6"><td><span class="req-id">B6</span></td><td>E2E</td><td>通し確認</td><td class="mono">B1〜B5を通しで実施</td><td>全ゲートが矛盾なく成立し、試験結果に記録可能な状態になる</td><td><span class="badge st-neutral"><span class="dot"></span>⬜ 実デプロイ後に記録</span></td></tr>
+        </tbody>
+      </table>
+      <p class="note">上表の判定欄は策定時点の記述のまま保持している。実測結果は <a class="ref-chip" href="08_試験結果報告書.html">08_試験結果報告書</a> を参照。</p>
+    </section>
+
+    <section id="s3">
+      <h2>3. 個別チェックリスト<a href="#s3">#</a></h2>
+      <h3 class="sub">B1 基盤疎通</h3>
+      <ul>
+        <li>☐ core-sw で <span class="mono">show ip interface brief | include Vlan</span> を実行し、Vlan10/20/30/50/99/100 が up/up であることを確認する。</li>
+        <li>☐ core-sw で <span class="mono">show authentication sessions</span> が実行できること（構文エラーが出ないこと）を確認する。</li>
+      </ul>
+      <h3 class="sub">B2 N1 動的VLAN</h3>
+      <ul>
+        <li>☐ core-sw で <span class="mono">show authentication sessions</span> を実行し、pc-sales(Et0/1)がVLAN10でAUTHORIZEDと表示されることを確認する。</li>
+        <li>☐ core-sw で pc-unauth(Et1/0)がno-responseによりVLAN99へ割当されていることを確認する。</li>
+      </ul>
+      <h3 class="sub">B3 N4 μセグ（2層）</h3>
+      <ul>
+        <li>☐ pc-sales→srv-app1:80がHTTP 200で到達することを確認する。</li>
+        <li>☐ pc-sales→srv-app1:22がACL SEG10-OUT のdenyで遮断されることを確認する。</li>
+        <li>☐ nft適用前、host-infected→srv-app1が到達可能であることを対照として確認する。</li>
+        <li>☐ deploy-all.sh nft 適用後、host-infected→srv-app1が遮断されることを確認する。</li>
+      </ul>
+      <h3 class="sub">B4 N3 検知</h3>
+      <ul>
+        <li>☐ deploy-all.sh scan でhost-infected→srv-app1へSYNスキャンを実行する。</li>
+        <li>☐ deploy-all.sh eve でsid:1000001のalertが出力されることを確認する。</li>
+        <li>☐ Grafana(:3000)でLoki経由のログが可視化されることを確認する。</li>
+      </ul>
+      <h3 class="sub">B5 N2 overlay到達</h3>
+      <ul>
+        <li>☐ clienttunからoverlay経由（localhost:8080）でsrv-app1にHTTP 200で到達することを確認する。</li>
+        <li>☐ clienttunから直接（172.31.50.11:80）は到達不能であることを確認する。</li>
+      </ul>
+      <h3 class="sub">総合障害試験</h3>
+      <ul>
+        <li>☐ core-swの dot1x timeout tx-period 到達後の再認証挙動を確認する（サプリカント再起動で再認証されること）。</li>
+        <li>☐ deploy-all.sh nft-flush でN4層2ルールを解除し、host-infected→srv-app1の到達が復旧することを確認する。</li>
+      </ul>
+    </section>
+
+    <section id="s4">
+      <h2>4. 合格基準<a href="#s4">#</a></h2>
+      <ul>
+        <li>B1〜B5の必須項目が全て合格していること。</li>
+        <li>B6（E2E通し）でB1〜B5の結果に矛盾がないこと。</li>
+        <li>総合障害試験で、再認証・nft解除後にそれぞれ期待通りの状態へ復旧すること。</li>
+        <li>上記が確認でき次第、05_試験/試験結果_YYYY-MM-DD.md を新規作成し実測値を記録する。</li>
+      </ul>
+    </section>
+
+    <section id="s5">
+      <h2>5. 参照<a href="#s5">#</a></h2>
+      <p>
+        <a class="ref-chip" href="../02_基本設計/02_基本設計書.html">02_基本設計書</a>
+        <a class="ref-chip" href="../03_詳細設計/05_パラメータシート.html">05_パラメータシート</a>
+        <a class="ref-chip" href="../03_詳細設計/06_CLI投入コマンド.html">06_CLI投入コマンド</a>
+        <a class="ref-chip" href="10_切り分けシート.html">10_切り分けシート</a>
+      </p>
+      <p class="note">関連: ゼロトラスト完全版 試験計画書（別テーマのドキュメント群のため本ページ群の対象外・リンクなし）。</p>
+    </section>
+
+    <div class="doc-footer">
+      <a class="prev" href="../03_詳細設計/06_CLI投入コマンド.html"><small>← 前工程</small>CLI投入コマンド</a>
+      <a class="next" href="08_試験結果報告書.html"><small>次工程 →</small>試験結果報告書</a>
+    </div>
+  </main>
+</div>
+<script>
+"use strict";
+document.querySelectorAll('.code-block').forEach(b=>{const btn=b.querySelector('.copy-btn');if(!btn)return;btn.addEventListener('click',()=>{const t=b.querySelector('pre').innerText;navigator.clipboard&&navigator.clipboard.writeText(t);btn.textContent='copied';setTimeout(()=>btn.textContent='copy',1200);});});
+const navLinks = [...document.querySelectorAll(".nav a")];
+const sections = [...document.querySelectorAll("main section")];
+const spy = new IntersectionObserver((entries) => {
+  entries.forEach((entry) => {
+    if (!entry.isIntersecting) return;
+    navLinks.forEach((a) => a.classList.toggle("current", a.getAttribute("href") === `#${entry.target.id}`));
+  });
+}, { rootMargin: "-20% 0px -70% 0px" });
+sections.forEach((s) => spy.observe(s));
+</script>
+</body>
+</html>

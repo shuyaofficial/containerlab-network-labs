@@ -1,0 +1,25 @@
+#!/usr/bin/expect -f
+# 検証用 expect（設定投入なし・show のみ）: 認証セッション・ACLカウンタ・VLAN状態を採取。
+# 使い方: sudo expect verify_nwzt.exp <node>
+set timeout 40
+set node [lindex $argv 0]
+log_file -noappend /Users/shuya/Documents/claude/Mac仮想環境構築/ゼロトラスト_ネットワーク特化/04_構築/out_verify.log
+spawn sudo docker attach --sig-proxy=false $node
+send "\r"
+expect -re {[>#]}
+send "enable\r"
+expect "#"
+send "terminal length 0\r"
+expect "#"
+send "show authentication sessions\r"
+expect "#"
+send "show dot1x all summary\r"
+expect "#"
+send "show ip access-lists SEG10-OUT\r"
+expect "#"
+send "show vlan brief\r"
+expect "#"
+send "show ip interface brief | include Vlan\r"
+expect "#"
+send "\020\021"
+expect eof

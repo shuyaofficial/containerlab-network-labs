@@ -1,0 +1,54 @@
+%% ゼロトラスト_ネットワーク特化 — ネットワーク物理構成図
+%% 生成日: 2026-07-08
+%% このファイルは README_Lab_Challenge.md 内のトポロジ図と同一内容を保つ（単独参照・印刷用）。
+%% ノード名は nwzt.clab.yml のノード名と一致させること。
+
+graph TB
+    subgraph V100["VLAN100 コア・認証管理 172.31.0.0/24"]
+        RADIUS["radius 172.31.0.10"]
+    end
+    SW["core-sw（IOL L2-advipservices-2017）<br/>802.1X認証者 + L3 SVI + inter-VLAN ACL(SEG10-OUT)"]
+    subgraph V10["VLAN10 営業 172.31.10.0/24"]
+        SALES["pc-sales<br/>802.1X動的割当 → .101"]
+    end
+    subgraph V20["VLAN20 開発 172.31.20.0/24"]
+        DEV["pc-dev .101（静的）"]
+    end
+    subgraph V30["VLAN30 ゲスト 172.31.30.0/24"]
+        GUEST["guest-pc .101（静的）"]
+    end
+    subgraph V99["VLAN99 隔離 172.31.99.0/24"]
+        UNAUTH["pc-unauth（未認証→自動割当）"]
+    end
+    subgraph SRV["サーバ室 VLAN50 172.31.50.0/24（docker bridge nwzt-srv0）"]
+        APP["srv-app1 .11"]
+        INF["host-infected .31"]
+    end
+    subgraph SOC["監視SOC（論理VLAN90・host mode）"]
+        SURI["suricata -i nwzt-srv0"]
+        LOKI["loki:3100 / grafana:3000"]
+    end
+    subgraph ZTI["N2 ZTNA overlay（zn-ziti）"]
+        ZC["ziti controller+router"]
+        AT["apptun"]
+        CT["clienttun<br/>＝リモート社員端末"]
+    end
+
+    SALES -->|"EAPOL 802.1X"| SW
+    UNAUTH -.->|"no-response"| SW
+    DEV --- SW
+    GUEST --- SW
+    RADIUS -->|"RADIUS 1812/1813"| SW
+    SW -->|"SEG10-OUT ACL<br/>tcp80許可・tcp22拒否"| APP
+    SW ---|"Et1/2 uplink"| SRV
+    SURI -.->|"promiscuous監視"| SRV
+    SURI --> LOKI
+    AT -->|"dial(nwzt-srv0)"| APP
+    CT -.->|"直接到達不可"| APP
+    CT -->|"overlay経由 localhost:8080"| ZC
+    ZC --> AT
+    INF -.->|"東西SYNスキャン"| APP
+
+%% 拡張時のヒント:
+%% - 拠点を追加する場合は core-sw を集約点として subgraph を1つ追加する
+%% - ゾーンをまたぐ結線には必ずプロトコル名（802.1X/RADIUS/ACL/overlay等）か用途をラベルで書く

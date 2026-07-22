@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>基本設計書 | ZT-NW特化</title>
+<style>
+  :root {
+    --surface: #FAFAF9; --raised: #FFFFFF; --ink: #1C1917; --ink-2: #57534E; --ink-3: #A8A29E; --border: #E7E5E4;
+    --accent: #BE185D; --accent-soft: #FDF2F8;
+    --ok: #10B981; --warn: #F59E0B; --error: #EF4444; --info: #3B82F6; --neutral: #94A3B8;
+    --code-bg: #0F172A; --code-ink: #E2E8F0;
+    --mono: "SF Mono", Menlo, Consolas, monospace; --sans: "Hiragino Sans", "Noto Sans JP", sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-full: 999px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,.06); --shadow-2: 0 8px 30px rgba(0,0,0,.12);
+    --ease: cubic-bezier(0.16,1,0.3,1);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; scroll-padding-top:72px; }
+  body { font-family:var(--sans); font-size:15px; line-height:1.8; color:var(--ink); background:var(--surface); }
+  .mono { font-family:var(--mono); font-feature-settings:"tnum"; }
+  .num { text-align:right; }
+  .site-header { position:sticky; top:0; z-index:50; display:flex; align-items:center; gap:20px; height:56px; padding:0 24px; background:rgba(250,250,249,.85); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); }
+  .site-header .back { font-size:13px; color:var(--ink-2); text-decoration:none; transition:color .15s var(--ease); }
+  .site-header .back:hover { color:var(--accent); }
+  .brand { font-weight:700; font-size:15px; letter-spacing:-.01em; }
+  .brand span { color:var(--accent); }
+  .phase-chip { padding:3px 12px; font-family:var(--mono); font-size:11px; letter-spacing:.08em; color:var(--accent); background:var(--accent-soft); border-radius:var(--r-full); }
+  .header-meta { margin-left:auto; font-size:12px; color:var(--ink-2); }
+  .layout { display:grid; grid-template-columns:220px minmax(0,1fr); gap:48px; max-width:1100px; margin:0 auto; padding:0 24px; }
+  .nav { position:sticky; top:56px; height:calc(100vh - 56px); overflow-y:auto; padding:40px 0; }
+  .nav-label { font-size:11px; font-weight:600; letter-spacing:.08em; color:var(--ink-3); text-transform:uppercase; margin-bottom:10px; }
+  .nav a { display:block; padding:6px 10px; margin-left:-10px; font-size:13.5px; color:var(--ink-2); text-decoration:none; border-radius:var(--r-sm); transition:color .12s var(--ease),background .12s var(--ease); }
+  .nav a:hover { color:var(--ink); background:#F5F5F4; }
+  .nav a.current { color:var(--accent); background:var(--accent-soft); font-weight:600; }
+  .doc { padding:40px 0 96px; min-width:0; }
+  .breadcrumb { font-size:12px; color:var(--ink-3); margin-bottom:12px; }
+  .breadcrumb a { color:inherit; text-decoration:none; }
+  .breadcrumb a:hover { color:var(--accent); }
+  h1 { font-size:28px; font-weight:700; letter-spacing:-.01em; line-height:1.3; }
+  .doc-meta { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 40px; }
+  .badge { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; font-size:12px; font-weight:500; border-radius:var(--r-full); border:1px solid var(--border); background:var(--raised); color:var(--ink-2); }
+  .badge .dot { width:7px; height:7px; border-radius:50%; background:var(--ok); }
+  .badge.ver { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); font-family:var(--mono); }
+  .badge.st-ok .dot { background:var(--ok); } .badge.st-ok { color:var(--ok); border-color:var(--ok); }
+  .badge.st-warn .dot { background:var(--warn); } .badge.st-warn { color:#B45309; border-color:var(--warn); }
+  .badge.st-neutral .dot { background:var(--neutral); } .badge.st-neutral { color:var(--ink-2); }
+  section { margin-bottom:56px; scroll-margin-top:72px; overflow-x:auto; }
+  h2 { font-size:20px; font-weight:600; margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+  h2 a { color:var(--ink-3); text-decoration:none; opacity:0; margin-left:6px; font-weight:400; }
+  h2:hover a { opacity:1; }
+  h3.sub { font-size:14px; font-weight:600; color:var(--ink-2); margin:24px 0 10px; }
+  p.note { font-size:13.5px; color:var(--ink-2); margin-bottom:12px; }
+  ul, ol { padding-left:20px; font-size:14.5px; line-height:1.9; }
+  .req-table { width:100%; border-collapse:collapse; font-size:14px; min-width:620px; }
+  .req-table th, .req-table td { padding:12px; text-align:left; vertical-align:top; }
+  .req-table thead th { font-size:11px; font-weight:600; letter-spacing:.06em; color:var(--ink-3); text-transform:uppercase; border-bottom:1px solid var(--border); }
+  .req-table tbody tr { border-bottom:1px solid var(--border); transition:background .12s; scroll-margin-top:72px; }
+  .req-table tbody tr:hover { background:#F5F5F4; }
+  .req-table tbody tr:target { background:var(--accent-soft); }
+  .req-id { display:inline-block; font-family:var(--mono); font-weight:700; font-size:12.5px; color:var(--accent); background:var(--accent-soft); padding:2px 8px; border-radius:var(--r-sm); white-space:nowrap; }
+  .ref-chip { display:inline-block; font-family:var(--mono); font-size:11.5px; padding:2px 8px; margin:2px 4px 2px 0; border:1px solid var(--border); border-radius:var(--r-full); color:var(--ink-2); text-decoration:none; transition:border-color .12s var(--ease),color .12s var(--ease); }
+  .ref-chip:hover { border-color:var(--accent); color:var(--accent); }
+  .code-block { position:relative; margin:16px 0; }
+  .code-block pre { background:var(--code-bg); color:var(--code-ink); border-radius:var(--r-md); padding:16px 18px; overflow-x:auto; font-family:var(--mono); font-size:13px; line-height:1.7; }
+  .code-block .copy-btn { position:absolute; top:10px; right:10px; font-size:11px; font-family:var(--mono); color:var(--code-ink); background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:var(--r-sm); padding:3px 10px; cursor:pointer; transition:background .12s; }
+  .code-block .copy-btn:hover { background:rgba(255,255,255,.18); }
+  .callout { margin:16px 0; padding:12px 16px; border-radius:var(--r-md); border-left:3px solid var(--info); background:var(--raised); font-size:14px; color:var(--ink-2); }
+  .callout.warn { border-left-color:var(--warn); } .callout.error { border-left-color:var(--error); } .callout.ok { border-left-color:var(--ok); }
+  .callout strong { color:var(--ink); }
+  .scope-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .scope { padding:16px 18px; border-radius:var(--r-md); border:1px solid var(--border); background:var(--raised); }
+  .scope.in { border-left:3px solid var(--ok); } .scope.out { border-left:3px solid var(--ink-3); }
+  .scope h3 { font-size:13px; color:var(--ink-2); margin-bottom:8px; }
+  .scope ul { padding-left:18px; font-size:14px; line-height:1.8; }
+  .doc-footer { display:flex; justify-content:space-between; gap:16px; margin-top:64px; padding-top:24px; border-top:1px solid var(--border); }
+  .doc-footer a { display:block; padding:14px 18px; min-width:200px; border:1px solid var(--border); border-radius:var(--r-md); text-decoration:none; color:var(--ink); font-weight:600; font-size:14px; background:var(--raised); transition:transform .18s var(--ease),box-shadow .18s var(--ease),border-color .18s var(--ease); }
+  .doc-footer a:hover { transform:translateY(-2px); box-shadow:var(--shadow-2); border-color:var(--accent); }
+  .doc-footer a small { display:block; font-size:11px; font-weight:500; color:var(--ink-3); letter-spacing:.06em; }
+  .doc-footer .next { text-align:right; margin-left:auto; }
+  @media (max-width:1100px) { .layout { grid-template-columns:190px minmax(0,1fr); gap:32px; } }
+  @media (max-width:768px) {
+    .header-meta, .phase-chip { display:none; }
+    .layout { grid-template-columns:1fr; gap:0; }
+    .nav { position:static; height:auto; padding:20px 0 0; display:flex; gap:16px; overflow-x:auto; }
+    .nav-label { display:none; } .scope-grid { grid-template-columns:1fr; }
+  }
+  @media (prefers-reduced-motion:reduce) { * { transition:none !important; animation:none !important; } html { scroll-behavior:auto; } }
+  @media (max-width:480px) { .doc-footer { flex-direction:column; } .doc-footer a { min-width:0; } .doc-footer .next { margin-left:0; } }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <a class="back" href="../00_ドキュメントマップ.html">← ドキュメントマップ</a>
+  <div class="brand">ZT-NW<span>特化</span></div>
+  <span class="phase-chip">PHASE 2 基本設計</span>
+  <div class="header-meta">nwzt-lan / OrbStack VM(arm64)</div>
+</header>
+<div class="layout">
+  <nav class="nav" aria-label="基本設計書 目次">
+    <div class="nav-label">目次</div>
+    <a href="#s1" class="current" data-target="s1">1. 設計方針</a>
+    <a href="#s2" data-target="s2">2. 全体構成</a>
+    <a href="#s3" data-target="s3">3. アドレス設計方針</a>
+    <a href="#s4" data-target="s4">4. 冗長性・拡張性</a>
+    <a href="#s5" data-target="s5">5. セキュリティ方針</a>
+    <a href="#s6" data-target="s6">6. 設計判断の記録</a>
+  </nav>
+  <main class="doc">
+    <div class="breadcrumb"><a href="../00_ドキュメントマップ.html">ドキュメントマップ</a> / 基本設計書</div>
+    <h1>基本設計書: ゼロトラスト_ネットワーク特化</h1>
+    <div class="doc-meta">
+      <span class="badge ver">v1.0</span>
+      <span class="badge st-warn"><span class="dot"></span>draft</span>
+      <span class="badge">最終更新 2026-07-08</span>
+      <span class="badge">対象: core-sw 単一IOL統合構成</span>
+    </div>
+
+    <section id="s1">
+      <h2>1. 設計方針<a href="#s1">#</a></h2>
+      <p class="note">本テーマはゼロトラスト完全版 基本設計書が定義した統合ポイントのうち、ネットワーク層に閉じるものを実装対象に選ぶ。</p>
+      <table class="req-table">
+        <thead><tr><th>完全版の統合ポイント/フロー</th><th>本テーマでの実装</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">I-2 認証→セグメント</td><td>RADIUS属性による動的VLAN割当（core-sw ↔ radius）→ inter-VLAN ACL(SEG10-OUT)</td></tr>
+          <tr><td class="mono">I-3 常時監視</td><td>東西SPAN代替として、サーバ室ブリッジ <span class="mono">nwzt-srv0</span> を Suricata が host mode でpromiscuous監視</td></tr>
+          <tr><td class="mono">I-5 サーバ非公開化</td><td>srv-app1 を OpenZiti overlay 経由のみ到達可能なダークサービスにする</td></tr>
+          <tr><td class="mono">F-A 社員PC入場</td><td>802.1X認証成功(pc-sales)→動的VLAN10→ACL通過でsrv-app1(tcp80)到達</td></tr>
+          <tr><td class="mono">F-C 感染端末の検知</td><td>host-infected の東西SYNスキャン→Suricata検知(sid:1000001)→層2 nftables 手動投入で隔離</td></tr>
+          <tr><td class="mono">F-D リモート社員のZTNA到達</td><td>clienttun→overlay(zn-ziti)→apptun→srv-app1。直接到達(172.31.50.11:80)は失敗する対照を示す</td></tr>
+          <tr><td class="mono">F-E サーバ間東西のμセグ</td><td>inter-VLAN ACL（層1）＋ 同一VLAN内ホストnftables（層2）の二層で東西を制御</td></tr>
+        </tbody>
+      </table>
+      <p class="note">I-1（ID統一）・I-4（検知→対応の自動CoA）・I-6（Webアプリ認可）・I-7（統合可観測の全社統合）・I-8（宣言型アクセス層）、およびL7由来のP0-P6は、いずれもL7層かCoA自動化を要するため本テーマのスコープ外とする。I-4のCoA自動隔離は完全版同様に◐設計のまま維持し、本テーマでは層2 nftables の手動投入によるデモに留める（<a class="ref-chip" href="../01_要件定義/01_要件定義書.html">要件定義書</a> 制約）。</p>
+    </section>
+
+    <section id="s2">
+      <h2>2. 全体構成<a href="#s2">#</a></h2>
+      <p class="note">単一の IOL コアスイッチ <span class="mono">core-sw</span> に、802.1X認証者(L2)とL3 SVI + inter-VLAN ACL(L4)を統合し、業務端末・RADIUS・サーバ室ブリッジを収容する。N2(ZTNA)・N3(NDR)は containerlab の管理外で docker 併走させ、<span class="mono">deploy-all.sh</span> が一括オーケストレーションする。</p>
+      <div class="code-block">
+        <button class="copy-btn">copy</button>
+        <pre>graph TB
+    RADIUS["radius&lt;br/&gt;172.31.0.10"] -->|"RADIUS(UDP1812/1813)"| SW
+    SW["core-sw&lt;br/&gt;802.1X + L3 SVI + ACL"]
+    SW ---|"Et0/1 dot1x"| SALES["pc-sales→VLAN10"]
+    SW ---|"Et0/2 static"| DEV["pc-dev VLAN20"]
+    SW ---|"Et0/3 static"| GUEST["guest-pc VLAN30"]
+    SW ---|"Et1/0 dot1x→隔離"| UNAUTH["pc-unauth→VLAN99"]
+    SW ---|"Et1/2 uplink VLAN50"| SRVBR["nwzt-srv0(docker bridge)"]
+    SRVBR --- APP["srv-app1 .11"]
+    SRVBR --- INF["host-infected .31"]
+    SURI["suricata(host mode)"] -.->|"promiscuous"| SRVBR
+    AT["apptun(zn-ziti+nwzt-srv0)"] -->|"dial"| APP
+    CT["clienttun(zn-zitiのみ)"] -->|"overlay"| ZC["ziti controller+router"] --> AT</pre>
+      </div>
+      <table class="req-table">
+        <thead><tr><th>ノード名</th><th>役割</th><th>ゾーン</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">core-sw</td><td>802.1X認証者 + L3 SVI + inter-VLAN ACL</td><td>コア</td></tr>
+          <tr><td class="mono">radius</td><td>FreeRADIUS認証サーバ</td><td>VLAN100 コア・認証管理</td></tr>
+          <tr><td class="mono">pc-sales</td><td>営業端末（802.1X動的割当）</td><td>VLAN10 営業</td></tr>
+          <tr><td class="mono">pc-dev</td><td>開発端末（静的）</td><td>VLAN20 開発</td></tr>
+          <tr><td class="mono">guest-pc</td><td>ゲスト端末（静的）</td><td>VLAN30 ゲスト</td></tr>
+          <tr><td class="mono">pc-unauth</td><td>未認証端末（隔離自動割当）</td><td>VLAN99 隔離</td></tr>
+          <tr><td class="mono">nwzt-srv0</td><td>サーバ室VLAN50の実体ブリッジ（docker network）</td><td>VLAN50 サーバ室</td></tr>
+          <tr><td class="mono">srv-app1</td><td>保護対象サーバ（http/80 + 疑似ssh/22）</td><td>VLAN50 サーバ室</td></tr>
+          <tr><td class="mono">host-infected</td><td>感染端末役（東西スキャン源）</td><td>VLAN50 サーバ室</td></tr>
+          <tr><td class="mono">suricata/loki/promtail/grafana</td><td>NDR検知＋集約</td><td>監視SOC（論理VLAN90・host mode）</td></tr>
+          <tr><td class="mono">ziti / apptun / clienttun</td><td>ZTNAコントローラ/ルータ・app側/client側tunneler</td><td>ZTNA overlay（zn-ziti）</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="s3">
+      <h2>3. アドレス設計方針<a href="#s3">#</a></h2>
+      <p class="note">ゼロトラスト完全版 IPアドレス管理表が定義した <span class="mono">172.31.0.0/16</span>・第3オクテット＝VLAN ID の設計を無変更で踏襲する。第4オクテットは <span class="mono">.1</span>=GW/SVI、<span class="mono">.10</span>台=認証、<span class="mono">.101〜</span>=端末の規則に従う。詳細なノード一覧・mgmt-ipv4・出自対応は<a class="ref-chip" href="03_IPアドレス管理表.html">03 IPアドレス管理表</a>に集約する（本書は方針のみ）。</p>
+    </section>
+
+    <section id="s4">
+      <h2>4. 冗長性・拡張性<a href="#s4">#</a></h2>
+      <ul>
+        <li>本テーマは実デプロイ検証を目的とした単一構成であり、冗長化しない（core-swは単一ノード、可用性は検証対象外）</li>
+        <li>拡張点: pc-dev/guest-pc用の独立アクセス層スイッチを追加すれば、完全版の「floor-sw」構成（アクセス層とコアの分離）に近づけられる。現状は単一IOLへの統合を優先している（§6 D-1参照）</li>
+        <li>I-4（検知→対応の自動化）は soar-lite 等のCoA連携コンポーネントを追加すれば発展できるが、本テーマのスコープ外とする</li>
+      </ul>
+    </section>
+
+    <section id="s5">
+      <h2>5. セキュリティ方針<a href="#s5">#</a></h2>
+      <table class="req-table">
+        <thead><tr><th>項目</th><th>実装</th><th>検証ゲート</th></tr></thead>
+        <tbody>
+          <tr id="B2"><td>N1 動的VLAN</td><td>RADIUS <span class="mono">Tunnel-Private-Group-Id</span> によりpc-salesをVLAN10へ、no-responseのpc-unauthをVLAN99へ</td><td class="mono">B2</td></tr>
+          <tr id="B3-1"><td>N4 層1（inter-VLAN ACL）</td><td>core-sw SVI(Vlan10) に <span class="mono">SEG10-OUT</span> を適用し、srv-app1へのtcp/80のみ許可、tcp/22拒否</td><td class="mono">B3</td></tr>
+          <tr id="B3-2"><td>N4 層2（ホストnftables）</td><td>srv-app1で host-infected(172.31.50.31) からの着信をdrop（同一VLAN内は層1ACLの対象外のため）</td><td class="mono">B3</td></tr>
+          <tr id="B4"><td>N3 常時監視</td><td>Suricataが <span class="mono">nwzt-srv0</span> をhost modeでpromiscuous監視し、SYNスキャンをsid:1000001で検知</td><td class="mono">B4</td></tr>
+          <tr id="B5"><td>N2 サーバ非公開化</td><td>srv-app1はOpenZiti overlay経由のみ到達可能（apptunがdial、clienttunは直接到達不可）</td><td class="mono">B5</td></tr>
+        </tbody>
+      </table>
+      <p class="note">各ゲートの手順・期待結果は<a class="ref-chip" href="../05_試験/07_試験計画書.html">07 試験計画書</a>を参照。実測エビデンスは<a class="ref-chip" href="../05_試験/08_試験結果報告書.html">08 試験結果報告書</a>（2026-07-08実施、B1〜B6 ✅、B2bのみ◐残課題）を参照。</p>
+    </section>
+
+    <section id="s6">
+      <h2>6. 設計判断の記録（考えどころ）<a href="#s6">#</a></h2>
+      <table class="req-table">
+        <thead><tr><th>#</th><th>判断</th><th>選択</th><th>理由</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">D-1</td><td>アクセス層とコアを分離するか単一IOLに統合するか</td><td>単一IOL(core-sw)に統合</td><td>probe実機確認で <span class="mono">L2-advipservices-2017</span> が dot1x を PAE=AUTHENTICATOR として受理することを確認済み。テーマの主眼はNW層統合でありノード数を減らして検証を単純化する</td></tr>
+          <tr><td class="mono">D-2</td><td>サーバ室VLAN50をIOL配下の別ノードにするかdocker bridgeで実体化するか</td><td>docker bridge <span class="mono">nwzt-srv0</span> として実体化</td><td>Suricataのhost mode監視がbridgeインターフェース名を要求し、42_ndr_flow・microseg_nftablesで確立済みの手法を踏襲できる</td></tr>
+          <tr><td class="mono">D-3</td><td>N2/N3をclabトポロジに含めるかdocker併走にするか</td><td>docker併走（deploy-all.sh が束ねる）</td><td>OpenZiti/Suricata/Loki/Grafanaはclabの<span class="mono">kind:linux</span>管理外の運用パターンとして出自テーマ(36/42)で確立済み</td></tr>
+          <tr><td class="mono">D-4</td><td>I-4（検知→対応のCoA自動化）を実装するか</td><td>見送り（完全版同様◐設計のまま）</td><td>RADIUS CoA(UDP/3799)自動連携にはsoar-lite等の追加コンポーネントが必要でスコープ超過。層2 nftablesの手動投入デモに留める</td></tr>
+          <tr><td class="mono">D-5</td><td>統合IPアドレス空間の再設計要否</td><td>完全版のIPアドレス管理表を無変更で踏襲</td><td>完全版との対応関係を明確にし、二重管理を避ける</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <nav class="doc-footer" aria-label="前後のドキュメント">
+      <a class="prev" href="../01_要件定義/01_要件定義書.html"><small>前工程</small>要件定義書</a>
+      <a class="next" href="03_IPアドレス管理表.html"><small>次工程</small>IPアドレス管理表</a>
+    </nav>
+  </main>
+</div>
+<script>
+  "use strict";
+  const navLinks = [...document.querySelectorAll(".nav a")];
+  const sections = [...document.querySelectorAll("main section")];
+  const spy = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      navLinks.forEach((a) =>
+        a.classList.toggle("current", a.getAttribute("href") === `#${entry.target.id}`));
+    });
+  }, { rootMargin: "-20% 0px -70% 0px" });
+  sections.forEach((s) => spy.observe(s));
+  document.querySelectorAll('.code-block').forEach(b=>{const btn=b.querySelector('.copy-btn');if(!btn)return;btn.addEventListener('click',()=>{const t=b.querySelector('pre').innerText;navigator.clipboard&&navigator.clipboard.writeText(t);btn.textContent='copied';setTimeout(()=>btn.textContent='copy',1200);});});
+</script>
+</body>
+</html>

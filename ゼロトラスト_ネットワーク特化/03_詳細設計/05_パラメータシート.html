@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>パラメータシート | ゼロトラスト_ネットワーク特化</title>
+<meta name="description" content="ゼロトラスト_ネットワーク特化ラボの詳細設計パラメータシート。core-sw / radius / エンドポイント / N2 ZTNA / N3 NDR / N4層2 の設定値を core_sw_merged.cfg と一致させて整理。">
+<style>
+  :root {
+    --surface:#FAFAF9; --raised:#FFFFFF; --ink:#1C1917; --ink-2:#57534E; --ink-3:#A8A29E; --border:#E7E5E4;
+    --accent:#BE185D; --accent-soft:#FDF2F8;
+    --ok:#10B981; --warn:#F59E0B; --error:#EF4444; --info:#3B82F6; --neutral:#94A3B8;
+    --code-bg:#0F172A; --code-ink:#E2E8F0;
+    --mono:"SF Mono",Menlo,Consolas,monospace; --sans:"Hiragino Sans","Noto Sans JP",sans-serif;
+    --r-sm:6px; --r-md:10px; --r-full:999px;
+    --shadow-1:0 1px 3px rgba(0,0,0,.06); --shadow-2:0 8px 30px rgba(0,0,0,.12);
+    --ease:cubic-bezier(0.16,1,0.3,1);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html { scroll-behavior:smooth; scroll-padding-top:72px; }
+  body { font-family:var(--sans); font-size:15px; line-height:1.8; color:var(--ink); background:var(--surface); }
+  .mono { font-family:var(--mono); font-feature-settings:"tnum"; }
+  .num { text-align:right; }
+  .site-header { position:sticky; top:0; z-index:50; display:flex; align-items:center; gap:20px; height:56px; padding:0 24px; background:rgba(250,250,249,.85); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); }
+  .site-header .back { font-size:13px; color:var(--ink-2); text-decoration:none; transition:color .15s var(--ease); }
+  .site-header .back:hover { color:var(--accent); }
+  .brand { font-weight:700; font-size:15px; letter-spacing:-.01em; }
+  .brand span { color:var(--accent); }
+  .phase-chip { padding:3px 12px; font-family:var(--mono); font-size:11px; letter-spacing:.08em; color:var(--accent); background:var(--accent-soft); border-radius:var(--r-full); }
+  .header-meta { margin-left:auto; font-size:12px; color:var(--ink-2); }
+  .layout { display:grid; grid-template-columns:220px minmax(0,1fr); gap:48px; max-width:1100px; margin:0 auto; padding:0 24px; }
+  .nav { position:sticky; top:56px; height:calc(100vh - 56px); overflow-y:auto; padding:40px 0; }
+  .nav-label { font-size:11px; font-weight:600; letter-spacing:.08em; color:var(--ink-3); text-transform:uppercase; margin-bottom:10px; }
+  .nav a { display:block; padding:6px 10px; margin-left:-10px; font-size:13.5px; color:var(--ink-2); text-decoration:none; border-radius:var(--r-sm); transition:color .12s var(--ease),background .12s var(--ease); }
+  .nav a:hover { color:var(--ink); background:#F5F5F4; }
+  .nav a.current { color:var(--accent); background:var(--accent-soft); font-weight:600; }
+  .doc { padding:40px 0 96px; min-width:0; }
+  .breadcrumb { font-size:12px; color:var(--ink-3); margin-bottom:12px; }
+  .breadcrumb a { color:inherit; text-decoration:none; }
+  .breadcrumb a:hover { color:var(--accent); }
+  h1 { font-size:28px; font-weight:700; letter-spacing:-.01em; line-height:1.3; }
+  .doc-meta { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 40px; }
+  .badge { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; font-size:12px; font-weight:500; border-radius:var(--r-full); border:1px solid var(--border); background:var(--raised); color:var(--ink-2); }
+  .badge .dot { width:7px; height:7px; border-radius:50%; background:var(--ok); }
+  .badge.ver { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); font-family:var(--mono); }
+  .badge.st-ok .dot { background:var(--ok); } .badge.st-ok { color:var(--ok); border-color:var(--ok); }
+  .badge.st-warn .dot { background:var(--warn); } .badge.st-warn { color:#B45309; border-color:var(--warn); }
+  .badge.st-neutral .dot { background:var(--neutral); } .badge.st-neutral { color:var(--ink-2); }
+  section { margin-bottom:56px; scroll-margin-top:72px; overflow-x:auto; }
+  h2 { font-size:20px; font-weight:600; margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+  h2 a { color:var(--ink-3); text-decoration:none; opacity:0; margin-left:6px; font-weight:400; }
+  h2:hover a { opacity:1; }
+  h3.sub { font-size:14px; font-weight:600; color:var(--ink-2); margin:24px 0 10px; }
+  p.note { font-size:13.5px; color:var(--ink-2); margin-bottom:12px; }
+  ul, ol { padding-left:20px; font-size:14.5px; line-height:1.9; }
+  .req-table { width:100%; border-collapse:collapse; font-size:14px; min-width:520px; }
+  .req-table th, .req-table td { padding:11px 12px; text-align:left; vertical-align:top; }
+  .req-table thead th { font-size:11px; font-weight:600; letter-spacing:.06em; color:var(--ink-3); text-transform:uppercase; border-bottom:1px solid var(--border); }
+  .req-table tbody tr { border-bottom:1px solid var(--border); transition:background .12s; }
+  .req-table tbody tr:hover { background:#F5F5F4; }
+  .req-id { display:inline-block; font-family:var(--mono); font-weight:700; font-size:12.5px; color:var(--accent); background:var(--accent-soft); padding:2px 8px; border-radius:var(--r-sm); white-space:nowrap; }
+  code { font-family:var(--mono); font-size:12.5px; color:var(--accent); background:var(--accent-soft); padding:1px 6px; border-radius:5px; }
+  .callout { margin:16px 0; padding:12px 16px; border-radius:var(--r-md); border-left:3px solid var(--info); background:var(--raised); font-size:14px; color:var(--ink-2); }
+  .callout.warn { border-left-color:var(--warn); } .callout.ok { border-left-color:var(--ok); }
+  .callout strong { color:var(--ink); }
+  .doc-footer { display:flex; justify-content:space-between; gap:16px; margin-top:64px; padding-top:24px; border-top:1px solid var(--border); }
+  .doc-footer a { display:block; padding:14px 18px; min-width:200px; border:1px solid var(--border); border-radius:var(--r-md); text-decoration:none; color:var(--ink); font-weight:600; font-size:14px; background:var(--raised); transition:transform .18s var(--ease),box-shadow .18s var(--ease),border-color .18s var(--ease); }
+  .doc-footer a:hover { transform:translateY(-2px); box-shadow:var(--shadow-2); border-color:var(--accent); }
+  .doc-footer a small { display:block; font-size:11px; font-weight:500; color:var(--ink-3); letter-spacing:.06em; }
+  .doc-footer .next { text-align:right; margin-left:auto; }
+  @media (max-width:1100px) { .layout { grid-template-columns:190px minmax(0,1fr); gap:32px; } }
+  @media (max-width:768px) {
+    .header-meta, .phase-chip { display:none; }
+    .layout { grid-template-columns:1fr; gap:0; }
+    .nav { position:static; height:auto; padding:20px 0 0; display:flex; gap:16px; overflow-x:auto; }
+    .nav-label { display:none; }
+  }
+  @media (prefers-reduced-motion:reduce) { * { transition:none !important; animation:none !important; } html { scroll-behavior:auto; } }
+  @media (max-width:480px) { .doc-footer { flex-direction:column; } .doc-footer a { min-width:0; } .doc-footer .next { margin-left:0; } }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <a class="back" href="../00_ドキュメントマップ.html">← ドキュメントマップ</a>
+  <div class="brand">ZT-NW<span>特化</span></div>
+  <span class="phase-chip">PHASE 3 詳細設計</span>
+  <div class="header-meta">nwzt-lan / OrbStack VM(arm64)</div>
+</header>
+<div class="layout">
+  <nav class="nav" aria-label="目次">
+    <div class="nav-label">目次</div>
+    <a href="#s1" class="current">1. 共通設計</a>
+    <a href="#s2">2. core-sw</a>
+    <a href="#s3">3. radius</a>
+    <a href="#s4">4. エンドポイント</a>
+    <a href="#s5">5. サーバ室(VLAN50)</a>
+    <a href="#s6">6. N2 ZTNA</a>
+    <a href="#s7">7. N3 NDR</a>
+    <a href="#s8">8. N4 層2 nftables</a>
+    <a href="#s9">9. 期待する疎通結果</a>
+  </nav>
+  <main class="doc">
+    <div class="breadcrumb"><a href="../00_ドキュメントマップ.html">ドキュメントマップ</a> / パラメータシート</div>
+    <h1>パラメータシート（詳細設計）</h1>
+    <div class="doc-meta">
+      <span class="badge ver">v1.0</span>
+      <span class="badge st-ok"><span class="dot"></span>✅ 実機検証済</span>
+      <span class="badge">最終更新 2026-07-08</span>
+      <span class="badge">原本: core_sw_merged.cfg 他</span>
+    </div>
+
+    <div class="callout">
+      <strong>本書の位置づけ：</strong>本テーマは Claude 実装テーマのため設定値を明記します。原本は <code>core_sw_merged.cfg</code> 等の実ファイルであり、本書はそれを設計値として整理したものです。実際の投入コマンド列は <a href="06_CLI投入コマンド.html">CLI投入コマンド</a> を参照してください。
+    </div>
+
+    <section id="s1">
+      <h2>1. 共通設計<a href="#s1">#</a></h2>
+      <table class="req-table">
+        <thead><tr><th>項目</th><th>値</th></tr></thead>
+        <tbody>
+          <tr><td>認証方式</td><td>802.1X（<code>aaa authentication dot1x default group radius</code> / <code>aaa authorization network default group radius</code>）</td></tr>
+          <tr><td>RADIUSサーバ</td><td><code>172.31.0.10:1812</code>（認証）/ <code>1813</code>（アカウンティング）、key <code>[共有鍵]</code></td></tr>
+          <tr><td>ip routing</td><td>有効化（core-sw が SVI 間ルーティングを行う）</td></tr>
+          <tr><td>VLAN一覧</td><td>10(SALES) / 20(DEV) / 30(GUEST) / 50(SERVER) / 99(QUARANTINE) / 100(MGMT)</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="s2">
+      <h2>2. core-sw<a href="#s2">#</a></h2>
+      <p class="note">Cisco IOL（<code>L2-advipservices-2017</code>）単一ノードで N1（802.1X 動的VLAN）＋ N4（L3 SVI + inter-VLAN ACL）を兼務。mgmt-ipv4 <code>172.20.40.11</code>。</p>
+
+      <h3 class="sub">2.1 インターフェース</h3>
+      <p class="note">IOL は 1スロット 4ポート。clab の <code>eth4/5/6</code> は <code>Et1/0 / Et1/1 / Et1/2</code> にマップ（<code>/iol/NETMAP</code> 準拠）。</p>
+      <table class="req-table">
+        <thead><tr><th>IF</th><th>接続先</th><th>種別</th><th>VLAN/認証</th><th>備考</th></tr></thead>
+        <tbody>
+          <tr><td><code>Et0/1</code></td><td>pc-sales</td><td>access</td><td>dot1x → 動的VLAN10</td><td><code>authentication event no-response action authorize vlan 99</code></td></tr>
+          <tr><td><code>Et0/2</code></td><td>pc-dev</td><td>access</td><td>20（静的）</td><td>―</td></tr>
+          <tr><td><code>Et0/3</code></td><td>guest-pc</td><td>access</td><td>30（静的）</td><td>―</td></tr>
+          <tr><td><code>Et1/0</code></td><td>pc-unauth</td><td>access</td><td>dot1x → 隔離VLAN99</td><td>Et0/1 と同一の認証設定</td></tr>
+          <tr><td><code>Et1/1</code></td><td>radius</td><td>access</td><td>100</td><td>RADIUS 到達用</td></tr>
+          <tr><td><code>Et1/2</code></td><td>nwzt-srv0</td><td>access</td><td>50（uplink）</td><td>サーバ室ブリッジへの接続</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="sub">2.2 L2設計</h3>
+      <table class="req-table">
+        <thead><tr><th>項目</th><th>設計値</th></tr></thead>
+        <tbody>
+          <tr><td>VLAN10</td><td>name <code>SALES</code></td></tr>
+          <tr><td>VLAN20</td><td>name <code>DEV</code></td></tr>
+          <tr><td>VLAN30</td><td>name <code>GUEST</code></td></tr>
+          <tr><td>VLAN50</td><td>name <code>SERVER</code></td></tr>
+          <tr><td>VLAN99</td><td>name <code>QUARANTINE</code></td></tr>
+          <tr><td>VLAN100</td><td>name <code>MGMT</code></td></tr>
+          <tr><td>spanning-tree</td><td>全アクセスポートで <code>portfast</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="sub">2.3 ルーティング設計（SVI）</h3>
+      <table class="req-table">
+        <thead><tr><th>SVI</th><th>IP</th><th>備考</th></tr></thead>
+        <tbody>
+          <tr><td><code>Vlan10</code></td><td>172.31.10.1/24</td><td><code>ip access-group SEG10-OUT in</code></td></tr>
+          <tr><td><code>Vlan20</code></td><td>172.31.20.1/24</td><td>―</td></tr>
+          <tr><td><code>Vlan30</code></td><td>172.31.30.1/24</td><td>―</td></tr>
+          <tr><td><code>Vlan50</code></td><td>172.31.50.1/24</td><td>サーバ室（docker bridge 側 GW は <code>.254</code> で非衝突）</td></tr>
+          <tr><td><code>Vlan99</code></td><td>172.31.99.1/24</td><td>隔離</td></tr>
+          <tr><td><code>Vlan100</code></td><td>172.31.0.1/24</td><td><code>ip radius source-interface Vlan100</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="sub">2.4 セキュリティ設計</h3>
+      <table class="req-table">
+        <thead><tr><th>項目</th><th>設計値</th></tr></thead>
+        <tbody>
+          <tr><td>dot1x（Et0/1・Et1/0）</td><td><code>authentication port-control auto</code> / <code>dot1x pae authenticator</code> / <code>dot1x timeout tx-period 10</code> / <code>dot1x max-reauth-req 2</code></td></tr>
+          <tr><td>no-response 時の挙動</td><td><code>authentication event no-response action authorize vlan 99</code>（隔離VLANへ自動割当）</td></tr>
+          <tr><td>ACL <code>SEG10-OUT</code>（Vlan10 in）</td><td><code>permit tcp 172.31.10.0/24 host 172.31.50.11 eq 80</code> → <code>permit icmp 172.31.10.0/24 172.31.50.0/24</code> → <code>deny tcp 172.31.10.0/24 host 172.31.50.11 eq 22</code> → <code>permit ip any any</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="s3">
+      <h2>3. radius（nac-freeradius コンテナ）<a href="#s3">#</a></h2>
+      <table class="req-table">
+        <thead><tr><th>項目</th><th>値</th></tr></thead>
+        <tbody>
+          <tr><td>インターフェース</td><td><code>eth1: 172.31.0.10/24</code>（clab.yml exec で付与）</td></tr>
+          <tr><td>NASクライアント</td><td><code>172.16.0.0/12</code> 全体を許可、secret <code>[共有鍵]</code>（<code>clients.conf</code>）</td></tr>
+          <tr><td>認可プロファイル</td><td>ユーザー <code>alice</code> / <code>alicepass</code>、<code>Tunnel-Private-Group-Id="10"</code>（<code>authorize</code>）</td></tr>
+          <tr><td>デフォルト</td><td><code>DEFAULT Auth-Type := Reject</code>（未登録ユーザーは拒否）</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="s4">
+      <h2>4. エンドポイント（業務端末）<a href="#s4">#</a></h2>
+      <table class="req-table">
+        <thead><tr><th>ノード</th><th>mgmt-ipv4</th><th>データIP</th><th>割当方式</th><th>認証情報</th></tr></thead>
+        <tbody>
+          <tr><td>pc-sales</td><td><code>172.20.40.21</code></td><td><code>172.31.10.101/24</code>（認証後付与）</td><td>802.1X 動的</td><td>wpa_supplicant: identity=<code>alice</code>, password=<code>alicepass</code>, eap=MD5</td></tr>
+          <tr><td>pc-dev</td><td><code>172.20.40.22</code></td><td><code>172.31.20.101/24</code></td><td>静的（clab.yml exec）</td><td>―</td></tr>
+          <tr><td>guest-pc</td><td><code>172.20.40.23</code></td><td><code>172.31.30.101/24</code></td><td>静的（clab.yml exec）</td><td>―</td></tr>
+          <tr><td>pc-unauth</td><td><code>172.20.40.24</code></td><td>割当なし</td><td>サプリカント未起動 → no-response</td><td>―</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="s5">
+      <h2>5. サーバ室（VLAN50 / nwzt-srv0）<a href="#s5">#</a></h2>
+      <table class="req-table">
+        <thead><tr><th>ノード</th><th>データIP</th><th>サービス/ツール</th><th>備考</th></tr></thead>
+        <tbody>
+          <tr><td>srv-app1</td><td><code>172.31.50.11/24</code></td><td><code>python3 -m http.server 80</code>、<code>ncat -lk -p 22 -c 'echo NWZT-SRV-APP1-SSH-OK'</code></td><td>N2 ダークサービス対象、N4 層2 nft 遮断対象</td></tr>
+          <tr><td>host-infected</td><td><code>172.31.50.31/24</code></td><td>nmap（<code>wbitt/network-multitool</code>）</td><td>東西 SYN スキャン源</td></tr>
+        </tbody>
+      </table>
+      <p class="note">両ノードとも <code>ip route replace 172.31.0.0/16 via 172.31.50.1</code> で VLAN 間経路を確保する。</p>
+    </section>
+
+    <section id="s6">
+      <h2>6. N2 ZTNA（OpenZiti）<a href="#s6">#</a></h2>
+      <table class="req-table">
+        <thead><tr><th>項目</th><th>値</th></tr></thead>
+        <tbody>
+          <tr><td>コントローラ+ルータ</td><td><code>ziti</code> コンテナ（<code>openziti/ziti-cli:latest</code>）、<code>edge quickstart</code></td></tr>
+          <tr><td>app側tunneler</td><td><code>apptun</code>（<code>zn-ziti</code> + <code>nwzt-srv0</code> 接続、固定IP <code>172.31.50.50</code>）</td></tr>
+          <tr><td>client側tunneler</td><td><code>clienttun</code>（<code>zn-ziti</code> のみ＝直接到達不可）</td></tr>
+          <tr><td>サービス設定</td><td><code>webapp-host</code>（host.v1、protocol=tcp、address=<code>172.31.50.11</code>、port=80）</td></tr>
+          <tr><td>サービス</td><td><code>webapp</code>（configs=webapp-host）</td></tr>
+          <tr><td>identity</td><td><code>apphost</code>(role: hosts) / <code>webclient</code>(role: clients)</td></tr>
+          <tr><td>ポリシー</td><td><code>webapp-bind</code>(Bind, <code>@webapp</code>↔<code>#hosts</code>) / <code>webapp-dial</code>(Dial, <code>@webapp</code>↔<code>#clients</code>) / <code>allEr</code> / <code>allSerp</code></td></tr>
+          <tr><td>tunneler起動</td><td>apptun: <code>ziti tunnel host</code> ／ clienttun: <code>ziti tunnel proxy webapp:8080</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="s7">
+      <h2>7. N3 NDR（Suricata + Loki/Grafana）<a href="#s7">#</a></h2>
+      <table class="req-table">
+        <thead><tr><th>項目</th><th>値</th></tr></thead>
+        <tbody>
+          <tr><td>監視IF</td><td><code>-i nwzt-srv0</code>（host mode、promiscuous）</td></tr>
+          <tr><td>HOME_NET</td><td><code>172.31.50.0/24</code></td></tr>
+          <tr><td>ルール sid:1000001</td><td><code>flags:S; threshold:type both,track by_src,count 15,seconds 10</code> — 東西 SYN スキャン検知</td></tr>
+          <tr><td>ルール sid:1000002</td><td><code>flow:to_server</code> — srv-app1:80 への直接アクセスを記録（可視化補助）</td></tr>
+          <tr><td>Loki</td><td><code>:3100</code></td></tr>
+          <tr><td>Grafana</td><td><code>:3000</code>、匿名 Admin 有効、<code>GF_SECURITY_ADMIN_PASSWORD=admin</code>（ラボ用途）</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="s8">
+      <h2>8. N4 層2（ホストnftables）<a href="#s8">#</a></h2>
+      <table class="req-table">
+        <thead><tr><th>項目</th><th>値</th></tr></thead>
+        <tbody>
+          <tr><td>対象</td><td>srv-app1</td></tr>
+          <tr><td>ルール</td><td><code>table inet filter</code> → <code>chain input {type filter hook input priority 0; policy accept;}</code> → <code>rule ip saddr 172.31.50.31 counter drop</code>（host-infected を拒否）</td></tr>
+          <tr><td>適用/解除</td><td><code>deploy-all.sh nft</code> / <code>deploy-all.sh nft-flush</code></td></tr>
+        </tbody>
+      </table>
+      <div class="callout warn"><strong>◐ 残課題：</strong>同一VLAN内は層1 ACL の対象外のため層2 nftables で補うが、検知→対応（CoA自動隔離, I-4）はスコープ外。本テーマでは <code>deploy-all.sh nft</code> の手動投入デモに留める。</div>
+    </section>
+
+    <section id="s9">
+      <h2>9. 期待する経路と疎通結果<a href="#s9">#</a></h2>
+      <table class="req-table">
+        <thead><tr><th>送信元</th><th>宛先</th><th>期待結果</th><th>対応ゲート</th></tr></thead>
+        <tbody>
+          <tr><td>pc-sales</td><td>srv-app1:80</td><td>到達（HTTP 200）</td><td><span class="req-id">B3</span></td></tr>
+          <tr><td>pc-sales</td><td>srv-app1:22</td><td>遮断（ACL deny）</td><td><span class="req-id">B3</span></td></tr>
+          <tr><td>host-infected</td><td>srv-app1（nft 適用前）</td><td>到達</td><td><span class="req-id">B3</span> 対照</td></tr>
+          <tr><td>host-infected</td><td>srv-app1（nft 適用後）</td><td>遮断</td><td><span class="req-id">B3</span></td></tr>
+          <tr><td>host-infected</td><td>srv-app1（SYNスキャン）</td><td>Suricata sid:1000001 alert</td><td><span class="req-id">B4</span></td></tr>
+          <tr><td>clienttun</td><td>localhost:8080（overlay 経由）</td><td>到達（HTTP 200）</td><td><span class="req-id">B5</span></td></tr>
+          <tr><td>clienttun</td><td>172.31.50.11:80（直接）</td><td>到達不能</td><td><span class="req-id">B5</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <div class="doc-footer">
+      <a class="prev" href="../02_基本設計/04_物理・論理構成図.html"><small>← 前工程</small>物理・論理構成図</a>
+      <a class="next" href="06_CLI投入コマンド.html"><small>次工程 →</small>CLI投入コマンド</a>
+    </div>
+  </main>
+</div>
+<script>
+  "use strict";
+  const navLinks = [...document.querySelectorAll(".nav a")];
+  const sections = [...document.querySelectorAll("main section")];
+  const spy = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      navLinks.forEach((a) => a.classList.toggle("current", a.getAttribute("href") === `#${entry.target.id}`));
+    });
+  }, { rootMargin: "-20% 0px -70% 0px" });
+  sections.forEach((s) => spy.observe(s));
+</script>
+</body>
+</html>
