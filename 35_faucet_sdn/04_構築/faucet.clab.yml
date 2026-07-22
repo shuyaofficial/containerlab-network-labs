@@ -1,0 +1,87 @@
+name: faucet-sdn
+
+mgmt:
+  network: faucet-sdn-mgmt
+  ipv4-subnet: 172.35.35.0/24
+
+topology:
+  nodes:
+    # ------------------
+    # 制御面: OpenFlowコントローラ
+    # ------------------
+    faucet:
+      kind: linux
+      image: faucet/faucet:latest
+      mgmt-ipv4: 172.35.35.11
+      binds:
+        - ./faucet/faucet.yaml:/etc/faucet/faucet.yaml:ro
+      labels:
+        graph-level: 3
+        graph-icon: router
+
+    # gauge:
+    #   kind: linux
+    #   image: faucet/gauge:latest
+    #   mgmt-ipv4: 172.35.35.12
+    #   binds:
+    #     - ./faucet/gauge.yaml:/etc/faucet/gauge.yaml:ro
+    #   labels:
+    #     graph-level: 3
+    #     graph-icon: router
+    #   # Phase Bで有効化: ポート統計をエクスポートし、NDR基盤（42_ndr_flow）と連携する将来拡張。
+    #   # Phase A（本テーマ）では未使用。
+
+    # ------------------
+    # データ面: OpenFlowスイッチ（OVS, userspace datapath）
+    # ------------------
+    ovs1:
+      kind: linux
+      image: local/ovs:arm64          # deploy.sh が初回に ovs/Dockerfile からビルドする
+      mgmt-ipv4: 172.35.35.21
+      # containerlab は linux ノードを既定で privileged 起動するため privileged 指定は不要。
+      # bootstrap.sh はイメージのentrypointとして実行される（bind不要）。
+      labels:
+        graph-level: 2
+        graph-icon: switch
+
+    # ------------------
+    # エンドポイント（PC）
+    # ------------------
+    pc-a:
+      kind: linux
+      image: wbitt/network-multitool
+      mgmt-ipv4: 172.35.35.101
+      labels:
+        graph-level: 1
+        graph-icon: host
+      exec:
+        - ip addr add 10.0.100.11/24 dev eth1
+
+    pc-b:
+      kind: linux
+      image: wbitt/network-multitool
+      mgmt-ipv4: 172.35.35.102
+      labels:
+        graph-level: 1
+        graph-icon: host
+      exec:
+        - ip addr add 10.0.100.12/24 dev eth1
+
+    pc-c:
+      kind: linux
+      image: wbitt/network-multitool
+      mgmt-ipv4: 172.35.35.103
+      labels:
+        graph-level: 1
+        graph-icon: host
+      exec:
+        - ip addr add 10.0.200.13/24 dev eth1
+
+  links:
+    # --- データ面（ovs1のofport_requestはbootstrap.shでeth1=1, eth2=2, eth3=3に対応） ---
+    - endpoints: ["ovs1:eth1", "pc-a:eth1"]
+    - endpoints: ["ovs1:eth2", "pc-b:eth1"]
+    - endpoints: ["ovs1:eth3", "pc-c:eth1"]
+
+    # 制御面（OpenFlow）は containerlab の mgmt ネットワーク経由で faucet ↔ ovs1 が到達するため、
+    # links に個別リンクは不要（172.35.35.0/24 上で疎通する）。

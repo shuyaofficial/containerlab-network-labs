@@ -1,0 +1,66 @@
+# ============================================================================
+# テーマ35 Faucet SDN — faucet.yaml 雛形（学習対象の骨組みのみ）
+#
+# これはあなたが完成させる学習対象です。このファイルをコピーして `faucet.yaml`
+# を作成し、TODOコメントに従って自分で値を埋めてください。
+#
+#   cp faucet.yaml.example faucet.yaml
+#
+# 動く設定値（VLAN番号の割当・ACLルールの具体的な宣言）はここには書きません。
+# 「どんなキーが必要か」「何を目的とした項目か」のヒントのみを置いています。
+# 詳しい狙い（どのポートをどのVLANにしたいか等）は
+# ../../03_詳細設計/パラメータシート.md を参照してください。
+#
+# 参考: Faucet公式ドキュメントの設定リファレンス（dps/vlans/acls のトップレベル構造）
+# ============================================================================
+
+dps:
+  # TODO: このOVSスイッチ（ovs1）を表す datapath 名を1つ定義する。
+  #       名前は任意だが、他ファイル（構築ログ等）との対応がわかる名前にする。
+  # <dp名>:
+    # TODO: ovs1 の bootstrap.sh で固定した datapath-id をここに指定する
+    #       （パラメータシート §2.2 参照。0x始まりの16進数で書く）。
+    # dp_id: <ovs1のdatapath-idをここに>
+
+    # TODO: OVSからのOpenFlow接続を待ち受けるインターフェース名（省略可・環境依存）。
+    # hardware: Open vSwitch
+
+    # TODO: このdatapathが持つポート（interfaces）を定義する。
+    #       ポート番号は ovs-ofctl show br0 で確認したofport番号と一致させること。
+    interfaces:
+      1:
+        # TODO: このポート(pc-a接続)をどのVLANに所属させるか
+        # name: <わかりやすい名前>
+        # native_vlan: <VLAN名をここに>
+        description: "port1 (pc-a)"
+      2:
+        # TODO: このポート(pc-b接続)をどのVLANに所属させるか
+        description: "port2 (pc-b)"
+      3:
+        # TODO: このポート(pc-c接続)をどのVLANに所属させるか
+        description: "port3 (pc-c)"
+
+vlans:
+  # TODO: Mission 1 用に、pc-a/pc-bを収容するVLANと、pc-cを収容する別VLANの
+  #       2つを定義する（VLAN名・vid番号は任意。パラメータシートの「狙い」と対応させる）。
+  # <vlan名1>:
+  #   vid: <VLAN ID>
+  #   description: "..."
+  #
+  # <vlan名2>:
+  #   vid: <VLAN ID>
+  #   description: "..."
+  #
+  # TODO（Mission 3・任意）: VLAN間L3ルーティングを行う場合、各VLANに
+  #   faucet_vips（仮想IP）を追加する。単一スイッチ内のVLAN間ルーティングの
+  #   仕組みを調べてから追記すること。
+
+acls:
+  # TODO（Mission 2）: 特定プロトコル（例: ICMP）を許可し、それ以外を遮断する
+  #   ACLルールをここに定義する。ACLはリスト形式で、上から順に評価される点に注意。
+  #   定義したACLは、上のvlansまたはinterfacesのどちらに紐づけるべきか考えること。
+  # <acl名>:
+  #   - rule:
+  #       ...
+  #   - rule:
+  #       ...

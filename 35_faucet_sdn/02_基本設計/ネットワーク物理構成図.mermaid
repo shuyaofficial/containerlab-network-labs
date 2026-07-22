@@ -1,0 +1,32 @@
+%% テーマ35 Faucet SDN — ネットワーク物理構成図
+%% 生成日: 2026-07-07
+%% このファイルは README_Lab_Challenge.md 内のトポロジ図と同一内容を保つ（単独参照・印刷用）。
+%% ノード名は faucet.clab.yml のノード名と一致させること。
+
+graph TB
+    subgraph Control["制御面（OpenFlow / mgmtネット経由）"]
+        direction LR
+        faucet["faucet<br/>172.35.35.11<br/>OpenFlow :6653"]
+    end
+
+    subgraph Data["データ面"]
+        direction LR
+        ovs1["ovs1 (br0)<br/>172.35.35.21<br/>datapath_type=netdev"]
+        pca["pc-a<br/>172.35.35.101<br/>10.0.100.11/24"]
+        pcb["pc-b<br/>172.35.35.102<br/>10.0.100.12/24"]
+        pcc["pc-c<br/>172.35.35.103<br/>10.0.200.13/24"]
+    end
+
+    faucet -.->|"OpenFlow 1.3 制御チャネル"| ovs1
+    pca ---|eth1| ovs1
+    pcb ---|eth1| ovs1
+    pcc ---|eth1| ovs1
+
+    classDef ctrl fill:#1b4332,stroke:#40916c,color:#fff
+    classDef data fill:#2b2d42,stroke:#8d99ae,color:#fff
+    class faucet ctrl
+    class ovs1,pca,pcb,pcc data
+
+%% 拡張時のヒント:
+%% - Phase B（NDR連携）を足す場合は gauge ノードを Control subgraph に追加し、
+%%   ovs1 からミラー/サンプリング経路を点線で NDR 基盤へ伸ばす（42_ndr_flow 参照）
