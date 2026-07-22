@@ -1,0 +1,181 @@
+name: lan-refresh-lab
+
+mgmt:
+  network: lan-refresh-mgmt
+  ipv4-subnet: 172.29.29.0/24
+
+topology:
+  nodes:
+    # ---------------------------------------------------------
+    # 現行環境（テーマ28の老朽LANをas-is再現。コンフィグは
+    # 04_構築/現行機コンフィグ集.md を Mission 1 で手動投入）
+    # ---------------------------------------------------------
+    old-rt:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.6.3M3a
+      mgmt-ipv4: 172.29.29.11
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+        # IOL実ライセンス（deploy.shがVM内イメージから/opt/clab/.iourcへ自動抽出。git管理外）
+        - /opt/clab/.iourc:/iol/.iourc:ro
+    old-core:
+      kind: cisco_iol
+      type: l2
+      image: vrnetlab/cisco_iol:L2-15.2
+      mgmt-ipv4: 172.29.29.12
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+        - /opt/clab/.iourc:/iol/.iourc:ro
+    old-sw1:
+      kind: cisco_iol
+      type: l2
+      image: vrnetlab/cisco_iol:L2-15.2
+      mgmt-ipv4: 172.29.29.13
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+        - /opt/clab/.iourc:/iol/.iourc:ro
+    old-sw2:
+      kind: cisco_iol
+      type: l2
+      image: vrnetlab/cisco_iol:L2-15.2
+      mgmt-ipv4: 172.29.29.14
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+        - /opt/clab/.iourc:/iol/.iourc:ro
+
+    # ---------------------------------------------------------
+    # 監視基盤（テーマ28で構築済みの資産を存置。移行の判定装置）
+    # ---------------------------------------------------------
+    mon-core:
+      kind: cisco_iol
+      type: l2
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      mgmt-ipv4: 172.29.29.21
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+        - /opt/clab/.iourc:/iol/.iourc:ro
+    cap-sw:
+      kind: cisco_iol
+      type: l2
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      mgmt-ipv4: 172.29.29.22
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+        - /opt/clab/.iourc:/iol/.iourc:ro
+
+    # ---------------------------------------------------------
+    # 新環境（本テーマで更改導入する機器。Mission 3 で事前構築し、
+    # カットオーバーまでユーザー向けポート/SVIはshutdownを維持）
+    # ---------------------------------------------------------
+    new-core1:
+      kind: cisco_iol
+      type: l2
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      mgmt-ipv4: 172.29.29.31
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+        - /opt/clab/.iourc:/iol/.iourc:ro
+    new-core2:
+      kind: cisco_iol
+      type: l2
+      image: vrnetlab/cisco_iol:L2-advipservices-2017
+      mgmt-ipv4: 172.29.29.32
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+        - /opt/clab/.iourc:/iol/.iourc:ro
+    new-rt:
+      kind: cisco_iol
+      image: vrnetlab/cisco_iol:15.7.3M2
+      mgmt-ipv4: 172.29.29.33
+      binds:
+        - ./entrypoint_attach.sh:/entrypoint.sh:ro
+        - /opt/clab/.iourc:/iol/.iourc:ro
+
+    # ---------------------------------------------------------
+    # エンドポイント（データプレーンIPはテーマ28から温存）
+    # ---------------------------------------------------------
+    nms:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.29.29.101
+      exec:
+        - ip link set eth1 up
+        - ip link set eth1 mtu 1500
+        - ip address add 10.28.100.10/24 dev eth1
+        # defaultはmgmt(eth0)側に残す（apk等の外部到達を維持）。
+        # 現行(10.28.0.0/16)と新環境(10.29.0.0/16)の両方をeth1経由で監視する
+        - ip route add 10.28.0.0/16 via 10.28.100.1 dev eth1
+        - ip route add 10.29.0.0/16 via 10.28.100.1 dev eth1
+
+    cap:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.29.29.102
+      exec:
+        - ip link set eth1 up
+        - ip link set eth1 mtu 1500
+        - ip link set eth1 promisc on
+
+    pc-a:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.29.29.103
+      exec:
+        - ip link set eth1 up
+        - ip link set eth1 mtu 1500
+        - ip address add 10.28.10.10/24 dev eth1
+        - ip route replace default via 10.28.10.1 dev eth1
+
+    pc-b:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.29.29.104
+      exec:
+        # eth1=現行収容(old-sw1)。eth2=移設先(old-sw2)配線のみ事前敷設し、
+        # Mission 6 の移設作業でeth1をdown→eth2へIPを付け替える
+        - ip link set eth1 up
+        - ip link set eth1 mtu 1500
+        - ip address add 10.28.20.10/24 dev eth1
+        - ip route replace default via 10.28.20.1 dev eth1
+        - ip link set eth2 up
+        - ip link set eth2 mtu 1500
+
+    srv-file:
+      kind: linux
+      image: wbitt/network-multitool:latest
+      mgmt-ipv4: 172.29.29.105
+      exec:
+        - ip link set eth1 up
+        - ip link set eth1 mtu 1500
+        - ip address add 10.28.30.10/24 dev eth1
+        - ip route replace default via 10.28.30.1 dev eth1
+
+  links:
+    # ===== 現行環境（テーマ28と同一配線） =====
+    - endpoints: ["old-rt:eth1", "old-core:eth1"]
+    - endpoints: ["old-core:eth2", "old-sw1:eth1"]
+    - endpoints: ["old-core:eth3", "old-sw2:eth1"]
+    - endpoints: ["old-sw1:eth2", "pc-a:eth1"]
+    - endpoints: ["old-sw1:eth3", "pc-b:eth1"]
+    - endpoints: ["old-sw2:eth2", "srv-file:eth1"]
+    - endpoints: ["old-core:eth4", "cap-sw:eth1"]
+    - endpoints: ["cap-sw:eth2", "mon-core:eth1"]
+    - endpoints: ["cap-sw:eth3", "cap:eth1"]
+    - endpoints: ["mon-core:eth2", "nms:eth1"]
+
+    # ===== 移設先配線（pc-b: フロアA→フロアBへの移設。Mission 6） =====
+    - endpoints: ["old-sw2:eth5", "pc-b:eth2"]
+
+    # ===== 新環境の事前配線（Mission 3までポートshutdownで待機） =====
+    # 新コア間トランク（HSRP hello / VLAN10,20,30,90）
+    - endpoints: ["new-core1:eth1", "new-core2:eth1"]
+    # フロアSWの二重ホーム（新コアへ）
+    - endpoints: ["new-core1:eth2", "old-sw1:eth4"]
+    - endpoints: ["new-core2:eth2", "old-sw1:eth5"]
+    - endpoints: ["new-core1:eth3", "old-sw2:eth3"]
+    - endpoints: ["new-core2:eth3", "old-sw2:eth4"]
+    # 新WANルータ（10.29.1.0/30, 10.29.2.0/30）
+    - endpoints: ["new-rt:eth1", "new-core1:eth4"]
+    - endpoints: ["new-rt:eth2", "new-core2:eth4"]
+    # 監視→新環境ルート（10.29.0.0/30。並行稼働中に新旧両方を監視）
+    - endpoints: ["mon-core:eth3", "new-core1:eth5"]
