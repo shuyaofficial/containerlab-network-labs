@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>国内ゼロトラスト入門 — 網屋 ALog / Verona / NATURE SERIES</title>
+<style>
+  :root{
+    --navy:#0f1f38;
+    --text:#243044;
+    --muted:#5b6b7f;
+    --bg:#f5f7fa;
+    --white:#ffffff;
+    --border:#e1e6ec;
+    --green:#1a7a4a;
+    --green-bg:#e8f5ee;
+    --green-dark:#0f5533;
+    --blue:#1558b0;
+    --blue-bg:#eaf1fc;
+    --blue-dark:#0d3d80;
+    --dark:#1b1b23;
+    --orange:#e8791a;
+    --orange-bg:#fff4e9;
+    --orange-dark:#a85512;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    font-size:16px;
+    line-height:1.8;
+  }
+  h1,h2,h3,h4{color:var(--navy); line-height:1.4;}
+  a{color:var(--blue);}
+  img,svg{max-width:100%;}
+
+  /* ---------- layout ---------- */
+  .layout{display:flex; align-items:flex-start;}
+  .sidenav{
+    width:250px; flex-shrink:0; background:var(--white);
+    border-right:1px solid var(--border);
+    position:fixed; top:0; left:0; height:100vh; overflow-y:auto;
+    padding:22px 0 40px; z-index:50;
+  }
+  .sidenav .brand{
+    padding:0 20px 16px; font-weight:700; color:var(--navy);
+    font-size:15px; border-bottom:1px solid var(--border); margin-bottom:10px;
+  }
+  .sidenav .brand small{display:block; font-weight:400; color:var(--muted); font-size:11px; margin-top:4px;}
+  .sidenav ul{list-style:none; margin:0; padding:0;}
+  .sidenav li a{
+    display:block; padding:10px 20px; color:var(--muted); text-decoration:none;
+    font-size:13.5px; border-left:3px solid transparent; transition:.15s;
+  }
+  .sidenav li a:hover{background:var(--bg); color:var(--navy);}
+  .sidenav li a.active{color:var(--navy); border-left-color:var(--blue); background:var(--bg); font-weight:700;}
+
+  main{margin-left:250px; flex:1; min-width:0; padding:48px min(6vw,64px) 110px; max-width:1100px;}
+
+  @media (max-width:768px){
+    .layout{display:block;}
+    .sidenav{
+      position:static; width:100%; height:auto; overflow-x:auto; overflow-y:hidden;
+      border-right:none; border-bottom:1px solid var(--border); padding:10px 0;
+      white-space:nowrap;
+    }
+    .sidenav .brand{display:none;}
+    .sidenav ul{display:flex;}
+    .sidenav li a{padding:10px 14px; border-left:none; border-bottom:3px solid transparent;}
+    .sidenav li a.active{border-left-color:transparent; border-bottom-color:var(--blue);}
+    main{margin-left:0; padding:28px 18px 80px; max-width:100%;}
+  }
+
+  /* ---------- hero ---------- */
+  .hero{
+    background:linear-gradient(135deg,var(--navy) 0%,#1b3a63 100%);
+    color:#fff; padding:52px 40px; border-radius:18px; margin-bottom:44px;
+  }
+  .hero .eyebrow{font-size:12.5px; letter-spacing:.08em; opacity:.75; text-transform:uppercase; margin-bottom:10px;}
+  .hero h1{font-size:clamp(24px,4vw,34px); margin:0 0 14px; color:#fff;}
+  .hero p{font-size:16px; opacity:.92; max-width:720px; margin:0 0 8px;}
+  .hero .reader-note{
+    margin-top:22px; background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.22);
+    border-radius:12px; padding:14px 18px; font-size:14.5px;
+  }
+
+  .doc-cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:18px; margin-top:28px;}
+  .doc-card{background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.28); border-radius:12px; padding:20px;}
+  .doc-card .pages{font-size:11.5px; opacity:.75; text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px;}
+  .doc-card h3{margin:0 0 8px; font-size:17px; color:#fff;}
+  .doc-card p{font-size:13.5px; opacity:.9; margin:0;}
+
+  /* ---------- generic section ---------- */
+  section.block{margin-bottom:64px; scroll-margin-top:20px;}
+  section.block > h2{
+    font-size:23px; border-bottom:3px solid var(--border); padding-bottom:12px; margin-bottom:22px;
+  }
+  .lead{font-size:16.5px; color:var(--text); max-width:780px;}
+  .section-num{
+    display:inline-block; width:26px; height:26px; border-radius:50%;
+    background:var(--navy); color:#fff; text-align:center; line-height:26px;
+    font-size:13px; font-weight:700; margin-right:10px;
+  }
+
+  h3.sub{font-size:18px; margin-top:36px; margin-bottom:14px;}
+  h4.sub{font-size:15.5px; margin-top:24px; margin-bottom:10px;}
+
+  /* ---------- product theme wrappers ---------- */
+  .theme-panel{border-radius:18px; padding:32px min(5vw,40px); margin-top:6px;}
+  .theme-green{background:var(--green-bg); border:1px solid #cfe8da;}
+  .theme-green h2, .theme-green h3, .theme-green h4{color:var(--green-dark);}
+  .theme-green .accent{color:var(--green);}
+  .theme-blue{background:var(--blue-bg); border:1px solid #cfe0f7;}
+  .theme-blue h2, .theme-blue h3, .theme-blue h4{color:var(--blue-dark);}
+  .theme-blue .accent{color:var(--blue);}
+  .theme-dark{background:var(--orange-bg); border:1px solid #f5deb8;}
+  .theme-dark h2, .theme-dark h3, .theme-dark h4{color:var(--orange-dark);}
+  .theme-dark .accent{color:var(--orange);}
+
+  .badge{
+    display:inline-block; padding:4px 12px; border-radius:999px; font-size:12px; font-weight:700;
+    background:var(--navy); color:#fff; margin-bottom:14px;
+  }
+  .theme-green .badge{background:var(--green);}
+  .theme-blue .badge{background:var(--blue);}
+  .theme-dark .badge{background:var(--orange);}
+
+  /* ---------- cards ---------- */
+  .card-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:18px; margin:20px 0;}
+  .basic-card{background:var(--white); border:1px solid var(--border); border-radius:12px; padding:20px;}
+  .basic-card h4{margin:0 0 8px; font-size:16.5px;}
+  .basic-card p{margin:0 0 8px; font-size:14.5px; color:var(--text);}
+  .basic-card ul{margin:8px 0 0; padding-left:18px; font-size:13.5px; color:var(--muted);}
+  .basic-card .icon{font-size:22px; margin-bottom:6px; display:block;}
+
+  .svc-card{background:var(--white); border:1px solid var(--border); border-radius:12px; padding:16px 18px; display:flex; gap:12px; align-items:flex-start;}
+  .svc-card .emoji{font-size:26px; line-height:1;}
+  .svc-card h5{margin:0 0 4px; font-size:14.5px; color:var(--navy);}
+  .svc-card p{margin:0; font-size:12.5px; color:var(--muted);}
+
+  /* ---------- callout (metaphor box) ---------- */
+  .callout{
+    background:#fffaf0; border:1px solid #f3d9a6; border-left:5px solid #e8a93a;
+    border-radius:10px; padding:16px 20px; margin:20px 0; font-size:15px;
+  }
+  .callout .callout-title{font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:8px; color:#8a5c10;}
+  .callout .callout-title .icon{font-size:18px;}
+
+  /* ---------- term tooltip ---------- */
+  .term{
+    position:relative; border-bottom:1px dashed var(--blue); cursor:help;
+    font-weight:600; color:var(--blue-dark);
+  }
+  .term .tip{
+    display:none; position:absolute; left:50%; transform:translateX(-50%); bottom:135%;
+    width:250px; background:var(--navy); color:#fff; font-size:12.5px; font-weight:400;
+    line-height:1.6; padding:10px 12px; border-radius:8px; z-index:30;
+    box-shadow:0 8px 20px rgba(0,0,0,.25);
+  }
+  .term .tip::after{
+    content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%);
+    border:6px solid transparent; border-top-color:var(--navy);
+  }
+  .term:hover .tip, .term:focus .tip{display:block;}
+
+  /* ---------- stat cards ---------- */
+  .stat-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin:22px 0;}
+  .stat-card{background:var(--white); border:1px solid var(--border); border-radius:12px; padding:18px 12px; text-align:center;}
+  .stat-card .num{font-size:26px; font-weight:800; color:var(--navy);}
+  .stat-card.green .num{color:var(--green);}
+  .stat-card.blue .num{color:var(--blue);}
+  .stat-card.orange .num{color:var(--orange-dark);}
+  .stat-card .label{font-size:12.5px; color:var(--muted); margin-top:6px;}
+
+  /* ---------- tables ---------- */
+  .table-wrap{overflow-x:auto; margin:18px 0; border:1px solid var(--border); border-radius:10px; background:var(--white);}
+  table{border-collapse:collapse; width:100%; min-width:480px; font-size:13.8px;}
+  th,td{padding:10px 14px; text-align:left; border-bottom:1px solid var(--border); white-space:nowrap;}
+  thead th{background:var(--bg); color:var(--navy); font-weight:700;}
+  tbody tr:last-child td{border-bottom:none;}
+  caption{caption-side:top; text-align:left; font-size:13px; color:var(--muted); padding:8px 14px 0;}
+
+  /* ---------- case study ---------- */
+  .case{background:var(--white); border:1px solid var(--border); border-radius:12px; padding:18px 20px; margin-bottom:14px;}
+  .case h5{margin:0 0 8px; font-size:15px; color:var(--navy);}
+  .case .comment{font-style:normal; color:var(--muted); font-size:13.5px; margin-top:10px; border-left:3px solid var(--border); padding-left:12px;}
+
+  /* ---------- glossary dictionary ---------- */
+  .dict{display:grid; grid-template-columns:1fr; gap:0; border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--white);}
+  .dict dt{background:var(--bg); font-weight:700; padding:12px 18px; color:var(--navy); font-size:14.5px; border-top:1px solid var(--border);}
+  .dict dt:first-child{border-top:none;}
+  .dict dd{margin:0; padding:10px 18px 16px; font-size:14px; color:var(--text);}
+
+  /* ---------- footer / sources ---------- */
+  .src-list{list-style:none; padding:0; margin:0;}
+  .src-list li{background:var(--white); border:1px solid var(--border); border-radius:10px; padding:14px 18px; margin-bottom:10px; font-size:14px;}
+  .disclaimer{background:var(--white); border:1px solid var(--border); border-radius:10px; padding:18px 20px; font-size:13.5px; color:var(--muted); margin-top:18px;}
+
+  footer.page-footer{margin-top:60px; padding-top:24px; border-top:1px solid var(--border); font-size:12.5px; color:var(--muted); text-align:center;}
+
+  svg text{font-family:system-ui,-apple-system,"Hiragino Sans","Yu Gothic",sans-serif;}
+  .diagram-wrap{background:var(--white); border:1px solid var(--border); border-radius:12px; padding:18px; margin:20px 0; overflow-x:auto;}
+  .diagram-caption{font-size:12.5px; color:var(--muted); text-align:center; margin-top:8px;}
+
+  .flow-steps{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:18px 0;}
+  .flow-step{background:var(--white); border:1px solid var(--border); border-radius:10px; padding:10px 14px; font-size:13px; flex:1 1 140px; text-align:center;}
+  .flow-arrow{font-size:18px; color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidenav" aria-label="章目次">
+    <div class="brand">国内ゼロトラスト入門<small>網屋 ALog / Verona / NATURE SERIES</small></div>
+    <ul>
+      <li><a href="#intro" data-nav>1. はじめに</a></li>
+      <li><a href="#why-zerotrust" data-nav>2. なぜ今ゼロトラストか</a></li>
+      <li><a href="#basics" data-nav>3. 基礎用語ミニ講座</a></li>
+      <li><a href="#alog" data-nav>4. ALog（カンタンSIEM）</a></li>
+      <li><a href="#verona" data-nav>5. Verona（SASE）</a></li>
+      <li><a href="#amiya" data-nav>6. 網屋とNATURE SERIES</a></li>
+      <li><a href="#bigpicture" data-nav>7. 3資料の全体像</a></li>
+      <li><a href="#glossary" data-nav>8. 用語集</a></li>
+      <li><a href="#sources" data-nav>9. 出典・注意書き</a></li>
+    </ul>
+  </aside>
+
+  <main>
+
+    <!-- ============ 1. HERO + はじめに ============ -->
+    <section class="block" id="intro">
+      <div class="hero">
+        <div class="eyebrow">Beginner-friendly Guide</div>
+        <h1>国内ゼロトラスト入門</h1>
+        <p>このページは、株式会社網屋（AMIYA）が公開している3つの製品・サービス資料の内容を、<strong>セキュリティ製品の商用知識がゼロの読者</strong>でも理解できるように再構成した学習用まとめです。ネットワーク技術は学習中だけれど、SIEMやSASEといった業界用語には馴染みがない、という読者を想定しています。</p>
+        <p>元になっているのは、①ログ管理製品「ALog」、②ネットワークセキュリティ製品「Verona」、③網屋のセキュリティサービス全体を紹介する「NATURE SERIES」という3本の資料です。それぞれの内容を初心者向けに噛み砕きつつ、数字や事例は原資料の記載をそのまま使っています。</p>
+        <div class="reader-note">
+          <strong>この資料の使い方：</strong> 上から順に読むと、「ゼロトラストとは何か」→「用語の基礎」→「製品①ALog」→「製品②Verona」→「網屋という会社」→「全体像」→「用語集」の順で理解が深まるように構成しています。気になる章だけ左のメニューから移動しても構いません。
+        </div>
+
+        <div class="doc-cards">
+          <div class="doc-card">
+            <div class="pages">全49頁 / Ver.2.1</div>
+            <h3>① ALog</h3>
+            <p>「カンタンSIEM」を掲げるログ管理・異常検知製品。ログを集めて自動で異常を見つける仕組みを提供します。</p>
+          </div>
+          <div class="doc-card">
+            <div class="pages">全67頁 / Ver.13.7.2</div>
+            <h3>② Verona</h3>
+            <p>ネットワークとセキュリティをまとめてクラウドで提供する、フルマネージドのSASE製品です。</p>
+          </div>
+          <div class="doc-card">
+            <div class="pages">全33頁 / Ver.1.9.2</div>
+            <h3>③ NATURE SERIES</h3>
+            <p>網屋のセキュリティサービス全体像。コンサルティングから復旧まで、人による支援サービス群です。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 2. なぜ今「ゼロトラスト」なのか ============ -->
+    <section class="block" id="why-zerotrust">
+      <h2><span class="section-num">2</span>なぜ今「ゼロトラスト」なのか</h2>
+      <p class="lead">セキュリティの世界でよく聞く「<span class="term">ゼロトラスト<span class="tip">何も無条件に信頼せず、アクセスのたびに検証するというセキュリティの考え方。</span></span>」という言葉。これを理解するには、まず従来の考え方だった「<span class="term">境界型防御<span class="tip">社内ネットワークの内側は安全、外側は危険という前提で、境界（ファイアウォールなど）を守る従来型の防御の考え方。</span></span>」がなぜ限界を迎えたのかを知る必要があります。</p>
+
+      <h3 class="sub">従来の考え方：「城と堀」の境界型防御</h3>
+      <p>これまで多くの企業は、「社内ネットワークの内側にいれば安全、外側は危険」という前提でセキュリティを考えてきました。社内と社外の境界にファイアウォールなどの「壁」を築き、その壁の内側だけを守るという発想です。ちょうどお城の周りに堀を掘り、城壁の中だけを守るイメージに近いといえます。</p>
+
+      <div class="diagram-wrap">
+        <svg viewBox="0 0 720 260" role="img" aria-label="境界型防御のイメージ図：外側は危険なインターネット、内側は安全な社内ネットワークという従来の考え方">
+          <rect x="16" y="16" width="688" height="228" rx="16" fill="#fdecec" stroke="#c94d4d" stroke-width="2" stroke-dasharray="6 6"/>
+          <text x="34" y="42" font-size="14" fill="#a83a3a" font-weight="700">インターネット（危険・外側）</text>
+          <rect x="150" y="66" width="420" height="150" rx="14" fill="#e8f5ee" stroke="#1a7a4a" stroke-width="2"/>
+          <text x="170" y="92" font-size="14" fill="#0f5533" font-weight="700">社内ネットワーク（安全・内側）</text>
+          <text x="190" y="130" font-size="13" fill="#333">社員PC・ファイルサーバー・</text>
+          <text x="190" y="150" font-size="13" fill="#333">基幹システムなど</text>
+          <text x="190" y="180" font-size="12.5" fill="#555">「壁の中にいれば安全」という前提</text>
+          <rect x="330" y="216" width="60" height="26" fill="#fff" stroke="#555" stroke-width="2"/>
+          <text x="337" y="234" font-size="11" fill="#555">出入口</text>
+        </svg>
+        <div class="diagram-caption">図：境界型防御＝「城と堀」のイメージ。壁（境界）の内側は無条件に信頼される。</div>
+      </div>
+
+      <h3 class="sub">その前提が崩れた3つの理由</h3>
+      <p>ところが近年、この「壁の中は安全」という前提そのものが通用しなくなってきました。理由は主に、テレワークの普及とクラウドサービスの利用拡大により、社員が社外から社内システムやSaaSにアクセスする機会が急増したためです。壁の「外」と「内」の境目があいまいになり、境界を守るだけでは不十分になったのです。</p>
+      <p>さらに、実際の<span class="term">ランサムウェア<span class="tip">ファイルを勝手に暗号化し、復旧と引き換えに身代金を要求するマルウェア（悪意あるソフトウェア）。</span></span>被害の多くは、次の3つの経路から侵入しています。</p>
+
+      <div class="diagram-wrap">
+        <svg viewBox="0 0 760 320" role="img" aria-label="ランサムウェアの3つの侵入経路：テレワークの脆弱な通信経路、フィッシングメール、パッチ未適用の古いVPNルータ">
+          <rect x="20" y="30" width="200" height="80" rx="10" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="2"/>
+          <text x="120" y="58" font-size="13" fill="var(--blue-dark)" font-weight="700" text-anchor="middle">① テレワーク</text>
+          <text x="120" y="76" font-size="11.5" fill="#333" text-anchor="middle">自宅Wi-Fi/店舗の</text>
+          <text x="120" y="92" font-size="11.5" fill="#333" text-anchor="middle">フリーWi-Fiなど脆弱な通信</text>
+
+          <rect x="280" y="30" width="200" height="80" rx="10" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="2"/>
+          <text x="380" y="58" font-size="13" fill="var(--blue-dark)" font-weight="700" text-anchor="middle">② フィッシングメール</text>
+          <text x="380" y="76" font-size="11.5" fill="#333" text-anchor="middle">社員がメールを開封し</text>
+          <text x="380" y="92" font-size="11.5" fill="#333" text-anchor="middle">一気に感染が拡大</text>
+
+          <rect x="540" y="30" width="200" height="80" rx="10" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="2"/>
+          <text x="640" y="58" font-size="13" fill="var(--blue-dark)" font-weight="700" text-anchor="middle">③ 古いVPNルータ</text>
+          <text x="640" y="76" font-size="11.5" fill="#333" text-anchor="middle">パッチ未適用で流出した</text>
+          <text x="640" y="92" font-size="11.5" fill="#333" text-anchor="middle">認証情報が悪用される</text>
+
+          <line x1="120" y1="110" x2="330" y2="180" stroke="#999" stroke-width="2" marker-end="url(#arrow)"/>
+          <line x1="380" y1="110" x2="380" y2="180" stroke="#999" stroke-width="2" marker-end="url(#arrow)"/>
+          <line x1="640" y1="110" x2="430" y2="180" stroke="#999" stroke-width="2" marker-end="url(#arrow)"/>
+
+          <defs>
+            <marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 z" fill="#999"/>
+            </marker>
+          </defs>
+
+          <rect x="280" y="185" width="200" height="55" rx="10" fill="#fff" stroke="var(--navy)" stroke-width="2"/>
+          <text x="380" y="210" font-size="13" fill="var(--navy)" font-weight="700" text-anchor="middle">本社・工場・支社・店舗</text>
+          <text x="380" y="228" font-size="11" fill="#555" text-anchor="middle">サプライチェーン全体へ波及</text>
+
+          <line x1="380" y1="240" x2="380" y2="262" stroke="#c94d4d" stroke-width="2" marker-end="url(#arrow2)"/>
+          <defs>
+            <marker id="arrow2" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 z" fill="#c94d4d"/>
+            </marker>
+          </defs>
+          <rect x="230" y="264" width="300" height="42" rx="8" fill="#fdecec" stroke="#c94d4d" stroke-width="2"/>
+          <text x="380" y="290" font-size="12.5" fill="#a83a3a" font-weight="700" text-anchor="middle">感染・暗号化・情報流出・恐喝</text>
+        </svg>
+        <div class="diagram-caption">図：ランサムウェアの主な侵入経路3パターン（Verona資料の課題提起の図を再構成）。</div>
+      </div>
+
+      <h3 class="sub">ゼロトラストという発想への転換</h3>
+      <p>こうした状況を踏まえて広まったのが「ゼロトラスト」という考え方です。ゼロトラストとは、社内・社外という場所で信頼を判断するのではなく、<strong>誰が・どの端末で・何にアクセスしようとしているかを、そのつど検証する</strong>という発想です。「一度社内に入れたら後は自由」ではなく、「アクセスのたびに毎回確認する」という点が、境界型防御との決定的な違いです。</p>
+
+      <p>この違いは、従来の<span class="term">VPN<span class="tip">Virtual Private Networkの略。インターネット上に専用トンネルを作り、社外から社内ネットワークへ接続する技術。</span></span>とゼロトラストを比べるとわかりやすくなります。従来のVPNは、いったん認証されると社内ネットワークに広くアクセスできてしまうため、もし攻撃者に一度侵入されると、社内のあらゆるサーバーへ被害が広がる（<span class="term">横展開（ラテラルムーブメント）<span class="tip">侵入した攻撃者が、最初に侵入した端末から内部ネットワークの他のシステムへ次々と移動し、被害範囲を広げる行為。</span></span>）リスクを抱えています。一方でゼロトラストの考え方では、「ユーザーAはサーバーAだけにアクセスできる」というように、アクセスできる範囲を必要最小限に絞り込みます。</p>
+
+      <div class="diagram-wrap">
+        <svg viewBox="0 0 780 300" role="img" aria-label="従来のVPNとゼロトラストの比較図">
+          <text x="190" y="26" font-size="14" fill="var(--navy)" font-weight="700" text-anchor="middle">従来のVPN（境界型）</text>
+          <circle cx="60" cy="90" r="20" fill="#fff" stroke="var(--navy)" stroke-width="2"/>
+          <text x="60" y="95" font-size="10" text-anchor="middle">攻撃者</text>
+          <rect x="130" y="70" width="120" height="42" rx="8" fill="#fdecec" stroke="#c94d4d" stroke-width="2"/>
+          <text x="190" y="96" font-size="12" fill="#a83a3a" text-anchor="middle">VPN装置（常時公開）</text>
+          <line x1="80" y1="90" x2="128" y2="90" stroke="#c94d4d" stroke-width="2" marker-end="url(#arrowR)"/>
+          <defs><marker id="arrowR" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#c94d4d"/></marker></defs>
+
+          <rect x="130" y="150" width="120" height="34" rx="6" fill="#fdecec" stroke="#c94d4d" stroke-width="1.5"/>
+          <text x="190" y="171" font-size="11" fill="#a83a3a" text-anchor="middle">サーバーA（侵入可）</text>
+          <rect x="130" y="192" width="120" height="34" rx="6" fill="#fdecec" stroke="#c94d4d" stroke-width="1.5"/>
+          <text x="190" y="213" font-size="11" fill="#a83a3a" text-anchor="middle">サーバーB（侵入可）</text>
+          <rect x="130" y="234" width="120" height="34" rx="6" fill="#fdecec" stroke="#c94d4d" stroke-width="1.5"/>
+          <text x="190" y="255" font-size="11" fill="#a83a3a" text-anchor="middle">サーバーC（侵入可）</text>
+          <line x1="190" y1="112" x2="190" y2="150" stroke="#c94d4d" stroke-width="2" marker-end="url(#arrowD)"/>
+          <line x1="190" y1="112" x2="190" y2="192" stroke="#c94d4d" stroke-width="2" marker-end="url(#arrowD)"/>
+          <line x1="190" y1="112" x2="190" y2="234" stroke="#c94d4d" stroke-width="2" marker-end="url(#arrowD)"/>
+          <defs><marker id="arrowD" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#c94d4d"/></marker></defs>
+          <text x="190" y="290" font-size="11.5" fill="#a83a3a" text-anchor="middle" font-weight="700">一度侵入されると全部アクセス可</text>
+
+          <line x1="390" y1="20" x2="390" y2="300" stroke="var(--border)" stroke-width="2"/>
+
+          <text x="590" y="26" font-size="14" fill="var(--navy)" font-weight="700" text-anchor="middle">ゼロトラスト（Verona）</text>
+          <circle cx="450" cy="90" r="20" fill="#fff" stroke="var(--blue)" stroke-width="2"/>
+          <text x="450" y="95" font-size="9.5" text-anchor="middle">ユーザーA</text>
+          <rect x="510" y="70" width="140" height="42" rx="8" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="2"/>
+          <text x="580" y="90" font-size="11" fill="var(--blue-dark)" text-anchor="middle">Veronaクラウド</text>
+          <text x="580" y="104" font-size="10" fill="var(--blue-dark)" text-anchor="middle">（毎回検証）</text>
+          <line x1="470" y1="90" x2="508" y2="90" stroke="var(--blue)" stroke-width="2" marker-end="url(#arrowB)"/>
+          <defs><marker id="arrowB" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--blue)"/></marker></defs>
+
+          <rect x="520" y="150" width="120" height="34" rx="6" fill="#e8f5ee" stroke="#1a7a4a" stroke-width="1.5"/>
+          <text x="580" y="171" font-size="11" fill="#0f5533" text-anchor="middle">サーバーA（許可）</text>
+          <rect x="520" y="192" width="120" height="34" rx="6" fill="#f1f1f1" stroke="#999" stroke-width="1.5"/>
+          <text x="580" y="213" font-size="11" fill="#777" text-anchor="middle">サーバーB（× 遮断）</text>
+          <rect x="520" y="234" width="120" height="34" rx="6" fill="#f1f1f1" stroke="#999" stroke-width="1.5"/>
+          <text x="580" y="255" font-size="11" fill="#777" text-anchor="middle">クラウドサービス（× 遮断）</text>
+          <line x1="580" y1="112" x2="580" y2="150" stroke="#1a7a4a" stroke-width="2" marker-end="url(#arrowG)"/>
+          <defs><marker id="arrowG" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#1a7a4a"/></marker></defs>
+          <text x="580" y="290" font-size="11.5" fill="#0f5533" text-anchor="middle" font-weight="700">必要な範囲だけに安全にアクセス</text>
+        </svg>
+        <div class="diagram-caption">図：VPN＝一度入れば広範囲にアクセス可能／ゼロトラスト＝ユーザーごとに必要な範囲だけ許可（Verona資料の図を再構成）。</div>
+      </div>
+
+      <div class="callout">
+        <div class="callout-title"><span class="icon">💡</span>たとえ話で理解する</div>
+        従来のVPNは「会社の鍵をまるごと1本渡す」ようなもの。一度渡してしまえば、その人はどの部屋にも入れてしまいます。ゼロトラストは「必要な部屋の鍵だけをその都度渡す」イメージです。同じ社員でも、経理部屋の鍵は経理担当だけに、サーバー室の鍵は情シス担当だけに、というように必要な分だけアクセスを許可します。
+      </div>
+    </section>
+
+    <!-- ============ 3. 基礎用語ミニ講座 ============ -->
+    <section class="block" id="basics">
+      <h2><span class="section-num">3</span>基礎用語ミニ講座</h2>
+      <p class="lead">製品の話に入る前に、これから何度も出てくる基礎用語を「たとえ話」つきで押さえておきましょう。</p>
+
+      <div class="card-grid">
+        <div class="basic-card">
+          <span class="icon">📝</span>
+          <h4>ログ</h4>
+          <p><span class="term">ログ<span class="tip">システムやアプリケーションが「いつ・誰が・何をしたか」を自動的に記録するデータ。</span></span>とは、システム上で「いつ・誰が・何をしたか」を記録したデータのことです。何かトラブルが起きたとき、原因を調べるための証拠になります。</p>
+          <div class="callout" style="margin:10px 0 0;">
+            <div class="callout-title"><span class="icon">💡</span>たとえ話</div>
+            車ならドライブレコーダー、会社なら会計帳簿、医療機関ならカルテ。ITの世界ではそれが「ログ」にあたります（ALog資料より）。
+          </div>
+        </div>
+
+        <div class="basic-card">
+          <span class="icon">🔎</span>
+          <h4><span class="term">SIEM<span class="tip">Security Information and Event Managementの略。ログを収集・分析し、セキュリティ対策に活用する仕組み・製品カテゴリ。</span></span></h4>
+          <p>会社中のシステムから発生する大量のログを一箇所に集め、その中から「異常」を自動で見つけ出す仕組みです。ドラレコの映像を1台1台チェックする代わりに、AIが自動で不審な場面を教えてくれるイメージです。</p>
+        </div>
+
+        <div class="basic-card">
+          <span class="icon">🔒</span>
+          <h4>VPN</h4>
+          <p>インターネット上に社内ネットワークへの「専用トンネル」を作る技術です。ただし、この入口は常時ネット上に公開されているため、そこを狙われると弱点になりやすい、という課題があります。</p>
+        </div>
+
+        <div class="basic-card">
+          <span class="icon">☁️</span>
+          <h4><span class="term">SASE<span class="tip">Secure Access Service Edgeの略。ネットワーク機能とセキュリティ機能をクラウド上でまとめて提供するモデル。</span></span></h4>
+          <p>ネットワークの仕組み（通信をつなぐ機能）とセキュリティの仕組み（通信を守る機能）を、クラウド上でひとまとめにして提供するモデルです。次の5つの機能を組み合わせて構成されるのが一般的です。</p>
+          <ul>
+            <li><span class="term">ZTNA<span class="tip">ゼロトラストネットワークアクセス。ユーザーや端末ごとにアクセスを検証し、必要なリソースだけへの接続を許可する仕組み。</span></span>：ユーザーごとに必要な範囲だけアクセスを許可</li>
+            <li><span class="term">SWG<span class="tip">Secure Web Gatewayの略。URLフィルタリングやDNSセキュリティなど、Web通信を検査・制御する仕組み。</span></span>：危険なWebサイトへの通信を防ぐ</li>
+            <li><span class="term">FWaaS<span class="tip">Firewall as a Serviceの略。IPS/IDS、アンチウイルス、アンチスパムなどをクラウドで提供するファイアウォール機能。</span></span>：不正アクセスやウイルスを防ぐ</li>
+            <li><span class="term">CASB<span class="tip">Cloud Access Security Brokerの略。クラウドサービス（アプリケーション）の利用状況を可視化・制御する仕組み。</span></span>：使っているクラウドサービスを可視化・制御</li>
+            <li><span class="term">SD-WAN<span class="tip">拠点間の通信を効率よく制御・最適化するネットワーク技術。回線の冗長化やクラウド接続の最適化などを担う。</span></span>：拠点同士の通信を最適化</li>
+          </ul>
+        </div>
+
+        <div class="basic-card">
+          <span class="icon">👥</span>
+          <h4>人と組織にまつわる用語</h4>
+          <ul>
+            <li><span class="term">EDR<span class="tip">Endpoint Detection and Responseの略。PCやサーバーなど端末上の不審な挙動を検知・記録し、対応する仕組み。</span></span>：パソコンなど端末の不審な動きを検知・対応する仕組み</li>
+            <li><span class="term">SOC<span class="tip">Security Operation Centerの略。ログやアラートを24時間体制などで監視・分析する専門拠点・チーム。</span></span>：セキュリティを監視する専門チーム・拠点</li>
+            <li><span class="term">MDR<span class="tip">Managed Detection and Responseの略。監視から分析・報告・改善までのセキュリティ運用を専門チームが代行するサービス形態。</span></span>：監視から対応までを専門家が代行してくれるサービス</li>
+            <li><span class="term">CSIRT<span class="tip">Computer Security Incident Response Teamの略。組織内でセキュリティインシデントが発生した際に対応する専門チーム。</span></span>：社内でインシデント対応にあたる専門チーム</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 4. ALog ============ -->
+    <section class="block" id="alog">
+      <div class="theme-panel theme-green">
+        <span class="badge">製品解説① カンタンSIEM</span>
+        <h2>ALog — ログを集めて異常を自動で見つける</h2>
+        <p class="lead">ALogは、株式会社網屋が提供する「カンタンSIEM」というキャッチコピーの<span class="term">SIEM<span class="tip">ログを収集・分析してセキュリティ対策に役立てる仕組み・製品カテゴリ。</span></span>製品です。専門知識がなくても始められることを重視して設計されています。</p>
+
+        <h3 class="sub">解決する課題：「証拠」がないと調査できない</h3>
+        <p>ALog資料は、ログの重要性をこう説明しています。セキュリティインシデントが発生したとき、<strong>9割以上の組織で十分なログ管理ができておらず</strong>、「攻撃された証拠」を得られていません。実際、調査可能なログが存在しない組織は<strong>60%</strong>にのぼるという調査結果もあります（グローバルセキュリティエキスパート社の年間300件の被害対応相談実績より）。ログがなければ、侵入の兆候を見逃す、原因の特定ができない、内部不正を検知できない、といった問題につながります。</p>
+
+        <h3 class="sub">3つの強み</h3>
+
+        <h4 class="sub">① カンタン導入 + AIが自動検知</h4>
+        <p>ログ収集用のフォワーダーやAPI経由で複雑な設計をせずにログを自動収集でき、テンプレートを選ぶだけで運用を始められます。導入後はAIがユーザーの普段の行動を自動学習してスコアリングし、次の3つの観点で異常を検知します。</p>
+        <div class="card-grid">
+          <div class="basic-card"><h4>件数の変化</h4><p>例：ログイン失敗回数の急増など、「回数」の異常を検知します。</p></div>
+          <div class="basic-card"><h4>値の変化</h4><p>例：通信量の異常な増大など、「量」の異常を検知します。</p></div>
+          <div class="basic-card"><h4>新規出現</h4><p>例：過去30日間に出現しなかったアカウントやIPアドレスの初登場を検知します。</p></div>
+        </div>
+
+        <h4 class="sub">② MDRサービスで専門家が運用を代行</h4>
+        <p><span class="term">MDR<span class="tip">Managed Detection and Response。監視・分析・報告・改善までのセキュリティ運用を専門チームが代行するサービス。</span></span>サービスでは、専門チームがログ運用を丸ごと代行し、以下のサイクルを繰り返します。</p>
+        <div class="flow-steps">
+          <div class="flow-step">監視<br><small>攻撃・内部不正を監視</small></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step">分析<br><small>インシデントを分析</small></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step">報告<br><small>結果をわかりやすく報告</small></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step">最適化<br><small>監視項目を見直す</small></div>
+          <div class="flow-arrow">↻</div>
+        </div>
+
+        <h4 class="sub">③ ログ量課金 + 特許技術で最大1/200圧縮</h4>
+        <p>ALogは監視するデバイスやユーザーが増えても追加費用が発生しない、ログデータ量に応じたシンプルな課金体系を採用しています。さらに、特許取得済み（特許第6501159号）の「翻訳変換技術」により、複雑なイベントログを人が読める形に自動変換すると同時に、データ容量を<strong>最大1/200</strong>に圧縮します（環境や取り込むOS・ログ種別により変動）。</p>
+        <p>圧縮の例：元のログ 1GB → 変換後 1MB → さらに圧縮して 25KB という規模までデータ量を削減できます。</p>
+
+        <div class="table-wrap">
+          <table>
+            <caption>翻訳変換のBefore/After例（READ/WRITE/DELETEを人が読める文章に変換）</caption>
+            <thead>
+              <tr><th>項目</th><th>Before（システム的な記録）</th><th>After（翻訳変換後）</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>ファイルの閲覧</td><td>READ</td><td>「ファイルを開いた」</td></tr>
+              <tr><td>ファイルの保存</td><td>WRITE</td><td>「保存した」</td></tr>
+              <tr><td>ファイルの削除</td><td>DELETE</td><td>「削除した」</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="sub">主要機能</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>機能</th><th>できること</th></tr></thead>
+            <tbody>
+              <tr><td>監視テンプレート</td><td>Microsoft 365やActive Directoryなど、システムごとのテンプレートを選ぶだけでアラート・レポート設定が完了</td></tr>
+              <tr><td>ダッシュボード</td><td>異常な通信パターンや海外トラフィックなどを地図上で可視化し、いま見るべき情報にすぐたどり着ける</td></tr>
+              <tr><td>マルチノード構成</td><td>複数サーバーを1クラスターとして動作させ、大規模環境でも遅延なく処理（オンプレミス版）</td></tr>
+              <tr><td>S3オフロード</td><td>保管期限を過ぎたログをAmazon S3へ自動移行し、長期保管コストを削減（オンプレミス版）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="sub">料金の目安</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>項目</th><th>料金（税抜・月額）</th></tr></thead>
+            <tbody>
+              <tr><td>基本利用料金（クラウド版）</td><td>¥100,000</td></tr>
+              <tr><td>基本利用料金（オンプレミス版）</td><td>¥70,000</td></tr>
+              <tr><td>ログデータ容量料金</td><td>¥50,000 / 5GB（1日に取得する容量）</td></tr>
+              <tr><td>ALog MDR Basic（〜1,000アカウント）</td><td>¥200,000〜</td></tr>
+              <tr><td>ALog MDR Advanced（〜1,000アカウント）</td><td>¥300,000〜</td></tr>
+              <tr><td>プレミアムサポート</td><td>¥50,000</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="font-size:13px;color:var(--muted);">※年間契約（自動更新）。MDRサービスはアカウント数に応じて料金が上がります（〜2,000アカウントでBasic ¥300,000/Advanced ¥400,000、〜5,000アカウントでBasic ¥500,000/Advanced ¥600,000）。</p>
+
+        <h3 class="sub">導入実績</h3>
+        <div class="stat-grid">
+          <div class="stat-card green"><div class="num">6,500+</div><div class="label">契約数</div></div>
+          <div class="stat-card green"><div class="num">99%</div><div class="label">継続率</div></div>
+          <div class="stat-card green"><div class="num">No.1</div><div class="label">国産SIEM市場</div></div>
+          <div class="stat-card green"><div class="num">20+</div><div class="label">導入業界数</div></div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-card green"><div class="num">75%</div><div class="label">検知時間 短縮</div></div>
+          <div class="stat-card green"><div class="num">60%</div><div class="label">対応工数 削減</div></div>
+          <div class="stat-card green"><div class="num">50%</div><div class="label">運用コスト 削減</div></div>
+          <div class="stat-card green"><div class="num">90%</div><div class="label">監査対応時間 短縮</div></div>
+        </div>
+        <p style="font-size:13px;color:var(--muted);">※導入効果の数字は網屋の顧客実績、契約数・継続率等はデロイトトーマツミック経済研究所の市場調査（2026年3月発刊）および網屋自社調査（2026年1月末時点）に基づく。</p>
+
+        <h3 class="sub">導入事例</h3>
+        <div class="case">
+          <h5>A社（製造業・従業員約3,000名）</h5>
+          <p>サプライチェーン攻撃への警戒感やランサムウェア被害増加への懸念から導入。不審なVPNアクセスの早期検知、横展開攻撃の兆候監視により感染拡大をブロックし、セキュリティ監査の対応工数を<strong>80%削減</strong>しました。</p>
+          <p class="comment">「社内のセキュリティ体制に不安がありましたが、ALog導入後は安心感が大幅に向上しました。専門家による運用サポートも心強いです。」</p>
+        </div>
+        <div class="case">
+          <h5>B校（教育機関・学生数約10,000名）</h5>
+          <p>内部情報の持ち出し懸念やIT担当者のリソース不足から導入。USB操作の検知で内部不正を未然に防止し、通学時間外のファイルアクセスも監視。MDRサービスにより専門家による運用を実現しました。</p>
+          <p class="comment">「限られたIT人員で運用できるか心配でしたが、運用代行サービスにより、セキュリティレベルを大幅に向上できました。ガイドライン対応も容易になりました。」</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 5. Verona ============ -->
+    <section class="block" id="verona">
+      <div class="theme-panel theme-blue">
+        <span class="badge">製品解説② フルマネージドSASE</span>
+        <h2>Verona — ネットワークとセキュリティをクラウドでまとめて守る</h2>
+        <p class="lead">Veronaは、株式会社網屋が提供する<span class="term">SASE<span class="tip">Secure Access Service Edge。ネットワークとセキュリティをクラウド上で統合するモデル。</span></span>製品で、「フルマネージドSASE」を掲げています。専門要員がいなくても運用を任せられることが最大の特徴です。</p>
+
+        <h3 class="sub">解決する課題：VPN依存の限界</h3>
+        <p>前章で見た通り、従来のVPNには「常時ポートが開放されている」「一度突破されると社内を横展開されるリスクがある」という弱点があります。Veronaは、この<span class="term">VPN<span class="tip">Virtual Private Network。インターネット上に専用トンネルを作り社内ネットワークへ接続する技術。</span></span>依存の限界を解決するために設計されています。</p>
+
+        <h3 class="sub">3つの構成要素</h3>
+        <p>Veronaは、大きく3つの要素で構成されています。</p>
+        <div class="card-grid">
+          <div class="basic-card"><h4>Verona SASE</h4><p>ネットワーク機能とセキュリティ機能を提供するクラウド基盤。全体の中心となる部分です。</p></div>
+          <div class="basic-card"><h4>Verona Edge</h4><p>拠点（本社・支社・工場など）で使うSASEルータ。拠点間の安全なプライベートアクセスを提供します。</p></div>
+          <div class="basic-card"><h4>Verona Client</h4><p>テレワークなどリモート端末にインストールするソフト。証明書認証で安全にアクセスします。</p></div>
+        </div>
+
+        <div class="diagram-wrap">
+          <svg viewBox="0 0 760 300" role="img" aria-label="Veronaの構成図：クラウド中心にEdge拠点2つ、Clientの端末、SaaS/IaaSがつながる図">
+            <circle cx="380" cy="140" r="70" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="2.5"/>
+            <text x="380" y="135" font-size="14" fill="var(--blue-dark)" font-weight="700" text-anchor="middle">Verona SASE</text>
+            <text x="380" y="153" font-size="10.5" fill="var(--blue-dark)" text-anchor="middle">（クラウド基盤）</text>
+
+            <rect x="330" y="14" width="100" height="40" rx="8" fill="#fff" stroke="var(--navy)" stroke-width="2"/>
+            <text x="380" y="38" font-size="12" text-anchor="middle" fill="var(--navy)">SaaS / IaaS</text>
+            <line x1="380" y1="54" x2="380" y2="72" stroke="var(--navy)" stroke-width="2"/>
+
+            <rect x="60" y="60" width="140" height="52" rx="8" fill="#fff" stroke="var(--blue)" stroke-width="2"/>
+            <text x="130" y="82" font-size="12.5" text-anchor="middle" fill="var(--blue-dark)" font-weight="700">Verona Edge</text>
+            <text x="130" y="98" font-size="10.5" text-anchor="middle" fill="#555">拠点①（本社）</text>
+            <line x1="200" y1="90" x2="315" y2="120" stroke="var(--blue)" stroke-width="2"/>
+
+            <rect x="60" y="190" width="140" height="52" rx="8" fill="#fff" stroke="var(--blue)" stroke-width="2"/>
+            <text x="130" y="212" font-size="12.5" text-anchor="middle" fill="var(--blue-dark)" font-weight="700">Verona Edge</text>
+            <text x="130" y="228" font-size="10.5" text-anchor="middle" fill="#555">拠点②（支社・工場）</text>
+            <line x1="200" y1="210" x2="315" y2="170" stroke="var(--blue)" stroke-width="2"/>
+
+            <rect x="560" y="120" width="150" height="52" rx="8" fill="#fff" stroke="var(--blue)" stroke-width="2"/>
+            <text x="635" y="142" font-size="12.5" text-anchor="middle" fill="var(--blue-dark)" font-weight="700">Verona Client</text>
+            <text x="635" y="158" font-size="10.5" text-anchor="middle" fill="#555">テレワーク端末</text>
+            <line x1="558" y1="146" x2="450" y2="140" stroke="var(--blue)" stroke-width="2"/>
+          </svg>
+          <div class="diagram-caption">図：Verona SASEを中心に、拠点はVerona Edge、リモート端末はVerona Clientで接続し、SaaS/IaaSとも連携する構成。</div>
+        </div>
+
+        <h3 class="sub">5大機能</h3>
+        <div class="card-grid">
+          <div class="basic-card">
+            <h4><span class="term">ZTNA<span class="tip">ゼロトラストネットワークアクセス。端末やユーザーごとにアクセスを検証し、必要な範囲だけ接続を許可する仕組み。</span></span></h4>
+            <p>接続前に端末のセキュリティ状態を自動チェックする「デバイスポスチャー」機能、社外端末を常時Verona SASEに接続させる「起動強制」機能、就業時間外の新規接続を制限する「接続時間制御」機能などを備えます。</p>
+          </div>
+          <div class="basic-card">
+            <h4><span class="term">SWG<span class="tip">Secure Web Gateway。URLフィルタリングやDNSセキュリティなど、Web通信を検査・制御する機能区分。</span></span></h4>
+            <p>91カテゴリに基づくURLフィルタリングで危険サイトへのアクセスをブロックするほか、DNSレイヤーでの通信チェックである「DNSセキュリティ」により、Web以外の通信も含めて不正な通信を検知します。</p>
+          </div>
+          <div class="basic-card">
+            <h4><span class="term">FWaaS<span class="tip">Firewall as a Service。IPS/IDS、アンチウイルス、アンチスパムなどを含むファイアウォール機能区分。</span></span></h4>
+            <p>IPS/IDS（不正アクセス検知・防御）、アンチウイルス（ウイルスやスパイウェアの検知・ブロック）、アンチスパム（スパムメールの削減）を包括的に提供します。</p>
+          </div>
+          <div class="basic-card">
+            <h4><span class="term">CASB<span class="tip">Cloud Access Security Broker。クラウドサービス（アプリケーション）の利用状況を可視化・制御する仕組み。</span></span></h4>
+            <p>4,800以上のアプリケーションを識別できるコントロールリストにより、業務に必要なアプリだけを許可したり、情報漏えいの危険があるアプリの使用を禁止したりできます。</p>
+          </div>
+          <div class="basic-card">
+            <h4><span class="term">SD-WAN<span class="tip">拠点間通信を効率よく制御・最適化するネットワーク技術。</span></span></h4>
+            <p>メイン回線がダウンした際にサブ回線へ自動フェイルオーバーする「WAN冗長化」や、AWS・Azure・GCPなど複数クラウドへの接続に対応する「IaaS接続」を提供します。</p>
+          </div>
+        </div>
+
+        <h3 class="sub">目玉機能：ダイナミックポートコントロール</h3>
+        <p>Veronaの大きな特徴が「ダイナミックポートコントロール」です。多くのランサムウェア攻撃はVPNの脆弱性を悪用しますが、Veronaは通信の出入口となるポートを常時開放せず、証明書と紐づいた正規端末からの認証要求があったときだけポートを開放します。不正なユーザーはそもそもVeronaの存在自体を認識できないため、認証要求すらできません。</p>
+        <div class="diagram-wrap">
+          <svg viewBox="0 0 700 160" role="img" aria-label="鍵を強くする発想と存在を見えなくする発想の比較図">
+            <text x="170" y="24" font-size="13" fill="var(--navy)" font-weight="700" text-anchor="middle">一般的な発想：鍵を強くする</text>
+            <rect x="110" y="40" width="120" height="90" rx="6" fill="#fff" stroke="var(--navy)" stroke-width="2"/>
+            <path d="M170 40 L110 70 L110 130 L230 130 L230 70 Z" fill="none" stroke="var(--navy)" stroke-width="2"/>
+            <circle cx="170" cy="95" r="12" fill="#eee" stroke="var(--navy)" stroke-width="2"/>
+            <text x="170" y="99" font-size="10" text-anchor="middle">🔒</text>
+            <text x="170" y="150" font-size="11" text-anchor="middle" fill="#555">存在は見える／鍵で防御</text>
+
+            <line x1="350" y1="10" x2="350" y2="150" stroke="var(--border)" stroke-width="2"/>
+
+            <text x="530" y="24" font-size="13" fill="var(--blue-dark)" font-weight="700" text-anchor="middle">Veronaの発想：存在を見えなくする</text>
+            <rect x="470" y="40" width="120" height="90" rx="6" fill="none" stroke="var(--blue)" stroke-width="2" stroke-dasharray="5 5" opacity="0.5"/>
+            <path d="M530 40 L470 70 L470 130 L590 130 L590 70 Z" fill="none" stroke="var(--blue)" stroke-width="2" stroke-dasharray="5 5" opacity="0.5"/>
+            <text x="530" y="99" font-size="16" text-anchor="middle" opacity="0.6">？</text>
+            <text x="530" y="150" font-size="11" text-anchor="middle" fill="var(--blue-dark)">外部から存在自体が見えない</text>
+          </svg>
+          <div class="diagram-caption">図：鍵を強くする発想 vs 存在そのものを見えなくする発想（ダイナミックポートコントロールのイメージ）。</div>
+        </div>
+        <div class="callout">
+          <div class="callout-title"><span class="icon">💡</span>たとえ話で理解する</div>
+          一般的なセキュリティ強化は「家の鍵をより頑丈にする」発想です。しかしダイナミックポートコントロールは、「家の鍵を強くする」のではなく「家の場所そのものを外から見えなくする」発想に近いといえます。そこに家（＝アクセスできる入口）があることさえわからなければ、そもそも泥棒（攻撃者）は近づくことすらできません。
+        </div>
+
+        <h3 class="sub">なぜ「フルマネージド」が重要なのか</h3>
+        <p>Verona資料は、日本企業にフルマネージド（運用まるごと代行）型のSASEが向いている理由を、IT人材の所在データで説明しています。日本ではIT人材の<strong>72%がベンダー企業側</strong>に在籍している一方、<strong>ユーザー企業側は28%</strong>にとどまります。対照的に米国では<strong>ユーザー企業側に65%</strong>のIT人材が在籍しています（情報処理推進機構「IT人材白書2017」を基に作成）。</p>
+        <p>つまり、自社エンジニアでの運用を前提に作られた海外製のSASEは、IT人材の多くがベンダー側にいる日本企業にとって、自社運用が難しいという構造的なミスマッチがあります。Veronaはこの点を踏まえ、専門のセキュリティエンジニアが運用・設定管理・障害対応を代行する「フルマネージド」を標準で提供しています。</p>
+
+        <h3 class="sub">通信速度への工夫</h3>
+        <p>特定のクラウドサービスへは本社を経由せず拠点から直接インターネットへ接続する「<span class="term">ローカルブレイクアウト<span class="tip">特定のクラウドサービスへの通信を本社経由にせず、拠点から直接インターネットへ接続させる方式。回線負荷の軽減や速度向上に寄与する。</span></span>」により、回線の混雑を回避しながら通信品質を向上させます。また、従来のPPPoE方式より<strong>最大10倍の通信速度</strong>を実現する<span class="term">IPoE<span class="tip">IPv4 over IPv6。従来のPPPoE方式に比べて混雑の影響を受けにくく、高速な接続を実現する新しい接続方式。</span></span>方式対応ルータにも対応しています。</p>
+
+        <h3 class="sub">料金の目安</h3>
+        <div class="table-wrap">
+          <table>
+            <caption>Verona SASE プラン（税抜・年間契約前提）</caption>
+            <thead><tr><th>プラン</th><th>初期費用</th><th>サービス費用/月</th></tr></thead>
+            <tbody>
+              <tr><td>SASE 200</td><td>¥350,000</td><td>¥350,000</td></tr>
+              <tr><td>SASE 500</td><td>¥500,000</td><td>¥500,000</td></tr>
+              <tr><td>SASE 1000</td><td>¥750,000</td><td>¥750,000</td></tr>
+              <tr><td>SASE 3000</td><td>¥2,500,000</td><td>¥2,500,000</td></tr>
+              <tr><td>SASE 5000</td><td>¥3,900,000</td><td>¥3,900,000</td></tr>
+              <tr><td>SASE 10000</td><td>¥7,200,000</td><td>¥7,200,000</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <caption>小規模向け・拠点/端末オプション（税抜）</caption>
+            <thead><tr><th>項目</th><th>料金</th></tr></thead>
+            <tbody>
+              <tr><td>Verona SASE Lite（50デバイス未満向け）</td><td>初期¥200,000 / 月額¥100,000</td></tr>
+              <tr><td>Verona Edge（レンタル・最安タイプ）</td><td>月額¥12,000〜</td></tr>
+              <tr><td>Verona Client（1ライセンス/月）</td><td>¥500〜¥700/台</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="font-size:13px;color:var(--muted);">※Verona SASEは<strong>2026年10月1日より価格改定が予定されています</strong>。最新の価格は公式情報を確認してください。</p>
+
+        <h3 class="sub">導入実績</h3>
+        <div class="stat-grid">
+          <div class="stat-card blue"><div class="num">5,900+</div><div class="label">導入社数（2025年10月時点）</div></div>
+        </div>
+        <div class="card-grid">
+          <div class="basic-card"><h4>松屋フーズ様</h4><p>1,000店舗へスピード導入。</p></div>
+          <div class="basic-card"><h4>熊谷組様</h4><p>300拠点超のサテライト工事事務所をクラウド化。</p></div>
+          <div class="basic-card"><h4>ホーチキ様</h4><p>2,000名のテレワーク環境に導入。</p></div>
+          <div class="basic-card"><h4>モリタ東京製作所様</h4><p>歯科用医療機器メーカー（従業員約345名）。少人数体制での運用属人化を解消し、BCP面でも改善。</p></div>
+          <div class="basic-card"><h4>タカサ様</h4><p>調剤薬局等（従業員約636名）。68店舗へ導入し、既存回線を活かしつつセキュリティ統一とローカルブレイクアウトによる速度改善を実現。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 6. 網屋とNATURE SERIES ============ -->
+    <section class="block" id="amiya">
+      <div class="theme-panel theme-dark">
+        <span class="badge">網屋という会社について</span>
+        <h2>網屋という会社と NATURE SERIES</h2>
+        <p class="lead">ALogとVeronaを開発・提供している株式会社網屋（AMIYA）は、製品だけでなく「人によるセキュリティ支援サービス」も幅広く展開しています。それが「NATURE SERIES」と呼ばれるサービス群です。</p>
+
+        <h3 class="sub">会社の概要</h3>
+        <div class="stat-grid">
+          <div class="stat-card orange"><div class="num">1996</div><div class="label">創立年</div></div>
+          <div class="stat-card orange"><div class="num">2021.12</div><div class="label">グロース上場</div></div>
+          <div class="stat-card orange"><div class="num">4,000人</div><div class="label">年次カンファレンス Security BLAZE 参加者</div></div>
+        </div>
+        <p>拠点は東京本社・大阪営業所・さっぽろ研究所・和歌山セキュリティセンター。さらに北海道大学と長崎県立大学にも研究ラボを設置し、AIによるサイバー攻撃検知や脅威インテリジェンスの研究を進めています。</p>
+
+        <h3 class="sub">NIST CSF 2.0の6フェーズとNATURE SERIES</h3>
+        <p>網屋のサービスは、<span class="term">NIST CSF 2.0<span class="tip">米国国立標準技術研究所（NIST）が策定した、世界標準のサイバーセキュリティフレームワーク。統治・特定・防御・検知・対応・復旧の6フェーズで対策を整理する。</span></span>という世界標準のフレームワークに沿って整理されています。統治・特定・防御・検知・対応・復旧の6つのフェーズごとに、対応するサービスが用意されています。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>統治</th><th>特定</th><th>防御</th><th>検知</th><th>対応</th><th>復旧</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>リスクアセスメント支援</td>
+                <td>資産管理</td>
+                <td>EDR（SentinelOne）導入</td>
+                <td>SIEM（ALog）導入/運用</td>
+                <td>インシデントレスポンスコンサル</td>
+                <td>ファストフォレンジック</td>
+              </tr>
+              <tr>
+                <td>セキュリティ文章化/改訂支援</td>
+                <td>アタックサーフェス調査</td>
+                <td>SASE（Verona）導入・ネットワークセキュリティ</td>
+                <td>EDR SOC（SentinelOne）</td>
+                <td>インシデント対応訓練</td>
+                <td>フルフォレンジック</td>
+              </tr>
+              <tr>
+                <td>セキュリティ監査支援</td>
+                <td>脆弱性診断（Web/プラットフォーム）</td>
+                <td>IDP導入・IDセキュリティ</td>
+                <td>UTM SOC</td>
+                <td>対応フローマニュアル作成</td>
+                <td>ログ調査</td>
+              </tr>
+              <tr>
+                <td>セキュリティ認証（ISO27001/Pマーク）取得支援</td>
+                <td>セキュリティ設定診断</td>
+                <td>セキュリティトレーニング</td>
+                <td>内部不正監視</td>
+                <td></td>
+                <td>ランサムウェア対策バックアップ</td>
+              </tr>
+              <tr>
+                <td>BCP策定支援</td>
+                <td>ペネトレーションテスト</td>
+                <td>標的型攻撃メール訓練</td>
+                <td>脅威インテリジェンス</td>
+                <td></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>CSIRT構築支援</td>
+                <td>ダークウェブ調査</td>
+                <td>情報セキュリティ教育</td>
+                <td>SOC構築コンサル</td>
+                <td></td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="sub">サービスの4カテゴリ</h3>
+        <p>NATURE SERIESのサービス一覧では、各サービスに動物のアイコンが付けられています（資料内に選定理由の説明はありませんが、視覚的にサービスを覚えやすくする工夫と考えられます）。</p>
+
+        <h4 class="sub">コンサルティング</h4>
+        <div class="card-grid">
+          <div class="svc-card"><span class="emoji">🐺</span><div><h5>サイバーセキュリティアドバイザリー</h5><p>専門コンサルタントが伴走型で助言</p></div></div>
+          <div class="svc-card"><span class="emoji">🦁</span><div><h5>情報セキュリティ文書作成支援/監査</h5><p>規程作成から教育・監査まで一貫支援</p></div></div>
+          <div class="svc-card"><span class="emoji">🐼</span><div><h5>CSIRT構築支援</h5><p><span class="term">CSIRT<span class="tip">組織内のセキュリティインシデントが発生した際に対応する専門チーム。</span></span>の体制整備を支援</p></div></div>
+          <div class="svc-card"><span class="emoji">🦫</span><div><h5>ISMS認証取得支援</h5><p>ISO/IEC 27001の認証取得を支援</p></div></div>
+        </div>
+
+        <h4 class="sub">セキュリティ診断</h4>
+        <div class="card-grid">
+          <div class="svc-card"><span class="emoji">🦅</span><div><h5>脆弱性診断</h5><p>設定ミスやパッチ未適用の穴を発見</p></div></div>
+          <div class="svc-card"><span class="emoji">🦉</span><div><h5>セキュリティ設定診断</h5><p>ITシステムの設定不備を洗い出す</p></div></div>
+          <div class="svc-card"><span class="emoji">🦒</span><div><h5><span class="term">アタックサーフェス<span class="tip">攻撃者から狙われうるIT資産・接点の範囲。</span></span>調査</h5><p>ドメイン・IP単位で攻撃対象を可視化</p></div></div>
+          <div class="svc-card"><span class="emoji">🐻</span><div><h5>脅威ベースセキュリティアセスメント</h5><p>組織特有の脅威を特定し対策案を策定</p></div></div>
+          <div class="svc-card"><span class="emoji">🎯</span><div><h5><span class="term">ペネトレーションテスト<span class="tip">攻撃者目線で実際にシステムへの侵入を試み、現行の対策の有効性やリスクの有無を明らかにするテスト。</span></span></h5><p>攻撃者目線で実際に侵入を試みる疑似攻撃テスト</p></div></div>
+        </div>
+
+        <h4 class="sub">セキュリティ教育・研修 / インシデント対応</h4>
+        <div class="card-grid">
+          <div class="svc-card"><span class="emoji">🦍</span><div><h5>サイバーセキュリティ教育</h5><p>一般社員から経営層、エンジニアまで幅広く対応</p></div></div>
+          <div class="svc-card"><span class="emoji">🐆</span><div><h5>緊急インシデント対応</h5><p>インシデント発生時の初動支援と<span class="term">ファストフォレンジック<span class="tip">インシデント発生後、初期侵入経路や被害範囲を短期間で特定する調査。</span></span>調査</p></div></div>
+          <div class="svc-card"><span class="emoji">🔍</span><div><h5>フルフォレンジックサービス</h5><p><span class="term">フォレンジック<span class="tip">インシデント発生後に端末やログを詳細解析し、原因・証拠を明らかにする調査手法。</span></span>により根本原因と法的証拠を調査</p></div></div>
+        </div>
+
+        <h4 class="sub">関連サービス</h4>
+        <div class="card-grid">
+          <div class="svc-card"><span class="emoji">🛡️</span><div><h5>セキュサポ（クラウドCSIRTサービス）</h5><p>予防・検知・対応を月額固定料金でパッケージ提供</p></div></div>
+          <div class="svc-card"><span class="emoji">🤖</span><div><h5>SentinelOne（自立型EDR）</h5><p>AIが検知から隔離・修復までを自動対応する次世代EDR</p></div></div>
+        </div>
+
+        <h3 class="sub">費用感の例</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>サービス</th><th>サンプル価格（税抜）</th></tr></thead>
+            <tbody>
+              <tr><td>サイバーセキュリティアドバイザリー</td><td>12.5万円 / 1ヶ月</td></tr>
+              <tr><td>ISMS認証取得支援</td><td>360万円</td></tr>
+              <tr><td>ペネトレーションテスト</td><td>500万円 / 1シナリオ</td></tr>
+              <tr><td>緊急インシデント対応（インシデント対応アドバイザリー）</td><td>380万円 / 1ヶ月</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 7. 全体像 ============ -->
+    <section class="block" id="bigpicture">
+      <h2><span class="section-num">7</span>3つの資料の全体像</h2>
+      <p class="lead">最後に、ここまで見てきた3つの資料がどう関係しているかを整理します。ひとことで言うと、<strong>Verona（防御）</strong>と<strong>ALog（検知）</strong>という2つの製品を、<strong>NATURE SERIES（人的サービス）</strong>が取り巻いている、という構造です。</p>
+
+      <div class="diagram-wrap">
+        <svg viewBox="0 0 760 340" role="img" aria-label="Verona=防御、ALog=検知、NATURE SERIES=人的サービスという全体像の図">
+          <rect x="30" y="20" width="700" height="300" rx="20" fill="none" stroke="var(--orange)" stroke-width="3" stroke-dasharray="8 6"/>
+          <text x="380" y="46" font-size="14" fill="var(--orange-dark)" font-weight="700" text-anchor="middle">NATURE SERIES（人的サービス：コンサル〜復旧を取り巻く支援）</text>
+
+          <rect x="90" y="110" width="240" height="120" rx="14" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="2.5"/>
+          <text x="210" y="145" font-size="15" fill="var(--blue-dark)" font-weight="700" text-anchor="middle">Verona</text>
+          <text x="210" y="167" font-size="12.5" fill="var(--blue-dark)" text-anchor="middle">＝防御</text>
+          <text x="210" y="190" font-size="11" fill="#333" text-anchor="middle">入口・通信を守る</text>
+          <text x="210" y="208" font-size="11" fill="#333" text-anchor="middle">（SASE：ZTNA/SWG/FWaaS/CASB/SD-WAN）</text>
+
+          <rect x="430" y="110" width="240" height="120" rx="14" fill="var(--green-bg)" stroke="var(--green)" stroke-width="2.5"/>
+          <text x="550" y="145" font-size="15" fill="var(--green-dark)" font-weight="700" text-anchor="middle">ALog</text>
+          <text x="550" y="167" font-size="12.5" fill="var(--green-dark)" text-anchor="middle">＝検知</text>
+          <text x="550" y="190" font-size="11" fill="#333" text-anchor="middle">ログで異常を見つけ</text>
+          <text x="550" y="208" font-size="11" fill="#333" text-anchor="middle">証跡を残す（SIEM）</text>
+
+          <line x1="330" y1="170" x2="428" y2="170" stroke="var(--navy)" stroke-width="2.5" marker-end="url(#arrowBP)"/>
+          <defs><marker id="arrowBP" markerWidth="9" markerHeight="9" refX="4.5" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="var(--navy)"/></marker></defs>
+          <text x="380" y="160" font-size="11" fill="var(--navy)" text-anchor="middle" font-weight="700">ログ転送</text>
+
+          <text x="380" y="270" font-size="12.5" fill="var(--orange-dark)" text-anchor="middle">NIST CSFでは：Veronaは「防御」フェーズ、ALogは「検知」フェーズに対応</text>
+          <text x="380" y="292" font-size="12.5" fill="var(--orange-dark)" text-anchor="middle">その前後（統治・特定・対応・復旧）をNATURE SERIESの各種支援がカバー</text>
+        </svg>
+        <div class="diagram-caption">図：VeronaからALogへのログ転送（Verona資料p66）と、NIST CSFフェーズ上の位置づけ。</div>
+      </div>
+
+      <p>Veronaはネットワークの入口や通信そのものを守る「防御」の役割を担い、実際にVerona資料の中でも、Veronaで取得した通信ログをALogへ転送して分析する連携が紹介されています。一方でALogは、あらゆるシステムのログを集めて異常を見つけ、万一のときの証跡を残す「検知」の役割を担います。</p>
+      <p>そして、これら2つの製品だけでは対応しきれない「導入前の計画」「診断」「教育」「有事の対応」「復旧」といった人手が必要な領域を、NATURE SERIESのコンサルティング・診断・教育・インシデント対応サービスが取り巻いてカバーする、という構図になっています。NIST CSFの6フェーズで言えば、Veronaは「防御」、ALogは「検知」に位置づけられ、残りの「統治」「特定」「対応」「復旧」はNATURE SERIESの各種サービスが担当します。</p>
+    </section>
+
+    <!-- ============ 8. 用語集 ============ -->
+    <section class="block" id="glossary">
+      <h2><span class="section-num">8</span>用語集</h2>
+      <p class="lead">ここまでに登場した専門用語を辞書形式でまとめました。</p>
+      <dl class="dict">
+        <dt>SIEM（シーム）</dt>
+        <dd>Security Information and Event Managementの略。さまざまなシステムのログを収集・分析し、セキュリティ対策に活用する仕組み・製品カテゴリ。ALogはこの分野の国産製品。</dd>
+
+        <dt>SASE（サシー）</dt>
+        <dd>Secure Access Service Edgeの略。ネットワーク機能とセキュリティ機能をクラウド上で統合して提供するモデル。Veronaはこの分野のフルマネージド製品。</dd>
+
+        <dt>ZTNA</dt>
+        <dd>ゼロトラストネットワークアクセス。ユーザーや端末ごとにアクセスを検証し、必要なリソースだけへの接続を許可する仕組み。</dd>
+
+        <dt>SWG（Secure Web Gateway）</dt>
+        <dd>URLフィルタリングやDNSセキュリティなど、Web通信を検査・制御する機能区分。</dd>
+
+        <dt>FWaaS（Firewall as a Service）</dt>
+        <dd>IPS/IDS、アンチウイルス、アンチスパムなどをクラウドで提供するファイアウォール機能。</dd>
+
+        <dt>CASB（Cloud Access Security Broker）</dt>
+        <dd>クラウドサービス（アプリケーション）の利用状況を可視化・制御する仕組み。</dd>
+
+        <dt>SD-WAN</dt>
+        <dd>拠点間の通信を効率よく制御・最適化するネットワーク技術。回線の冗長化やクラウド接続の最適化を含む。</dd>
+
+        <dt>EDR（Endpoint Detection and Response）</dt>
+        <dd>PCやサーバーなど端末上の不審な挙動を検知・記録し、対応する仕組み。SentinelOneはこの分野の製品。</dd>
+
+        <dt>MDR（Managed Detection and Response）</dt>
+        <dd>監視から分析・報告・改善までのセキュリティ運用を専門チームが代行するサービス形態。ALog MDRサービスなど。</dd>
+
+        <dt>SOC（Security Operation Center）</dt>
+        <dd>ログやアラートを監視・分析する専門拠点・チーム。</dd>
+
+        <dt>CSIRT（Computer Security Incident Response Team）</dt>
+        <dd>組織内でセキュリティインシデントが発生した際に対応する専門チーム。</dd>
+
+        <dt>IDaaS（Identity as a Service）</dt>
+        <dd>クラウド上でID管理・認証を提供するサービス（Entra ID、Oktaなど）。Veronaは証明書認証とIDaaS認証を組み合わせた2要素認証に対応。</dd>
+
+        <dt>ローカルブレイクアウト</dt>
+        <dd>特定のクラウドサービスへの通信を本社経由にせず、拠点から直接インターネットへ接続させる方式。回線負荷の軽減や速度向上に寄与する。</dd>
+
+        <dt>C&amp;Cサーバ（Command &amp; Control）</dt>
+        <dd>マルウェアが外部の攻撃者と通信するために使うサーバ。感染端末はC&amp;Cサーバからの指令を受けて動作する。</dd>
+
+        <dt>DNSトンネリング</dt>
+        <dd>DNSクエリ（名前解決の問い合わせ）を悪用して、C&amp;Cサーバとの通信を確立する攻撃手法。</dd>
+
+        <dt>ランサムウェア</dt>
+        <dd>ファイルを勝手に暗号化し、復旧と引き換えに身代金を要求するマルウェア。</dd>
+
+        <dt>フィッシング</dt>
+        <dd>偽のメールやWebサイトを使って、パスワードなどの情報を盗み取る攻撃手法。</dd>
+
+        <dt>横展開（ラテラルムーブメント）</dt>
+        <dd>侵入した攻撃者が、最初に侵入した端末から内部ネットワークの他のシステムへ次々と移動し、被害範囲を広げる行為。</dd>
+
+        <dt>境界型防御</dt>
+        <dd>社内ネットワークの内側は安全、外側は危険という前提で、ファイアウォールなどの境界を守る従来型の防御の考え方。</dd>
+
+        <dt>フォレンジック</dt>
+        <dd>インシデント発生後に端末やネットワーク機器、サーバーのログを詳細解析し、原因・被害範囲・証拠を明らかにする調査手法。</dd>
+
+        <dt>ペネトレーションテスト</dt>
+        <dd>攻撃者目線で実際にシステムへの侵入を試み、現行の対策の有効性やリスクの有無を明らかにするテスト。</dd>
+
+        <dt>アタックサーフェス</dt>
+        <dd>攻撃者から狙われうるIT資産・接点の範囲。ドメインやIPアドレスをもとに調査するサービスがある。</dd>
+
+        <dt>NIST CSF 2.0</dt>
+        <dd>米国国立標準技術研究所（NIST）が策定した世界標準のサイバーセキュリティフレームワーク。統治・特定・防御・検知・対応・復旧の6フェーズで対策を整理する。</dd>
+
+        <dt>ダイナミックポートコントロール</dt>
+        <dd>通信の出入口となるポートを常時開放せず、正規端末からの認証要求時のみ動的に開放する仕組み。Veronaの目玉機能。</dd>
+
+        <dt>デバイスポスチャー機能</dt>
+        <dd>接続前に端末のセキュリティ状態（ドメイン参加有無、セキュリティソフトの稼働状況など）を自動チェックする機能。</dd>
+
+        <dt>ISMS / ISO/IEC 27001</dt>
+        <dd>情報セキュリティマネジメントシステムの国際規格・認証制度。組織の情報資産を適切に管理する体制を評価する。</dd>
+
+        <dt>IPS/IDS</dt>
+        <dd>通信パケットを監視し、ネットワークへの不正アクセスを検知・防御する仕組み（侵入防止システム／侵入検知システム）。</dd>
+      </dl>
+    </section>
+
+    <!-- ============ 9. 出典と注意書き ============ -->
+    <section class="block" id="sources">
+      <h2><span class="section-num">9</span>出典と注意書き</h2>
+      <ul class="src-list">
+        <li><strong>ALog サービス概要資料</strong>（Document Ver.2.1、全49頁）— 発行元：株式会社網屋（AMIYA Corporation）</li>
+        <li><strong>Verona フルマネージドSASE 資料</strong>（Ver.13.7.2、全67頁）— 発行元：株式会社網屋（AMIYA Corporation）</li>
+        <li><strong>NATURE SERIES セキュリティサービス詳細資料</strong>（Ver.1.9.2、全33頁）— 発行元：株式会社網屋（AMIYA Corporation）</li>
+      </ul>
+      <div class="disclaimer">
+        本ページは、上記3資料をもとにセキュリティ知識ゼロの読者向けに再構成した<strong>学習用の要約</strong>です。内容の正確な仕様・最新の価格については、必ず原本PDFおよび網屋公式サイトをご確認ください。掲載している価格はすべて資料時点の<strong>税抜表記</strong>です。特にVeronaの価格は2026年10月1日に改定が予定されているため、契約検討時は最新情報を確認してください。
+      </div>
+    </section>
+
+    <footer class="page-footer">
+      国内ゼロトラスト入門 — 網屋 ALog / Verona / NATURE SERIES 学習用まとめページ
+    </footer>
+
+  </main>
+</div>
+
+<script>
+  (function(){
+    "use strict";
+    var navLinks = Array.prototype.slice.call(document.querySelectorAll('.sidenav a[data-nav]'));
+    var sections = navLinks.map(function(link){
+      return document.getElementById(link.getAttribute('href').slice(1));
+    }).filter(Boolean);
+
+    navLinks.forEach(function(link){
+      link.addEventListener('click', function(e){
+        var id = link.getAttribute('href').slice(1);
+        var target = document.getElementById(id);
+        if(target){
+          e.preventDefault();
+          target.scrollIntoView({behavior:'smooth', block:'start'});
+          history.pushState(null, '', '#' + id);
+        }
+      });
+    });
+
+    function setActive(id){
+      navLinks.forEach(function(link){
+        link.classList.toggle('active', link.getAttribute('href') === '#' + id);
+      });
+    }
+
+    if('IntersectionObserver' in window){
+      var observer = new IntersectionObserver(function(entries){
+        var visible = entries.filter(function(en){ return en.isIntersecting; });
+        if(visible.length > 0){
+          visible.sort(function(a,b){ return b.intersectionRatio - a.intersectionRatio; });
+          setActive(visible[0].target.id);
+        }
+      }, {rootMargin:'-15% 0px -60% 0px', threshold:[0, 0.1, 0.25, 0.5, 0.75, 1]});
+
+      sections.forEach(function(sec){ observer.observe(sec); });
+    }
+
+    if(sections.length){ setActive(sections[0].id); }
+  })();
+</script>
+</body>
+</html>

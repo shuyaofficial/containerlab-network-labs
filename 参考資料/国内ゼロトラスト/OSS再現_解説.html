@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSSで再現するゼロトラスト — ALog(SIEM) / Verona(SASE) 実機検証</title>
+<style>
+  :root{
+    --navy:#0f1f38;
+    --text:#243044;
+    --muted:#5b6b7f;
+    --bg:#f5f7fa;
+    --white:#ffffff;
+    --border:#e1e6ec;
+    --green:#1a7a4a;
+    --green-bg:#e8f5ee;
+    --green-dark:#0f5533;
+    --blue:#1558b0;
+    --blue-bg:#eaf1fc;
+    --blue-dark:#0d3d80;
+    --dark:#1b1b23;
+    --orange:#e8791a;
+    --orange-bg:#fff4e9;
+    --orange-dark:#a85512;
+    --gray-bg:#eef0f2;
+    --gray-text:#66707c;
+    --gray-border:#ccd2d8;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    font-size:16px;
+    line-height:1.8;
+  }
+  h1,h2,h3,h4{color:var(--navy); line-height:1.4;}
+  a{color:var(--blue);}
+  img,svg{max-width:100%;}
+
+  /* ---------- layout ---------- */
+  .layout{display:flex; align-items:flex-start;}
+  .sidenav{
+    width:250px; flex-shrink:0; background:var(--white);
+    border-right:1px solid var(--border);
+    position:fixed; top:0; left:0; height:100vh; overflow-y:auto;
+    padding:22px 0 40px; z-index:50;
+  }
+  .sidenav .brand{
+    padding:0 20px 16px; font-weight:700; color:var(--navy);
+    font-size:15px; border-bottom:1px solid var(--border); margin-bottom:10px;
+  }
+  .sidenav .brand small{display:block; font-weight:400; color:var(--muted); font-size:11px; margin-top:4px;}
+  .sidenav ul{list-style:none; margin:0; padding:0;}
+  .sidenav li a{
+    display:block; padding:10px 20px; color:var(--muted); text-decoration:none;
+    font-size:13.5px; border-left:3px solid transparent; transition:.15s;
+  }
+  .sidenav li a:hover{background:var(--bg); color:var(--navy);}
+  .sidenav li a.active{color:var(--navy); border-left-color:var(--blue); background:var(--bg); font-weight:700;}
+
+  main{margin-left:250px; flex:1; min-width:0; padding:48px min(6vw,64px) 110px; max-width:1100px;}
+
+  @media (max-width:768px){
+    .layout{display:block;}
+    .sidenav{
+      position:static; width:100%; height:auto; overflow-x:auto; overflow-y:hidden;
+      border-right:none; border-bottom:1px solid var(--border); padding:10px 0;
+      white-space:nowrap;
+    }
+    .sidenav .brand{display:none;}
+    .sidenav ul{display:flex;}
+    .sidenav li a{padding:10px 14px; border-left:none; border-bottom:3px solid transparent;}
+    .sidenav li a.active{border-left-color:transparent; border-bottom-color:var(--blue);}
+    main{margin-left:0; padding:28px 18px 80px; max-width:100%;}
+  }
+
+  /* ---------- hero ---------- */
+  .hero{
+    background:linear-gradient(135deg,var(--navy) 0%,#1b3a63 100%);
+    color:#fff; padding:52px 40px; border-radius:18px; margin-bottom:44px;
+  }
+  .hero .eyebrow{font-size:12.5px; letter-spacing:.08em; opacity:.75; text-transform:uppercase; margin-bottom:10px;}
+  .hero h1{font-size:clamp(24px,4vw,34px); margin:0 0 14px; color:#fff;}
+  .hero p{font-size:16px; opacity:.92; max-width:760px; margin:0 0 8px;}
+  .hero .reader-note{
+    margin-top:22px; background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.22);
+    border-radius:12px; padding:14px 18px; font-size:14.5px;
+  }
+
+  .doc-cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:18px; margin-top:28px;}
+  .doc-card{background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.28); border-radius:12px; padding:20px;}
+  .doc-card .pages{font-size:11.5px; opacity:.75; text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px;}
+  .doc-card h3{margin:0 0 8px; font-size:17px; color:#fff;}
+  .doc-card p{font-size:13.5px; opacity:.9; margin:0;}
+  .doc-card dl{margin:12px 0 0; font-size:12.5px; border-top:1px solid rgba(255,255,255,.22); padding-top:10px;}
+  .doc-card dt{font-weight:700; opacity:.8; margin-top:8px;}
+  .doc-card dt:first-child{margin-top:0;}
+  .doc-card dd{margin:2px 0 0; opacity:.94;}
+
+  /* ---------- generic section ---------- */
+  section.block{margin-bottom:64px; scroll-margin-top:20px;}
+  section.block > h2{
+    font-size:23px; border-bottom:3px solid var(--border); padding-bottom:12px; margin-bottom:22px;
+  }
+  .lead{font-size:16.5px; color:var(--text); max-width:800px;}
+  .section-num{
+    display:inline-block; width:26px; height:26px; border-radius:50%;
+    background:var(--navy); color:#fff; text-align:center; line-height:26px;
+    font-size:13px; font-weight:700; margin-right:10px;
+  }
+
+  h3.sub{font-size:18px; margin-top:36px; margin-bottom:14px;}
+  h4.sub{font-size:15.5px; margin-top:24px; margin-bottom:10px;}
+
+  /* ---------- product theme wrappers ---------- */
+  .theme-panel{border-radius:18px; padding:32px min(5vw,40px); margin-top:6px;}
+  .theme-green{background:var(--green-bg); border:1px solid #cfe8da;}
+  .theme-green h2, .theme-green h3, .theme-green h4{color:var(--green-dark);}
+  .theme-green .accent{color:var(--green);}
+  .theme-blue{background:var(--blue-bg); border:1px solid #cfe0f7;}
+  .theme-blue h2, .theme-blue h3, .theme-blue h4{color:var(--blue-dark);}
+  .theme-blue .accent{color:var(--blue);}
+
+  .badge{
+    display:inline-block; padding:4px 12px; border-radius:999px; font-size:12px; font-weight:700;
+    background:var(--navy); color:#fff; margin-bottom:14px;
+  }
+  .theme-green .badge{background:var(--green);}
+  .theme-blue .badge{background:var(--blue);}
+
+  /* ---------- status pill (再現度バッジ) ---------- */
+  .status-pill{
+    display:inline-flex; align-items:center; gap:5px; padding:3px 11px; border-radius:999px;
+    font-size:12px; font-weight:700; white-space:nowrap; border:1px solid transparent;
+  }
+  .status-pill.status-ok{background:var(--green-bg); color:var(--green-dark); border-color:#9fd3b6;}
+  .status-pill.status-partial{background:var(--orange-bg); color:var(--orange-dark); border-color:#f0c078;}
+  .status-pill.status-no{background:var(--gray-bg); color:var(--gray-text); border-color:var(--gray-border);}
+
+  /* ---------- cards ---------- */
+  .card-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:18px; margin:20px 0;}
+  .basic-card{background:var(--white); border:1px solid var(--border); border-radius:12px; padding:20px;}
+  .basic-card h4{margin:0 0 8px; font-size:16.5px;}
+  .basic-card p{margin:0 0 8px; font-size:14.5px; color:var(--text);}
+  .basic-card ul{margin:8px 0 0; padding-left:18px; font-size:13.5px; color:var(--muted);}
+  .basic-card .icon{font-size:22px; margin-bottom:6px; display:block;}
+
+  /* ---------- callout (metaphor box) ---------- */
+  .callout{
+    background:#fffaf0; border:1px solid #f3d9a6; border-left:5px solid #e8a93a;
+    border-radius:10px; padding:16px 20px; margin:20px 0; font-size:15px;
+  }
+  .callout .callout-title{font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:8px; color:#8a5c10;}
+  .callout .callout-title .icon{font-size:18px;}
+  .callout.warn{background:#fdecec; border-color:#e6b5b5; border-left-color:#c94d4d;}
+  .callout.warn .callout-title{color:#a83a3a;}
+
+  /* ---------- term tooltip ---------- */
+  .term{
+    position:relative; border-bottom:1px dashed var(--blue); cursor:help;
+    font-weight:600; color:var(--blue-dark);
+  }
+  .term .tip{
+    display:none; position:absolute; left:50%; transform:translateX(-50%); bottom:135%;
+    width:250px; background:var(--navy); color:#fff; font-size:12.5px; font-weight:400;
+    line-height:1.6; padding:10px 12px; border-radius:8px; z-index:30;
+    box-shadow:0 8px 20px rgba(0,0,0,.25);
+  }
+  .term .tip::after{
+    content:""; position:absolute; top:100%; left:50%; transform:translateX(-50%);
+    border:6px solid transparent; border-top-color:var(--navy);
+  }
+  .term:hover .tip, .term:focus .tip{display:block;}
+
+  /* ---------- stat cards ---------- */
+  .stat-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin:22px 0;}
+  .stat-card{background:var(--white); border:1px solid var(--border); border-radius:12px; padding:18px 12px; text-align:center;}
+  .stat-card .num{font-size:24px; font-weight:800; color:var(--navy);}
+  .stat-card.green .num{color:var(--green);}
+  .stat-card.blue .num{color:var(--blue);}
+  .stat-card .label{font-size:12.5px; color:var(--muted); margin-top:6px;}
+
+  /* ---------- evidence cards (実測値カード) ---------- */
+  .evidence-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:18px; margin:20px 0;}
+  .evidence-card{background:var(--white); border:1px solid var(--border); border-radius:12px; padding:18px 20px; border-left:5px solid var(--border);}
+  .evidence-card.ev-green{border-left-color:var(--green);}
+  .evidence-card.ev-blue{border-left-color:var(--blue);}
+  .evidence-card .ev-id{font-size:11px; font-weight:700; letter-spacing:.05em; color:var(--muted); text-transform:uppercase; margin-bottom:4px;}
+  .evidence-card h5{margin:0 0 8px; font-size:15.5px; color:var(--navy); display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .evidence-card p{margin:0 0 8px; font-size:13.5px; color:var(--text);}
+  .evidence-card pre{
+    background:var(--navy); color:#d8f0e2; border-radius:8px; padding:12px 14px; font-size:12px;
+    line-height:1.7; overflow-x:auto; margin:8px 0 0;
+    font-family:ui-monospace,SFMono-Regular,"SF Mono",Consolas,Menlo,monospace;
+    white-space:pre;
+  }
+  .evidence-card.ev-blue pre{color:#dbe9fb;}
+
+  /* ---------- tables ---------- */
+  .table-wrap{overflow-x:auto; margin:18px 0; border:1px solid var(--border); border-radius:10px; background:var(--white);}
+  table{border-collapse:collapse; width:100%; min-width:480px; font-size:13.5px;}
+  th,td{padding:10px 14px; text-align:left; border-bottom:1px solid var(--border); vertical-align:top;}
+  thead th{background:var(--bg); color:var(--navy); font-weight:700; white-space:nowrap;}
+  tbody tr:last-child td{border-bottom:none;}
+  caption{caption-side:top; text-align:left; font-size:13px; color:var(--muted); padding:8px 14px 0;}
+
+  /* ---------- flow steps ---------- */
+  .flow-steps{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:18px 0;}
+  .flow-step{background:var(--white); border:1px solid var(--border); border-radius:10px; padding:10px 14px; font-size:13px; flex:1 1 160px; text-align:center;}
+  .flow-step.dest{background:var(--navy); color:#fff; border-color:var(--navy); font-weight:700;}
+  .flow-step.dest.green-dest{background:var(--green);}
+  .flow-step.dest.blue-dest{background:var(--blue);}
+  .flow-arrow{font-size:18px; color:var(--muted);}
+
+  /* ---------- glossary dictionary ---------- */
+  .dict{display:grid; grid-template-columns:1fr; gap:0; border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--white);}
+  .dict dt{background:var(--bg); font-weight:700; padding:12px 18px; color:var(--navy); font-size:14.5px; border-top:1px solid var(--border);}
+  .dict dt:first-child{border-top:none;}
+  .dict dd{margin:0; padding:10px 18px 16px; font-size:14px; color:var(--text);}
+
+  /* ---------- footer / sources ---------- */
+  .src-list{list-style:none; padding:0; margin:0;}
+  .src-list li{background:var(--white); border:1px solid var(--border); border-radius:10px; padding:14px 18px; margin-bottom:10px; font-size:14px;}
+  .src-list code{background:var(--bg); padding:1px 6px; border-radius:5px; font-size:12.5px;}
+  .disclaimer{background:var(--white); border:1px solid var(--border); border-radius:10px; padding:18px 20px; font-size:13.5px; color:var(--muted); margin-top:18px;}
+
+  footer.page-footer{margin-top:60px; padding-top:24px; border-top:1px solid var(--border); font-size:12.5px; color:var(--muted); text-align:center;}
+
+  svg text{font-family:system-ui,-apple-system,"Hiragino Sans","Yu Gothic",sans-serif;}
+  .diagram-wrap{background:var(--white); border:1px solid var(--border); border-radius:12px; padding:18px; margin:20px 0; overflow-x:auto;}
+  .diagram-caption{font-size:12.5px; color:var(--muted); text-align:center; margin-top:8px;}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidenav" aria-label="章目次">
+    <div class="brand">OSSで再現するゼロトラスト<small>ALog(SIEM) / Verona(SASE) 実機検証</small></div>
+    <ul>
+      <li><a href="#intro" data-nav>1. はじめに</a></li>
+      <li><a href="#why" data-nav>2. なぜ再現するのか</a></li>
+      <li><a href="#alog" data-nav>3. ALog再現（SIEM）</a></li>
+      <li><a href="#verona" data-nav>4. Verona再現（SASE）</a></li>
+      <li><a href="#summary" data-nav>5. まとめ</a></li>
+      <li><a href="#glossary" data-nav>6. 用語集</a></li>
+      <li><a href="#sources" data-nav>7. 出典</a></li>
+    </ul>
+  </aside>
+
+  <main>
+
+    <!-- ============ 1. HERO + はじめに ============ -->
+    <section class="block" id="intro">
+      <div class="hero">
+        <div class="eyebrow">OSS Reproduction &amp; Verification Report</div>
+        <h1>商用ゼロトラスト製品をOSSで再現できるか？</h1>
+        <p>このページは、株式会社網屋（AMIYA）の商用製品<strong>ALog</strong>（<span class="term">SIEM<span class="tip">Security Information and Event Managementの略。ログを収集・分析してセキュリティ対策に活用する仕組み・製品カテゴリ。</span></span>）と<strong>Verona</strong>（<span class="term">SASE<span class="tip">Secure Access Service Edgeの略。ネットワークとセキュリティの機能をクラウド上でまとめて提供するモデル。</span></span>）を、OSS（オープンソースソフトウェア）だけでどこまで再現できるかを検証したレポートです。仮想環境（arm64 / OrbStack / containerlab）の中に「ALog再現」「Verona再現」という2つのラボを新たに構築し、実機デプロイして機能を実際に動かした結果をまとめています。</p>
+        <p>セキュリティ製品やSIEM・SASEといった専門知識がゼロの読者でも読めるように、専門用語には<span class="term">ホバー説明<span class="tip">この点線下線の付いた語にカーソルを合わせる（スマホでは軽くタップする）と、簡単な説明が吹き出しで表示されます。</span></span>を付けています。</p>
+        <div class="reader-note">
+          <strong>この資料の使い方：</strong> 「2. なぜ再現するのか」で背景を押さえたあと、「3. ALog再現」「4. Verona再現」でそれぞれの再現スタックと実機検証結果（✅合格した項目の実測値）を確認し、「5. まとめ」で2製品を通じた再現度の全体像をつかむ、という順に読み進めると理解しやすい構成です。
+        </div>
+
+        <div class="doc-cards">
+          <div class="doc-card">
+            <div class="pages">再現ラボ①</div>
+            <h3>ALog再現</h3>
+            <p>ログを集めて異常を自動検知する国産SIEM「ALog」の中核機能をOSSで組み上げたラボ。</p>
+            <dl>
+              <dt>対応商用製品</dt><dd>ALog（網屋 / SIEM）</dd>
+              <dt>使ったOSS</dt><dd>Vector / Loki / Grafana / MinIO / Suricata / Promtail</dd>
+              <dt>結論</dt><dd>試験T-A1〜A6 全項目✅合格。収集→正規化→検知→通知→保管の中核データパイプラインを実機実証。</dd>
+            </dl>
+          </div>
+          <div class="doc-card">
+            <div class="pages">再現ラボ②</div>
+            <h3>Verona再現</h3>
+            <p>ネットワークとセキュリティをまとめて提供する国産SASE「Verona」の5大機能をOSSで組み上げたラボ。</p>
+            <dl>
+              <dt>対応商用製品</dt><dd>Verona（網屋 / SASE）</dd>
+              <dt>使ったOSS</dt><dd>OpenZiti / Squid / Blocky / Suricata / step-ca / Keycloak / Headscale</dd>
+              <dt>結論</dt><dd>試験T-V1〜V7 全項目✅合格（コア4機能＋発展3機能）。5大機能を個別OSSで組み合わせて実機実証。</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 2. なぜ再現するのか ============ -->
+    <section class="block" id="why">
+      <h2><span class="section-num">2</span>前提: なぜ再現するのか</h2>
+      <p class="lead">ALogやVeronaのような商用ゼロトラスト製品は、月額数十万円クラスのライセンス費用がかかる上、内部の実装は基本的にブラックボックスです。「なぜそのアラートが発報されるのか」「なぜこのポートは外から見えないのか」を、実際に自分の手でOSSを組み合わせて動かしてみることで、商用製品が解決している課題の本質を学ぶ。それが今回2つのラボを新設した狙いです。</p>
+
+      <div class="callout">
+        <div class="callout-title"><span class="icon">💡</span>たとえ話で理解する</div>
+        完成品の自動車を眺めているだけでは、エンジンがどう動いているかは分かりません。同じ部品（OSS）をひとつずつ組み立てて動かしてみると、「アクセルを踏むと何が起きるか」が体で理解できます。今回のラボは、ALogとVeronaという2台の「完成車」を、市販部品（OSS）だけでどこまで分解・再構築できるかに挑戦したものです。
+      </div>
+
+      <h3 class="sub">既存ラボを製品視点で統合・拡張</h3>
+      <p>今回の2ラボは、ゼロから作ったわけではありません。このリポジトリには、以前から個別の技術要素を検証した既存ラボがあり、それらを「商用製品のどの機能に対応するか」という<strong>製品視点</strong>で束ね直し、足りない機能を追加する形で構築しています。</p>
+
+      <div class="flow-steps">
+        <div class="flow-step"><strong>42_ndr_flow</strong><br><small>Loki + Promtail + Grafana + Suricata（NDR基盤）</small></div>
+        <div class="flow-arrow">＋</div>
+        <div class="flow-step"><small>Vector正規化 / 3観点検知ルール / MinIO S3保管 / Webhook通知 を追加</small></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step dest green-dest">ALog再現<br><small>SIEM機能ギャップを補完</small></div>
+      </div>
+      <div class="flow-steps">
+        <div class="flow-step"><strong>36_ztna_openziti</strong><br><small>OpenZiti（ZTNAダークサービス）</small></div>
+        <div class="flow-arrow">＋</div>
+        <div class="flow-step"><small>Squid / Blocky / Suricata-IDS / step-ca / Keycloak / Headscale を追加</small></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step dest blue-dest">Verona再現<br><small>SASE 5大機能を補完</small></div>
+      </div>
+
+      <p>つまり「42_ndr_flow＝NDR（ネットワーク検知）」を土台にログ正規化・3観点検知・長期保管・通知を足したものが<strong>ALog再現</strong>、「36_ztna_openziti＝ZTNA（ダークサービス）」を土台にSWG・FWaaS・デバイスポスチャー・IdP連携・拠点間トンネルを足したものが<strong>Verona再現</strong>です。個々の技術要素検証を、商用製品というレンズを通して一段上の視点で統合し直した、という位置づけになります。</p>
+    </section>
+
+    <!-- ============ 3. ALog再現 ============ -->
+    <section class="block" id="alog">
+      <div class="theme-panel theme-green">
+        <span class="badge">再現ラボ① SIEM</span>
+        <h2>ALog再現 — ログを集めて異常を自動検知する国産SIEM</h2>
+        <p class="lead">ALogは、ログを集めて異常を自動で見つける<span class="term">SIEM<span class="tip">Security Information and Event Management。ログを収集・分析してセキュリティ対策に活用する仕組み・製品カテゴリ。</span></span>製品です。本ラボでは、その中核機能（多様なログソース収集・翻訳変換・3観点AI検知・アラート通知・S3長期保管）を、OSSで組み上げたスタックとして再現し、OrbStack VM上で実機デプロイして動作検証しました。</p>
+
+        <h3 class="sub">再現スタック構成</h3>
+        <p>syslog（AD/サーバ/NW機器を模擬）と<span class="term">Suricata<span class="tip">オープンソースのネットワーク侵入検知/防御エンジン。パケットを解析し不正な通信パターンを検知する。</span></span>の検知ログという2系統のログ源を、それぞれ<span class="term">Vector<span class="tip">CNCFのログ・メトリクス集約ツール。VRL（Vector Remap Language）というミニ言語でログの変換・正規化ができる。</span></span>と<span class="term">Promtail<span class="tip">Grafana Loki用のログ収集エージェント。ログファイルを監視しLokiへ転送する。</span></span>経由で<span class="term">Loki<span class="tip">Grafana社が開発する軽量ログ集約システム。ログにラベルを付けて保管し、LogQLというクエリ言語で検索・集計できる。</span></span>へ集約し、<span class="term">Grafana<span class="tip">オープンソースの可視化・アラーティングツール。ダッシュボード表示や閾値ベースのアラート発報を行う。</span></span>で3観点検知とアラート通知、<span class="term">MinIO<span class="tip">S3互換のオープンソースオブジェクトストレージ。AWS S3と同じAPIでセルフホストできる。</span></span>で長期保管を担う構成です。</p>
+
+        <div class="diagram-wrap">
+          <svg viewBox="0 0 780 300" role="img" aria-label="ALog再現の構成図：syslog送信元とSuricataの2系統のログ源が、Vector/Promtail経由でLokiに集約され、MinIOへの長期保管とGrafanaでの検知・アラート通知に分岐する">
+            <rect x="20" y="30" width="150" height="56" rx="10" fill="var(--white)" stroke="var(--green)" stroke-width="2"/>
+            <text x="95" y="54" font-size="12.5" fill="var(--green-dark)" font-weight="700" text-anchor="middle">logsrc（syslog）</text>
+            <text x="95" y="72" font-size="10.5" fill="#555" text-anchor="middle">AD/サーバ/NW機器 模擬</text>
+
+            <rect x="20" y="110" width="150" height="56" rx="10" fill="var(--white)" stroke="var(--green)" stroke-width="2"/>
+            <text x="95" y="134" font-size="12.5" fill="var(--green-dark)" font-weight="700" text-anchor="middle">suricata</text>
+            <text x="95" y="152" font-size="10.5" fill="#555" text-anchor="middle">DPI検知 / eve.json</text>
+
+            <rect x="220" y="30" width="150" height="56" rx="10" fill="var(--green-bg)" stroke="var(--green)" stroke-width="2"/>
+            <text x="295" y="54" font-size="12.5" fill="var(--green-dark)" font-weight="700" text-anchor="middle">Vector</text>
+            <text x="295" y="72" font-size="10.5" fill="#555" text-anchor="middle">VRLで翻訳変換/正規化</text>
+
+            <rect x="220" y="110" width="150" height="56" rx="10" fill="var(--green-bg)" stroke="var(--green)" stroke-width="2"/>
+            <text x="295" y="134" font-size="12.5" fill="var(--green-dark)" font-weight="700" text-anchor="middle">Promtail</text>
+            <text x="295" y="152" font-size="10.5" fill="#555" text-anchor="middle">eve.json転送</text>
+
+            <rect x="420" y="70" width="140" height="56" rx="10" fill="var(--white)" stroke="var(--navy)" stroke-width="2.5"/>
+            <text x="490" y="94" font-size="13" fill="var(--navy)" font-weight="700" text-anchor="middle">Loki</text>
+            <text x="490" y="112" font-size="10.5" fill="#555" text-anchor="middle">集約・保管（job=alog/suricata）</text>
+
+            <rect x="610" y="10" width="150" height="50" rx="10" fill="var(--white)" stroke="var(--green)" stroke-width="2"/>
+            <text x="685" y="32" font-size="12.5" fill="var(--green-dark)" font-weight="700" text-anchor="middle">MinIO</text>
+            <text x="685" y="48" font-size="10" fill="#555" text-anchor="middle">S3互換・長期保管オフロード</text>
+
+            <rect x="610" y="90" width="150" height="50" rx="10" fill="var(--white)" stroke="var(--green)" stroke-width="2"/>
+            <text x="685" y="112" font-size="12.5" fill="var(--green-dark)" font-weight="700" text-anchor="middle">Grafana</text>
+            <text x="685" y="128" font-size="10" fill="#555" text-anchor="middle">3観点検知 + アラートルール</text>
+
+            <rect x="610" y="170" width="150" height="50" rx="10" fill="var(--green)" stroke="var(--green)" stroke-width="2"/>
+            <text x="685" y="192" font-size="12.5" fill="#fff" font-weight="700" text-anchor="middle">Webhook</text>
+            <text x="685" y="208" font-size="10" fill="#eaffee" text-anchor="middle">アラート通知の受信確認</text>
+
+            <line x1="170" y1="58" x2="218" y2="58" stroke="var(--green)" stroke-width="2" marker-end="url(#arrowAL)"/>
+            <line x1="170" y1="138" x2="218" y2="138" stroke="var(--green)" stroke-width="2" marker-end="url(#arrowAL)"/>
+            <line x1="370" y1="58" x2="418" y2="90" stroke="var(--green)" stroke-width="2" marker-end="url(#arrowAL)"/>
+            <line x1="370" y1="138" x2="418" y2="108" stroke="var(--green)" stroke-width="2" marker-end="url(#arrowAL)"/>
+            <line x1="560" y1="90" x2="608" y2="45" stroke="var(--green)" stroke-width="2" marker-end="url(#arrowAL)"/>
+            <line x1="560" y1="100" x2="608" y2="112" stroke="var(--green)" stroke-width="2" marker-end="url(#arrowAL)"/>
+            <line x1="685" y1="140" x2="685" y2="168" stroke="var(--green)" stroke-width="2" marker-end="url(#arrowAL)"/>
+            <defs>
+              <marker id="arrowAL" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+                <path d="M0,0 L8,4 L0,8 z" fill="var(--green)"/>
+              </marker>
+            </defs>
+          </svg>
+          <div class="diagram-caption">図：ALog再現の再現スタック。syslog系とSuricata系の2系統のログをLokiに集約し、MinIOへの長期保管とGrafanaでの3観点検知・Webhook通知に分岐する。</div>
+        </div>
+
+        <h3 class="sub">6機能の再現度</h3>
+        <p style="font-size:13.5px;color:var(--muted);">凡例（<a href="#sources">網屋ALog_OSS対応表.md</a>より）: <span class="status-pill status-ok">✅ 概ね再現</span> <span class="status-pill status-partial">△ 簡略化して再現</span> <span class="status-pill status-no">❌ 対象外</span></p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>機能</th><th>本ラボのOSS対応</th><th>再現度</th><th>簡略化ポイント</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>① 多様なログソース収集</td>
+                <td>syslog(Vector) + eve.json(Suricata/Promtail) の2系統をLokiへ集約</td>
+                <td><span class="status-pill status-partial">△</span></td>
+                <td>実機のADサーバ・NW機器は用意せず、代表的なログパターンをシミュレーション生成。ファイルサーバ/DB/クラウドのログソースは対象外</td>
+              </tr>
+              <tr>
+                <td>② 翻訳変換（特許第6501159号）</td>
+                <td>Vector VRLによる正規表現ベースの構造化変換（4パターン）</td>
+                <td><span class="status-pill status-partial">△</span></td>
+                <td>特許技術そのものは再現できない。対応パターン数もALogの全対応システムよりごく少数。データ量圧縮率（1GB→1MB→25KB相当）は未測定</td>
+              </tr>
+              <tr>
+                <td>③ AI異常検知（件数変化・値変化・新規出現）</td>
+                <td>Grafana AlertingのLogQLルール（count_over_time / unless集合演算 / 固定閾値）</td>
+                <td><span class="status-pill status-partial">△</span></td>
+                <td>AIの教師なし学習・ユーザー行動スコアリングは実装せず、固定閾値・固定時間窓のルールベース近似</td>
+              </tr>
+              <tr>
+                <td>④ アラート通知（メール/Webhook）</td>
+                <td>Grafana AlertingのWebhook contact pointのみ</td>
+                <td><span class="status-pill status-partial">△</span></td>
+                <td>メール通知は対象外。Webhook受信も簡易socatリスナーで、実運用のインシデント管理システム連携は再現しない</td>
+              </tr>
+              <tr>
+                <td>⑤ S3長期保管（オフロード機能）</td>
+                <td>LokiのchunksをMinIO(S3互換)へ配置し、compactorのretentionで自動削除</td>
+                <td><span class="status-pill status-ok">✅</span></td>
+                <td>保管期限は学習用に大幅短縮（2h）。実運用のAWS S3ではなくセルフホストMinIOを使用</td>
+              </tr>
+              <tr>
+                <td>⑥ 可視化ダッシュボード</td>
+                <td>Grafana provisioningダッシュボード（未確認アラート数相当/Top送信元IP/event種別時系列/認証失敗推移）</td>
+                <td><span class="status-pill status-ok">✅</span></td>
+                <td>パネル構成・指標はALogのキャプチャ例を参考に近似。地理的可視化（海外トラフィックの地図表示）は対象外</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="sub">実機検証結果（T-A1〜A6、全項目✅合格）</h3>
+        <p>OrbStack VM <code>clab</code>（aarch64、10コア/19GiB）に9コンテナ構成でデプロイし、2026-07-21に実測した結果です。</p>
+        <div class="evidence-grid">
+          <div class="evidence-card ev-green">
+            <div class="ev-id">T-A1 ・ 合格</div>
+            <h5>多様なログソース集約 <span class="status-pill status-ok">✅</span></h5>
+            <p>Lokiのjobラベルに <code>alog</code>（Vector/syslog）と <code>suricata</code>（Promtail/eve.json）の2系統。</p>
+            <pre>job=alog     (Vector/syslog): auth_fail / priv_exec /
+             ad_logon_fail / nw_if_down　計4 event種
+job=suricata (Promtail/eve.json): alert 536件 / flow 267件 / stats 89件</pre>
+          </div>
+          <div class="evidence-card ev-green">
+            <div class="ev-id">T-A2 ・ 合格</div>
+            <h5>翻訳変換（正規化） <span class="status-pill status-ok">✅</span></h5>
+            <p>Vector VRLが生syslogを構造化し、人間可読な日本語 <code>message_ja</code> を付与。</p>
+            <pre>[priv_exec]     alice が管理者権限(sudo)で
+                「/usr/bin/cat /etc/shadow」を実行した
+[ad_logon_fail] bob のドメインログオンが失敗した
+                （送信元 203.0.113.12）</pre>
+          </div>
+          <div class="evidence-card ev-green">
+            <div class="ev-id">T-A3 ・ 合格</div>
+            <h5>件数変化検知 <span class="status-pill status-ok">✅</span></h5>
+            <p>直近5分の認証失敗件数が閾値を超え、Grafana Alertingが発報。</p>
+            <pre>sum(count_over_time({job="alog",event="auth_fail"}[5m]))
+  = 22件（閾値10超）
+→ Grafana Alerting「件数の変化: 認証失敗の急増」= firing</pre>
+          </div>
+          <div class="evidence-card ev-green">
+            <div class="ev-id">T-A4 ・ 合格</div>
+            <h5>新規出現検知 <span class="status-pill status-ok">✅</span></h5>
+            <p>LogQL集合差（unless）で、既知IPを除外し真に新しいIPのみを抽出。</p>
+            <pre>新規出現IP: 203.0.113.201 = 1件
+（既知IP 203.0.113.10 / .11 / 198.51.100.20 /
+ 203.0.113.200 は正しく除外）</pre>
+          </div>
+          <div class="evidence-card ev-green">
+            <div class="ev-id">T-A5 ・ 合格</div>
+            <h5>アラート通知（Webhook） <span class="status-pill status-ok">✅</span></h5>
+            <p>Grafana AlertingのWebhook contact pointが3観点すべての発報をsocat受信器へ到達させた。</p>
+            <pre>"件数の変化: 認証失敗の急増"           3件
+"値の変化: イベント件数の急増"         3件
+"新規出現: 未知の送信元IPからの認証失敗" 11件</pre>
+          </div>
+          <div class="evidence-card ev-green">
+            <div class="ev-id">T-A6 ・ 合格</div>
+            <h5>MinIO長期保管（S3オフロード） <span class="status-pill status-ok">✅</span></h5>
+            <p>LokiのobjectストアをMinIOに設定し、flush強制後にchunk本体の出現を確認。</p>
+            <pre>fake/523818318b74994c/19f84c88656:...  ← ログchunk本体
+fake/624f652105daf96a/...
+（計7 chunkオブジェクト）+ index/delete_requests/ 他</pre>
+          </div>
+        </div>
+
+        <div class="callout warn">
+          <div class="callout-title"><span class="icon">⚠️</span>正直な注記</div>
+          3観点検知（件数変化・値変化・新規出現）は<strong>AIの教師なし学習ではなく、固定閾値・固定時間窓のルールベース近似</strong>です。「3観点という検知の考え方」の再現であり、ALogのAI適応能力・行動ベースラインの自動学習そのものは再現していません。リスクスコアリング・監視テンプレート・マルチノード構成・MDR運用代行・課金モデルも対象外（❌）です。
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 4. Verona再現 ============ -->
+    <section class="block" id="verona">
+      <div class="theme-panel theme-blue">
+        <span class="badge">再現ラボ② SASE</span>
+        <h2>Verona再現 — ネットワークとセキュリティをクラウドでまとめて守る国産SASE</h2>
+        <p class="lead">Veronaは、ネットワーク機能とセキュリティ機能をクラウド上でまとめて提供する<span class="term">SASE<span class="tip">Secure Access Service Edge。ネットワークとセキュリティの機能をクラウド上で統合するモデル。</span></span>製品です。本ラボでは、その5大機能（<span class="term">ZTNA<span class="tip">ゼロトラストネットワークアクセス。ユーザーや端末ごとにアクセスを検証し、必要なリソースだけへの接続を許可する仕組み。</span></span> / <span class="term">SWG<span class="tip">Secure Web Gatewayの略。URLフィルタリングやDNSセキュリティなど、Web通信を検査・制御する仕組み。</span></span> / <span class="term">FWaaS<span class="tip">Firewall as a Serviceの略。IPS/IDSなどをクラウドで提供するファイアウォール機能。</span></span> / CASB / SD-WAN）を個別OSSで組み合わせて再現し、OrbStack VM上で実機デプロイして動作検証しました。</p>
+
+        <h3 class="sub">再現スタック構成</h3>
+        <p>「SASEクラウド」（<span class="term">OpenZiti<span class="tip">オープンソースのZTNA（ゼロトラストネットワークアクセス）プラットフォーム。証明書ベースの認証で、必要な相手だけに動的に通信経路を開く。</span></span>＋Squid＋Blocky＋Suricata）、「拠点」（branch-client）、保護対象アプリ（<span class="term">ダークサービス<span class="tip">公開ポートを一切持たず、認証済みのオーバーレイ経由でのみ到達可能なサービス。外部からは存在自体が見えない。</span></span>）、そして発展機能（step-ca / Keycloak / Headscale）という4つのゾーンで構成されています。</p>
+
+        <div class="diagram-wrap">
+          <svg viewBox="0 0 780 340" role="img" aria-label="Verona再現の構成図：拠点のbranch-clientがSASEクラウドのOpenZiti/Squid/Blockyへ接続し、認証済みオーバーレイ経由でのみダークサービスのprotected-appに到達できる。SuricataがSASEクラウド全体をIDS監視し、発展機能としてstep-ca/Keycloak/Headscaleが用意される">
+            <rect x="20" y="120" width="150" height="70" rx="10" fill="var(--white)" stroke="var(--blue)" stroke-width="2"/>
+            <text x="95" y="148" font-size="12.5" fill="var(--blue-dark)" font-weight="700" text-anchor="middle">branch-client</text>
+            <text x="95" y="166" font-size="10" fill="#555" text-anchor="middle">拠点（vsase-branch）</text>
+            <text x="95" y="180" font-size="10" fill="#555" text-anchor="middle">Verona Client相当</text>
+
+            <rect x="220" y="20" width="330" height="230" rx="16" fill="var(--blue-bg)" stroke="var(--blue)" stroke-width="2.5"/>
+            <text x="385" y="40" font-size="12.5" fill="var(--blue-dark)" font-weight="700" text-anchor="middle">SASEクラウド（vsase-cloud）</text>
+
+            <rect x="240" y="52" width="130" height="46" rx="8" fill="var(--white)" stroke="var(--blue)" stroke-width="1.5"/>
+            <text x="305" y="72" font-size="11.5" fill="var(--blue-dark)" font-weight="700" text-anchor="middle">Squid</text>
+            <text x="305" y="88" font-size="9.5" fill="#555" text-anchor="middle">SWG・URLフィルタ</text>
+
+            <rect x="390" y="52" width="140" height="46" rx="8" fill="var(--white)" stroke="var(--blue)" stroke-width="1.5"/>
+            <text x="460" y="72" font-size="11.5" fill="var(--blue-dark)" font-weight="700" text-anchor="middle">Blocky</text>
+            <text x="460" y="88" font-size="9.5" fill="#555" text-anchor="middle">SWG・DNSフィルタ</text>
+
+            <rect x="240" y="112" width="130" height="46" rx="8" fill="var(--white)" stroke="var(--blue)" stroke-width="1.5"/>
+            <text x="305" y="132" font-size="11.5" fill="var(--blue-dark)" font-weight="700" text-anchor="middle">OpenZiti</text>
+            <text x="305" y="148" font-size="9.5" fill="#555" text-anchor="middle">ZTNAコントローラ</text>
+
+            <rect x="390" y="112" width="140" height="46" rx="8" fill="var(--white)" stroke="var(--blue)" stroke-width="1.5"/>
+            <text x="460" y="132" font-size="11.5" fill="var(--blue-dark)" font-weight="700" text-anchor="middle">apptun / clienttun</text>
+            <text x="460" y="148" font-size="9.5" fill="#555" text-anchor="middle">overlayトンネル終端</text>
+
+            <rect x="240" y="172" width="290" height="60" rx="8" fill="#f6faff" stroke="var(--blue)" stroke-width="1" stroke-dasharray="4 3"/>
+            <text x="385" y="188" font-size="11" fill="var(--blue-dark)" font-weight="700" text-anchor="middle">発展機能（単独起動）</text>
+            <text x="385" y="206" font-size="10" fill="#555" text-anchor="middle">step-ca（デバイスポスチャー）</text>
+            <text x="385" y="222" font-size="10" fill="#555" text-anchor="middle">Keycloak（IdP連携） / Headscale（拠点間トンネル）</text>
+
+            <rect x="610" y="120" width="150" height="70" rx="10" fill="#f4f4f4" stroke="#888" stroke-width="2" stroke-dasharray="5 4"/>
+            <text x="685" y="148" font-size="12.5" fill="#444" font-weight="700" text-anchor="middle">protected-app</text>
+            <text x="685" y="166" font-size="9.5" fill="#666" text-anchor="middle">公開ポート無し</text>
+            <text x="685" y="180" font-size="9.5" fill="#666" text-anchor="middle">＝ダークサービス（vsase-dark）</text>
+
+            <text x="385" y="270" font-size="10.5" fill="var(--blue-dark)" text-anchor="middle">Suricata（FWaaS/IDS）が vsase-br0 をhost modeで監視</text>
+
+            <line x1="170" y1="150" x2="238" y2="75" stroke="var(--blue)" stroke-width="2" marker-end="url(#arrowVE)"/>
+            <line x1="170" y1="160" x2="238" y2="135" stroke="var(--blue)" stroke-width="2" marker-end="url(#arrowVE)"/>
+            <line x1="530" y1="135" x2="608" y2="150" stroke="var(--blue)" stroke-width="2.5" marker-end="url(#arrowVE)"/>
+            <text x="565" y="145" font-size="9.5" fill="var(--blue-dark)">許可</text>
+            <path d="M170 175 C 350 300, 480 300, 608 175" fill="none" stroke="#c94d4d" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrowVEblock)"/>
+            <text x="385" y="308" font-size="10" fill="#a83a3a" text-anchor="middle">直接アクセス（到達不能・HTTP 000）</text>
+
+            <defs>
+              <marker id="arrowVE" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--blue)"/></marker>
+              <marker id="arrowVEblock" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#c94d4d"/></marker>
+            </defs>
+          </svg>
+          <div class="diagram-caption">図：Verona再現の再現スタック。branch-clientはSquid/Blockyでフィルタ検証し、OpenZiti経由の認証済みオーバーレイのみがダークサービスprotected-appに到達できる（直接アクセスは到達不能）。</div>
+        </div>
+
+        <h3 class="sub">5大機能の再現度</h3>
+        <p style="font-size:13.5px;color:var(--muted);">凡例（<a href="#sources">網屋Verona_OSS対応表.md</a>より）: <span class="status-pill status-ok">✅ 実機で成立</span> <span class="status-pill status-partial">△ 部分再現</span> <span class="status-pill status-no">❌ 対象外</span></p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Verona 5大機能</th><th>対応OSS</th><th>総合再現度</th><th>備考</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span class="term">ZTNA<span class="tip">ゼロトラストネットワークアクセス。端末やユーザーごとにアクセスを検証し、必要な範囲だけ接続を許可する仕組み。</span></span></td>
+                <td>OpenZiti（コア）+ step-ca / Keycloak（発展）</td>
+                <td><span class="status-pill status-ok">✅</span>（コア部分）/ <span class="status-pill status-partial">△</span>（ポスチャー・IDaaS連携）</td>
+                <td>ダイナミックポートコントロールは実機で成立</td>
+              </tr>
+              <tr>
+                <td>SWG（URLフィルタ・DNSセキュリティ）</td>
+                <td>Squid + Blocky</td>
+                <td><span class="status-pill status-partial">△</span></td>
+                <td>二層防御の構造は実機で成立するが、分類DB・脅威インテリジェンスは無し</td>
+              </tr>
+              <tr>
+                <td>FWaaS</td>
+                <td>Suricata（IDSモードのみ）</td>
+                <td><span class="status-pill status-partial">△</span></td>
+                <td>IDSモードのみ、IPS（インライン遮断）・アンチウイルス・アンチスパムは対象外</td>
+              </tr>
+              <tr>
+                <td>CASB</td>
+                <td>―</td>
+                <td><span class="status-pill status-no">❌</span></td>
+                <td>4,800以上のアプリケーションコントロールは完全に対象外</td>
+              </tr>
+              <tr>
+                <td>SD-WAN</td>
+                <td>Headscale + tailscale（発展）</td>
+                <td><span class="status-pill status-partial">△</span></td>
+                <td>Headscaleコーディネータ単独起動まで。拠点間の実疎通（データプレーン）は未検証</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="sub">実機検証結果（T-V1〜V7、全項目✅合格）</h3>
+        <p>コア4機能（T-V1〜V4）・発展3機能（T-V5〜V7）とも合格（計画の合格基準「コア全て＋発展1つ以上」を上回る）。2026-07-21にOrbStack VM <code>clab</code>で実測。</p>
+        <div class="evidence-grid">
+          <div class="evidence-card ev-blue">
+            <div class="ev-id">T-V1 ・ 合格 ・ ZTNA</div>
+            <h5>ダイナミックポートコントロール <span class="status-pill status-ok">✅</span></h5>
+            <p>protected-appは<span class="term">ダークサービス<span class="tip">公開ポートを持たず、認証済みオーバーレイ経由でのみ到達可能なサービス。</span></span>としてvsase-darkにのみ存在。</p>
+            <pre>[1] オーバーレイ経由 clienttun→localhost:8080→protected-app
+    : HTTP 200
+[2] 直接 clienttun→protected-app:80（到達不能が正常）
+    : HTTP 000</pre>
+          </div>
+          <div class="evidence-card ev-blue">
+            <div class="ev-id">T-V2 ・ 合格 ・ SWG</div>
+            <h5>URLフィルタ（Squid） <span class="status-pill status-ok">✅</span></h5>
+            <p>許可ドメインとブロックドメインで応答が明確に分かれることを確認。</p>
+            <pre>[1] 許可ドメイン safe.verona-lab.test 経由 squid : HTTP 200
+[2] ブロックドメイン malware.verona-lab.test 経由 squid
+    : HTTP 403</pre>
+          </div>
+          <div class="evidence-card ev-blue">
+            <div class="ev-id">T-V3 ・ 合格 ・ SWG</div>
+            <h5>DNSセキュリティ（Blocky） <span class="status-pill status-ok">✅</span></h5>
+            <p>URL層（Squid）とDNS層（Blocky）の二重防御を実機で確認。</p>
+            <pre>[3] 許可ドメイン safe.verona-lab.test
+    → 172.60.10.13（正引き成功）
+[4] ブロックドメイン malware.verona-lab.test
+    → 0.0.0.0（denylistでシンクホール）</pre>
+          </div>
+          <div class="evidence-card ev-blue">
+            <div class="ev-id">T-V4 ・ 合格 ・ FWaaS</div>
+            <h5>IPS/IDS（Suricata） <span class="status-pill status-ok">✅</span></h5>
+            <p>SASEクラウドの結節点（vsase-br0）をhost modeで監視し、偵察行為を検知。</p>
+            <pre>signature: "VERONA-IDS recon SYN scan toward
+            SASE cloud chokepoint" (sid:2000001)
+src 172.60.10.21 → dest 172.60.10.11</pre>
+          </div>
+          <div class="evidence-card ev-blue">
+            <div class="ev-id">T-V5 ・ 合格 ・ 発展</div>
+            <h5><span class="term">デバイスポスチャー<span class="tip">接続前に端末のセキュリティ状態（証明書・OS種別・EDR稼働状況など）を自動チェックする機能。</span></span>（step-ca） <span class="status-pill status-ok">✅</span></h5>
+            <p>証明書なし端末を拒否し、step-ca発行証明書＋擬似EDRを満たす端末のみ許可。</p>
+            <pre>[A拒否] 証明書なし → NG: クライアント証明書が
+        見つかりません → 判定: NG（接続拒否）
+[B許可] step-ca発行証明書 + EDR2.5 → [1]証明書OK
+        [2]OS OK [3]EDR2.5>=2.0 → 判定: OK（接続許可）</pre>
+          </div>
+          <div class="evidence-card ev-blue">
+            <div class="ev-id">T-V6 ・ 合格 ・ 発展</div>
+            <h5><span class="term">IdP<span class="tip">Identity Provider。ユーザー認証・IDを一元管理し、OIDCなどの標準プロトコルで各サービスへ認証情報を提供する仕組み。</span></span>連携（Keycloak） <span class="status-pill status-ok">✅</span></h5>
+            <p>Keycloakでveronaレルムを作成し、<span class="term">OIDC<span class="tip">OpenID Connect。OAuth 2.0を拡張した認証プロトコル。IdPがユーザー認証結果をトークンとして発行する標準規格。</span></span> discoveryが正常応答。</p>
+            <pre>kcadmで verona レルム＋OIDCクライアント
+verona-sase を作成
+OIDC discovery: HTTP 200
+  issuer / token_endpoint / grant_types 応答</pre>
+          </div>
+          <div class="evidence-card ev-blue">
+            <div class="ev-id">T-V7 ・ 合格 ・ 発展</div>
+            <h5>拠点間トンネル制御（Headscale＝SD-WAN相当） <span class="status-pill status-ok">✅</span></h5>
+            <p>WireGuardメッシュ制御プレーンが起動し、拠点用のpreauthキーを発行。</p>
+            <pre>Headscale v0.29.2 起動（埋め込みDERPリージョン）
+health=200
+拠点ユーザー branch-site 作成
+preauthキー発行: hskey-auth-O_NqE...</pre>
+          </div>
+        </div>
+
+        <div class="callout warn">
+          <div class="callout-title"><span class="icon">⚠️</span>正直な注記</div>
+          T-V5のデバイスポスチャーは、osqueryがarm64非対応のため<strong>証明書有無・OS種別・擬似EDRバージョンの3点チェックに簡略化したモック</strong>です（ただし証明書自体は実際にstep-caが発行）。IdP連携（T-V6）とトンネル制御（T-V7）は各コンポーネントの<strong>起動・基盤動作までを実証したもので、完全な相互連携</strong>（証明書認証×IdaaS SSOの完全連携、拠点間の実データプレーン疎通）は次段階です。CASBは完全に対象外（❌）です。
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 5. まとめ ============ -->
+    <section class="block" id="summary">
+      <h2><span class="section-num">5</span>まとめ: 再現できたこと・できなかったこと</h2>
+      <p class="lead">2つのラボを通じて分かったのは、「<strong>中核データパイプライン</strong>」と「<strong>ゼロトラストの核心となる仕組み</strong>」はOSSで実機再現できる、という点です。一方で、商用製品ならではの運用の作り込みや大規模化・完全自動化の部分は、再現の対象外としています。誇張せず、両方をそのまま並べて示します。</p>
+
+      <div class="stat-grid">
+        <div class="stat-card green"><div class="num">T-A1〜A6</div><div class="label">ALog再現：試験6項目 全✅合格</div></div>
+        <div class="stat-card blue"><div class="num">T-V1〜V7</div><div class="label">Verona再現：試験7項目 全✅合格</div></div>
+      </div>
+
+      <h3 class="sub accent">ALog（SIEM）機能別の再現度一覧</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ALogの商用機能</th><th>本ラボのOSS対応</th><th>再現度</th></tr></thead>
+          <tbody>
+            <tr><td>対応ログソース（AD/サーバ/NW機器/クラウド等）</td><td>syslog(Vector) + eve.json(Suricata)</td><td><span class="status-pill status-partial">△ 簡略</span></td></tr>
+            <tr><td>自動ログ解析・翻訳変換（特許技術）</td><td>Vector VRLによる正規表現ベース変換</td><td><span class="status-pill status-partial">△ 簡略</span></td></tr>
+            <tr><td>AI検知・分析（件数変化・値変化・新規出現）</td><td>Grafana AlertingのLogQLルール</td><td><span class="status-pill status-partial">△ 簡略</span></td></tr>
+            <tr><td>リスクスコアリング（ユーザー単位のランキング）</td><td>未実装</td><td><span class="status-pill status-no">❌ 対象外</span></td></tr>
+            <tr><td>検索・分析画面（時系列・ドリルダウン）</td><td>GrafanaのExplore + ダッシュボード</td><td><span class="status-pill status-ok">✅ 完全</span></td></tr>
+            <tr><td>監視テンプレート（Azure AD/M365等）</td><td>未実装（固定3ルールのみ）</td><td><span class="status-pill status-no">❌ 対象外</span></td></tr>
+            <tr><td>アラート通知（メール/Webhook）</td><td>Grafana AlertingのWebhookのみ</td><td><span class="status-pill status-partial">△ 簡略</span></td></tr>
+            <tr><td>可視化パネル・ダッシュボード</td><td>Grafana provisioningダッシュボード</td><td><span class="status-pill status-ok">✅ 完全</span></td></tr>
+            <tr><td>マルチノード構成（スケールアウト/HA）</td><td>未実装（単一プロセス構成）</td><td><span class="status-pill status-no">❌ 対象外</span></td></tr>
+            <tr><td>アクセスログのオフロード機能（S3自動移行）</td><td>LokiのchunksをMinIOへ配置</td><td><span class="status-pill status-ok">✅ 完全</span></td></tr>
+            <tr><td>ALog MDRサービス（運用代行）</td><td>対象外</td><td><span class="status-pill status-no">❌ 対象外</span></td></tr>
+            <tr><td>ライセンス体系・データ圧縮課金</td><td>対象外</td><td><span class="status-pill status-no">❌ 対象外</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub accent">Verona（SASE）機能別の再現度一覧</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Verona機能</th><th>分類</th><th>本ラボのOSS対応</th><th>再現度</th></tr></thead>
+          <tbody>
+            <tr><td>ダイナミックポートコントロール</td><td>ZTNA</td><td>OpenZiti</td><td><span class="status-pill status-ok">✅ 完全</span></td></tr>
+            <tr><td>証明書単位のゼロトラストアクセス</td><td>ZTNA</td><td>OpenZiti identity/service-policy</td><td><span class="status-pill status-ok">✅ 完全</span></td></tr>
+            <tr><td>デバイスポスチャー</td><td>ZTNA</td><td>step-ca + check_posture.sh</td><td><span class="status-pill status-partial">△ 簡略</span></td></tr>
+            <tr><td>起動強制／接続時間制御</td><td>ZTNA</td><td>―</td><td><span class="status-pill status-no">❌ 対象外</span></td></tr>
+            <tr><td>証明書×IDaaSの2要素・SSO</td><td>ZTNA</td><td>Keycloak（発展）</td><td><span class="status-pill status-partial">△ 簡略</span></td></tr>
+            <tr><td>URLフィルタリング（91カテゴリ）</td><td>SWG</td><td>Squid（dstdomain ACL）</td><td><span class="status-pill status-partial">△ 簡略</span></td></tr>
+            <tr><td>DNSセキュリティ</td><td>SWG</td><td>Blocky（denylist/zeroIp）</td><td><span class="status-pill status-partial">△ 簡略</span></td></tr>
+            <tr><td>DNSトンネリング対策／ローカルブレイクアウト</td><td>SWG</td><td>―</td><td><span class="status-pill status-no">❌ 対象外</span></td></tr>
+            <tr><td>IPS/IDS（不正アクセス検知）</td><td>FWaaS</td><td>Suricata（IDSモード）</td><td><span class="status-pill status-partial">△ 簡略</span></td></tr>
+            <tr><td>アンチウイルス／アンチスパム</td><td>FWaaS</td><td>―</td><td><span class="status-pill status-no">❌ 対象外</span></td></tr>
+            <tr><td>IDaaSユーザ同期・プロビジョニング</td><td>IDaaS連携</td><td>Keycloak（発展）</td><td><span class="status-pill status-partial">△ 簡略</span></td></tr>
+            <tr><td>拠点間の安全なプライベートアクセス</td><td>SD-WAN</td><td>Headscale + tailscale（発展）</td><td><span class="status-pill status-partial">△ 簡略</span></td></tr>
+            <tr><td>WAN冗長化／IaaS接続／10G・5G回線対応</td><td>SD-WAN</td><td>―</td><td><span class="status-pill status-no">❌ 対象外</span></td></tr>
+            <tr><td>アプリケーションコントロール（4,800+）</td><td>CASB</td><td>―</td><td><span class="status-pill status-no">❌ 対象外</span></td></tr>
+            <tr><td>Cloud Console（一元管理画面）</td><td>Cloud Console</td><td>―</td><td><span class="status-pill status-no">❌ 対象外</span></td></tr>
+            <tr><td>各種ログ出力（トラフィック/Webフィルタ/DNS等）</td><td>Cloud Console</td><td>Suricata/Squid/Blockyの個別ログ</td><td><span class="status-pill status-partial">△ 簡略</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout">
+        <div class="callout-title"><span class="icon">✅</span>誠実な結論</div>
+        <strong>再現できたこと：</strong> ALogの中核データパイプライン（収集→正規化→検知→通知→保管）、Veronaのゼロトラストの核心（ダイナミックポートコントロール＝ダークサービス、URL/DNSの二層防御、IDS検知）は、いずれもOSSの組み合わせで実機実証できました。<br><br>
+        <strong>再現の対象外としたこと：</strong> フルマネージド運用（MDR/CASB相当の商用運用代行）、AIの教師なし学習・行動ベースラインの自動適応、91カテゴリ/4,800+アプリの商用URL・アプリ分類フィード、マルチノードによる大規模分散構成は、いずれも本ラボのスコープ外です。「考え方の再現」と「商用グレードの完成度」は別物であることを、正直に切り分けています。
+      </div>
+    </section>
+
+    <!-- ============ 6. 用語集 ============ -->
+    <section class="block" id="glossary">
+      <h2><span class="section-num">6</span>用語集</h2>
+      <p class="lead">ここまでに登場した専門用語を辞書形式でまとめました。</p>
+      <dl class="dict">
+        <dt>SIEM（シーム）</dt>
+        <dd>Security Information and Event Managementの略。さまざまなシステムのログを収集・分析し、セキュリティ対策に活用する仕組み・製品カテゴリ。ALogはこの分野の国産製品。</dd>
+
+        <dt>SASE（サシー）</dt>
+        <dd>Secure Access Service Edgeの略。ネットワーク機能とセキュリティ機能をクラウド上で統合して提供するモデル。Veronaはこの分野のフルマネージド製品。</dd>
+
+        <dt>ZTNA</dt>
+        <dd>ゼロトラストネットワークアクセス。ユーザーや端末ごとにアクセスを検証し、必要なリソースだけへの接続を許可する仕組み。本ラボではOpenZitiで再現。</dd>
+
+        <dt>SWG（Secure Web Gateway）</dt>
+        <dd>URLフィルタリング（危険なWebサイトへのアクセス遮断）やDNSセキュリティ（DNSレイヤーでの通信チェック）など、Web通信を検査・制御する機能区分。本ラボではSquid（URL）とBlocky（DNS）の二層で再現。</dd>
+
+        <dt>FWaaS（Firewall as a Service）</dt>
+        <dd>IPS/IDS、アンチウイルス、アンチスパムなどをクラウドで提供するファイアウォール機能。本ラボはSuricataによるIDS（検知のみ）で再現。</dd>
+
+        <dt>IDS / IPS</dt>
+        <dd>通信パケットを監視し、ネットワークへの不正アクセスを検知する仕組みがIDS（侵入検知システム）、検知した通信を自動遮断するのがIPS（侵入防止システム）。本ラボはSuricataでIDSモードのみを再現し、IPSのインライン遮断は対象外。</dd>
+
+        <dt>デバイスポスチャー機能</dt>
+        <dd>接続前に端末のセキュリティ状態（証明書の有無、OS種別、EDRの稼働状況など）を自動チェックする機能。本ラボはstep-ca発行の証明書＋擬似EDRチェックのモックで再現。</dd>
+
+        <dt>IdP（Identity Provider）</dt>
+        <dd>ユーザー認証・IDを一元管理し、他のサービスへ認証結果を提供する仕組み。本ラボではKeycloakを利用。</dd>
+
+        <dt>OIDC（OpenID Connect）</dt>
+        <dd>OAuth 2.0を拡張した認証プロトコル。IdPがユーザー認証結果をトークンとして発行する標準規格。本ラボではKeycloakのOIDC discoveryエンドポイントの応答を確認。</dd>
+
+        <dt>SD-WAN</dt>
+        <dd>拠点間の通信を効率よく制御・最適化するネットワーク技術。回線の冗長化やクラウド接続の最適化を含む。本ラボはHeadscale（WireGuardメッシュの制御プレーン）で拠点管理の基盤動作を再現。</dd>
+
+        <dt>ダークサービス</dt>
+        <dd>公開ポートを一切持たず、認証済みのオーバーレイ経由でのみ到達可能なサービス。外部から見ると存在自体が認識できない。Veronaの「ダイナミックポートコントロール」の考え方の核心。</dd>
+
+        <dt>ローカルブレイクアウト</dt>
+        <dd>特定のクラウドサービスへの通信を本社経由にせず、拠点から直接インターネットへ接続させる方式。回線負荷の軽減や速度向上に寄与する（本ラボでは対象外）。</dd>
+
+        <dt>CASB（Cloud Access Security Broker）</dt>
+        <dd>クラウドサービス（アプリケーション）の利用状況を可視化・制御する仕組み。本ラボでは対応するOSSの実装コストが高く、完全に対象外とした。</dd>
+
+        <dt>LogQL</dt>
+        <dd>Grafana Lokiのログクエリ言語。count_over_time（時間窓内の件数集計）やunless（集合差演算）などを使い、3観点検知のルールを表現する。</dd>
+
+        <dt>VRL（Vector Remap Language）</dt>
+        <dd>Vectorが提供するログ変換用のミニ言語。生ログから構造化フィールドを抽出し、人間可読なメッセージを付与する変換（本ラボでの「翻訳変換」の再現）に使用。</dd>
+
+        <dt>S3互換ストレージ</dt>
+        <dd>Amazon S3と同じAPI仕様で操作できるオブジェクトストレージ。本ラボではMinIOをセルフホストし、Lokiのログchunkのオフロード先として使用。</dd>
+
+        <dt>WireGuard</dt>
+        <dd>高速・軽量な暗号化VPNプロトコル。Headscaleはこのプロトコルのメッシュネットワークを制御するオープンソースのコーディネータ。</dd>
+
+        <dt>preauthキー</dt>
+        <dd>WireGuardメッシュ（Headscale/Tailscale）に端末を事前認証で参加させるための使い捨てトークン。拠点の初期登録に使う。</dd>
+
+        <dt>オーバーレイネットワーク</dt>
+        <dd>物理ネットワークの上に論理的に構築される仮想的な通信経路。OpenZitiやWireGuardメッシュは、認証済みの相手同士だけがオーバーレイ経由で通信できる。</dd>
+
+        <dt>DNSシンクホール</dt>
+        <dd>危険な/禁止されたドメインへのDNS問い合わせに対し、実在しないアドレス（0.0.0.0など）を返して通信を無効化する手法。本ラボではBlockyのzeroIp設定で再現。</dd>
+
+        <dt>ルールベース近似</dt>
+        <dd>AIの学習・適応能力の代わりに、固定の閾値・時間窓を使ったクエリ（LogQL等）で異常検知の「考え方」だけを再現する手法。本ラボの3観点検知はこれにあたる。</dd>
+      </dl>
+    </section>
+
+    <!-- ============ 7. 出典 ============ -->
+    <section class="block" id="sources">
+      <h2><span class="section-num">7</span>出典</h2>
+      <p class="lead">本ページの実測値・再現度は、以下のラボ内ドキュメントに基づいています。すべて同一環境・同一日の実機検証結果です。</p>
+      <ul class="src-list">
+        <li><strong>ALog再現ラボ</strong> — <code>ALog再現/</code>（README_Lab_Challenge.md / 02_基本設計/網屋ALog_OSS対応表.md / 05_試験/試験結果_2026-07-21.md）</li>
+        <li><strong>Verona再現ラボ</strong> — <code>Verona再現/</code>（README_Lab_Challenge.md / 02_基本設計/網屋Verona_OSS対応表.md / 05_試験/試験結果_2026-07-21.md）</li>
+      </ul>
+      <h3 class="sub">使用OSS一覧とバージョン</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ラボ</th><th>使用OSS（実測イメージ）</th></tr></thead>
+          <tbody>
+            <tr><td>ALog再現</td><td>grafana/loki、grafana/promtail、grafana/grafana:13.1.0、jasonish/suricata、timberio/vector:0.57.0-alpine、minio/minio、wbitt/network-multitool</td></tr>
+            <tr><td>Verona再現</td><td>openziti/ziti-cli、jasonish/suricata、ubuntu/squid、ghcr.io/0xerr0r/blocky v0.33.0、smallstep/step-ca、quay.io/keycloak/keycloak 26.7.0、headscale/headscale v0.29.2、nginx:alpine、wbitt/network-multitool</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="disclaimer">
+        実機検証日は<strong>2026-07-21</strong>、実行環境は<strong>arm64（aarch64）OrbStack VM <code>clab</code></strong>（10コア/19GiB、docker 29.1.3）です。すべてのイメージをarm64ネイティブで実測しており、エミュレーションは使用していません。本ページは学習用の要約であり、正確な仕様・再現範囲の詳細は上記の各ラボ内ドキュメント（試験結果・OSS対応表・README）を参照してください。
+      </div>
+    </section>
+
+    <footer class="page-footer">
+      OSSで再現するゼロトラスト — ALog(SIEM) / Verona(SASE) 実機検証 学習用まとめページ
+    </footer>
+
+  </main>
+</div>
+
+<script>
+  (function(){
+    "use strict";
+    var navLinks = Array.prototype.slice.call(document.querySelectorAll('.sidenav a[data-nav]'));
+    var sections = navLinks.map(function(link){
+      return document.getElementById(link.getAttribute('href').slice(1));
+    }).filter(Boolean);
+
+    navLinks.forEach(function(link){
+      link.addEventListener('click', function(e){
+        var id = link.getAttribute('href').slice(1);
+        var target = document.getElementById(id);
+        if(target){
+          e.preventDefault();
+          target.scrollIntoView({behavior:'smooth', block:'start'});
+          history.pushState(null, '', '#' + id);
+        }
+      });
+    });
+
+    function setActive(id){
+      navLinks.forEach(function(link){
+        link.classList.toggle('active', link.getAttribute('href') === '#' + id);
+      });
+    }
+
+    if('IntersectionObserver' in window){
+      var observer = new IntersectionObserver(function(entries){
+        var visible = entries.filter(function(en){ return en.isIntersecting; });
+        if(visible.length > 0){
+          visible.sort(function(a,b){ return b.intersectionRatio - a.intersectionRatio; });
+          setActive(visible[0].target.id);
+        }
+      }, {rootMargin:'-15% 0px -60% 0px', threshold:[0, 0.1, 0.25, 0.5, 0.75, 1]});
+
+      sections.forEach(function(sec){ observer.observe(sec); });
+    }
+
+    if(sections.length){ setActive(sections[0].id); }
+  })();
+</script>
+</body>
+</html>
